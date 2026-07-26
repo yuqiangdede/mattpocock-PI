@@ -1,6 +1,19 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+
+const devScriptUrl = new URL(
+  "../../../scripts/dev-electron.mjs",
+  import.meta.url,
+);
 
 const mainSource = await readFile(
   new URL("../electron/main/index.ts", import.meta.url),
@@ -10,11 +23,18 @@ const iconScriptSource = await readFile(
   new URL("../../../scripts/make-icon.py", import.meta.url),
   "utf8",
 );
+const devScriptSource = await readFile(
+  devScriptUrl,
+  "utf8",
+);
+const packageJson = JSON.parse(
+  await readFile(new URL("../package.json", import.meta.url), "utf8"),
+);
 
 test("macOS development uses the canonical PI-Desktop Dock icon", () => {
   assert.match(
     mainSource,
-    /process\.platform !== "darwin" \|\| app\.isPackaged \|\| !app\.dock/,
+    /process\.platform !== "darwin" \|\| !isDevelopmentBuild \|\| !app\.dock/,
   );
   assert.match(
     mainSource,
@@ -37,3 +57,90 @@ test("macOS icon derivation preserves the canonical renderer asset", () => {
     /\.save\(BUILD \/ "icon_1024\.png"\)/,
   );
 });
+
+test("macOS development launches from a branded host bundle", () => {
+  assert.equal(packageJson.scripts.dev, "node ../../scripts/dev-electron.mjs");
+  assert.match(devScriptSource, /process\.platform === "darwin"/);
+  assert.match(devScriptSource, /PI_DESKTOP_DEV: "1"/);
+  assert.match(devScriptSource, /ELECTRON_EXEC_PATH/);
+  assert.match(devScriptSource, /CFBundleDisplayName", APP_NAME/);
+  assert.match(devScriptSource, /CFBundleName", APP_NAME/);
+  assert.match(devScriptSource, /CFBundleExecutable", APP_NAME/);
+  assert.match(devScriptSource, /CFBundleIconFile", "icon\.icns"/);
+  assert.match(
+    devScriptSource,
+    /copyFileSync\(iconPath, join\(resources, "icon\.icns"\)\)/,
+  );
+  assert.match(devScriptSource, /verbatimSymlinks: true/);
+  assert.match(devScriptSource, /join\(ROOT, "\.cache", "electron-dev"\)/);
+  assert.doesNotMatch(devScriptSource, /node_modules.*Info\.plist/);
+});
+
+test(
+  "development launcher can be imported without starting Electron",
+  async () => {
+    const launcher = await import(devScriptUrl.href);
+    assert.equal(typeof launcher.prepareMacDevelopmentBundle, "function");
+  },
+);
+
+test(
+  "macOS development bundle rewrites native identity and reuses its cache",
+  { skip: process.platform !== "darwin" },
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi-desktop-dev-bundle-"));
+    const sourceBundle = join(root, "Electron.app");
+    const contents = join(sourceBundle, "Contents");
+    const macos = join(contents, "MacOS");
+    const resources = join(contents, "Resources");
+    const executable = join(macos, "Electron");
+    const iconPath = join(root, "source.icns");
+    const cacheRoot = join(root, "cache");
+
+    try {
+      await mkdir(macos, { recursive: true });
+      await mkdir(resources, { recursive: true });
+      await writeFile(executable, "electron-host");
+      await writeFile(iconPath, "canonical-icon");
+      await writeFile(
+        join(contents, "Info.plist"),
+        `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleDisplayName</key><string>Electron</string>
+<key>CFBundleName</key><string>Electron</string>
+<key>CFBundleExecutable</key><string>Electron</string>
+<key>CFBundleIdentifier</key><string>com.github.Electron</string>
+<key>CFBundleIconFile</key><string>electron.icns</string>
+</dict></plist>`,
+      );
+
+      const { prepareMacDevelopmentBundle } = await import(devScriptUrl.href);
+      const options = {
+        electronExecutable: executable,
+        electronVersion: "test-version",
+        iconPath,
+        cacheRoot,
+        sign: false,
+      };
+      const brandedExecutable = prepareMacDevelopmentBundle(options);
+      const brandedContents = join(
+        brandedExecutable,
+        "..",
+        "..",
+      );
+      const plist = await readFile(join(brandedContents, "Info.plist"), "utf8");
+
+      assert.equal(await readFile(brandedExecutable, "utf8"), "electron-host");
+      assert.equal(
+        await readFile(join(brandedContents, "Resources", "icon.icns"), "utf8"),
+        "canonical-icon",
+      );
+      assert.match(plist, /<string>PI-Desktop<\/string>/);
+      assert.match(plist, /<string>com\.pi-desktop\.app\.dev<\/string>/);
+      assert.equal(prepareMacDevelopmentBundle(options), brandedExecutable);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);
