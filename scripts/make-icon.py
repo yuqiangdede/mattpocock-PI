@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Derive PI-Desktop macOS icon resources from the canonical logo.
+"""Derive PI-Desktop platform icon resources from the canonical logo.
 
 The tracked ``apps/desktop/build/icon_1024.png`` file is the brand source of
 truth. This script preserves that file and emits:
 
   apps/desktop/build/icon.iconset/  - all macOS iconset sizes
   apps/desktop/build/icon.icns      - via `iconutil` (macOS only)
-  apps/desktop/build/icon_1024.png  - master render for reuse
+  apps/desktop/build/icon.png       - 512px Windows/Linux package icon
 
 Run: python3 scripts/make-icon.py
 """
@@ -38,6 +38,8 @@ def main() -> None:
         )
 
     BUILD.mkdir(parents=True, exist_ok=True)
+    package_icon = BUILD / "icon.png"
+    master.resize((512, 512), Image.LANCZOS).save(package_icon)
 
     iconset = BUILD / "icon.iconset"
     if iconset.exists():
@@ -50,11 +52,19 @@ def main() -> None:
             iconset / f"icon_{sz}x{sz}@2x.png"
         )
 
+    iconutil = shutil.which("iconutil")
+    if iconutil is None:
+        print(f"used {SOURCE}")
+        print(f"wrote {package_icon}")
+        print("skipped icon.icns (iconutil is unavailable)")
+        return
+
     icns = BUILD / "icon.icns"
     subprocess.run(
-        ["iconutil", "-c", "icns", str(iconset), "-o", str(icns)], check=True
+        [iconutil, "-c", "icns", str(iconset), "-o", str(icns)], check=True
     )
     print(f"used {SOURCE}")
+    print(f"wrote {package_icon}")
     print(f"wrote {icns}")
 
 
