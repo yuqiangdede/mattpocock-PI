@@ -16,6 +16,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync, readFileSync, mkdirSync
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { PROTOCOL_VERSION } from "../packages/shared/dist/protocol.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
@@ -38,6 +39,11 @@ const results = [];
 function record(id, ok, detail = "") {
   results.push({ id, ok, detail });
   console.log(`${ok ? "PASS" : "FAIL"} ${id}${detail ? " — " + detail : ""}`);
+}
+
+function skip(id, detail) {
+  results.push({ id, ok: true, skipped: true, detail });
+  console.log(`SKIP ${id} — ${detail}`);
 }
 
 class Host {
@@ -96,14 +102,19 @@ async function main() {
   const host = new Host(hostBin, dataDir);
   try {
     // E2E-003 host health / handshake
-    const hs = await host.call("app.handshake", { protocolVersion: 4 });
+    const hs = await host.call("app.handshake", {
+      protocolVersion: PROTOCOL_VERSION,
+    });
     record(
       "E2E-003-handshake",
-      hs.protocolVersion === 4,
+      hs.protocolVersion === PROTOCOL_VERSION,
       `v=${hs.protocolVersion}`,
     );
     const health = await host.call("app.health");
     record("E2E-003-health", health.ok === true, `uptime=${health.uptimeMs}`);
+
+    const sample = join(root, "examples/fixtures/sample-project");
+    await host.call("workspace.set", { path: sample });
 
     // provider + secret
     const created = await host.call("providers.create", {
@@ -134,6 +145,7 @@ async function main() {
       mode: "agent",
       providerId: created.provider.id,
       modelId: MODEL,
+      projectPath: sample,
     });
     await host.call("session.appendMessage", {
       sessionId: session.session.id,
@@ -204,8 +216,6 @@ async function main() {
     );
 
     // workspace + tools
-    const sample = join(root, "examples/fixtures/sample-project");
-    await host.call("workspace.set", { path: sample });
     const read = await host.call("tools.execute", {
       sessionId: session.session.id,
       toolCallId: randomUUID(),
@@ -363,8 +373,8 @@ async function main() {
         `bytes=${text.length}`,
       );
     } else {
-      record("E2E-008-live-model", false, "PI_DESKTOP_TEST_API_KEY not set");
-      record("E2E-009-stream", false, "skipped");
+      skip("E2E-008-live-model", "PI_DESKTOP_TEST_API_KEY not set");
+      skip("E2E-009-stream", "PI_DESKTOP_TEST_API_KEY not set");
     }
 
     // agent-runtime unit-ish import check
@@ -382,7 +392,17 @@ async function main() {
   }
 
   const failed = results.filter((r) => !r.ok);
-  console.log("\nSummary:", results.length - failed.length, "/", results.length, "passed");
+  const skipped = results.filter((r) => r.skipped);
+  const executed = results.length - skipped.length;
+  console.log(
+    "\nSummary:",
+    executed - failed.length,
+    "/",
+    executed,
+    "passed;",
+    skipped.length,
+    "skipped",
+  );
   if (failed.length) {
     process.exitCode = 1;
   }
