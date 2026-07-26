@@ -30,7 +30,7 @@ import type {
 } from "@pi-desktop/shared";
 import type { HostClient } from "./host-client.js";
 import { classifyAgentError } from "./agent-errors.js";
-import { clampThinkingLevel } from "./thinking-level.js";
+import { clampThinkingLevel, type ModelWireCompat } from "./thinking-level.js";
 
 
 function usageFromPi(usage: Usage | undefined | null): MessageUsage | undefined {
@@ -78,6 +78,10 @@ export type RuntimeProviderConfig = {
   maxOutputTokens?: number;
   /** Sampling temperature override; omitted keeps the provider default. */
   temperature?: number;
+  /** Wire-dialect hints resolved from the pi-ai catalog by the main process
+   * (the sidecar never loads the catalog). Controls how thinking on/off is
+   * expressed on custom OpenAI-compatible endpoints. */
+  modelCompat?: ModelWireCompat;
 };
 
 const DEFAULT_CONTEXT_WINDOW = 128_000;
@@ -413,6 +417,8 @@ export class DesktopAgentRuntime {
       (this.provider.temperature ?? null) === (provider.temperature ?? null) &&
       this.provider.supportsReasoning === provider.supportsReasoning &&
       currentThinkingLevels === nextThinkingLevels &&
+      safeJson(this.provider.modelCompat ?? null) ===
+        safeJson(provider.modelCompat ?? null) &&
       this.thinkingLevel === clampThinkingLevel(provider, thinkingLevel) &&
       current === next
     );
@@ -508,13 +514,25 @@ export class DesktopAgentRuntime {
   }
 
   private buildModel(): Model<Api> {
-    const thinkingLevelMap: Partial<Record<ThinkingLevel, string | null>> = {};
+    const wire = this.provider.modelCompat;
+    // Seed with catalog wire values so "off" emits an explicit disable —
+    // e.g. off -> "none" (gpt-5.1-style reasoning_effort) — instead of no
+    // parameter, which leaves default-on reasoners thinking.
+    const thinkingLevelMap: Partial<Record<ThinkingLevel, string | null>> = {
+      ...(wire?.thinkingLevelMap ?? {}),
+    };
+    const supported = this.provider.supportedThinkingLevels ?? ["off"];
     for (const level of THINKING_LEVELS) {
-      if (!(this.provider.supportedThinkingLevels ?? ["off"]).includes(level)) {
+      if (!supported.includes(level)) {
         thinkingLevelMap[level] = null;
       } else if (level === "xhigh" || level === "max") {
         // pi-ai requires extended levels to be explicitly opted into.
-        thinkingLevelMap[level] = level;
+        if (typeof thinkingLevelMap[level] !== "string") {
+          thinkingLevelMap[level] = level;
+        }
+      } else if (thinkingLevelMap[level] === null) {
+        // The provider's declared support wins over a catalog null.
+        delete thinkingLevelMap[level];
       }
     }
 
@@ -532,8 +550,10 @@ export class DesktopAgentRuntime {
       contextWindow: this.provider.contextWindow || DEFAULT_CONTEXT_WINDOW,
       maxTokens: this.provider.maxOutputTokens || DEFAULT_MAX_TOKENS,
       ...(binding.api === "openai-completions"
-        ? { compat: { supportsDeveloperRole: false } }
-        : {}),
+        ? { compat: { ...(wire?.compat ?? {}), supportsDeveloperRole: false } }
+        : wire?.compat
+          ? { compat: { ...wire.compat } }
+          : {}),
     } as Model<Api>;
   }
 

@@ -37,6 +37,7 @@ import {
 } from "@pi-desktop/shared";
 import {
   clampThinkingLevel,
+  resolveModelWireCompat,
   resolveThinkingCapabilities,
   type ThinkingCapabilities,
 } from "@pi-desktop/agent-runtime";
@@ -2743,6 +2744,18 @@ function registerIpc() {
       thinkingCapabilities,
       normalizeThinkingLevel(session.thinkingLevel),
     );
+    // Wire-dialect hints from the pi-ai catalog (exact or alias-suffix model
+    // id match). Without them, thinking "off" emits no request parameter on
+    // custom OpenAI-compatible endpoints and default-on reasoners (e.g.
+    // MiMo *-think) keep thinking. Resolved here because the sidecar never
+    // loads the catalog.
+    const modelCompat = thinkingCapabilities.supportsReasoning
+      ? resolveModelWireCompat({
+          vendorKey: provider.vendorKey || "custom",
+          modelId,
+          apiStyle: provider.apiStyle,
+        })
+      : undefined;
 
     // Open a durable turn row, then persist the user message under it.
     const turn = await host
@@ -2820,6 +2833,7 @@ function registerIpc() {
             contextWindow: provider.contextWindow,
             maxOutputTokens: provider.maxOutputTokens,
             temperature: provider.temperature,
+            ...(modelCompat ? { modelCompat } : {}),
           },
           // Registered plugin agent tools join the model's toolset; execution
           // round-trips host -> main (plugins.execute) -> plugin JS.

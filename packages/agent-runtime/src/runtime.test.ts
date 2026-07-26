@@ -85,6 +85,73 @@ describe("DesktopAgentRuntime thinking configuration", () => {
     await runtime.dispose();
   });
 
+  it("applies wire-dialect compat so off emits an explicit disable", async () => {
+    const mimo: RuntimeProviderConfig = {
+      ...provider,
+      modelId: "mimo-v2.5-pro-think",
+      supportedThinkingLevels: ["off", "high"],
+      modelCompat: {
+        compat: {
+          thinkingFormat: "deepseek",
+          requiresReasoningContentOnAssistantMessages: true,
+        },
+      },
+    };
+    const runtime = createRuntime({ provider: mimo, thinkingLevel: "off" });
+    const model = (runtime as any).agent.state.model;
+
+    expect(model.compat).toMatchObject({
+      thinkingFormat: "deepseek",
+      requiresReasoningContentOnAssistantMessages: true,
+      supportsDeveloperRole: false,
+    });
+    // off must stay expressible (not null) so the deepseek dialect sends
+    // thinking {type: "disabled"} instead of omitting the parameter.
+    expect(model.thinkingLevelMap.off).toBeUndefined();
+    expect(model.thinkingLevelMap.medium).toBeNull();
+    expect((runtime as any).thinkingLevel).toBe("off");
+
+    await runtime.dispose();
+  });
+
+  it("merges catalog level values with declared provider support", async () => {
+    const effortStyle: RuntimeProviderConfig = {
+      ...provider,
+      modelCompat: {
+        thinkingLevelMap: { off: "none", low: null, minimal: null },
+      },
+    };
+    const runtime = createRuntime({
+      provider: effortStyle,
+      thinkingLevel: "off",
+    });
+    const model = (runtime as any).agent.state.model;
+
+    // Catalog off value survives so reasoning_effort "none" is emitted.
+    expect(model.thinkingLevelMap.off).toBe("none");
+    // Declared provider support ("low") beats a catalog null…
+    expect(model.thinkingLevelMap.low).toBeUndefined();
+    // …while levels the provider does not declare stay null.
+    expect(model.thinkingLevelMap.minimal).toBeNull();
+
+    await runtime.dispose();
+  });
+
+  it("recreates the runtime when wire compat changes", async () => {
+    const mimo: RuntimeProviderConfig = {
+      ...provider,
+      modelCompat: { compat: { thinkingFormat: "deepseek" } },
+    };
+    const runtime = createRuntime({ provider: mimo, thinkingLevel: "medium" });
+
+    expect(runtime.matches("agent", mimo, "medium")).toBe(true);
+    expect(
+      runtime.matches("agent", { ...mimo, modelCompat: undefined }, "medium"),
+    ).toBe(false);
+
+    await runtime.dispose();
+  });
+
   it("restores assistant thinking blocks into the pi transcript", async () => {
     const runtime = createRuntime({
       history: [
