@@ -32,7 +32,6 @@ export const zhCN = {
     commandPalette: "命令面板",
     back: "后退",
     forward: "前进",
-    toggleWorkPanel: "切换工作面板",
     sessionActions: "会话操作",
     sessionRunning: "运行中",
     sortSessions: "项目与会话排序",
@@ -75,6 +74,7 @@ export const zhCN = {
     errorModel: "模型",
     previewFile: "在侧边面板预览文件",
     previewUrl: "在侧边浏览器中打开",
+    openTerminal: "在终端中打开命令输出",
     retry: "重新生成",
     deleteMessage: "删除消息",
     revisions: "回复版本",
@@ -422,20 +422,12 @@ export const zhCN = {
   },
   panel: {
     title: "工作面板",
-    close: "关闭面板",
+    collapse: "收起工作面板",
+    closeTab: "关闭{{name}}",
     tabs: {
       review: "审阅",
       terminal: "终端",
       browser: "浏览器",
-      files: "文件",
-    },
-    welcome: {
-      title: "需要什么工具？",
-      subtitle: "选择一个工具开始，之后可以随时在右侧菜单切换。",
-      review: "查看工作区未提交的代码变更",
-      terminal: "在项目目录中运行命令",
-      browser: "预览本地服务或任意网页",
-      files: "浏览项目文件并快速预览",
     },
     review: {
       noWorkspace: "打开一个项目后可查看变更",

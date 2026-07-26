@@ -50,6 +50,7 @@ import {
 } from "./importers";
 
 let mainWindow: BrowserWindow | null = null;
+let panelWindowWidthOffset = 0;
 let host: HostProcess | null = null;
 let sidecar: AgentSidecar | null = null;
 let quitting = false;
@@ -329,6 +330,7 @@ function writeWindowState(state: WindowState) {
 }
 
 async function createWindow() {
+  panelWindowWidthOffset = 0;
   notificationViewingSessionId = null;
   const savedState = await readWindowState();
   mainWindow = new BrowserWindow({
@@ -486,8 +488,14 @@ async function createWindow() {
     saveTimer = setTimeout(() => {
       if (!mainWindow || mainWindow.isDestroyed() || boundsGuard) return;
       if (mainWindow.isMinimized() || mainWindow.isFullScreen()) return;
-      const b = mainWindow.getBounds();
-      if (b.width >= 960 && b.height >= 640) writeWindowState(b);
+      const bounds = mainWindow.getBounds();
+      const persistedBounds = {
+        ...bounds,
+        width: bounds.width - panelWindowWidthOffset,
+      };
+      if (persistedBounds.width >= 960 && persistedBounds.height >= 640) {
+        writeWindowState(persistedBounds);
+      }
     }, 600);
   };
   mainWindow.on("resize", scheduleStateSave);
@@ -644,34 +652,28 @@ async function createWindow() {
             const composerProbe = await mainWindow!.webContents.executeJavaScript(`(() => { const ta=document.querySelector("textarea.composer-input"); if(!ta) return null; const r=ta.getBoundingClientRect(); return {value:ta.value, ph:ta.placeholder, h:ta.offsetHeight, y:Math.round(r.y), mark:document.querySelector(".composer-thread-mark")?.textContent||""}; })()`);
             console.log("COMPOSER_PROBE", composerProbe);
             await shot("pi-final");
-            // Work panel scenes: welcome tool list, then the four tools via
-            // the vertical rail (D097–D100).
-            const clickPanelToggle = () =>
+            // Work panel scenes are opened by simulated artifacts; production
+            // exposes no empty/manual panel entry point (D119).
+            const openPanelArtifact = (kind: string, resource?: string) =>
               mainWindow!.webContents.executeJavaScript(
-                `document.querySelector('.main-titlebar-right .title-nav-btn')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`,
+                `window.__PI_DESKTOP__?.openWorkPanelArtifact(${JSON.stringify(kind)}, ${JSON.stringify(resource)})`,
               );
-            const clickPanelTab = (index: number) =>
-              mainWindow!.webContents.executeJavaScript(
-                `document.querySelectorAll('.work-panel-rail-btn')[${index}]?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`,
-              );
-            await clickPanelToggle();
-            await new Promise((r) => setTimeout(r, 500));
-            await shot("pi-panel-welcome");
-            await clickPanelTab(0);
+            await openPanelArtifact("review");
             await new Promise((r) => setTimeout(r, 500));
             await shot("pi-panel-review");
-            await clickPanelTab(1);
+            await openPanelArtifact("terminal");
             // The PTY needs a beat for the login shell prompt to settle.
             await new Promise((r) => setTimeout(r, 1200));
             await shot("pi-panel-terminal");
-            await clickPanelTab(2);
+            await openPanelArtifact("browser");
             await new Promise((r) => setTimeout(r, 400));
             await shot("pi-panel-browser");
-            await clickPanelTab(3);
+            await openPanelArtifact("file", "apps/desktop/src/App.tsx");
             await new Promise((r) => setTimeout(r, 500));
             await shot("pi-panel-files");
-            await clickPanelTab(0);
-            await clickPanelToggle();
+            await mainWindow!.webContents.executeJavaScript(
+              `window.__PI_DESKTOP__?.collapseWorkPanel()`,
+            );
             await new Promise((r) => setTimeout(r, 300));
             // Open composer + menu for chrome parity proof.
             await mainWindow!.webContents.executeJavaScript(`
@@ -2186,7 +2188,9 @@ function registerIpc() {
         width = Math.min(width, workRight - x);
       }
       mainWindow.setBounds({ x, y: bounds.y, width, height: bounds.height }, false);
-      return { applied: width - bounds.width };
+      const applied = width - bounds.width;
+      panelWindowWidthOffset = Math.max(0, panelWindowWidthOffset + applied);
+      return { applied };
     },
   );
 

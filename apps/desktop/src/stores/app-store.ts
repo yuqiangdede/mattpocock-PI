@@ -38,6 +38,17 @@ import {
   type SessionSort,
 } from "../lib/sidebar-preferences";
 import { formatToolValue } from "../lib/tool-display";
+import {
+  activateWorkPanelTabState,
+  closeWorkPanelTabState,
+  fileWorkPanelTab,
+  openWorkPanelTabState,
+  shouldOpenReviewArtifact,
+  toolWorkPanelTab,
+  type WorkPanelTab,
+} from "../lib/work-panel-tabs";
+
+export type { WorkPanelTab } from "../lib/work-panel-tabs";
 
 // Sessions created before locale switches keep their old default title, so
 // match against every locale's defaults (case-insensitive), not just the
@@ -59,8 +70,6 @@ export type ToastOptions = {
   /** Override the variant default (4s, error 8s); 0 disables auto-dismiss. */
   duration?: number;
 };
-
-export type WorkPanelTab = "welcome" | "review" | "terminal" | "browser" | "files";
 
 const WORK_PANEL_STORAGE_KEY = "pi.desktop.workPanel";
 export const WORK_PANEL_MIN_WIDTH = 320;
@@ -121,47 +130,25 @@ function assistantErrorMessage(error: AppError): UiMessage {
   };
 }
 
-function loadWorkPanelPreferences(): {
-  open: boolean;
-  tab: WorkPanelTab;
-  width: number;
-} {
-  const fallback = {
-    open: false,
-    // First ever open lands on the welcome page so the user picks a tool.
-    tab: "welcome" as WorkPanelTab,
-    width: WORK_PANEL_DEFAULT_WIDTH,
-  };
+function loadWorkPanelWidth(): number {
   try {
     const raw = localStorage.getItem(WORK_PANEL_STORAGE_KEY);
-    if (!raw) return fallback;
+    if (!raw) return WORK_PANEL_DEFAULT_WIDTH;
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     const width = Number(parsed.width);
-    return {
-      open: parsed.open === true,
-      // Every fresh app start lands on the tool list, not the last tool.
-      tab: fallback.tab,
-      width: Number.isFinite(width)
-        ? Math.max(WORK_PANEL_MIN_WIDTH, Math.min(720, width))
-        : fallback.width,
-    };
+    return Number.isFinite(width)
+      ? Math.max(WORK_PANEL_MIN_WIDTH, Math.min(720, width))
+      : WORK_PANEL_DEFAULT_WIDTH;
   } catch {
-    return fallback;
+    return WORK_PANEL_DEFAULT_WIDTH;
   }
 }
 
-function saveWorkPanelPreferences(state: Pick<
-  AppState,
-  "workPanelOpen" | "workPanelTab" | "workPanelWidth"
->) {
+function saveWorkPanelWidth(width: number) {
   try {
     localStorage.setItem(
       WORK_PANEL_STORAGE_KEY,
-      JSON.stringify({
-        open: state.workPanelOpen,
-        tab: state.workPanelTab,
-        width: state.workPanelWidth,
-      }),
+      JSON.stringify({ width }),
     );
   } catch {
     // best-effort persistence
@@ -311,24 +298,30 @@ export type AppState = {
   prefillComposer: (text: string) => void;
   clearComposerPrefill: () => void;
   workPanelOpen: boolean;
-  workPanelTab: WorkPanelTab;
+  workPanelTabs: WorkPanelTab[];
+  activeWorkPanelTabId: string | null;
   workPanelWidth: number;
   /** Bumped on agent Write/Edit/Bash completion; review tab refetches. */
   reviewRev: number;
   /** Chat-initiated "preview this file" request consumed by the files tab. */
   workPanelFileRequest: { path: string; seq: number } | null;
-  toggleWorkPanel: () => void;
-  setWorkPanelOpen: (open: boolean) => void;
-  setWorkPanelTab: (tab: WorkPanelTab) => void;
+  openWorkPanelTab: (tab: WorkPanelTab) => void;
+  activateWorkPanelTab: (tabId: string) => void;
+  closeWorkPanelTab: (tabId: string) => void;
+  collapseWorkPanel: () => void;
+  /** Drop tabs when the visible session or workspace context changes. */
+  resetWorkPanelContext: () => void;
   setWorkPanelWidth: (width: number) => void;
   /** Open a workspace-relative file in the work panel files viewer. */
   openFileInWorkPanel: (path: string) => void;
   /** Open a URL in the work panel browser tab. */
   openUrlInWorkPanel: (url: string) => void;
+  /** Open the interactive terminal from a completed command artifact. */
+  openTerminalInWorkPanel: () => void;
 };
 
 const initialSidebarPreferences = loadSidebarPreferences();
-const initialWorkPanelPreferences = loadWorkPanelPreferences();
+const initialWorkPanelWidth = loadWorkPanelWidth();
 
 // tool_end events carry no tool name, and cross-session tool calls never
 // enter `messages`, so remember names from tool_start envelopes here.
@@ -419,9 +412,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       .filter(([, meta]) => meta.collapsed === true)
       .map(([path]) => [path, true]),
   ),
-  workPanelOpen: initialWorkPanelPreferences.open,
-  workPanelTab: initialWorkPanelPreferences.tab,
-  workPanelWidth: initialWorkPanelPreferences.width,
+  workPanelOpen: false,
+  workPanelTabs: [],
+  activeWorkPanelTabId: null,
+  workPanelWidth: initialWorkPanelWidth,
   reviewRev: 0,
   workPanelFileRequest: null,
   projectSort: initialSidebarPreferences.projectSort,
@@ -562,6 +556,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   selectSession: async (id, opts) => {
     const detail = await api.getSession(id);
+    if (id !== get().activeSessionId) get().resetWorkPanelContext();
     const sessionProjectPath = detail.session?.projectPath;
     // Selecting a conversation also selects its project tab. This is what
     // makes several open projects behave like independent sidebar scopes.
@@ -676,6 +671,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
     await get().refreshSessions();
     const detail = await api.getSession(created.session.id);
+    get().resetWorkPanelContext();
     const entry = { page: "chat" as const, sessionId: created.session.id };
     set((s) => {
       const stack = s.navStack.slice(0, s.navIndex + 1);
@@ -1009,6 +1005,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     const result = await api.setProject(requestedPath);
     const workspace = result.workspace;
     if (!workspace?.path) return null;
+    if (
+      normalizeProjectPath(get().activeProjectPath) !==
+      normalizeProjectPath(workspace.path)
+    ) {
+      get().resetWorkPanelContext();
+    }
 
     set((state) => {
       const switchesVisibleProject =
@@ -1076,6 +1078,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     const result = await api.openProject();
     if (!result.canceled && result.workspace) {
       const workspace = result.workspace;
+      if (
+        normalizeProjectPath(get().activeProjectPath) !==
+        normalizeProjectPath(workspace.path)
+      ) {
+        get().resetWorkPanelContext();
+      }
       set((state) => {
         const switchesVisibleProject =
           normalizeProjectPath(state.activeProjectPath) !==
@@ -1114,6 +1122,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   clearProject: async () => {
     await api.clearProject();
+    get().resetWorkPanelContext();
     set({
       workspace: null,
       activeProjectPath: undefined,
@@ -1189,6 +1198,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   deleteSession: async (id) => {
     if (!id) return;
     await api.deleteSession(id);
+    if (get().activeSessionId === id) get().resetWorkPanelContext();
     set((state) => {
       const sessionMeta = { ...state.sessionMeta };
       delete sessionMeta[id];
@@ -1537,8 +1547,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     } else if (event.type === "tool_end") {
       const toolName = toolNamesByCallId.get(event.toolCallId);
       toolNamesByCallId.delete(event.toolCallId);
-      if (toolName && WORKSPACE_MUTATING_TOOLS.has(toolName)) {
+      if (toolName && WORKSPACE_MUTATING_TOOLS.has(toolName) && !event.isError) {
         set((s) => ({ reviewRev: s.reviewRev + 1 }));
+      }
+      if (
+        shouldOpenReviewArtifact({
+          toolName,
+          isError: event.isError,
+          result: event.result,
+          sessionId: envelope.sessionId,
+          activeSessionId: get().activeSessionId,
+        })
+      ) {
+        get().openWorkPanelTab(toolWorkPanelTab("review"));
       }
     }
     if (envelope.sessionId !== get().activeSessionId) {
@@ -1808,33 +1829,105 @@ export const useAppStore = create<AppState>((set, get) => ({
   dismissToast: (id) =>
     set((state) => ({ toasts: state.toasts.filter((item) => item.id !== id) })),
 
-  toggleWorkPanel: () => {
-    const opening = !get().workPanelOpen;
-    // Opening always lands on the tool list; the user picks from there.
-    set(opening ? { workPanelOpen: true, workPanelTab: "welcome" } : { workPanelOpen: false });
-    saveWorkPanelPreferences(get());
-    if (opening) expandWindowForPanel(get().workPanelWidth);
-    else shrinkWindowForPanel(get().workPanelWidth);
-  },
-  setWorkPanelOpen: (open) => {
-    if (get().workPanelOpen === open) return;
-    set(open ? { workPanelOpen: true, workPanelTab: "welcome" } : { workPanelOpen: false });
-    saveWorkPanelPreferences(get());
-    if (open) expandWindowForPanel(get().workPanelWidth);
-    else shrinkWindowForPanel(get().workPanelWidth);
-  },
-  setWorkPanelTab: (tab) => {
+  openWorkPanelTab: (tab) => {
     const wasOpen = get().workPanelOpen;
-    set({ workPanelTab: tab, workPanelOpen: true });
-    saveWorkPanelPreferences(get());
+    set((state) => {
+      const next = openWorkPanelTabState(
+        {
+          tabs: state.workPanelTabs,
+          activeTabId: state.activeWorkPanelTabId,
+        },
+        tab,
+      );
+      return {
+        workPanelTabs: next.tabs,
+        activeWorkPanelTabId: next.activeTabId,
+        workPanelOpen: true,
+        ...(tab.kind === "file" && tab.resource
+          ? {
+              workPanelFileRequest: {
+                path: tab.resource,
+                seq: (state.workPanelFileRequest?.seq ?? 0) + 1,
+              },
+            }
+          : {}),
+      };
+    });
     if (!wasOpen) expandWindowForPanel(get().workPanelWidth);
+  },
+  activateWorkPanelTab: (tabId) => {
+    set((state) => {
+      const next = activateWorkPanelTabState(
+        {
+          tabs: state.workPanelTabs,
+          activeTabId: state.activeWorkPanelTabId,
+        },
+        tabId,
+      );
+      const activeTab = next.tabs.find((tab) => tab.id === next.activeTabId);
+      return {
+        activeWorkPanelTabId: next.activeTabId,
+        ...(activeTab?.kind === "file" && activeTab.resource
+          ? {
+              workPanelFileRequest: {
+                path: activeTab.resource,
+                seq: (state.workPanelFileRequest?.seq ?? 0) + 1,
+              },
+            }
+          : {}),
+      };
+    });
+  },
+  closeWorkPanelTab: (tabId) => {
+    const wasOpen = get().workPanelOpen;
+    let closePanel = false;
+    set((state) => {
+      const next = closeWorkPanelTabState(
+        {
+          tabs: state.workPanelTabs,
+          activeTabId: state.activeWorkPanelTabId,
+        },
+        tabId,
+      );
+      const activeTab = next.tabs.find((tab) => tab.id === next.activeTabId);
+      closePanel = next.activeTabId === null;
+      return {
+        workPanelTabs: next.tabs,
+        activeWorkPanelTabId: next.activeTabId,
+        workPanelOpen: closePanel ? false : state.workPanelOpen,
+        ...(activeTab?.kind === "file" && activeTab.resource
+          ? {
+              workPanelFileRequest: {
+                path: activeTab.resource,
+                seq: (state.workPanelFileRequest?.seq ?? 0) + 1,
+              },
+            }
+          : {}),
+      };
+    });
+    if (wasOpen && closePanel) shrinkWindowForPanel(get().workPanelWidth);
+  },
+  collapseWorkPanel: () => {
+    if (!get().workPanelOpen) return;
+    set({ workPanelOpen: false });
+    shrinkWindowForPanel(get().workPanelWidth);
+  },
+  resetWorkPanelContext: () => {
+    const wasOpen = get().workPanelOpen;
+    set({
+      workPanelOpen: false,
+      workPanelTabs: [],
+      activeWorkPanelTabId: null,
+      workPanelFileRequest: null,
+    });
+    if (wasOpen) shrinkWindowForPanel(get().workPanelWidth);
   },
   setWorkPanelWidth: (width) => {
     const prev = get().workPanelWidth;
     set({
       workPanelWidth: Math.max(WORK_PANEL_MIN_WIDTH, Math.min(720, width)),
     });
-    saveWorkPanelPreferences(get());
+    saveWorkPanelWidth(get().workPanelWidth);
     // Committed drag-resize also extends the window instead of the chat.
     const next = get().workPanelWidth;
     if (get().workPanelOpen && next !== prev) {
@@ -1848,19 +1941,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   openFileInWorkPanel: (path) => {
-    get().setWorkPanelTab("files");
-    set((s) => ({
-      workPanelFileRequest: {
-        path,
-        seq: (s.workPanelFileRequest?.seq ?? 0) + 1,
-      },
-    }));
+    get().openWorkPanelTab(fileWorkPanelTab(path));
   },
   openUrlInWorkPanel: (url) => {
-    get().setWorkPanelTab("browser");
+    get().openWorkPanelTab(toolWorkPanelTab("browser"));
     // The browser view lives in main; it pushes navigation state back to
     // whichever BrowserTab is (or becomes) mounted.
     void api.browserNavigate(url).catch(() => {});
+  },
+  openTerminalInWorkPanel: () => {
+    get().openWorkPanelTab(toolWorkPanelTab("terminal"));
   },
 
   prefillComposer: (text) => set({ composerPrefill: text }),

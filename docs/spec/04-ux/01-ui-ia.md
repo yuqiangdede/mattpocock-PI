@@ -20,10 +20,10 @@ destination, chat as the home surface, tools and permissions inline.
 |  New task        |  chat home / transcript        |  (optional,      |
 |  Projects        |  or Projects / Plugins page    |   resizable      |
 |  Plugins         |                                |   320–720px)     |
-|  Open projects   |                                |  Review          |
-|   Project A      |                                |  Terminal        |
-|   Project B      |                                |  Browser         |
-|  Temporary       |                                |  Files           |
+|  Open projects   |                                | App.tsx Review × |
+|   Project A      |                                | ───────────────  |
+|   Project B      |                                | Active artifact  |
+|  Temporary       |                                | surface          |
 |  Footer: local   |  Floating composer (chat)      |                  |
 +------------------+--------------------------------+------------------+
 ```
@@ -46,14 +46,20 @@ destination, chat as the home surface, tools and permissions inline.
 - **Main pane**: exactly one destination at a time; destinations replace the
   pane (they are pages, not modals).
 - **Titlebar**: hiddenInset traffic lights; back/forward controls traverse
-  destination history; work-panel toggle on the right.
-- **Work panel**: docked right column (not an overlay) toggled from the
-  titlebar or Cmd/Ctrl+J. Opening lands on a welcome chooser; the right-edge
-  rail switches among Review (working-tree diff), Terminal (interactive PTY),
-  Browser (embedded preview), and Files (workspace browser). Width is
+  destination history.
+- **Work panel**: docked right column (not an overlay) created only by file,
+  URL, browser-preview, successful-command, or successful workspace-edit
+  artifacts. Its top strip contains only currently opened, closeable tabs:
+  file paths get distinct tabs while Review, Terminal, and Browser deduplicate
+  by kind. A successful active-session workspace Write/Edit artifact opens
+  Review; scratch, failed, and background-session writes never steal focus.
+  Width is
   drag-resizable from 320px to
   `min(720px, 60vw, viewport − visible sidebar − 360px)`, preserving a
-  readable 360px Main pane. Open state and width persist across launches.
+  readable 360px Main pane. The sole panel-level control collapses the panel;
+  changing the visible session/workspace clears runtime tabs. Startup is closed
+  with no tabs and only panel width persists across launches; temporary OS
+  window expansion is excluded from restored launch bounds.
   Replaces the former context-panel overlay; workspace/model/status info lives
   in the composer chips and Settings instead.
 - **Composer**: workspace-agnostic floating pill anchored to the chat
@@ -154,7 +160,6 @@ independent Plugins destination described in §3.5.
 |---|---|
 | Cmd/Ctrl+K, Cmd/Ctrl+Shift+P | command palette |
 | Cmd/Ctrl+B | toggle sidebar |
-| Cmd/Ctrl+J | toggle work panel |
 | Cmd/Ctrl+. | abort current run |
 | Enter / Shift+Enter | send / newline (configurable Enter-to-send) |
 | Esc | dismiss overlay/menu |
@@ -167,7 +172,8 @@ independent Plugins destination described in §3.5.
   workspace-required empty state. The composer never renders a workspace rail.
 - Background project session → the originating project row retains its
   running/error indicator. Selected shell state can move independently while
-  the session tool root remains bound to its durable project.
+  the session tool root remains bound to its durable project; its artifacts do
+  not open or activate tabs over the currently selected project.
 - Completed/failed turn not already visible → host-core appends one durable
   inbox row. A result shown in the visible, focused current chat and every
   `aborted` turn append none. Background sessions and any turn finishing while

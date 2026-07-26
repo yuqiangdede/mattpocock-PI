@@ -64,7 +64,7 @@ test("renderer surfaces the browser tab when the agent opens a preview", () => {
   assert.match(apiSource, /onBrowserPreview:/);
   assert.match(
     appSource,
-    /api\.onBrowserPreview\(\(\) => \{\s*useAppStore\.getState\(\)\.setWorkPanelTab\("browser"\);/,
+    /api\.onBrowserPreview\(\(\) => \{\s*useAppStore\.getState\(\)\.openWorkPanelTab\(toolWorkPanelTab\("browser"\)\);/,
   );
   assert.match(appSource, /offBrowserPreview\(\);/);
 });

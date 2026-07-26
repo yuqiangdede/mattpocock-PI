@@ -29,7 +29,6 @@ export const en = {
     commandPalette: "Command palette",
     back: "Back",
     forward: "Forward",
-    toggleWorkPanel: "Toggle work panel",
     sessionActions: "Session actions",
     sessionRunning: "Running",
     sortSessions: "Sort projects and conversations",
@@ -72,6 +71,7 @@ export const en = {
     errorModel: "Model",
     previewFile: "Preview file in the side panel",
     previewUrl: "Open in the side panel browser",
+    openTerminal: "Open command output in terminal",
     retry: "Regenerate",
     deleteMessage: "Delete message",
     revisions: "Response versions",
@@ -423,21 +423,12 @@ export const en = {
   },
   panel: {
     title: "Work panel",
-    close: "Close panel",
+    collapse: "Collapse work panel",
+    closeTab: "Close {{name}}",
     tabs: {
       review: "Review",
       terminal: "Terminal",
       browser: "Browser",
-      files: "Files",
-    },
-    welcome: {
-      title: "What do you need?",
-      subtitle:
-        "Pick a tool to get started — you can switch anytime from the menu on the right.",
-      review: "See uncommitted changes in your workspace",
-      terminal: "Run commands in the project directory",
-      browser: "Preview a local server or any web page",
-      files: "Browse and preview project files",
     },
     review: {
       noWorkspace: "Open a project to see changes",

@@ -301,8 +301,8 @@ Each scenario is documented in this format:
 #### E2E-019a: Scratch-directory writes stay out of the workspace (D114)
 
 - **Preconditions**: Agent mode; project open; session started.
-- **Steps**: 1) Ask the agent to produce a temporary/intermediate file (e.g. a one-off script). 2) Observe where it writes and whether a permission card appears. 3) Check `git status` in the project and the work panel Files tab. 4) Delete the session and check `<data_dir>/scratch/`.
-- **Expected**: The file lands under `<data_dir>/scratch/<sessionId>/` without a permission card; project `git status` stays clean; the Files tab lists no scratch entries; deleting the session removes the scratch directory.
+- **Steps**: 1) Ask the agent to produce a temporary/intermediate file (e.g. a one-off script). 2) Observe where it writes and whether a permission card appears. 3) Check `git status` and the work-panel state. 4) Delete the session and check `<data_dir>/scratch/`.
+- **Expected**: The file lands under `<data_dir>/scratch/<sessionId>/` without a permission card; project `git status` stays clean; no file or Review artifact tab opens for the scratch write; deleting the session removes the scratch directory.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md §4b`, `03-runtime/04-data-storage.md`
 - **Acceptance**: E (temp files isolated from workspace)
 - **Milestone**: M5
@@ -863,20 +863,27 @@ Each scenario is documented in this format:
 #### E2E-056: Work panel shell docking and persistence
 
 - **Preconditions**: App running with any workspace state.
-- **Steps**: 1) Toggle the panel via the titlebar button and via Cmd/Ctrl+J.
-  2) Verify the welcome chooser, then switch across all four tools using the
-  right rail. 3) Drag the left-edge handle below 320px and beyond every upper
-  bound at 960px, 1200px, and 1600px window widths. 4) Shrink the window under
-  the current panel width and test a short window height. 5) Relaunch the app.
-- **Expected**: The panel docks as a third shell column (main pane shrinks —
-  no overlay), every open lands on the welcome chooser, and the chooser is
-  vertically centered with spare height while safely top-aligning and
-  scrolling at short heights. Tools switch without losing terminal state.
-  Width clamps to
+- **Steps**: 1) Relaunch and inspect the titlebar, application menu, and
+  Cmd/Ctrl+J. 2) Open two distinct file artifacts, the same first file again,
+  a URL preview, and a completed command artifact. 3) Close an inactive tab,
+  then the active middle and edge tabs. 4) Use the sole collapse control and
+  trigger another artifact. 5) Switch sessions and projects with tabs open.
+  6) Drag the left-edge handle below 320px and beyond every upper bound at
+  960px, 1200px, and 1600px window widths. 7) Relaunch.
+- **Expected**: Startup shows no panel, welcome chooser, fixed tool buttons,
+  titlebar/menu launcher, or Cmd/Ctrl+J action. Each artifact atomically opens
+  the docked third column and creates or activates one closeable top tab; file
+  tabs are path-keyed, repeated resources deduplicate, and tabs scroll without
+  colliding with the collapse control while keeping the active tab visible.
+  Active close selects the right neighbor then left; closing the last tab hides
+  the panel. Collapse retains runtime
+  tabs but hides the panel until another artifact reopens it. Width clamps to
   `320px–min(720px, 60vw, viewport − visible sidebar − 360px)`, re-clamps on
-  window resize, and never squeezes MainChat below 360px in the supported
-  shell. `{open, width}` are restored after relaunch. The former context-panel
-  overlay no longer exists; the titlebar button reflects open state.
+  window resize, and never squeezes MainChat below 360px in the supported shell.
+  Session/workspace changes clear tabs before relative resources can cross
+  contexts. Only `{width}` is restored after relaunch; open state and tabs
+  reset, and temporary panel expansion does not enlarge the restored base
+  window. The former context-panel overlay no longer exists.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/08-component-spec.md`
 - **Acceptance**: F (persistence), Quality
 - **Milestone**: M5
@@ -885,15 +892,17 @@ Each scenario is documented in this format:
 #### E2E-057: Review tab reflects the git working tree
 
 - **Preconditions**: A git workspace with a clean tree; agent configured.
-- **Steps**: 1) Open the review tab (clean state). 2) Ask the agent to edit a
-  tracked file and create a new file. 3) Wait for the turn to finish. 4) Edit
-  a file outside the app and press refresh. 5) Open the panel in a
-  non-git folder and with no workspace.
-- **Expected**: Clean tree shows the "no changes" empty state; agent
-  Write/Edit/Bash completions refresh the diff automatically (debounced) with
+- **Steps**: 1) Ask the active agent to edit a tracked workspace file and
+  create a new one. 2) Repeat with a failed Write, a scratch Write, and a Write
+  in a background project session. 3) Edit a file outside the app and press
+  refresh after Review is open. 4) Inspect Review in a non-git folder.
+- **Expected**: Each successful active-session workspace Write/Edit creates or
+  activates one deduplicated Review tab and refreshes the diff automatically
+  (debounced) with
   per-file status badges, +/− counts, and colored unified hunks (untracked
-  files included); manual refresh picks up external edits; non-git and
-  no-workspace states render their dedicated copy. Binary and >200KB patches
+  files included). Failed/scratch/background writes do not open or steal focus;
+  background invalidation remains scoped. Manual refresh picks up external
+  edits; non-git and no-workspace states render their dedicated copy. Binary and >200KB patches
   render as capped rows without hunks; >100 changed files shows the
   truncation notice.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md` §13a, `04-ux/08-component-spec.md` §5
@@ -903,9 +912,11 @@ Each scenario is documented in this format:
 
 #### E2E-058: Interactive terminal session lifecycle
 
-- **Preconditions**: A workspace is open; work panel visible.
-- **Steps**: 1) Open the terminal tab and run `pwd` and `ls`. 2) Switch to
-  another tab and back. 3) Close and reopen the panel. 4) Drag-resize the
+- **Preconditions**: A workspace is open; a successful completed-command
+  artifact exists.
+- **Steps**: 1) Activate the completed command artifact to create Terminal,
+  then run `pwd` and `ls`. 2) Switch to another artifact tab and back. 3)
+  Collapse and reopen via another command artifact. 4) Drag-resize the
   panel and toggle light/dark theme. 5) Run `exit`. 6) Restart via the
   overlay button. 7) Quit the app and check for orphan shells.
 - **Expected**: The shell starts in the workspace directory as a login
@@ -921,8 +932,8 @@ Each scenario is documented in this format:
 
 #### E2E-059: Embedded browser preview isolation and overlays
 
-- **Preconditions**: A local dev server is running; work panel open.
-- **Steps**: 1) Enter `localhost:<port>` without a scheme and submit.
+- **Preconditions**: A local dev server is running; a URL or BrowserPreview artifact exists.
+- **Steps**: 1) Activate the artifact, enter `localhost:<port>` without a scheme, and submit.
   2) Navigate site links; use back/forward/reload/stop. 3) Trigger a
   `window.open` popup and a permission-requesting page (e.g. notification
   prompt). 4) Open the command palette, then a tool permission dialog, then
@@ -943,9 +954,10 @@ Each scenario is documented in this format:
 
 #### E2E-060: Files tab browsing stays inside the workspace
 
-- **Preconditions**: Workspace with nested folders, a large file (>512KB), an
-  image, and a binary file.
-- **Steps**: 1) Browse the tree, expanding nested folders. 2) Open a source
+- **Preconditions**: Workspace with file artifacts for nested source, large
+  (>512KB), image, and binary files.
+- **Steps**: 1) Activate each file artifact and verify a distinct path-keyed
+  top tab; browse the tree, expanding nested folders. 2) Open a source
   file, the image, the binary, and the large file. 3) Use reveal-in-Finder.
   4) Attempt a traversal read (`../outside`) via devtools IPC. 5) Switch
   workspaces.
@@ -1598,7 +1610,8 @@ This test plan spec is accepted when:
 - Start a visible turn in project A, switch to project B while it runs, and
   inspect both sidebar status indicators.
 - Expect A's turn to continue in the background, B's composer/context to show
-  only B, and tool output/artifacts from A to remain rooted in A.
+  only B, and tool output/artifacts from A to remain rooted in A without
+  opening or activating a work-panel tab over B.
 - Open a Temporary session and invoke a workspace-required tool; expect the
   normal `WORKSPACE_REQUIRED` result rather than inheritance from B.
 

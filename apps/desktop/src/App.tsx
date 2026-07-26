@@ -18,8 +18,8 @@ import { PluginsPage } from "./pages/PluginsPage";
 import { useAppStore } from "./stores/app-store";
 import type { ToastOptions } from "./stores/app-store";
 import { api } from "./lib/api";
+import { toolWorkPanelTab } from "./lib/work-panel-tabs";
 import { BrandLogo } from "./components/BrandLogo";
-import { IconPanel } from "./components/icons";
 
 class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -79,7 +79,6 @@ function AppShell() {
   const workspace = useAppStore((s) => s.workspace);
   const openProject = useAppStore((s) => s.openProject);
   const workPanelOpen = useAppStore((s) => s.workPanelOpen);
-  const toggleWorkPanel = useAppStore((s) => s.toggleWorkPanel);
   const permission = useAppStore((s) => s.permission);
 
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -124,7 +123,7 @@ function AppShell() {
     // Agent-driven HTML preview: surface the browser tab when the agent
     // opens a workspace file in the embedded browser (BrowserPreview tool).
     const offBrowserPreview = api.onBrowserPreview(() => {
-      useAppStore.getState().setWorkPanelTab("browser");
+      useAppStore.getState().openWorkPanelTab(toolWorkPanelTab("browser"));
     });
     const offHostStatus = api.onHostStatus((status) => {
       if (status.ok) {
@@ -192,10 +191,6 @@ function AppShell() {
         e.preventDefault();
         setSidebarCollapsed((v) => !v);
       }
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "j") {
-        e.preventDefault();
-        useAppStore.getState().toggleWorkPanel();
-      }
     };
     window.addEventListener("keydown", onKey);
     return () => {
@@ -235,6 +230,23 @@ function AppShell() {
       clearProject: () => useAppStore.getState().clearProject(),
       showToast: (message: string, opts?: ToastOptions) =>
         useAppStore.getState().showToast(message, opts),
+      openWorkPanelArtifact: (
+        kind: "review" | "terminal" | "browser" | "file",
+        resource?: string,
+      ) => {
+        if (!(window as any).__PI_CAPTURE__) return;
+        if (kind === "file" && resource) {
+          useAppStore.getState().openFileInWorkPanel(resource);
+          return;
+        }
+        if (kind !== "file") {
+          useAppStore.getState().openWorkPanelTab(toolWorkPanelTab(kind));
+        }
+      },
+      collapseWorkPanel: () => {
+        if (!(window as any).__PI_CAPTURE__) return;
+        useAppStore.getState().collapseWorkPanel();
+      },
       seedTranscript: (count = 12) => {
         // Capture-only transcript fixture (conversation minimap scenes);
         // count 0 restores the empty transcript for later scenes.
@@ -493,13 +505,6 @@ function AppShell() {
         <div className="main-titlebar">
           <div className="main-titlebar-right no-drag">
             <NotificationCenter />
-            <button
-              className={`title-nav-btn ${workPanelOpen ? "active" : ""}`}
-              title={t("nav.toggleWorkPanel")}
-              onClick={toggleWorkPanel}
-            >
-              <IconPanel size={14} />
-            </button>
           </div>
         </div>
 

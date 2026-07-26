@@ -4,11 +4,11 @@ import { useAppStore, WORK_PANEL_MIN_WIDTH } from "../../stores/app-store";
 import type { WorkPanelTab } from "../../stores/app-store";
 import { cx } from "../ui";
 import {
-  IconChevronRight,
   IconClose,
   IconDiff,
-  IconFolder,
+  IconFileText,
   IconGlobe,
+  IconPanel,
   IconTerminal,
 } from "../icons";
 import { ReviewTab } from "./ReviewTab";
@@ -19,12 +19,12 @@ import { FilesTab } from "./FilesTab";
 const WORK_PANEL_MAX_WIDTH_RATIO = 0.6;
 const MAIN_PANE_MIN_WIDTH = 360;
 
-const TOOL_TABS = [
-  { id: "review", Icon: IconDiff },
-  { id: "terminal", Icon: IconTerminal },
-  { id: "browser", Icon: IconGlobe },
-  { id: "files", Icon: IconFolder },
-] as const;
+const TAB_ICONS = {
+  review: IconDiff,
+  terminal: IconTerminal,
+  browser: IconGlobe,
+  file: IconFileText,
+} as const;
 
 function clampWidth(width: number) {
   const sidebar = document.querySelector<HTMLElement>(".sidebar, .sidebar-rail");
@@ -43,49 +43,29 @@ function clampWidth(width: number) {
   return Math.max(WORK_PANEL_MIN_WIDTH, Math.min(max, width));
 }
 
-function WelcomePane({ onPick }: { onPick: (tab: WorkPanelTab) => void }) {
-  const { t } = useTranslation();
-  return (
-    <div className="work-welcome">
-      <h2 className="work-welcome-title">{t("panel.welcome.title")}</h2>
-      <p className="work-welcome-subtitle">{t("panel.welcome.subtitle")}</p>
-      <div className="work-welcome-menu">
-        {TOOL_TABS.map(({ id, Icon }) => (
-          <button
-            key={id}
-            type="button"
-            className="work-welcome-item"
-            onClick={() => onPick(id)}
-          >
-            <span className="work-welcome-icon" aria-hidden>
-              <Icon size={17} />
-            </span>
-            <span className="work-welcome-text">
-              <span className="work-welcome-name">{t(`panel.tabs.${id}`)}</span>
-              <span className="work-welcome-desc">{t(`panel.welcome.${id}`)}</span>
-            </span>
-            <span className="work-welcome-go" aria-hidden>
-              <IconChevronRight size={14} />
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
+function tabLabel(tab: WorkPanelTab, t: (key: string) => string) {
+  if (tab.kind !== "file") return t(`panel.tabs.${tab.kind}`);
+  const path = tab.resource ?? "";
+  return path.split("/").filter(Boolean).pop() || path;
 }
 
 export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean }) {
   const { t } = useTranslation();
-  const tab = useAppStore((s) => s.workPanelTab);
+  const tabs = useAppStore((s) => s.workPanelTabs);
+  const activeTabId = useAppStore((s) => s.activeWorkPanelTabId);
   const width = useAppStore((s) => s.workPanelWidth);
-  const setTab = useAppStore((s) => s.setWorkPanelTab);
-  const setOpen = useAppStore((s) => s.setWorkPanelOpen);
+  const activateTab = useAppStore((s) => s.activateWorkPanelTab);
+  const closeTab = useAppStore((s) => s.closeWorkPanelTab);
+  const collapsePanel = useAppStore((s) => s.collapseWorkPanel);
   const setWidth = useAppStore((s) => s.setWorkPanelWidth);
+  const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
+  const terminalOpen = tabs.some((tab) => tab.kind === "terminal");
 
   // Live width during a drag stays local; the store (and localStorage)
   // only sees the committed value on pointer-up.
   const [dragWidth, setDragWidth] = useState<number | null>(null);
   const dragState = useRef<{ pointerId: number } | null>(null);
+  const activeTabRef = useRef<HTMLDivElement | null>(null);
 
   const onResizeStart = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -122,6 +102,12 @@ export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean
     window.addEventListener("resize", onWindowResize);
     return () => window.removeEventListener("resize", onWindowResize);
   }, []);
+  useEffect(() => {
+    activeTabRef.current?.scrollIntoView({
+      block: "nearest",
+      inline: "nearest",
+    });
+  }, [activeTabId]);
   const renderWidth = clampWidth(dragWidth ?? width);
 
   return (
@@ -141,47 +127,108 @@ export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean
       />
       <div className="work-panel-main">
         <header className="work-panel-header">
-          <div className="work-panel-title">
-            {tab === "welcome" ? t("panel.title") : t(`panel.tabs.${tab}`)}
-          </div>
+          <nav
+            className="work-panel-tabs no-drag"
+            role="tablist"
+            aria-label={t("panel.title")}
+          >
+            {tabs.map((tab) => {
+              const label = tabLabel(tab, t);
+              const Icon = TAB_ICONS[tab.kind];
+              const selected = tab.id === activeTabId;
+              return (
+                <div
+                  ref={selected ? activeTabRef : undefined}
+                  className={cx("work-panel-tab", selected && "active")}
+                  key={tab.id}
+                >
+                  <button
+                    id={`work-panel-tab-${tab.id}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    aria-controls={`work-panel-surface-${tab.id}`}
+                    className="work-panel-tab-trigger"
+                    onClick={() => activateTab(tab.id)}
+                    title={tab.resource ?? label}
+                  >
+                    <span className="work-panel-tab-icon" aria-hidden>
+                      <Icon size={14} />
+                    </span>
+                    <span className="work-panel-tab-label">{label}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="work-panel-tab-close"
+                    aria-label={t("panel.closeTab", { name: label })}
+                    title={t("panel.closeTab", { name: label })}
+                    onClick={() => closeTab(tab.id)}
+                  >
+                    <IconClose size={12} />
+                  </button>
+                </div>
+              );
+            })}
+          </nav>
           <button
             type="button"
-            className="icon-btn no-drag"
-            onClick={() => setOpen(false)}
-            title={t("panel.close")}
+            className="icon-btn work-panel-collapse no-drag"
+            onClick={collapsePanel}
+            title={t("panel.collapse")}
+            aria-label={t("panel.collapse")}
           >
-            <IconClose size={15} />
+            <IconPanel size={15} />
           </button>
         </header>
         <div className="work-panel-body">
-          {tab === "welcome" && <WelcomePane onPick={setTab} />}
-          {tab === "review" && <ReviewTab />}
-          {/* The terminal outlives tab switches: hide it instead of unmounting
-              so the PTY session and scrollback survive. */}
-          <div className={cx("work-panel-tabpane", tab !== "terminal" && "is-hidden")}>
-            <TerminalTab active={tab === "terminal"} />
-          </div>
-          {tab === "browser" && <BrowserTab blocked={browserBlocked} />}
-          {tab === "files" && <FilesTab />}
+          {activeTab?.kind === "review" && (
+            <div
+              id={`work-panel-surface-${activeTab.id}`}
+              className="work-panel-tabpane"
+              role="tabpanel"
+              aria-labelledby={`work-panel-tab-${activeTab.id}`}
+            >
+              <ReviewTab />
+            </div>
+          )}
+          {/* The terminal mounts only after a command artifact opens it, then
+              survives tab switches so its PTY and scrollback stay intact. */}
+          {terminalOpen && (
+            <div
+              id="work-panel-surface-terminal"
+              className={cx(
+                "work-panel-tabpane",
+                activeTab?.kind !== "terminal" && "is-hidden",
+              )}
+              role="tabpanel"
+              aria-labelledby="work-panel-tab-terminal"
+            >
+              <TerminalTab active={activeTab?.kind === "terminal"} />
+            </div>
+          )}
+          {activeTab?.kind === "browser" && (
+            <div
+              id={`work-panel-surface-${activeTab.id}`}
+              className="work-panel-tabpane"
+              role="tabpanel"
+              aria-labelledby={`work-panel-tab-${activeTab.id}`}
+            >
+              <BrowserTab blocked={browserBlocked} />
+            </div>
+          )}
+          {activeTab?.kind === "file" && (
+            <div
+              key={activeTab.id}
+              id={`work-panel-surface-${activeTab.id}`}
+              className="work-panel-tabpane"
+              role="tabpanel"
+              aria-labelledby={`work-panel-tab-${activeTab.id}`}
+            >
+              <FilesTab />
+            </div>
+          )}
         </div>
       </div>
-      <nav className="work-panel-rail no-drag" aria-label={t("panel.title")}>
-        {TOOL_TABS.map(({ id, Icon }) => {
-          const label = t(`panel.tabs.${id}`);
-          return (
-            <button
-              key={id}
-              type="button"
-              className={cx("work-panel-rail-btn", tab === id && "active")}
-              onClick={() => setTab(id)}
-              title={label}
-            >
-              <Icon size={16} />
-              <span>{label}</span>
-            </button>
-          );
-        })}
-      </nav>
     </aside>
   );
 }

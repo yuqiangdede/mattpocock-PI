@@ -168,6 +168,26 @@ the visible shell context.
   presentation boundary from structured fields; persisted rows never contain
   localized prose.
 
+### 1.8 Artifact-driven work panel tabs (D119)
+
+- The shell exposes no empty work-panel launcher, application-menu command, or
+  global shortcut. An artifact trigger atomically creates or reuses its tab,
+  activates it, and opens the panel.
+- File tabs use normalized paths as identity. Review, Terminal, and Browser are
+  singletons; repeated triggers preserve tab order and activate the existing tab.
+- Every tab has its own close control. Closing the active tab selects the right
+  neighbor, then the left; closing the final tab hides the panel. The separate
+  panel collapse control hides the panel without deleting tabs.
+- A successful active-session workspace Write/Edit opens Review. Failed and
+  scratch writes do not; background-session artifacts stay rooted in their
+  session and never take focus from the current project.
+- Terminal mounts only after a command artifact opens it and remains mounted
+  across tab switches while that tab exists.
+- Selecting another session or workspace closes the panel and clears retained
+  tabs, preventing workspace-relative resources from crossing context
+  boundaries. Window-state persistence records the base shell width without
+  any temporary panel expansion.
+
 ## 2. Streaming message behavior
 
 ### 2.1 Token rendering

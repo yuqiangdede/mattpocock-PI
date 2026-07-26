@@ -78,8 +78,9 @@ session gets a scratch directory outside the workspace:
   goes through the full resolver, so it is not an escape vector. Chat mode
   still denies Write/Edit/Bash entirely (D004 unchanged).
 - **Artifacts.** Successful scratch writes are not recorded in the
-  `artifacts` table; the work panel file list shows workspace deliverables
-  only. Tool results carry `root: "workspace" | "scratch"` to make this
+  `artifacts` table; artifact-driven file tabs represent workspace
+  deliverables only, while the Files surface may still browse the active
+  workspace. Tool results carry `root: "workspace" | "scratch"` to make this
   decision and the UI rendering explicit.
 - **Tool coverage.** `Read`/`Write`/`Edit` are dual-root. `Glob`/`Grep`
   remain workspace-only (the model lists scratch via `ls $PI_SCRATCH_DIR`).

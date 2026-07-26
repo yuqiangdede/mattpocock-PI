@@ -323,6 +323,7 @@ function ToolRow({ message }: { message: UiMessage }) {
   const detailsId = useId();
   const root = useAppStore((s) => s.workspace?.path);
   const openTarget = useOpenPreviewTarget();
+  const openTerminal = useAppStore((s) => s.openTerminalInWorkPanel);
   const status = message.toolStatus;
   const [open, setOpen] = useState(status === "error");
   const action = getToolAction(message.toolName);
@@ -334,6 +335,7 @@ function ToolRow({ message }: { message: UiMessage }) {
   const previewTarget = PREVIEWABLE_ACTIONS.has(action)
     ? getToolPreviewTarget(message.toolArgs, root)
     : null;
+  const terminalArtifact = action === "run" && status === "success";
   const { input, output } = getToolSections(message);
   const hasDetails = Boolean(input || output);
   const statusLabel =
@@ -371,20 +373,23 @@ function ToolRow({ message }: { message: UiMessage }) {
         </span>
         {summary ? (
           <span
-            className={`tool-row-summary${previewTarget ? " linked" : ""}`}
+            className={`tool-row-summary${previewTarget || terminalArtifact ? " linked" : ""}`}
             title={
               previewTarget
                 ? previewTarget.kind === "file"
                   ? t("chat.previewFile")
                   : t("chat.previewUrl")
+                : terminalArtifact
+                  ? t("chat.openTerminal")
                 : undefined
             }
             onClick={
-              previewTarget
+              previewTarget || terminalArtifact
                 ? (e) => {
-                    // Preview instead of toggling the surrounding header.
+                    // Open the produced surface instead of toggling details.
                     e.stopPropagation();
-                    openTarget(previewTarget);
+                    if (previewTarget) openTarget(previewTarget);
+                    else openTerminal();
                   }
                 : undefined
             }

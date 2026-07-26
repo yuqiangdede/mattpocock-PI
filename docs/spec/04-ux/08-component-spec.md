@@ -43,12 +43,11 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 | Default | Sidebar expanded, work panel hidden |
 | Narrow (<640px) | Sidebar auto-collapses to icon rail |
 | Narrow window with panel open | Work panel width re-clamps to 60vw |
-| Fullscreen | Topbar remains; sidebar/panel toggle |
+| Fullscreen | Topbar remains; sidebar toggle and artifact-driven panel stay available |
 
 ### 1.4 Interactions
 
 - Sidebar toggle: keyboard shortcut + hamburger button in topbar
-- Work panel toggle: Cmd/Ctrl+J + panel button in topbar
 - Work panel resize: left-edge drag handle (§5.4)
 - Window resize: responsive collapse per [07-ui-design-system.md](07-ui-design-system.md) §10.1
 
@@ -333,15 +332,15 @@ preview), and Files (workspace browser). Codex-parity surface.
 
 ```text
 +--------------------------------------+
-| Active tool / Tools            [×]   |  header 46px, drag region
+| App.tsx [×] | Review [×]       [◧]  |  dynamic tabs + collapse, 46px
 +--------------------------------------+
-| Active tab body                 | R  |
+| Active tab body                      |
 |  Review: file cards + unified diff   |
 |  Terminal: xterm host                |
 |  Browser: URL bar + preview surface  |
-|  Files: tree + file viewer       | A  |
-|                                  | I  |
-|                                  | L  |
+|  Files: tree + file viewer            |
+|                                      |
+|                                      |
 +--------------------------------------+
 ^ 6px resize handle on the left edge
 ```
@@ -350,28 +349,38 @@ preview), and Files (workspace browser). Codex-parity surface.
 
 | State | Behavior |
 |---|---|
-| Closed (default) | Not rendered; titlebar toggle inactive |
-| Open | Docked flex row right of the main pane; opens on the welcome chooser; width 320–`min(720, 60vw, viewport − visible sidebar − 360px)` |
-| Welcome | Title, subtitle, and four tool choices form one vertically centered column while spare height exists; short heights safely top-align and scroll without clipping |
+| Closed (default) | Not rendered; no manual open control and no retained tabs after startup |
+| Open | Docked flex row right of the main pane; opened by an artifact with width 320–`min(720, 60vw, viewport − visible sidebar − 360px)` |
+| Multiple artifacts | Tabs follow first-open order, scroll horizontally, keep the active tab visible, and preserve readable labels at the panel minimum |
 | Resizing | Live width follows pointer while preserving a 360px MainChat; committed (and persisted) on release |
 | No workspace | Each tab renders its own "open a project" empty state |
 | Narrow window | Width re-clamps on window resize; the 320px panel minimum wins only when the supported shell itself cannot satisfy both minima |
 
 ### 5.4 Interactions
 
-- Toggle: titlebar panel button or Cmd/Ctrl+J; close button in the header.
-- Tab switch: right-edge vertical rail; selecting a tool also opens the panel
-  when driven programmatically. Every explicit panel open returns to the
-  welcome chooser. Terminal stays mounted across switches so the PTY and
-  scrollback survive; other tabs mount on demand.
+- Trigger: file/URL references, BrowserPreview, and completed-command artifacts
+  create/activate their resource tab. Successful active-session workspace
+  Write/Edit artifacts create/activate Review. Repeated resources deduplicate.
+- Tab close: closing an active tab selects its right neighbor, then its left;
+  closing the last tab hides the panel. The panel-level collapse control hides
+  the panel without deleting the runtime tab set; a later artifact reopens it.
+  Terminal mounts only after its first command artifact and stays mounted while
+  its tab exists so the PTY and scrollback survive switches.
+- Context change: selecting another session or workspace closes the panel and
+  drops its runtime tabs before rendering the new context. Relative file tabs
+  can therefore never be reinterpreted against a different workspace.
 - Resize: pointer drag on the left-edge handle.
-- Persistence: `{open, tab, width}` in localStorage `pi.desktop.workPanel`.
+- Persistence: only `{width}` in localStorage `pi.desktop.workPanel`; open and
+  tabs reset on app startup. OS window-state persistence excludes width added
+  by an open work panel, so relaunch starts at the same base shell width.
 
 ### 5.5 Accessibility
 
-- `<aside>` landmark; tab strip is a `nav` with `aria-label`
+- `<aside>` landmark; the top strip uses `nav`, `role="tablist"`, and a
+  localized `aria-label`; each resource uses `role="tab"`, `aria-selected`,
+  `aria-controls`, and a corresponding `role="tabpanel"`
 - Resize handle: `role="separator"` `aria-orientation="vertical"`
-- Close button and every tab expose localized titles
+- Every tab close and the sole panel collapse button expose localized names
 
 ### 5.6 MVP constraints
 
