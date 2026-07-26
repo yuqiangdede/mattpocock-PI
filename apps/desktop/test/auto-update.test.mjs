@@ -74,6 +74,10 @@ test("updater gates delivery mode by platform, packaging and signature reality",
   assert.match(updaterSource, /APPIMAGE/);
   assert.match(updaterSource, /autoInstallOnAppQuit = true/);
   assert.match(updaterSource, /quitAndInstall/);
+  assert.match(
+    updaterSource,
+    /state\.status === "downloaded"[\s\S]*return this\.state/,
+  );
   assert.match(updaterSource, /autoUpdater\.on\("error"/);
   assert.match(
     updaterSource,
@@ -89,6 +93,7 @@ test("renderer exposes the updates API, banner and settings row", () => {
   assert.match(apiSource, /onUpdateState:/);
   assert.match(bannerSource, /updates\.restart/);
   assert.match(bannerSource, /updates\.viewRelease/);
+  assert.match(bannerSource, /availableVersion}:\$\{update\.status/);
   assert.match(settingsSource, /<UpdatesRow \/>/);
   assert.match(appSource, /<UpdateBanner \/>/);
   assert.match(appSource, /case "checkForUpdates"/);
@@ -114,8 +119,12 @@ test("packaging publishes an electron-updater feed for GitHub Releases", () => {
   assert.equal(pkg.build.publish[0].repo, "PI-Desktop");
   const macTargets = pkg.build.mac.target.map((entry) => entry.target);
   assert.ok(macTargets.includes("zip"), "mac zip target (Squirrel.Mac feed)");
-  // CI must not let electron-builder self-publish (it would fail on the
-  // missing token and race the softprops release step).
-  assert.match(releaseWorkflowSource, /--publish never/);
+  // electron-builder must never self-publish (implicit tag publishing would
+  // fail on the missing token and race the softprops release step).
+  for (const script of ["dist", "dist:mac", "dist:win", "dist:linux"]) {
+    assert.match(pkg.scripts[script], /--publish never/, script);
+  }
+  assert.equal(pkg.build.linux.executableName, "pi-desktop");
+  assert.match(releaseWorkflowSource, /release\/\*\.zip/);
   assert.match(releaseWorkflowSource, /latest-mac\.yml/);
 });

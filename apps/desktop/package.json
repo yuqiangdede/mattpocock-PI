@@ -18,10 +18,10 @@
     "build:host-release": "cargo build --release --manifest-path ../../Cargo.toml -p host-core",
     "bundle:runtime": "pnpm -C ../../packages/agent-runtime bundle",
     "pack": "pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --dir",
-    "dist": "pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder",
-    "dist:mac": "pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --mac",
-    "dist:win": "pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --win",
-    "dist:linux": "pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --linux"
+    "dist": "pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --publish never",
+    "dist:mac": "pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --mac --publish never",
+    "dist:win": "pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --win --publish never",
+    "dist:linux": "pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --linux --publish never"
   },
   "dependencies": {
     "@pi-desktop/agent-runtime": "workspace:*",
@@ -135,6 +135,7 @@
       "allowToChangeInstallationDirectory": true
     },
     "linux": {
+      "executableName": "pi-desktop",
       "target": [
         {
           "target": "AppImage",
