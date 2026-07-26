@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import type { AppSettings, GlobalPermissionMode } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { api } from "../lib/api";
 import type { ImportCandidate } from "../lib/api";
@@ -26,6 +27,14 @@ type NavItem = {
   id: SettingsTab;
   labelKey: string;
   icon: ReactNode;
+  /** i18n keys of the rows inside the tab; search matches their translations. */
+  keywordKeys: string[];
+};
+
+type NavGroup = {
+  id: string;
+  labelKey?: string;
+  items: NavItem[];
 };
 
 function SettingsRow({
@@ -307,24 +316,101 @@ export function SettingsPage() {
 
   const [query, setQuery] = useState("");
 
-  const navItems: NavItem[] = useMemo(
+  const saveSettings = async (patch: Partial<AppSettings>) => {
+    if (!settings) return;
+    await api.setSettings({ ...settings, ...patch });
+    await refreshProviders();
+  };
+
+  const navGroups: NavGroup[] = useMemo(
     () => [
-      { id: "general", labelKey: "settings.general", icon: <IconSettings size={14} /> },
-      { id: "agent", labelKey: "settings.configuration", icon: <IconConfig size={14} /> },
-      { id: "import", labelKey: "settings.import", icon: <IconSnapshot size={14} /> },
-      { id: "about", labelKey: "settings.about", icon: <IconInfo size={14} /> },
+      {
+        id: "personal",
+        labelKey: "settings.groupPersonal",
+        items: [
+          {
+            id: "general",
+            labelKey: "settings.general",
+            icon: <IconSettings size={14} />,
+            keywordKeys: [
+              "settings.appearance",
+              "settings.theme",
+              "settings.language",
+              "settings.mode",
+              "settings.enterToSend",
+              "settings.permissions",
+              "settings.permissionMode",
+            ],
+          },
+        ],
+      },
+      {
+        id: "integrations",
+        labelKey: "settings.groupIntegrations",
+        items: [
+          {
+            id: "agent",
+            labelKey: "settings.configuration",
+            icon: <IconConfig size={14} />,
+            keywordKeys: [
+              "settings.providers",
+              "settings.models",
+              "settings.defaultModel",
+              "settings.apiKey",
+              "settings.baseUrl",
+              "settings.apiStyle",
+            ],
+          },
+          {
+            id: "import",
+            labelKey: "settings.import",
+            icon: <IconSnapshot size={14} />,
+            keywordKeys: [
+              "settings.importTitle",
+              "settings.importSourceClaudeCode",
+              "settings.importSourceOpenCode",
+              "settings.importSourceCodex",
+            ],
+          },
+        ],
+      },
+      {
+        id: "system",
+        items: [
+          {
+            id: "about",
+            labelKey: "settings.about",
+            icon: <IconInfo size={14} />,
+            keywordKeys: ["settings.application", "settings.logs"],
+          },
+        ],
+      },
     ],
     [],
   );
 
-  const filteredNavItems = useMemo(() => {
+  // Search matches the tab label and the titles of the rows inside it, so
+  // typing e.g. "theme" or "主题" surfaces Basics even though the tab is
+  // named differently.
+  const filteredGroups = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return navItems;
-    return navItems.filter((item) => t(item.labelKey).toLowerCase().includes(q));
-  }, [navItems, query, t]);
+    if (!q) return navGroups;
+    return navGroups
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) =>
+          [t(item.labelKey), ...item.keywordKeys.map((key) => t(key))].some(
+            (text) => text.toLowerCase().includes(q),
+          ),
+        ),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [navGroups, query, t]);
 
   const activeLabel =
-    navItems.find((item) => item.id === tab)?.labelKey ?? "settings.title";
+    navGroups
+      .flatMap((group) => group.items)
+      .find((item) => item.id === tab)?.labelKey ?? "settings.title";
 
   return (
     <div className="settings-shell settings-shell-full">
@@ -352,18 +438,25 @@ export function SettingsPage() {
         </div>
 
         <div className="settings-nav-scroll no-drag">
-          {filteredNavItems.length === 0 ? (
+          {filteredGroups.length === 0 ? (
             <div className="settings-nav-empty">{t("settings.noResults")}</div>
           ) : (
-            filteredNavItems.map((item) => (
-              <button
-                key={item.id}
-                className={cx("settings-nav-item", tab === item.id && "active")}
-                onClick={() => setSettingsTab(item.id)}
-              >
-                <span className="settings-nav-icon">{item.icon}</span>
-                <span className="settings-nav-label">{t(item.labelKey)}</span>
-              </button>
+            filteredGroups.map((group) => (
+              <div key={group.id} className="settings-nav-group">
+                {group.labelKey ? (
+                  <div className="settings-nav-group-label">{t(group.labelKey)}</div>
+                ) : null}
+                {group.items.map((item) => (
+                  <button
+                    key={item.id}
+                    className={cx("settings-nav-item", tab === item.id && "active")}
+                    onClick={() => setSettingsTab(item.id)}
+                  >
+                    <span className="settings-nav-icon">{item.icon}</span>
+                    <span className="settings-nav-label">{t(item.labelKey)}</span>
+                  </button>
+                ))}
+              </div>
             ))
           )}
         </div>
@@ -374,9 +467,28 @@ export function SettingsPage() {
           <h1 className="settings-section-title">{t(activeLabel)}</h1>
 
           {tab === "general" && settings && (
-            <>
+            <div className="settings-stack">
               <SettingsCard title={t("settings.appearance")}>
-                <div className="settings-row">
+                <SettingsRow
+                  title={t("settings.language")}
+                  description={t("settings.languageDesc")}
+                >
+                  <select
+                    className="field-select"
+                    aria-label={t("settings.language")}
+                    value={settings.language ?? "auto"}
+                    onChange={(e) =>
+                      void saveSettings({
+                        language: e.target.value as "auto" | "en" | "zh-CN",
+                      })
+                    }
+                  >
+                    <option value="auto">{t("settings.languageAuto")}</option>
+                    <option value="en">English</option>
+                    <option value="zh-CN">简体中文</option>
+                  </select>
+                </SettingsRow>
+                <div className="settings-row settings-row-plain">
                   <div className="settings-row-copy">
                     <div className="settings-row-title">{t("settings.theme")}</div>
                     <div className="settings-row-desc">{t("settings.themeDesc")}</div>
@@ -392,10 +504,7 @@ export function SettingsPage() {
                         settings.theme === theme && "active",
                         theme,
                       )}
-                      onClick={async () => {
-                        await api.setSettings({ ...settings, theme });
-                        await refreshProviders();
-                      }}
+                      onClick={() => void saveSettings({ theme })}
                     >
                       <span className="settings-theme-swatch" />
                       <span className="settings-theme-label">
@@ -411,7 +520,76 @@ export function SettingsPage() {
                   ))}
                 </div>
               </SettingsCard>
-            </>
+
+              <SettingsCard title={t("settings.defaultsTitle")}>
+                <SettingsRow title={t("settings.mode")} description={t("settings.modeDesc")}>
+                  <div
+                    className="settings-segment"
+                    role="group"
+                    aria-label={t("settings.mode")}
+                  >
+                    {([
+                      ["agent", "settings.modeAgent"],
+                      ["chat", "settings.modeChat"],
+                    ] as const).map(([value, labelKey]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className={cx(
+                          "settings-segment-item",
+                          settings.defaultMode === value && "active",
+                        )}
+                        aria-pressed={settings.defaultMode === value}
+                        onClick={() => void saveSettings({ defaultMode: value })}
+                      >
+                        {t(labelKey)}
+                      </button>
+                    ))}
+                  </div>
+                </SettingsRow>
+                <SettingsRow
+                  title={t("settings.enterToSend")}
+                  description={t("settings.enterToSendDesc")}
+                >
+                  <button
+                    type="button"
+                    className={cx("settings-toggle", settings.enterToSend && "on")}
+                    role="switch"
+                    aria-checked={settings.enterToSend}
+                    aria-label={t("settings.enterToSend")}
+                    onClick={() =>
+                      void saveSettings({ enterToSend: !settings.enterToSend })
+                    }
+                  >
+                    <span className="settings-toggle-thumb" />
+                  </button>
+                </SettingsRow>
+              </SettingsCard>
+
+              <SettingsCard title={t("settings.permissions")}>
+                <SettingsRow
+                  title={t("settings.permissionMode")}
+                  description={t("settings.permissionModeDesc")}
+                >
+                  <select
+                    className="field-select"
+                    aria-label={t("settings.permissionMode")}
+                    value={settings.defaultPermissionMode ?? "ask"}
+                    onChange={(e) =>
+                      void saveSettings({
+                        defaultPermissionMode: e.target.value as GlobalPermissionMode,
+                      })
+                    }
+                  >
+                    <option value="ask">{t("settings.permissionModeAsk")}</option>
+                    <option value="accept-edits">
+                      {t("settings.permissionModeAcceptEdits")}
+                    </option>
+                    <option value="auto">{t("settings.permissionModeAuto")}</option>
+                  </select>
+                </SettingsRow>
+              </SettingsCard>
+            </div>
           )}
 
           {tab === "agent" && <ProvidersSection />}

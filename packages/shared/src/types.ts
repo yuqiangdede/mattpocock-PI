@@ -284,6 +284,8 @@ export type AppSettings = {
   /** Global permission mode default; sessions with `inherit` follow this. */
   defaultPermissionMode?: GlobalPermissionMode;
   theme: "system" | "light" | "dark";
+  /** UI language; `auto` (and absent) follows the OS locale. */
+  language?: "auto" | "en" | "zh-CN";
   enterToSend: boolean;
   onboardingDismissed: boolean;
 };

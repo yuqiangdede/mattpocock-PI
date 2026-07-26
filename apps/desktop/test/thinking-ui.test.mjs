@@ -18,10 +18,17 @@ const mainSource = await readFile(
   new URL("../electron/main/index.ts", import.meta.url),
   "utf8",
 );
-const settingsSource = await readFile(
-  new URL("../src/pages/SettingsPage.tsx", import.meta.url),
-  "utf8",
-);
+// Provider thinking config lives in the provider settings components, not the
+// settings page shell.
+const settingsSource = (
+  await Promise.all(
+    [
+      "../src/components/settings/ProvidersSection.tsx",
+      "../src/components/settings/ProviderDialog.tsx",
+      "../src/components/settings/provider-form.ts",
+    ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
+  )
+).join("\n");
 const stylesSource = await readFile(
   new URL("../src/styles/globals.css", import.meta.url),
   "utf8",

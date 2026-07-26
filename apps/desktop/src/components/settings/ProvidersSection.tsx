@@ -267,33 +267,6 @@ export function ProvidersSection() {
       <section className="settings-card-block">
         <h3 className="settings-card-heading">{t("settings.defaultsTitle")}</h3>
         <div className="settings-panel">
-          <SettingsRow title={t("settings.mode")} description={t("settings.modeDesc")}>
-            <div className="settings-segment" role="group" aria-label={t("settings.mode")}>
-              {([
-                ["agent", "settings.modeAgent"],
-                ["chat", "settings.modeChat"],
-              ] as const).map(([value, labelKey]) => (
-                <button
-                  key={value}
-                  type="button"
-                  className={cx(
-                    "settings-segment-item",
-                    settings.defaultMode === value && "active",
-                  )}
-                  aria-pressed={settings.defaultMode === value}
-                  onClick={async () => {
-                    await api.setSettings({
-                      ...settings,
-                      defaultMode: value,
-                    });
-                    await refreshProviders();
-                  }}
-                >
-                  {t(labelKey)}
-                </button>
-              ))}
-            </div>
-          </SettingsRow>
           <SettingsRow
             title={t("settings.defaultModel")}
             description={t("settings.defaultModelDesc")}
@@ -321,27 +294,6 @@ export function ProvidersSection() {
                 </option>
               ))}
             </select>
-          </SettingsRow>
-          <SettingsRow
-            title={t("settings.enterToSend")}
-            description={t("settings.enterToSendDesc")}
-          >
-            <button
-              type="button"
-              className={cx("settings-toggle", settings.enterToSend && "on")}
-              role="switch"
-              aria-checked={settings.enterToSend}
-              aria-label={t("settings.enterToSend")}
-              onClick={async () => {
-                await api.setSettings({
-                  ...settings,
-                  enterToSend: !settings.enterToSend,
-                });
-                await refreshProviders();
-              }}
-            >
-              <span className="settings-toggle-thumb" />
-            </button>
           </SettingsRow>
         </div>
       </section>
