@@ -230,6 +230,7 @@ export type AppState = {
   refreshSessions: () => Promise<void>;
   selectSession: (id: string, opts?: { record?: boolean }) => Promise<void>;
   newSession: (options?: { projectPath?: string | null }) => Promise<void>;
+  forkSession: (id: string) => Promise<void>;
   configureActiveSession: (config: {
     mode: "chat" | "agent";
     providerId?: string;
@@ -680,6 +681,56 @@ export const useAppStore = create<AppState>((set, get) => ({
         activeSessionId: created.session.id,
         messages: detail.session?.messages ?? [],
         page: "chat" as const,
+        navStack: nextStack,
+        navIndex: nextStack.length - 1,
+      };
+    });
+  },
+
+  forkSession: async (id) => {
+    const state = get();
+    if (!id || state.runningSessions[id]) return;
+    const source = state.sessions.find((session) => session.id === id);
+    if (!source) throw new Error("Session not found");
+
+    if (source.projectPath) {
+      if (
+        !sessionMatchesProject(
+          { projectPath: state.activeProjectPath },
+          source.projectPath,
+        )
+      ) {
+        const workspace = await get().activateProject(source.projectPath);
+        if (!workspace) throw new Error("Unable to activate project workspace");
+      }
+    } else if (state.workspace) {
+      await get().clearProject();
+    }
+
+    const sourceTitle = source.title.trim() || i18n.t("chat.untitledTask");
+    const result = await api.forkSession(
+      id,
+      i18n.t("nav.branchTitle", { title: sourceTitle }),
+    );
+    const { messages, ...summary } = result.session;
+    get().resetWorkPanelContext();
+    set((current) => {
+      const sessions = decorateSessions(
+        [
+          summary,
+          ...current.sessions.filter((session) => session.id !== summary.id),
+        ],
+        current.sessionMeta,
+      );
+      const stack = current.navStack.slice(0, current.navIndex + 1);
+      const entry = { page: "chat" as const, sessionId: summary.id };
+      const nextStack = [...stack, entry].slice(-50);
+      return {
+        sessions,
+        activeSessionId: summary.id,
+        messages,
+        page: "chat" as const,
+        isRunning: false,
         navStack: nextStack,
         navIndex: nextStack.length - 1,
       };

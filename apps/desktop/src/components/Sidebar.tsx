@@ -23,6 +23,7 @@ import {
   IconArchiveRestore,
   IconArrowUpDown,
   IconAt,
+  IconBranch,
   IconChevronDown,
   IconChevronLeft,
   IconChevronRight,
@@ -158,6 +159,7 @@ export function Sidebar({
   const navStack = useAppStore((s) => s.navStack);
   const selectSession = useAppStore((s) => s.selectSession);
   const newSession = useAppStore((s) => s.newSession);
+  const forkSessionAction = useAppStore((s) => s.forkSession);
   const openProject = useAppStore((s) => s.openProject);
   const clearProject = useAppStore((s) => s.clearProject);
   const activateProject = useAppStore((s) => s.activateProject);
@@ -294,7 +296,7 @@ export function Sidebar({
     if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
     const items = Array.from(
       event.currentTarget.querySelectorAll<HTMLButtonElement>(
-        '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]',
+        '[role="menuitem"]:not(:disabled), [role="menuitemradio"]:not(:disabled), [role="menuitemcheckbox"]:not(:disabled)',
       ),
     );
     if (!items.length) return;
@@ -642,6 +644,16 @@ export function Sidebar({
     }
   };
 
+  const forkSession = async (session: SessionSummary) => {
+    closeMenus(false);
+    try {
+      await forkSessionAction(session.id);
+      focusComposer();
+    } catch (error) {
+      reportError(error);
+    }
+  };
+
   const toggleProjectPin = (entry: ProjectEntry) => {
     toggleProjectPinned(entry.path);
     closeMenus();
@@ -947,6 +959,16 @@ export function Sidebar({
               {sessionArchived(session, sessionMeta[session.id])
                 ? t("nav.restoreTask", { defaultValue: "Restore" })
                 : t("nav.archiveTask", { defaultValue: "Archive" })}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              data-action="fork-session"
+              disabled={Boolean(runningSessions[session.id])}
+              onClick={() => void forkSession(session)}
+            >
+              <IconBranch size={14} />
+              {t("nav.createBranch")}
             </button>
             <button
               type="button"

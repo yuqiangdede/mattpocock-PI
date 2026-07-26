@@ -272,7 +272,7 @@ type SessionDetail = SessionSummary & {
 };
 ```
 
-Electron main enriches session list/get/create/configure results with effective
+Electron main enriches session list/get/create/fork/configure results with effective
 reasoning capability for that session's exact `(providerId, modelId)`. Missing
 provider/model metadata yields `supportsReasoning: false` and `off`; the Rust
 host remains authoritative only for the durable `thinkingLevel`.
@@ -281,6 +281,7 @@ Minimal interface:
 
 - `session/list`
 - `session/create`
+- `session/fork({ sessionId, title? }) -> { session: SessionDetail }`
 - `session/get`
 - `session/delete`
 - `session/rename`
@@ -289,6 +290,16 @@ Minimal interface:
 
 Import candidates carry `projectPath: string | null`. A successful import
 refreshes both sessions and the durable Projects index.
+
+`session/fork` is a protocol-v5 channel that creates an independent
+session from the source session's current active transcript. Electron rejects
+the request with `AGENT_BUSY` while that source session has an active turn.
+Electron owns localization and supplies the user-facing branch title; the host
+fallback title is reserved for non-UI callers.
+The host assigns a new session id, message ids, and tool-call ids; it copies
+the durable project/provider/model/mode/thinking/permission configuration but
+does not copy turns, notifications, artifacts, scratch data, permission
+grants, or regenerate revisions. The source session remains unchanged.
 
 Protocol version 2 adds `thinkingLevel`, `UiMessage.thinking`, and
 `message_update.deltaThinking`. A v1 peer must fail the version check instead
@@ -371,7 +382,7 @@ type ToolPermissionResolution = {
 
 ## 11. Version Compatibility
 
-- IPC/host contract version field: `protocolVersion: 4`
+- IPC/host contract version field: `protocolVersion: 5`
 - Breaking changes must bump the version and record an ADR
 - renderer and main validate the version at startup; on mismatch, prompt to upgrade/reinstall
 - Protocol v4 adds notification records, channels, and the
@@ -380,6 +391,9 @@ type ToolPermissionResolution = {
 - The optional viewing-session invoke and `createNotification` end-turn field
   are additive v4 behavior. Older callers omit the field and retain the
   fail-safe default of creating notifications.
+- Protocol v5 adds the required `session/fork` snapshot operation. A v4 peer is
+  rejected before chat becomes interactive instead of exposing a branch
+  command that can only fail at invocation time (ADR 0023).
 
 ## 12. Plugin API (host UI side)
 

@@ -96,6 +96,8 @@ export const zhCN = {
     unpinTask: "取消置顶",
     archiveTask: "归档",
     restoreTask: "恢复",
+    createBranch: "创建分支",
+    branchTitle: "{{title}}（分支）",
     openTaskFolder: "打开文件夹",
     deleteTask: "删除",
   },

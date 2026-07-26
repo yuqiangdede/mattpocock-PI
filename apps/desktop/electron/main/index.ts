@@ -1725,6 +1725,49 @@ function registerIpc() {
     const providers = await listRuntimeProviders();
     return { ...res, session: enrichSession(res.session, providers) };
   });
+  handle(
+    IPC.invoke.sessionFork,
+    async (input: { sessionId?: string; title?: string } = {}) => {
+      if (!host) throw new Error("host unavailable");
+      const sessionId = String(input.sessionId ?? "").trim();
+      if (!sessionId) {
+        throw Object.assign(new Error("sessionId required"), {
+          errorCode: ErrorCodes.INVALID_ARGUMENT,
+        });
+      }
+      if (activeTurns.has(sessionId)) {
+        throw Object.assign(new Error("Cannot fork a running session"), {
+          errorCode: ErrorCodes.AGENT_BUSY,
+        });
+      }
+      // Resolve enrichment before the mutation so a provider-list failure
+      // cannot report a failed IPC after the child has already been committed.
+      const providers = await listRuntimeProviders();
+      let result: { session?: RuntimeSession | null };
+      try {
+        result = await host.call("session.fork", {
+          sessionId,
+          title: String(input.title ?? "").trim() || undefined,
+        });
+      } catch (error: any) {
+        if (error?.data?.errorCode === ErrorCodes.CONFLICT) {
+          throw Object.assign(new Error("Cannot fork a running session"), {
+            errorCode: ErrorCodes.AGENT_BUSY,
+          });
+        }
+        throw error;
+      }
+      if (!result.session) return result;
+      logger.app("info", "session forked", {
+        sessionId: (result.session as { id?: string }).id,
+        data: { sourceSessionId: sessionId },
+      });
+      return {
+        ...result,
+        session: enrichSession(result.session, providers),
+      };
+    },
+  );
   handle(IPC.invoke.sessionGet, async (id: string) => {
     if (!host) throw new Error("host unavailable");
     const [result, providers] = await Promise.all([

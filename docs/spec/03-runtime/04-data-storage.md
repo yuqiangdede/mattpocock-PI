@@ -308,6 +308,10 @@ CREATE INDEX idx_sessions_project ON sessions(project_id) WHERE project_id IS NO
 - `project_id` is also the tool-root authority for that session. Switching the
   visible workspace cannot redirect an in-flight or later tool call belonging
   to a different session.
+- Forking a session copies its current active transcript into a new session
+  row while retaining the exact `project_id`, provider/model, mode, thinking,
+  and permission configuration. No parent/child column is stored: the result
+  is an independent session, not a durable navigation tree.
 
 ### 4.6 turns — one row per agent run
 
@@ -623,6 +627,7 @@ is the source of truth, the index is derived and self-healing.
 | tool succeeded (Write/Edit) | — | upsert `artifacts` + `audit_log` row, same tx as result persistence |
 | turn terminal via `session.endTurn` | — | update `turns`; for completed/error insert one notification and prune to 200 in the same tx; aborted inserts none |
 | compaction / edit (`session.replaceMessages`) | atomic transcript rewrite (temp + rename) | single tx: delete index rows, bulk reinsert, reset `last_seq` |
+| session fork (`session.fork`) | write a new transcript with remapped message/tool-call ids | single tx: clone session configuration, insert child index rows, set `last_seq`; remove child file on failure |
 | regenerate branch save | append revision line | index row with `message_count` (+ `is_active` flip) |
 | revision switch | read branch, atomic transcript rewrite | flip `is_active`, rebuild index rows, reset `last_seq` |
 | import | write transcript file | one tx per session: session row + index rows; on failure the file is removed |

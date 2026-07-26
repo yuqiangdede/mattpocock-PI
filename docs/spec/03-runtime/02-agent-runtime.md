@@ -113,6 +113,9 @@ interface AgentRuntime {
   well-formed for every provider API.
 - Failed assistant messages remain durable diagnostic transcript entries but
   are never restored into pi model context on a later turn.
+- A forked session receives a new session id and no shared runtime. Its first
+  prompt creates a fresh pi runtime and restores context only from the child
+  transcript, including the remapped tool call/result pairs.
 
 ## 6. Providers & models
 

@@ -395,6 +395,96 @@ fn record_to_ui(record: MessageRecord) -> UiMessage {
     }
 }
 
+fn dedupe_records(records: Vec<MessageRecord>) -> Vec<MessageRecord> {
+    let mut ordered: Vec<MessageRecord> = Vec::with_capacity(records.len());
+    let mut by_id: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::with_capacity(records.len());
+    for record in records {
+        match by_id.get(&record.id) {
+            Some(&pos) => ordered[pos] = record,
+            None => {
+                by_id.insert(record.id.clone(), ordered.len());
+                ordered.push(record);
+            }
+        }
+    }
+    ordered
+}
+
+fn record_index_text(record: &MessageRecord) -> Option<String> {
+    if record.role == "tool" {
+        return None;
+    }
+    let text = record
+        .blocks
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|block| {
+            (block.get("type").and_then(Value::as_str) == Some("text"))
+                .then(|| block.get("text").and_then(Value::as_str))
+                .flatten()
+        })
+        .collect::<String>();
+    (!text.is_empty()).then_some(text)
+}
+
+fn collect_tool_call_ids(records: &[MessageRecord]) -> std::collections::HashMap<String, String> {
+    let mut ids = std::collections::HashMap::new();
+    for record in records {
+        let Some(blocks) = record.blocks.as_array() else {
+            continue;
+        };
+        for block in blocks {
+            let Some(object) = block.as_object() else {
+                continue;
+            };
+            for key in ["callId", "toolCallId"] {
+                if let Some(id) = object.get(key).and_then(Value::as_str) {
+                    ids.entry(id.to_string())
+                        .or_insert_with(|| Uuid::new_v4().to_string());
+                }
+            }
+        }
+    }
+    ids
+}
+
+fn clone_records_for_fork(records: Vec<MessageRecord>) -> Vec<MessageRecord> {
+    let records = dedupe_records(records);
+    let tool_call_ids = collect_tool_call_ids(&records);
+    records
+        .into_iter()
+        .map(|mut record| {
+            record.id = Uuid::new_v4().to_string();
+            if let Some(meta) = record.meta.as_mut().and_then(Value::as_object_mut) {
+                meta.remove("revisionRootId");
+                meta.remove("revisionCount");
+                meta.remove("activeRevision");
+                if meta.is_empty() {
+                    record.meta = None;
+                }
+            }
+            if let Some(blocks) = record.blocks.as_array_mut() {
+                for block in blocks {
+                    let Some(object) = block.as_object_mut() else {
+                        continue;
+                    };
+                    for key in ["callId", "toolCallId"] {
+                        let Some(old_id) = object.get(key).and_then(Value::as_str) else {
+                            continue;
+                        };
+                        if let Some(new_id) = tool_call_ids.get(old_id) {
+                            object.insert(key.to_string(), json!(new_id));
+                        }
+                    }
+                }
+            }
+            record
+        })
+        .collect()
+}
+
 /// Insert one search/index row for a message whose content lives in the
 /// transcript file.
 fn insert_index_row(
@@ -593,21 +683,94 @@ pub fn get_session(db: &Database, id: &str) -> Result<Option<SessionDetail>> {
     // Content comes from the transcript file; SQLite only indexes it.
     // Keep-last dedupe by message id absorbs a retried append whose earlier
     // file line lost its index transaction to a crash.
-    let records = transcripts::read_transcript(db.data_dir(), id)?;
-    let mut ordered: Vec<MessageRecord> = Vec::with_capacity(records.len());
-    let mut by_id: std::collections::HashMap<String, usize> =
-        std::collections::HashMap::with_capacity(records.len());
-    for record in records {
-        match by_id.get(&record.id) {
-            Some(&pos) => ordered[pos] = record,
-            None => {
-                by_id.insert(record.id.clone(), ordered.len());
-                ordered.push(record);
-            }
-        }
-    }
-    let messages = ordered.into_iter().map(record_to_ui).collect();
+    let records = dedupe_records(transcripts::read_transcript(db.data_dir(), id)?);
+    let messages = records.into_iter().map(record_to_ui).collect();
     Ok(Some(SessionDetail { summary, messages }))
+}
+
+/// Create an independent session from the source session's current canonical
+/// transcript. Regenerate revisions, turns, artifacts, notifications, scratch
+/// data, and live runtime state are intentionally not copied.
+pub enum ForkSessionResult {
+    Created(Box<SessionDetail>),
+    NotFound,
+    Busy,
+}
+
+pub fn fork_session(
+    db: &Database,
+    source_id: &str,
+    title: Option<&str>,
+) -> Result<ForkSessionResult> {
+    let Some(source) = get_session(db, source_id)? else {
+        return Ok(ForkSessionResult::NotFound);
+    };
+    let has_running_turn: bool = db.conn().query_row(
+        "SELECT EXISTS(
+            SELECT 1 FROM turns WHERE session_id = ?1 AND status = 'running'
+         )",
+        params![source_id],
+        |row| row.get(0),
+    )?;
+    if has_running_turn {
+        return Ok(ForkSessionResult::Busy);
+    }
+    let source_records = transcripts::read_transcript(db.data_dir(), source_id)?;
+    let records = clone_records_for_fork(source_records);
+    let texts = records.iter().map(record_index_text).collect::<Vec<_>>();
+    let id = Uuid::new_v4().to_string();
+    let now = now_ms();
+    let created_at = ms_to_ts(now);
+    let requested_title = title.map(str::trim).filter(|value| !value.is_empty());
+    let title = requested_title
+        .map(|value| value.chars().take(100).collect::<String>())
+        .unwrap_or_else(|| format!("{} (branch)", source.summary.title));
+
+    transcripts::write_transcript(db.data_dir(), &id, &created_at, &records)?;
+    let indexed = (|| -> Result<()> {
+        let tx = db.conn().unchecked_transaction()?;
+        let inserted = tx
+            .prepare_cached(
+                "INSERT INTO sessions (
+                    id, title, project_id, provider_id, model_id, mode, thinking_level,
+                    permission_mode, source, pinned, last_seq, created_at, updated_at
+                 )
+                 SELECT ?1, ?2, project_id, provider_id, model_id, mode, thinking_level,
+                        permission_mode, NULL, 0, ?3, ?4, ?4
+                 FROM sessions WHERE id = ?5",
+            )?
+            .execute(params![id, title, records.len() as i64, now, source_id])?;
+        if inserted == 0 {
+            return Err(anyhow!("session not found: {source_id}"));
+        }
+        for (seq, record) in records.iter().enumerate() {
+            insert_index_row(&tx, &id, seq as i64, None, record, texts[seq].as_deref())?;
+        }
+        tx.commit()?;
+        Ok(())
+    })();
+    if let Err(error) = indexed {
+        transcripts::remove_session_files(db.data_dir(), &id);
+        return Err(error);
+    }
+
+    let summary = SessionSummary {
+        id,
+        title,
+        project_path: source.summary.project_path,
+        model_id: source.summary.model_id,
+        provider_id: source.summary.provider_id,
+        mode: source.summary.mode,
+        thinking_level: source.summary.thinking_level,
+        permission_mode: source.summary.permission_mode,
+        updated_at: created_at.clone(),
+        created_at,
+    };
+    let messages = records.into_iter().map(record_to_ui).collect();
+    Ok(ForkSessionResult::Created(Box::new(SessionDetail {
+        summary,
+        messages,
+    })))
 }
 
 /// Backwards-compatible configurator.  Omitting the thinking level preserves
@@ -1638,6 +1801,147 @@ mod tests {
         let detail = get_session(&db, &session.id).unwrap().unwrap();
         assert_eq!(detail.messages.len(), 2);
         assert_eq!(detail.messages[1].content, "next");
+    }
+
+    #[test]
+    fn fork_session_clones_active_transcript_and_configuration() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        let db = Database::open(&path).unwrap();
+        let source = create_session_with_thinking(
+            &db,
+            Some("Source".into()),
+            Some("chat".into()),
+            Some("provider-1".into()),
+            Some("model-1".into()),
+            Some("/tmp/project".into()),
+            Some("high".into()),
+        )
+        .unwrap();
+        configure_session_with_thinking(
+            &db,
+            &source.id,
+            "chat",
+            Some("provider-1"),
+            Some("model-1"),
+            Some("high"),
+            Some("auto"),
+        )
+        .unwrap();
+
+        let mut user = user_msg("user-1", "fork this", "2025-05-01T00:00:00Z");
+        user.revision_root_id = Some("user-1".into());
+        user.revision_count = Some(2);
+        user.active_revision = Some(2);
+        let mut tool = user_msg("tool-1", "ok", "2025-05-01T00:00:01Z");
+        tool.role = "tool".into();
+        tool.tool_name = Some("Read".into());
+        tool.tool_call_id = Some("call-1".into());
+        tool.tool_status = Some("success".into());
+        append_message(&db, &source.id, &user, None).unwrap();
+        append_message(&db, &source.id, &tool, None).unwrap();
+        save_message_revision(&db, &source.id, "user-1", &[user.clone()], true).unwrap();
+
+        let ForkSessionResult::Created(fork) =
+            fork_session(&db, &source.id, Some("Source (branch)")).unwrap()
+        else {
+            panic!("expected forked session");
+        };
+        let source_after = get_session(&db, &source.id).unwrap().unwrap();
+
+        assert_ne!(fork.summary.id, source.id);
+        assert_eq!(fork.summary.title, "Source (branch)");
+        assert_eq!(fork.summary.project_path, source.project_path);
+        assert_eq!(fork.summary.provider_id.as_deref(), Some("provider-1"));
+        assert_eq!(fork.summary.model_id.as_deref(), Some("model-1"));
+        assert_eq!(fork.summary.mode, "chat");
+        assert_eq!(fork.summary.thinking_level, "high");
+        assert_eq!(fork.summary.permission_mode, "auto");
+        assert_eq!(fork.messages.len(), 2);
+        assert_eq!(source_after.messages[0].id, "user-1");
+        assert_eq!(
+            source_after.messages[1].tool_call_id.as_deref(),
+            Some("call-1")
+        );
+        assert_ne!(fork.messages[0].id, source_after.messages[0].id);
+        assert_ne!(fork.messages[1].id, source_after.messages[1].id);
+        assert_ne!(
+            fork.messages[1].tool_call_id,
+            source_after.messages[1].tool_call_id
+        );
+        assert_eq!(fork.messages[0].content, "fork this");
+        assert_eq!(fork.messages[0].revision_root_id, None);
+        assert_eq!(fork.messages[0].revision_count, None);
+        assert_eq!(fork.messages[0].active_revision, None);
+        assert!(list_message_revisions(&db, &fork.summary.id, "user-1")
+            .unwrap()
+            .is_empty());
+        assert!(
+            !transcripts::revisions_path(db.data_dir(), &fork.summary.id)
+                .unwrap()
+                .exists()
+        );
+        assert!(search_messages(&db, "fork", 10)
+            .unwrap()
+            .iter()
+            .any(|hit| hit.session_id == fork.summary.id));
+
+        append_message(
+            &db,
+            &fork.summary.id,
+            &user_msg("child-only", "continue here", "2025-05-01T00:00:02Z"),
+            None,
+        )
+        .unwrap();
+        configure_session_with_thinking(
+            &db,
+            &fork.summary.id,
+            "agent",
+            Some("provider-2"),
+            Some("model-2"),
+            Some("off"),
+            Some("ask"),
+        )
+        .unwrap();
+        let source_final = get_session(&db, &source.id).unwrap().unwrap();
+        let fork_final = get_session(&db, &fork.summary.id).unwrap().unwrap();
+        assert_eq!(source_final.messages.len(), 2);
+        assert_eq!(source_final.summary.mode, "chat");
+        assert_eq!(source_final.summary.model_id.as_deref(), Some("model-1"));
+        assert_eq!(fork_final.messages.len(), 3);
+        assert_eq!(fork_final.summary.mode, "agent");
+        assert_eq!(fork_final.summary.model_id.as_deref(), Some("model-2"));
+        assert_eq!(fork_final.summary.thinking_level, "off");
+        assert_eq!(fork_final.summary.permission_mode, "ask");
+
+        drop(db);
+        let db = Database::open(&path).unwrap();
+        let source_reopened = get_session(&db, &source.id).unwrap().unwrap();
+        let fork_reopened = get_session(&db, &fork.summary.id).unwrap().unwrap();
+        assert_eq!(source_reopened.messages.len(), 2);
+        assert_eq!(fork_reopened.messages.len(), 3);
+        assert_eq!(fork_reopened.messages[2].content, "continue here");
+
+        assert!(matches!(
+            fork_session(&db, "missing", None).unwrap(),
+            ForkSessionResult::NotFound
+        ));
+        let turn = begin_turn(&db, &source.id, None, None).unwrap();
+        assert!(matches!(
+            fork_session(&db, &source.id, None).unwrap(),
+            ForkSessionResult::Busy
+        ));
+        end_turn(&db, &turn, "aborted", None, None, false).unwrap();
+        delete_session(&db, &source.id).unwrap();
+        assert!(get_session(&db, &source.id).unwrap().is_none());
+        assert_eq!(
+            get_session(&db, &fork.summary.id)
+                .unwrap()
+                .unwrap()
+                .messages
+                .len(),
+            3
+        );
     }
 
     #[test]

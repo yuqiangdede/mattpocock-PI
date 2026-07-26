@@ -44,6 +44,11 @@ accept_prompt
    inserts `task.failed`, and a result already visible in the focused current
    chat or any `aborted` turn inserts no notification (D117). Repeated terminal
    calls are no-ops.
+9. Fork is allowed only while the source is idle. The child begins idle with
+   no turn or waiting-permission state. Electron returns `AGENT_BUSY` for its
+   active runtime guard and normalizes the host's persisted running-turn
+   `CONFLICT` fallback to the same IPC error. Neither path produces a partial
+   child.
 
 ## 4. Persistence points
 
@@ -56,6 +61,8 @@ transcript-file line first, index transaction second.
   update; never for a visible-current result or abort
 - assistant/tool messages: on message_end/tool_end
 - mode/project fields: on change
+- fork snapshot: new transcript file plus one child session/index transaction;
+  source persistence remains untouched
 
 ## 5. Acceptance
 
@@ -66,3 +73,5 @@ transcript-file line first, index transaction second.
    transcript-event or workspace-root crossover
 5. each unseen completed/failed turn produces exactly one notification record
    while a visible-current result or aborted turn produces none
+6. an idle fork starts as an independent idle session; a busy source cannot
+   produce a child

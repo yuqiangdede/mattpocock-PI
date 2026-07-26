@@ -1,4 +1,4 @@
-export const PROTOCOL_VERSION = 4 as const;
+export const PROTOCOL_VERSION = 5 as const;
 export const APP_NAME = "PI-Desktop";
 export const APP_VERSION = "0.1.1";
 
@@ -66,6 +66,7 @@ export const IPC = {
     agentGetStatus: "pi-desktop/agent/getStatus",
     sessionList: "pi-desktop/session/list",
     sessionCreate: "pi-desktop/session/create",
+    sessionFork: "pi-desktop/session/fork",
     sessionGet: "pi-desktop/session/get",
     sessionDelete: "pi-desktop/session/delete",
     sessionRename: "pi-desktop/session/rename",

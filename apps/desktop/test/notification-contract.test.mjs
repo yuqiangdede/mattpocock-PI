@@ -14,7 +14,7 @@ const [protocolSource, mainSource, apiSource, storeSource, appSource] =
   ]);
 
 test("notification IPC stays behind the shared preload allowlist", () => {
-  assert.match(protocolSource, /PROTOCOL_VERSION = 4/);
+  assert.match(protocolSource, /PROTOCOL_VERSION = 5/);
   for (const channel of [
     "notificationList",
     "notificationMarkRead",

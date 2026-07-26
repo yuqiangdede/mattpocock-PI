@@ -57,3 +57,30 @@ type CommandExecutionResult =
 2. Palette search matches title/keywords
 3. Mode switch commands update session mode immediately
 4. Abort command works during stream and permission pending
+
+## 7. Composer slash aliases (D123, ADR 0024)
+
+Builtin commands surface in the composer `/` menu through short aliases
+defined in the same registry that feeds palette search
+(`electron/main/builtin-commands.ts`); execution reuses the renderer switch.
+
+| alias | palette id |
+|---|---|
+| `/new` | `builtin.session.new` |
+| `/delete-task` | `builtin.session.delete` |
+| `/abort` | `builtin.agent.abort` |
+| `/agent-mode` | `builtin.mode.agent` |
+| `/chat-mode` | `builtin.mode.chat` |
+| `/open-project` | `builtin.project.open` |
+| `/clear-project` | `builtin.project.clear` |
+| `/settings` | `builtin.settings.open` |
+| `/providers` | `builtin.settings.providers` |
+| `/import` | `builtin.settings.import` |
+| `/plugins` | `builtin.plugins.open` |
+| `/load-plugin` | `builtin.plugins.loadDev` |
+| `/logs` | `builtin.logs.open` |
+
+Aliases share one namespace with template and plugin command names; builtin
+aliases win collisions, then project templates, then user templates, then
+plugin commands. Selecting an alias inserts `/alias `; sending executes it
+locally without creating a session or a prompt.

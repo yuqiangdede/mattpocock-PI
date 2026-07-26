@@ -29,6 +29,7 @@ import {
   FileText,
   Folder,
   Globe2,
+  GitFork,
   GitPullRequestArrow,
   Hammer,
   Image,
@@ -89,6 +90,7 @@ export const IconNewSession = icon(MessageSquarePlus);
 export const IconFolder = icon(Folder);
 export const IconFileText = icon(FileText);
 export const IconGlobe = icon(Globe2);
+export const IconBranch = icon(GitFork);
 export const IconTerminal = icon(Terminal);
 export const IconPencil = icon(PencilLine);
 export const IconWrench = icon(Wrench);

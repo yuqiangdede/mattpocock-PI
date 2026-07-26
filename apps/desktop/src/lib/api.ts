@@ -120,6 +120,11 @@ export const api = {
     invoke<{ sessions: SessionSummary[] }>(IPC.invoke.sessionList),
   createSession: (input?: Partial<SessionSummary>) =>
     invoke<{ session: SessionSummary }>(IPC.invoke.sessionCreate, input ?? {}),
+  forkSession: (sessionId: string, title?: string) =>
+    invoke<{ session: SessionDetail }>(IPC.invoke.sessionFork, {
+      sessionId,
+      title,
+    }),
   getSession: (id: string) =>
     invoke<{ session: SessionDetail | null }>(IPC.invoke.sessionGet, id),
   deleteSession: (id: string) => invoke(IPC.invoke.sessionDelete, id),

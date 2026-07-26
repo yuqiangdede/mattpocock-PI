@@ -34,6 +34,8 @@ MVP passes when:
 - [x] Assistant output streams token-by-token — auto:`test:e2e` / `e2e-agent-live`
 - [x] Generation can be aborted — manual:M2 (abort → partial output preserved)
 - [x] Switching between history sessions works — manual:M2
+- [x] An idle session can be forked into an independent conversation —
+  auto:host-core + desktop contract tests
 
 ### D. Workspace
 - [x] A project directory can be selected — manual:M3
@@ -53,6 +55,8 @@ MVP passes when:
 - [x] Sessions survive restart — manual:M2 (SQLite via host-core)
 - [x] Message history is restored — manual:M2
 - [x] Session deletion takes effect — auto:`test:e2e`
+- [x] Forked source/child histories persist and diverge independently —
+  auto:host-core tests
 
 ### G. Plugin system (local minimum)
 - [x] Plugin loads from a local directory — auto:`test:e2e` (dev load)

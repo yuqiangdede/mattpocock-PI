@@ -93,6 +93,8 @@ export const en = {
     unpinTask: "Unpin",
     archiveTask: "Archive",
     restoreTask: "Restore",
+    createBranch: "Create branch",
+    branchTitle: "{{title}} (branch)",
     openTaskFolder: "Open folder",
     deleteTask: "Delete",
   },
