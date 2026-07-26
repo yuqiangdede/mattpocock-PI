@@ -20,7 +20,9 @@ On macOS, the unpackaged `pnpm dev` process explicitly applies
 `build/icon_1024.png` to the Dock after Electron becomes ready. The packaged
 lanes continue to use `build/icon.icns` through electron-builder, and the
 renderer imports the same PNG through `BrandLogo`. The PNG is canonical;
-`scripts/make-icon.py` derives the iconset and ICNS without overwriting it.
+`scripts/make-icon.py` derives the 512px Windows/Linux package PNG on every
+platform and the iconset/ICNS when macOS `iconutil` is available, without
+overwriting the canonical source.
 
 ## 2. Prerequisites (release lane)
 
@@ -80,7 +82,39 @@ Manual smoke on a clean profile (`PI_DESKTOP_DATA_DIR=$(mktemp -d)`):
 6. Quit/relaunch → session history restored, window bounds restored.
 7. `~/.pi-desktop/logs/` contains `app.log` / `host.log` / `agent.log`.
 
-## 6. Known limitations
+## 6. Windows/Linux shell-readiness packages
+
+The repository exposes `dist:win` and `dist:linux` for native-runner smoke
+builds. Each packaging command first runs `build:host-release`, then bundles
+the agent runtime and Electron app. Run a target command on that target OS:
+
+```text
+Windows: pnpm --filter @pi-desktop/desktop dist:win
+Linux:   pnpm --filter @pi-desktop/desktop dist:linux
+```
+
+The Windows package includes `bin/pi-desktop-host-core.exe`; Linux includes
+`bin/pi-desktop-host-core`. `node-pty` must also be rebuilt by
+electron-builder on the native runner. These lanes validate D118 shell and
+sidecar packaging readiness only. Signing, installer upgrade testing, release
+publishing, and release qualification remain post-MVP and do not alter D010.
+
+Native-runner output matrix:
+
+- Windows x64: NSIS installer
+- Linux x64: AppImage and deb
+
+Shell smoke on each native runner:
+
+1. Open every File/Edit/View/Window/Help menu by pointer and keyboard.
+2. Verify F10/arrow/Home/End/Enter/Escape/Tab behavior and Shift+F10 passthrough.
+3. Execute editing actions from a focused editor.
+4. Minimize, maximize, restore, and close from the custom controls.
+5. Relaunch with `PI_DESKTOP_START_MAXIMIZED=1`; confirm the initial
+   maximize/restore glyph matches the queried native state.
+6. Verify unknown menu/window IPC actions fail with the window open and closed.
+
+## 7. Known limitations
 
 - Auto-update channel: post-MVP (open question), DMG-only distribution for now.
-- Windows/Linux lanes: post-MVP (D010).
+- Windows/Linux release qualification and publishing: post-MVP (D010).

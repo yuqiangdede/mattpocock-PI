@@ -98,7 +98,10 @@ PI_DESKTOP_TEST_API_KEY=... pnpm test:e2e
 GitHub Actions:
 
 - **CI** (`.github/workflows/ci.yml`) — every PR and push to `main`: JS build / typecheck / lint / unit tests + `cargo test`.
-- **Release** (`.github/workflows/release.yml`) — pushing a `v*.*.*` tag builds installers for macOS (dmg, arm64), Windows (NSIS, x64) and Linux (AppImage + deb, x64) — each bundling the native Rust host-core — and publishes them to a GitHub Release.
+- **Release** (`.github/workflows/release.yml`) — builds native-host installers
+  for macOS (dmg, arm64), Windows (NSIS, x64), and Linux (AppImage + deb,
+  x64). Tag builds publish only the D010 macOS artifact; Windows/Linux remain
+  downloadable Actions artifacts for shell-readiness testing.
 
 Cut a release:
 
