@@ -93,6 +93,20 @@ pnpm dev
 PI_DESKTOP_TEST_API_KEY=... pnpm test:e2e
 ```
 
+## CI / Release
+
+GitHub Actions:
+
+- **CI** (`.github/workflows/ci.yml`) — every PR and push to `main`: JS build / typecheck / lint / unit tests + `cargo test`.
+- **Release** (`.github/workflows/release.yml`) — pushing a `v*.*.*` tag builds installers for macOS (dmg, arm64), Windows (NSIS, x64) and Linux (AppImage + deb, x64) — each bundling the native Rust host-core — and publishes them to a GitHub Release.
+
+Cut a release:
+
+```bash
+node scripts/release.mjs 0.2.0 --tag   # bump all versions + commit + tag v0.2.0
+git push origin main v0.2.0            # push tag → Release workflow builds & publishes
+```
+
 ## Principles
 
 1. pi is the agent engine; PI-Desktop is the product shell
