@@ -900,6 +900,40 @@ async function createWindow() {
             await mainWindow!.webContents.executeJavaScript(`
               document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
             `);
+            // Composer autocomplete scenes (D123–D125): "/" command menu and
+            // "@" file menu. React's controlled textarea needs the native
+            // value setter + input event to register the draft.
+            const setComposerDraft = (draft: string) =>
+              mainWindow!.webContents.executeJavaScript(`
+                (() => {
+                  const ta = document.querySelector("textarea.composer-input");
+                  if (!ta) return false;
+                  ta.focus();
+                  const set = Object.getOwnPropertyDescriptor(
+                    HTMLTextAreaElement.prototype,
+                    "value",
+                  ).set;
+                  set.call(ta, ${JSON.stringify(draft)});
+                  ta.dispatchEvent(new Event("input", { bubbles: true }));
+                  return true;
+                })()
+              `);
+            await setComposerDraft("/");
+            await new Promise((r) => setTimeout(r, 450));
+            const slashProbe = await mainWindow!.webContents.executeJavaScript(
+              `(() => { const m = document.querySelector(".composer-autocomplete"); return m ? { rows: m.querySelectorAll(".composer-ac-item").length, groups: [...m.querySelectorAll(".composer-model-group-label")].map((g) => g.textContent) } : null; })()`,
+            );
+            console.log("COMPOSER_AC_SLASH", slashProbe);
+            await shot("pi-composer-slash");
+            await setComposerDraft("@");
+            await new Promise((r) => setTimeout(r, 450));
+            const atProbe = await mainWindow!.webContents.executeJavaScript(
+              `(() => { const m = document.querySelector(".composer-autocomplete"); return m ? { rows: m.querySelectorAll(".composer-ac-item").length, empty: m.querySelector(".composer-model-empty")?.textContent || "" } : null; })()`,
+            );
+            console.log("COMPOSER_AC_AT", atProbe);
+            await shot("pi-composer-at");
+            await setComposerDraft("");
+            await new Promise((r) => setTimeout(r, 200));
             // Conversation minimap: seed a capture-only transcript, magnify
             // mid-rail (Dock effect + preview popover), then restore.
             await mainWindow!.webContents.executeJavaScript(
@@ -1084,49 +1118,53 @@ async function createWindow() {
               mainWindow!.webContents.executeJavaScript(`
                 document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }));
               `);
-            const closeSearch = () =>
+            const typeSearch = (value: string) =>
+              mainWindow!.webContents.executeJavaScript(`
+                (() => {
+                  const input = document.querySelector(".search-input");
+                  if (!input) return;
+                  const setter = Object.getOwnPropertyDescriptor(
+                    window.HTMLInputElement.prototype,
+                    "value",
+                  ).set;
+                  setter.call(input, ${JSON.stringify(value)});
+                  input.dispatchEvent(new Event("input", { bubbles: true }));
+                })()
+              `);
+            const searchKey = (key: string) =>
               mainWindow!.webContents.executeJavaScript(`
                 document.querySelector(".search-input")?.dispatchEvent(
-                  new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+                  new KeyboardEvent("keydown", { key: ${JSON.stringify(key)}, bubbles: true }),
                 );
               `);
             await openSearch();
             await new Promise((r) => setTimeout(r, 450));
             await shot("pi-search");
-            await mainWindow!.webContents.executeJavaScript(`
-              (() => {
-                const input = document.querySelector(".search-input");
-                if (!input) return;
-                const setter = Object.getOwnPropertyDescriptor(
-                  window.HTMLInputElement.prototype,
-                  "value",
-                ).set;
-                setter.call(input, "设计");
-                input.dispatchEvent(new Event("input", { bubbles: true }));
-              })()
-            `);
+            await typeSearch("设计");
             await new Promise((r) => setTimeout(r, 350));
             await shot("pi-search-query");
             // Settings hits: "主题" resolves to 通用 tab's theme row.
-            await mainWindow!.webContents.executeJavaScript(`
-              (() => {
-                const input = document.querySelector(".search-input");
-                if (!input) return;
-                const setter = Object.getOwnPropertyDescriptor(
-                  window.HTMLInputElement.prototype,
-                  "value",
-                ).set;
-                setter.call(input, "主题");
-                input.dispatchEvent(new Event("input", { bubbles: true }));
-              })()
-            `);
+            await typeSearch("主题");
             await new Promise((r) => setTimeout(r, 350));
             await shot("pi-search-settings");
             await setTheme("dark");
             await new Promise((r) => setTimeout(r, 250));
             await shot("pi-search-dark");
-            await closeSearch();
             await setTheme("light");
+            await new Promise((r) => setTimeout(r, 250));
+            // Page hits: "插件" surfaces the plugins page entry.
+            await typeSearch("插件");
+            await new Promise((r) => setTimeout(r, 350));
+            await shot("pi-search-pages");
+            // Anchor flash: Enter on the 主题 settings hit lands on 基础 and
+            // flashes the theme row.
+            await typeSearch("主题");
+            await new Promise((r) => setTimeout(r, 350));
+            await searchKey("ArrowDown");
+            await searchKey("Enter");
+            await new Promise((r) => setTimeout(r, 400));
+            await shot("pi-search-anchor");
+            await setPage("chat");
             await new Promise((r) => setTimeout(r, 250));
             // Toast stack proof (ToastHost variants) in both themes.
             const raiseToasts = () =>

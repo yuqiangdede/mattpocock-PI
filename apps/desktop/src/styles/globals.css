@@ -2829,6 +2829,22 @@ textarea:disabled {
   text-align: center;
 }
 
+/* Row anchor flash after arriving from a global-search settings hit. */
+.settings-anchor-flash {
+  border-radius: var(--radius-md);
+  animation: settings-anchor-flash 1.8s ease-out;
+}
+
+@keyframes settings-anchor-flash {
+  0%,
+  35% {
+    background-color: color-mix(in oklab, var(--ds-accent) 16%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
 /*
   Toast notifications (design-system §11.8, component-spec §17).
   Same floating-surface family as the elevated menus: elevated-opaque plate,
@@ -6434,7 +6450,7 @@ textarea:disabled {
 
 .composer-ac-hl {
   color: var(--ds-accent);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .composer-ac-footer {

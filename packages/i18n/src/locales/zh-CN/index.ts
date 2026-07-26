@@ -545,6 +545,7 @@ export const zhCN = {
   search: {
     placeholder: "搜索任务…",
     empty: "没有匹配的任务",
+    pages: "页面",
     today: "今天",
     yesterday: "昨天",
     previous7Days: "近 7 天",

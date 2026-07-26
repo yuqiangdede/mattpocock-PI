@@ -220,6 +220,8 @@ export type AppState = {
   unreadNotificationCount: number;
   page: "chat" | "projects" | "pulls" | "scheduled" | "plugins" | "settings";
   settingsTab: "general" | "agent" | "import" | "about";
+  /** Pending row anchor (i18n key) to flash after landing on a settings tab. */
+  settingsAnchor: string | null;
   navStack: Array<{ page: AppState["page"]; sessionId?: string }>;
   navIndex: number;
   error?: string | null;
@@ -286,6 +288,7 @@ export type AppState = {
   handleAgentEvent: (envelope: AgentEventEnvelope) => void;
   setPage: (page: AppState["page"], opts?: { record?: boolean }) => void;
   setSettingsTab: (tab: AppState["settingsTab"]) => void;
+  setSettingsAnchor: (key: string | null) => void;
   navBack: () => void;
   navForward: () => void;
   canNavBack: () => boolean;
@@ -429,6 +432,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   permission: null,
   page: "chat",
   settingsTab: "general",
+  settingsAnchor: null,
   navStack: [{ page: "chat" }],
   navIndex: 0,
   toasts: [],
@@ -1825,6 +1829,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().setPage("settings");
     set({ settingsTab });
   },
+  setSettingsAnchor: (settingsAnchor) => set({ settingsAnchor }),
   canNavBack: () => get().navIndex > 0,
   canNavForward: () => get().navIndex < get().navStack.length - 1,
   navBack: () => {

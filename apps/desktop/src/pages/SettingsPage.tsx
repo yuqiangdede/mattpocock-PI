@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { AppSettings, GlobalPermissionMode } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
@@ -398,12 +398,55 @@ export function SettingsPage() {
   const { t } = useTranslation();
   const tab = useAppStore((s) => s.settingsTab);
   const setSettingsTab = useAppStore((s) => s.setSettingsTab);
+  const settingsAnchor = useAppStore((s) => s.settingsAnchor);
+  const setSettingsAnchor = useAppStore((s) => s.setSettingsAnchor);
   const setPage = useAppStore((s) => s.setPage);
   const settings = useAppStore((s) => s.settings);
   const version = useAppStore((s) => s.version);
   const refreshProviders = useAppStore((s) => s.refreshProviders);
 
   const [query, setQuery] = useState("");
+
+  // Arriving from the global search dialog: scroll to and flash the row
+  // whose title matches the pending anchor key. Rows are located by their
+  // translated title so async tab content (providers, import) needs no
+  // per-row wiring; a short retry window covers late mounts.
+  useEffect(() => {
+    if (!settingsAnchor) return;
+    const target = t(settingsAnchor).trim();
+    let cancelled = false;
+    let timer: number | undefined;
+    const tryFind = (attempt: number) => {
+      if (cancelled) return;
+      const titles = document.querySelectorAll<HTMLElement>(
+        ".settings-content .settings-row-title, .settings-content .settings-card-heading",
+      );
+      const match = [...titles].find(
+        (node) => node.textContent?.trim() === target,
+      );
+      if (match) {
+        const row =
+          match.closest<HTMLElement>(".settings-row") ??
+          match.closest<HTMLElement>(".settings-card-block") ??
+          match;
+        row.scrollIntoView({ block: "center" });
+        row.classList.add("settings-anchor-flash");
+        window.setTimeout(
+          () => row.classList.remove("settings-anchor-flash"),
+          1800,
+        );
+        setSettingsAnchor(null);
+        return;
+      }
+      if (attempt < 8) timer = window.setTimeout(() => tryFind(attempt + 1), 120);
+      else setSettingsAnchor(null);
+    };
+    tryFind(0);
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [settingsAnchor, tab, t, setSettingsAnchor]);
 
   const saveSettings = async (patch: Partial<AppSettings>) => {
     if (!settings) return;

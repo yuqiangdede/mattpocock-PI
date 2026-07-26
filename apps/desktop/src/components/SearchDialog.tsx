@@ -13,7 +13,26 @@ import {
 } from "../lib/settings-search";
 import type { SessionSummary } from "@pi-desktop/shared";
 import type { SessionMeta } from "../lib/sidebar-preferences";
-import { IconChat, IconNewSession, IconSearch, IconSettings } from "./icons";
+import {
+  IconAt,
+  IconChat,
+  IconClock,
+  IconFolder,
+  IconNewSession,
+  IconPullRequest,
+  IconSearch,
+  IconSettings,
+} from "./icons";
+
+/** Navigable pages surfaced by the global search alongside sessions. */
+const PAGE_ENTRIES = [
+  { page: "projects", labelKey: "nav.projects", icon: IconFolder },
+  { page: "pulls", labelKey: "pulls.title", icon: IconPullRequest },
+  { page: "scheduled", labelKey: "scheduled.title", icon: IconClock },
+  { page: "plugins", labelKey: "nav.plugins", icon: IconAt },
+] as const;
+
+type PageEntry = (typeof PAGE_ENTRIES)[number];
 
 const GROUP_KEYS = [
   "today",
@@ -92,6 +111,8 @@ export function SearchDialog({
   const selectSession = useAppStore((s) => s.selectSession);
   const newSession = useAppStore((s) => s.newSession);
   const setSettingsTab = useAppStore((s) => s.setSettingsTab);
+  const setSettingsAnchor = useAppStore((s) => s.setSettingsAnchor);
+  const setPage = useAppStore((s) => s.setPage);
   const showToast = useAppStore((s) => s.showToast);
 
   const [query, setQuery] = useState("");
@@ -170,14 +191,23 @@ export function SearchDialog({
     }));
   }, [rows]);
 
-  // Settings rows join the listbox after the session results; their flat
-  // option indices therefore start at rows.length + 1.
+  // Pages and settings rows join the listbox after the session results;
+  // flat option order is: new-task, sessions, pages, settings.
+  const pageHits = useMemo<PageEntry[]>(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return PAGE_ENTRIES.filter((entry) =>
+      t(entry.labelKey).toLowerCase().includes(q),
+    );
+  }, [query, t]);
+
   const settingsHits = useMemo<SettingsSearchHit[]>(
     () => searchSettings(query, t),
     [query, t],
   );
 
-  const optionCount = rows.length + settingsHits.length + 1;
+  const settingsBase = rows.length + pageHits.length + 1;
+  const optionCount = settingsBase + settingsHits.length;
 
   useEffect(() => {
     setActive(0);
@@ -210,7 +240,13 @@ export function SearchDialog({
   };
 
   const openSettingsHit = (hit: SettingsSearchHit) => {
+    setSettingsAnchor(hit.rowKey);
     setSettingsTab(hit.tab);
+    onClose();
+  };
+
+  const openPage = (entry: PageEntry) => {
+    setPage(entry.page);
     onClose();
   };
 
@@ -218,7 +254,9 @@ export function SearchDialog({
     if (active === 0) return void run(null);
     const row = rows[active - 1];
     if (row) return void run(row);
-    const hit = settingsHits[active - 1 - rows.length];
+    const pageEntry = pageHits[active - 1 - rows.length];
+    if (pageEntry) return openPage(pageEntry);
+    const hit = settingsHits[active - settingsBase];
     if (hit) openSettingsHit(hit);
   };
 
@@ -335,13 +373,41 @@ export function SearchDialog({
                 </div>
               ))
             : null}
+          {pageHits.length > 0 ? (
+            <div role="presentation">
+              <div className="search-group-label" role="presentation">
+                {t("search.pages")}
+              </div>
+              {pageHits.map((entry, index) => {
+                const optionIndex = rows.length + 1 + index;
+                const Icon = entry.icon;
+                return (
+                  <button
+                    key={entry.page}
+                    id={`global-search-option-${optionIndex}`}
+                    type="button"
+                    role="option"
+                    aria-selected={active === optionIndex}
+                    className={`search-item ${active === optionIndex ? "active" : ""}`}
+                    onMouseEnter={() => setActive(optionIndex)}
+                    onClick={() => openPage(entry)}
+                  >
+                    <Icon size={15} className="search-item-icon" />
+                    <span className="search-item-title">
+                      {highlightMatch(t(entry.labelKey), query)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
           {settingsHits.length > 0 ? (
             <div role="presentation">
               <div className="search-group-label" role="presentation">
                 {t("nav.settings")}
               </div>
               {settingsHits.map((hit, index) => {
-                const optionIndex = rows.length + 1 + index;
+                const optionIndex = settingsBase + index;
                 return (
                   <button
                     key={`${hit.tab}:${hit.rowKey ?? "tab"}`}
@@ -369,7 +435,10 @@ export function SearchDialog({
               })}
             </div>
           ) : null}
-          {rows.length === 0 && settingsHits.length === 0 && query.trim() ? (
+          {rows.length === 0 &&
+          pageHits.length === 0 &&
+          settingsHits.length === 0 &&
+          query.trim() ? (
             <div className="search-empty">{t("search.empty")}</div>
           ) : null}
         </div>

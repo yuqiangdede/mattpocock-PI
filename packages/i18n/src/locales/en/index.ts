@@ -547,6 +547,7 @@ export const en = {
   search: {
     placeholder: "Search tasks…",
     empty: "No matching tasks",
+    pages: "Pages",
     today: "Today",
     yesterday: "Yesterday",
     previous7Days: "Previous 7 days",
