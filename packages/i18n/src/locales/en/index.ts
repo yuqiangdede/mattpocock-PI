@@ -93,6 +93,7 @@ export const en = {
     unpinTask: "Unpin",
     archiveTask: "Archive",
     restoreTask: "Restore",
+    openTaskFolder: "Open folder",
     deleteTask: "Delete",
   },
   chat: {

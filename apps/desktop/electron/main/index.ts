@@ -1750,6 +1750,39 @@ function registerIpc() {
       ? { ...result, session: enrichSession(result.session, providers) }
       : result;
   });
+  handle(IPC.invoke.sessionOpenFolder, async (id: string) => {
+    if (!host) throw new Error("host unavailable");
+    const sessionId = String(id ?? "").trim();
+    if (!sessionId) {
+      throw Object.assign(new Error("sessionId required"), {
+        errorCode: ErrorCodes.INVALID_ARGUMENT,
+      });
+    }
+    // Resolve the folder in main from the session record so the renderer
+    // never passes a raw filesystem path over IPC.
+    const res = await host.call<{
+      session?: { projectPath?: string } | null;
+    }>("session.get", { id: sessionId });
+    if (!res.session) {
+      throw Object.assign(new Error("session not found"), {
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+    const projectPath = res.session.projectPath?.trim();
+    // Project sessions open their project folder; temporary sessions open
+    // the per-session scratch dir (D114), created on demand so the folder
+    // opens even before the agent has written anything there.
+    const target = projectPath || join(dataDir, "scratch", sessionId);
+    if (!projectPath) mkdirSync(target, { recursive: true });
+    if (!existsSync(target)) {
+      throw Object.assign(new Error("folder not found"), {
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+    const openError = await shell.openPath(target);
+    if (openError) throw new Error(openError);
+    return { ok: true, path: target };
+  });
   handle(IPC.invoke.sessionDelete, async (id: string) => {
     if (!host) throw new Error("host unavailable");
     const res = await host.call("session.delete", { id });

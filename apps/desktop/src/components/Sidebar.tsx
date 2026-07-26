@@ -220,6 +220,39 @@ export function Sidebar({
     });
   }, []);
 
+  // Context-menu variant: anchor to the pointer. The menu is positioned by
+  // its right edge, so keep that edge far enough from the left border for
+  // the 184px menu to stay on screen.
+  const placeMenuAtPoint = useCallback((x: number, y: number) => {
+    setMenuPosition({
+      top: Math.max(8, Math.min(y + 4, window.innerHeight - 220)),
+      right: Math.min(
+        Math.max(8, window.innerWidth - x),
+        Math.max(8, window.innerWidth - 192),
+      ),
+    });
+  }, []);
+
+  const openSessionRowMenu = useCallback(
+    (sessionId: string, trigger: HTMLButtonElement | null) => {
+      menuTriggerRef.current = trigger;
+      setSortOpen(false);
+      setProjectMenu(null);
+      setSessionMenu(sessionId);
+    },
+    [],
+  );
+
+  const openProjectRowMenu = useCallback(
+    (projectKey: string, trigger: HTMLButtonElement | null) => {
+      menuTriggerRef.current = trigger;
+      setSortOpen(false);
+      setSessionMenu(null);
+      setProjectMenu(projectKey);
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!profileOpen && !sortOpen && !sessionMenu && !projectMenu) return;
     const onPointer = (e: MouseEvent) => {
@@ -600,6 +633,15 @@ export function Sidebar({
     }
   };
 
+  const openSessionFolder = async (session: SessionSummary) => {
+    closeMenus(false);
+    try {
+      await (await import("../lib/api")).api.openSessionFolder(session.id);
+    } catch (error) {
+      reportError(error);
+    }
+  };
+
   const toggleProjectPin = (entry: ProjectEntry) => {
     toggleProjectPinned(entry.path);
     closeMenus();
@@ -679,6 +721,17 @@ export function Sidebar({
         key={session.id}
         className={`thread-item ${active ? "active" : ""} ${archived ? "archived" : ""}`}
         data-sidebar-session-row={session.id}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          placeMenuAtPoint(event.clientX, event.clientY);
+          openSessionRowMenu(
+            session.id,
+            event.currentTarget.querySelector<HTMLButtonElement>(
+              '[data-action="session-menu"]',
+            ),
+          );
+        }}
       >
         <button
           type="button"
@@ -707,11 +760,8 @@ export function Sidebar({
                 closeMenus();
                 return;
               }
-              menuTriggerRef.current = event.currentTarget;
               placeMenu(event);
-              setSortOpen(false);
-              setProjectMenu(null);
-              setSessionMenu(session.id);
+              openSessionRowMenu(session.id, event.currentTarget);
             }}
           >
             <IconMore size={14} />
@@ -732,7 +782,20 @@ export function Sidebar({
         aria-labelledby={projectId}
         data-sidebar-project-group={entry.key}
       >
-        <div className="sidebar-session-group-header">
+        <div
+          className="sidebar-session-group-header"
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            placeMenuAtPoint(event.clientX, event.clientY);
+            openProjectRowMenu(
+              entry.key,
+              event.currentTarget.querySelector<HTMLButtonElement>(
+                ".project-more",
+              ),
+            );
+          }}
+        >
           <button
             type="button"
             id={projectId}
@@ -776,11 +839,8 @@ export function Sidebar({
                   closeMenus();
                   return;
                 }
-                menuTriggerRef.current = event.currentTarget;
                 placeMenu(event);
-                setSortOpen(false);
-                setSessionMenu(null);
-                setProjectMenu(entry.key);
+                openProjectRowMenu(entry.key, event.currentTarget);
               }}
             >
               <IconMore size={14} />
@@ -887,6 +947,15 @@ export function Sidebar({
               {sessionArchived(session, sessionMeta[session.id])
                 ? t("nav.restoreTask", { defaultValue: "Restore" })
                 : t("nav.archiveTask", { defaultValue: "Archive" })}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              data-action="open-session-folder"
+              onClick={() => void openSessionFolder(session)}
+            >
+              <IconFolder size={14} />
+              {t("nav.openTaskFolder", { defaultValue: "Open folder" })}
             </button>
             <button
               type="button"
