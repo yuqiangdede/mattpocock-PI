@@ -6,6 +6,10 @@ const settingsPageSource = await readFile(
   new URL("../src/pages/SettingsPage.tsx", import.meta.url),
   "utf8",
 );
+const settingsSearchSource = await readFile(
+  new URL("../src/lib/settings-search.ts", import.meta.url),
+  "utf8",
+);
 const providersSource = await readFile(
   new URL("../src/components/settings/ProvidersSection.tsx", import.meta.url),
   "utf8",
@@ -59,9 +63,9 @@ test("model configuration keeps model defaults; basics owns app behavior", () =>
 
 test("settings nav renders grouped sections with keyword search", () => {
   assert.match(settingsPageSource, /settings-nav-group-label/);
-  assert.match(settingsPageSource, /settings\.groupPersonal/);
-  assert.match(settingsPageSource, /settings\.groupIntegrations/);
-  assert.match(settingsPageSource, /keywordKeys/);
+  assert.match(settingsSearchSource, /settings\.groupPersonal/);
+  assert.match(settingsSearchSource, /settings\.groupIntegrations/);
+  assert.match(settingsSearchSource, /keywordKeys/);
   assert.match(stylesSource, /\.settings-nav-group-label\s*\{/);
   assert.match(
     stylesSource,

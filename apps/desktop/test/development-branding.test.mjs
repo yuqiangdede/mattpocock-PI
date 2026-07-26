@@ -14,7 +14,7 @@ const iconScriptSource = await readFile(
 test("macOS development uses the canonical PI-Desktop Dock icon", () => {
   assert.match(
     mainSource,
-    /process\.platform !== "darwin" \|\| app\.isPackaged \|\| !app\.dock/,
+    /process\.platform !== "darwin" \|\| !isDevelopmentBuild \|\| !app\.dock/,
   );
   assert.match(
     mainSource,
