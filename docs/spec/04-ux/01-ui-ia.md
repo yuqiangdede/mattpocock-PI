@@ -48,11 +48,10 @@ destination, chat as the home surface, tools and permissions inline.
   pane (they are pages, not modals).
 - **Titlebar**: platform-native desktop chrome (D118). macOS uses
   `hiddenInset` traffic lights and the system application menu.
-  Windows/Linux use a frameless 46px row with localized
-  File / Edit / View / Window / Help menus on the left and accessible
-  minimize / maximize-or-restore / close controls on the right. Back/forward
-  controls traverse destination history; the right side also contains the
-  notification bell/unread badge. The bell opens a
+  Windows/Linux use a menu-free frameless 46px row with navigation on the
+  left and accessible minimize / maximize-or-restore / close controls on the
+  right (D129). Back/forward controls traverse destination history; the right
+  side also contains the notification bell/unread badge. The bell opens a
   durable local inbox rather than a separate destination (D117).
 - **Work panel**: docked right column (not an overlay) created only by file,
   URL, browser-preview, successful-command, or successful workspace-edit
@@ -171,7 +170,6 @@ independent Plugins destination described in §3.5.
 | Cmd/Ctrl+O | open project |
 | Cmd/Ctrl+, | settings |
 | Cmd/Ctrl+. | abort current run |
-| F10 (Windows/Linux) | focus the application menu bar |
 | Enter / Shift+Enter | send / newline (configurable Enter-to-send) |
 | Esc | dismiss overlay/menu |
 

@@ -325,11 +325,11 @@ first block repeats the local identity with the same glyph and two-line text,
 followed by a divider and compact Settings / Logs / Theme rows.
 
 Toolbar: 46px on every platform. macOS places traffic lights at
-`{x:16,y:16}`. Windows/Linux reserve the left side for the localized
-application menubar and the rightmost 112px for three frameless-window
-controls. Menu popovers use the standard opaque elevated-menu surface,
-`radius-sm`, subtle border, and dialog shadow; they are never translucent
-over readable content.
+`{x:16,y:16}`. Windows/Linux place navigation at the left edge and reserve the
+rightmost 112px for three frameless-window controls. No application menu is
+rendered inside the window. Other menu popovers use the standard opaque
+elevated-menu surface, `radius-sm`, subtle border, and dialog shadow; they are
+never translucent over readable content.
 
 Composer elevation (Codex `elevation-prominent`):
 

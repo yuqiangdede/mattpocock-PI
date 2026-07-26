@@ -486,8 +486,8 @@ without one.
 ## 13b. Desktop Menu and Window APIs
 
 The preload exposes a synchronous, read-only `platform: NodeJS.Platform`
-value so the renderer chooses native macOS chrome or Windows/Linux frameless
-chrome before first paint.
+value so the renderer chooses native macOS chrome or menu-free Windows/Linux
+frameless chrome before first paint.
 
 Main-to-renderer application commands use one allowlisted event:
 
@@ -507,10 +507,11 @@ The renderer subscribes to `menu/event/command` before invoking
 command creates or reloads a window, so startup timing cannot drop the first
 command.
 
-Renderer-owned Windows/Linux menus execute editing and window operations
-through `menu/nativeAction`. Its request is restricted to the exported
-`NATIVE_MENU_ACTIONS` tuple; unknown values fail rather than becoming a
-generic main-process command surface:
+Renderer-owned Windows/Linux keyboard shortcuts execute zoom and fullscreen
+operations through `menu/nativeAction`. The retained compatibility surface
+also supports editing and window operations. Its request is restricted to the
+exported `NATIVE_MENU_ACTIONS` tuple; unknown values fail rather than becoming
+a generic main-process command surface:
 
 ```ts
 type NativeMenuAction =

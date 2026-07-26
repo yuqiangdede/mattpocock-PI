@@ -1,6 +1,6 @@
 # ADR 0021: Platform application chrome
 
-- Status: Accepted
+- Status: Superseded in part by ADR 0025
 - Date: 2026-07-26
 
 ## Context

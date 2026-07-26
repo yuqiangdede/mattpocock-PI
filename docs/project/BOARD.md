@@ -54,8 +54,8 @@ Open issue:
   with redaction/rotation (D082), crash supervision + degradation UI
   (D080), window state persistence (D083), app icon (D079)
 - Cross-platform shell readiness: native macOS application menu plus
-  Windows/Linux frameless menus, window controls, and native-runner package
-  configurations (D118)
+  menu-free Windows/Linux frameless titlebars, window controls, and
+  native-runner package configurations (D118/D129)
 - Transcript storage v7: per-session JSONL files under `sessions/` with
   SQLite reduced to an index (FTS/list/badges), append-only revisions file,
   pre-v7 databases archived via breaking reset (D119)

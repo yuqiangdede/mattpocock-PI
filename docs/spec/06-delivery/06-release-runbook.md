@@ -117,9 +117,9 @@ Native-runner output matrix:
 
 Shell smoke on each native runner:
 
-1. Open every File/Edit/View/Window/Help menu by pointer and keyboard.
-2. Verify F10/arrow/Home/End/Enter/Escape/Tab behavior and Shift+F10 passthrough.
-3. Execute editing actions from a focused editor.
+1. Confirm no File/Edit/View/Window/Help menu appears inside the window.
+2. Verify F10 and Shift+F10 remain available to focused content.
+3. Execute application and editing shortcuts from a focused editor.
 4. Minimize, maximize, restore, and close from the custom controls.
 5. Relaunch with `PI_DESKTOP_START_MAXIMIZED=1`; confirm the initial
    maximize/restore glyph matches the queried native state.

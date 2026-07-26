@@ -1169,10 +1169,12 @@ Each scenario is documented in this format:
   Project, Settings, Command Palette, sidebar toggle, editing,
   zoom/fullscreen, Window, Help, Logs, and Check for Updates actions. Verify
   the update status reports that the current fixture version is up to date.
-  2) Repeat through the visible Windows/Linux menubar using pointer and
-  F10/arrow/Home/End/Enter/Space/Escape/Tab navigation; verify Shift+F10 is not
-  consumed or redirected to File, invoke Edit actions after focusing an
-  editor, and invoke Check for Updates from Help with the same status result.
+  2) On Windows/Linux, confirm no File/Edit/View/Window/Help menubar appears
+  inside the window and the left-side navigation occupies the reclaimed
+  titlebar space. Verify F10 and Shift+F10 are not consumed by shell chrome;
+  exercise New Task, Open Project, Settings, close-window, zoom, fullscreen,
+  search, command-palette, sidebar, and standard editing shortcuts. Invoke
+  Check for Updates from Settings -> Info with the same status result.
   3) Close the macOS window, immediately invoke two native menu
   commands, and acknowledge renderer readiness after the replacement loads.
   Verify one window and one delivery per command. 4) Minimize, maximize,
@@ -1185,11 +1187,11 @@ Each scenario is documented in this format:
   native application identity, and the About panel uses the canonical
   PI-Desktop icon; neither surface exposes the stock Electron name or icon.
   macOS follows native menu conventions and accelerators.
-  Windows/Linux show localized File/Edit/View/Window/Help menus without
-  colliding with drag regions or right-side controls; keyboard focus and
-  checked sidebar state remains accurate, and no work-panel launcher is
-  present. Check for Updates invokes the allowlisted update command from both
-  menu surfaces and shows the resulting up-to-date state. Replacement-window
+  Windows/Linux show no application menu inside the window; navigation and
+  right-side controls do not collide with drag regions, keyboard shortcuts
+  remain operational, and no work-panel launcher is present. Check for Updates
+  invokes the allowlisted update command from the macOS system menu and the
+  Settings surface and shows the resulting up-to-date state. Replacement-window
   commands wait for renderer readiness without
   creating duplicate windows or losing events. Window controls match native state and
   have accessible names. Unknown actions fail closed. Each package contains
@@ -1199,7 +1201,7 @@ Each scenario is documented in this format:
   `04-ux/01-ui-ia.md`, `04-ux/02-i18n-english-first.md`,
   `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`,
   `04-ux/09-interaction-patterns.md`, `06-delivery/06-release-runbook.md`,
-  `08-meta/decisions-log.md` (D118, D121)
+  `08-meta/decisions-log.md` (D118, D121, D129)
 - **Acceptance**: A (app startup), Quality
 - **Milestone**: M5 on macOS; post-MVP release qualification on Windows/Linux
 - **Status**: Unit-covered (`window-menu.test.mjs`,

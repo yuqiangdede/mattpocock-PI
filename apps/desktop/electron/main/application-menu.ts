@@ -165,6 +165,10 @@ export function buildApplicationMenuTemplate({
 }
 
 export function installApplicationMenu(options: ApplicationMenuOptions) {
+  if ((options.platform ?? process.platform) !== "darwin") {
+    Menu.setApplicationMenu(null);
+    return;
+  }
   const template = buildApplicationMenuTemplate(options);
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }

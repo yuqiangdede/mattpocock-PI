@@ -10,8 +10,12 @@ const menuSource = await readFile(
   new URL("../electron/main/application-menu.ts", import.meta.url),
   "utf8",
 );
-const menuBarSource = await readFile(
-  new URL("../src/components/DesktopMenuBar.tsx", import.meta.url),
+const appSource = await readFile(
+  new URL("../src/App.tsx", import.meta.url),
+  "utf8",
+);
+const stylesSource = await readFile(
+  new URL("../src/styles/globals.css", import.meta.url),
   "utf8",
 );
 const controlsSource = await readFile(
@@ -52,12 +56,17 @@ test("macOS installs a standard application menu before window creation", () => 
   assert.match(menuSource, /Menu\.buildFromTemplate\(template\)/);
   assert.match(menuSource, /Menu\.setApplicationMenu/);
   assert.match(
+    menuSource,
+    /options\.platform \?\? process\.platform\) !== "darwin"/,
+  );
+  assert.match(menuSource, /Menu\.setApplicationMenu\(null\)/);
+  assert.match(
     mainSource,
     /installApplicationMenu\(\{\s+locale: app\.getLocale\(\),\s+dispatch: dispatchApplicationMenuCommand,\s+\}\);\s+registerIpc\(\)/,
   );
 });
 
-test("application menu routes shell commands and preserves native editing roles", () => {
+test("macOS application menu routes shell commands and preserves native roles", () => {
   for (const accelerator of [
     "CmdOrCtrl+,",
     "CmdOrCtrl+N",
@@ -85,29 +94,22 @@ test("application menu routes shell commands and preserves native editing roles"
   assert.match(mainSource, /IPC\.event\.menuCommand/);
   assert.match(mainSource, /APP_MENU_COMMANDS\.includes\(command\)/);
   assert.doesNotMatch(menuSource, /CmdOrCtrl\+J|toggleWorkPanel/);
-  assert.doesNotMatch(menuBarSource, /Ctrl\+J|toggleWorkPanel/);
   assert.doesNotMatch(protocolSource, /"toggleWorkPanel"/);
 });
 
-test("Windows and Linux use frameless chrome with accessible menus and controls", () => {
+test("Windows and Linux use menu-free frameless chrome with window controls", () => {
   assert.match(
     mainSource,
     /process\.platform === "darwin"[\s\S]*titleBarStyle:\s*"hiddenInset"[\s\S]*frame:\s*false/,
   );
-  assert.match(menuBarSource, /role="menubar"/);
-  assert.match(menuBarSource, /role="menu"/);
-  assert.match(menuBarSource, /"menuitem"\s*:\s*"menuitemcheckbox"/);
-  assert.match(menuBarSource, /event\.key !== "F10"/);
-  assert.match(menuBarSource, /event\.shiftKey/);
-  assert.match(menuBarSource, /"file", "edit", "view", "window", "help"/);
-  assert.match(menuBarSource, /tabIndex=\{focusedMenu === id \? 0 : -1\}/);
-  assert.match(menuBarSource, /event\.key === "Home"/);
-  assert.match(menuBarSource, /event\.key === "ArrowUp"/);
-  assert.match(menuBarSource, /event\.key === "Tab"/);
-  assert.match(menuBarSource, /EDITING_ACTIONS\.has\(entry\.action\)/);
-  assert.match(menuBarSource, /target\?\.isConnected/);
-  assert.match(menuBarSource, /t\("menu\.checkForUpdates"\)/);
-  assert.match(menuBarSource, /command:\s*"checkForUpdates"/);
+  assert.doesNotMatch(appSource, /DesktopMenuBar/);
+  assert.doesNotMatch(stylesSource, /\.desktop-menu-/);
+  assert.match(appSource, /platform === "darwin"/);
+  assert.match(appSource, /runMenuCommand\("newTask"\)/);
+  assert.match(appSource, /runMenuCommand\("openProject"\)/);
+  assert.match(appSource, /runMenuCommand\("openSettings"\)/);
+  assert.match(appSource, /nativeMenuAction\("resetZoom"\)/);
+  assert.match(appSource, /nativeMenuAction\("toggleFullScreen"\)/);
   assert.match(controlsSource, /windowControl\("getState"\)/);
   assert.match(controlsSource, /aria-label=\{t\("window\.minimize"/);
   assert.match(controlsSource, /aria-label=\{t\("window\.close"/);

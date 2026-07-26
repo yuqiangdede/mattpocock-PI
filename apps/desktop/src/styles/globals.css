@@ -365,7 +365,7 @@ textarea:disabled {
 
 :root[data-platform="win32"] .main-titlebar-left,
 :root[data-platform="linux"] .main-titlebar-left {
-  padding-left: 202px; /* clear of the desktop menu bar */
+  padding-left: 0;
 }
 
 /* macOS fullscreen hides the traffic lights: reclaim the reserved space. */
@@ -689,94 +689,7 @@ textarea:disabled {
  * Codex-style controls pinned top-right (see WindowControls.tsx). */
 :root[data-platform="win32"] .sidebar-drag,
 :root[data-platform="linux"] .sidebar-drag {
-  padding-left: 214px;
-}
-
-.desktop-menu-bar {
-  position: fixed;
-  top: 0;
-  left: 8px;
-  z-index: 210;
-  display: flex;
-  height: 46px;
-  align-items: center;
-  gap: 1px;
-  -webkit-app-region: no-drag;
-}
-
-.desktop-menu-root {
-  position: relative;
-}
-
-.desktop-menu-trigger {
-  display: inline-flex;
-  height: 26px;
-  align-items: center;
-  padding: 0 7px;
-  border-radius: var(--radius-2xs);
-  color: var(--ds-text-secondary);
-  font-size: var(--text-sm);
-  letter-spacing: 0;
-}
-
-.desktop-menu-trigger:hover,
-.desktop-menu-trigger.active {
-  color: var(--ds-text-primary);
-  background: var(--ds-bg-hover);
-}
-
-.desktop-menu-popover {
-  position: absolute;
-  top: 30px;
-  left: 0;
-  z-index: 220;
-  min-width: 238px;
-  padding: 4px;
-  border: 1px solid var(--ds-border-default);
-  border-radius: var(--radius-sm);
-  background: var(--ds-bg-elevated-opaque);
-  box-shadow: var(--ds-shadow-dialog);
-}
-
-.desktop-menu-popover button {
-  display: grid;
-  width: 100%;
-  min-height: 30px;
-  grid-template-columns: 16px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px 4px 4px;
-  border-radius: var(--radius-2xs);
-  color: var(--ds-text-primary);
-  font-size: var(--text-sm);
-  letter-spacing: 0;
-  text-align: left;
-}
-
-.desktop-menu-popover button:hover,
-.desktop-menu-popover button:focus-visible {
-  background: var(--ds-bg-hover);
-  outline-offset: -1px;
-}
-
-.desktop-menu-check {
-  display: inline-flex;
-  width: 16px;
-  align-items: center;
-  justify-content: center;
-}
-
-.desktop-menu-popover kbd {
-  color: var(--ds-text-muted);
-  font-family: inherit;
-  font-size: var(--text-xs);
-  letter-spacing: 0;
-}
-
-.desktop-menu-separator {
-  height: 1px;
-  margin: 4px 6px;
-  background: var(--ds-border-default);
+  padding-left: 8px;
 }
 
 .window-controls {

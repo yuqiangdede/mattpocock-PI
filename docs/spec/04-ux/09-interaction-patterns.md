@@ -19,7 +19,6 @@
 | `Cmd/Ctrl + B` | Toggle sidebar | Global |
 | `Cmd/Ctrl + .` | Abort active turn | Global (same as abort button) |
 | `Cmd/Ctrl + K` | Open command palette | Global |
-| `F10` | Focus application menubar | Windows/Linux |
 
 ### 1.2 Chat context shortcuts
 
@@ -41,9 +40,10 @@
 
 ### 1.4 Shortcut rules
 
-- Application-menu shortcuts are discoverable through visible menu
-  accelerators. Command-only shortcuts remain discoverable via command palette
-  search (keyword "shortcut" or "keybinding").
+- macOS application-menu shortcuts are discoverable through system-menu
+  accelerators. Windows/Linux shortcuts remain available without rendering an
+  application menubar; command-only shortcuts are discoverable via command
+  palette search (keyword "shortcut" or "keybinding").
 - Shortcuts must not conflict with macOS system shortcuts or common browser shortcuts
 - Never override `Cmd/Ctrl + C`, `Cmd/Ctrl + V`, `Cmd/Ctrl + A`, `Cmd/Ctrl + S`
 - Shortcuts are consistent across macOS (Cmd) and Windows/Linux (Ctrl)
@@ -55,20 +55,16 @@
 - macOS application-menu accelerators dispatch the same allowlisted shell
   commands as renderer controls. Native Edit/View/Window roles retain
   platform text-editing, zoom, fullscreen, hide, and quit behavior.
-- Windows/Linux F10 focuses File while Shift+F10 is not consumed by the
-  menubar and remains available to focused content. Enter, Space, or ArrowDown
-  opens the focused menu at its first item; ArrowUp opens it at its last item.
-  Left/Right moves between top-level menus; Up/Down wraps through menu items;
-  Home/End move to boundaries; Tab exits; Escape closes and restores trigger
-  focus.
-- Top-level items use roving tab focus. Keyboard-invoked editing actions
-  restore the previously focused editor before dispatch.
-- Opening one Windows/Linux menu and hovering another transfers the open
-  popover and focus without changing titlebar geometry. Outside pointer press
-  dismisses it.
+- Windows/Linux render no application menu in the window. Their frameless
+  titlebar keeps navigation at the left edge and native window controls at the
+  right edge. F10 and Shift+F10 are not consumed by shell chrome.
+- Windows/Linux keep New Task, Open Project, Settings, close-window,
+  zoom, fullscreen, search, command-palette, and sidebar shortcuts through
+  renderer key handling. Standard editing shortcuts remain native web-content
+  behavior.
 - Main queues native commands until the renderer acknowledges that its menu
-  event subscription is active. Closing and recreating a window resets this
-  handshake.
+  event subscription is active on macOS. Closing and recreating a window
+  resets this handshake.
 - Frameless minimize, maximize/restore, and close controls remain outside the
   drag region. Maximize state is queried on mount and updated from native
   window events, so the restore affordance never depends only on optimistic

@@ -22,7 +22,6 @@ import { ToastHost } from "./components/Toast";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { NotificationCenter } from "./components/NotificationCenter";
 import { WindowControls } from "./components/WindowControls";
-import { DesktopMenuBar } from "./components/DesktopMenuBar";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { PullRequestsPage } from "./pages/PullRequestsPage";
@@ -140,6 +139,7 @@ function TitlebarNav({
 
 function AppShell() {
   const { t } = useTranslation();
+  const platform = window.piDesktop?.platform ?? "darwin";
   const bootstrap = useAppStore((s) => s.bootstrap);
   const ready = useAppStore((s) => s.ready);
   const page = useAppStore((s) => s.page);
@@ -318,22 +318,57 @@ function AppShell() {
         );
     });
     const onKey = (e: KeyboardEvent) => {
+      const commandKey = e.metaKey || e.ctrlKey;
       // Codex-style global search on ⌘K; the command palette stays on ⌘⇧P.
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "k") {
+      if (commandKey && !e.shiftKey && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setSearchOpen(true);
       }
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "p") {
+      if (commandKey && e.shiftKey && e.key.toLowerCase() === "p") {
         e.preventDefault();
         setPaletteOpen(true);
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === ".") {
+      if (commandKey && e.key === ".") {
         e.preventDefault();
         void abort();
       }
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
+      if (commandKey && e.key.toLowerCase() === "b") {
         e.preventDefault();
         setSidebarCollapsed((v) => !v);
+      }
+
+      if (platform === "darwin") return;
+      if (commandKey && !e.shiftKey && e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        void runMenuCommand("newTask");
+      }
+      if (commandKey && !e.shiftKey && e.key.toLowerCase() === "o") {
+        e.preventDefault();
+        void runMenuCommand("openProject");
+      }
+      if (commandKey && !e.shiftKey && e.key === ",") {
+        e.preventDefault();
+        void runMenuCommand("openSettings");
+      }
+      if (commandKey && !e.shiftKey && e.key.toLowerCase() === "w") {
+        e.preventDefault();
+        void api.windowControl("close");
+      }
+      if (commandKey && !e.shiftKey && e.key === "0") {
+        e.preventDefault();
+        void api.nativeMenuAction("resetZoom");
+      }
+      if (commandKey && !e.shiftKey && (e.key === "+" || e.key === "=")) {
+        e.preventDefault();
+        void api.nativeMenuAction("zoomIn");
+      }
+      if (commandKey && !e.shiftKey && e.key === "-") {
+        e.preventDefault();
+        void api.nativeMenuAction("zoomOut");
+      }
+      if (!commandKey && !e.altKey && !e.shiftKey && e.key === "F11") {
+        e.preventDefault();
+        void api.nativeMenuAction("toggleFullScreen");
       }
     };
     window.addEventListener("keydown", onKey);
@@ -346,7 +381,7 @@ function AppShell() {
       offNotificationActivated();
       window.removeEventListener("keydown", onKey);
     };
-  }, [bootstrap, handleAgentEvent, showToast, abort, t]);
+  }, [bootstrap, handleAgentEvent, showToast, abort, t, platform, runMenuCommand]);
 
   const heroProject = useMemo(
     () => projectName(workspace?.path, workspace?.name),
@@ -630,10 +665,6 @@ function AppShell() {
   if (page === "settings") {
     return (
       <div className="app-shell settings-mode">
-        <DesktopMenuBar
-          sidebarCollapsed={sidebarCollapsed}
-          onCommand={runMenuCommand}
-        />
         <WindowControls />
         <SettingsPage />
         <PermissionDialog />
@@ -647,10 +678,6 @@ function AppShell() {
 
   return (
     <div className="app-shell">
-      <DesktopMenuBar
-        sidebarCollapsed={sidebarCollapsed}
-        onCommand={runMenuCommand}
-      />
       <WindowControls />
       {!sidebarCollapsed && (
         <Sidebar
