@@ -7,9 +7,13 @@ import {
 import { useTranslation } from "react-i18next";
 import { isDefaultSessionTitle, useAppStore } from "../stores/app-store";
 import { normalizeProjectPath } from "../lib/sidebar-session-groups";
+import {
+  searchSettings,
+  type SettingsSearchHit,
+} from "../lib/settings-search";
 import type { SessionSummary } from "@pi-desktop/shared";
 import type { SessionMeta } from "../lib/sidebar-preferences";
-import { IconChat, IconNewSession, IconSearch } from "./icons";
+import { IconChat, IconNewSession, IconSearch, IconSettings } from "./icons";
 
 const GROUP_KEYS = [
   "today",
@@ -87,6 +91,7 @@ export function SearchDialog({
   const refreshSessions = useAppStore((s) => s.refreshSessions);
   const selectSession = useAppStore((s) => s.selectSession);
   const newSession = useAppStore((s) => s.newSession);
+  const setSettingsTab = useAppStore((s) => s.setSettingsTab);
   const showToast = useAppStore((s) => s.showToast);
 
   const [query, setQuery] = useState("");
@@ -165,7 +170,14 @@ export function SearchDialog({
     }));
   }, [rows]);
 
-  const optionCount = rows.length + 1;
+  // Settings rows join the listbox after the session results; their flat
+  // option indices therefore start at rows.length + 1.
+  const settingsHits = useMemo<SettingsSearchHit[]>(
+    () => searchSettings(query, t),
+    [query, t],
+  );
+
+  const optionCount = rows.length + settingsHits.length + 1;
 
   useEffect(() => {
     setActive(0);
@@ -197,10 +209,17 @@ export function SearchDialog({
     }
   };
 
+  const openSettingsHit = (hit: SettingsSearchHit) => {
+    setSettingsTab(hit.tab);
+    onClose();
+  };
+
   const runActive = () => {
     if (active === 0) return void run(null);
     const row = rows[active - 1];
-    if (row) void run(row);
+    if (row) return void run(row);
+    const hit = settingsHits[active - 1 - rows.length];
+    if (hit) openSettingsHit(hit);
   };
 
   return (
@@ -271,51 +290,86 @@ export function SearchDialog({
             <IconNewSession size={15} className="search-item-icon" />
             <span className="search-item-title">{t("nav.newTask")}</span>
           </button>
-          {rows.length > 0 ? (
-            groups.map((group) => (
-              <div key={group.key} role="presentation">
-                <div className="search-group-label" role="presentation">
-                  {t(`search.${group.key}`)}
+          {rows.length > 0
+            ? groups.map((group) => (
+                <div key={group.key} role="presentation">
+                  <div className="search-group-label" role="presentation">
+                    {t(`search.${group.key}`)}
+                  </div>
+                  {group.rows.map((row) => (
+                    <button
+                      key={row.session.id}
+                      id={`global-search-option-${row.optionIndex}`}
+                      type="button"
+                      role="option"
+                      aria-selected={active === row.optionIndex}
+                      className={`search-item ${active === row.optionIndex ? "active" : ""}`}
+                      title={row.session.title}
+                      onMouseEnter={() => setActive(row.optionIndex)}
+                      onClick={() => void run(row)}
+                    >
+                      <IconChat size={15} className="search-item-icon" />
+                      <span className="search-item-title">
+                        {highlightMatch(row.session.title, query)}
+                      </span>
+                      <span className="search-item-meta">
+                        {runningSessions[row.session.id] ? (
+                          <span
+                            className="search-item-running"
+                            aria-label={t("nav.sessionRunning", {
+                              defaultValue: "Running",
+                            })}
+                          />
+                        ) : null}
+                        {row.archived ? (
+                          <span className="search-item-badge">
+                            {t("search.archived")}
+                          </span>
+                        ) : null}
+                        <span className="search-item-project">
+                          {row.projectLabel}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
                 </div>
-                {group.rows.map((row) => (
+              ))
+            : null}
+          {settingsHits.length > 0 ? (
+            <div role="presentation">
+              <div className="search-group-label" role="presentation">
+                {t("nav.settings")}
+              </div>
+              {settingsHits.map((hit, index) => {
+                const optionIndex = rows.length + 1 + index;
+                return (
                   <button
-                    key={row.session.id}
-                    id={`global-search-option-${row.optionIndex}`}
+                    key={`${hit.tab}:${hit.rowKey ?? "tab"}`}
+                    id={`global-search-option-${optionIndex}`}
                     type="button"
                     role="option"
-                    aria-selected={active === row.optionIndex}
-                    className={`search-item ${active === row.optionIndex ? "active" : ""}`}
-                    title={row.session.title}
-                    onMouseEnter={() => setActive(row.optionIndex)}
-                    onClick={() => void run(row)}
+                    aria-selected={active === optionIndex}
+                    className={`search-item ${active === optionIndex ? "active" : ""}`}
+                    onMouseEnter={() => setActive(optionIndex)}
+                    onClick={() => openSettingsHit(hit)}
                   >
-                    <IconChat size={15} className="search-item-icon" />
+                    <IconSettings size={15} className="search-item-icon" />
                     <span className="search-item-title">
-                      {highlightMatch(row.session.title, query)}
+                      {highlightMatch(t(hit.rowKey ?? hit.tabLabelKey), query)}
                     </span>
-                    <span className="search-item-meta">
-                      {runningSessions[row.session.id] ? (
-                        <span
-                          className="search-item-running"
-                          aria-label={t("nav.sessionRunning", {
-                            defaultValue: "Running",
-                          })}
-                        />
-                      ) : null}
-                      {row.archived ? (
-                        <span className="search-item-badge">
-                          {t("search.archived")}
+                    {hit.rowKey ? (
+                      <span className="search-item-meta">
+                        <span className="search-item-project">
+                          {t(hit.tabLabelKey)}
                         </span>
-                      ) : null}
-                      <span className="search-item-project">
-                        {row.projectLabel}
                       </span>
-                    </span>
+                    ) : null}
                   </button>
-                ))}
-              </div>
-            ))
-          ) : query.trim() ? (
+                );
+              })}
+            </div>
+          ) : null}
+          {rows.length === 0 && settingsHits.length === 0 && query.trim() ? (
             <div className="search-empty">{t("search.empty")}</div>
           ) : null}
         </div>

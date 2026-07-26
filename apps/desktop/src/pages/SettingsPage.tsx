@@ -13,6 +13,11 @@ import {
 } from "../lib/import-groups";
 import { Badge, Button, Select, cx } from "../components/ui";
 import {
+  SETTINGS_GROUP_LABEL_KEYS,
+  SETTINGS_NAV,
+  type SettingsNavGroupId,
+} from "../lib/settings-search";
+import {
   IconChevronLeft,
   IconConfig,
   IconInfo,
@@ -406,72 +411,36 @@ export function SettingsPage() {
     await refreshProviders();
   };
 
-  const navGroups: NavGroup[] = useMemo(
-    () => [
-      {
-        id: "personal",
-        labelKey: "settings.groupPersonal",
-        items: [
-          {
-            id: "general",
-            labelKey: "settings.general",
-            icon: <IconSettings size={14} />,
-            keywordKeys: [
-              "settings.appearance",
-              "settings.theme",
-              "settings.language",
-              "settings.mode",
-              "settings.enterToSend",
-              "settings.permissions",
-              "settings.permissionMode",
-            ],
-          },
-        ],
-      },
-      {
-        id: "integrations",
-        labelKey: "settings.groupIntegrations",
-        items: [
-          {
-            id: "agent",
-            labelKey: "settings.configuration",
-            icon: <IconConfig size={14} />,
-            keywordKeys: [
-              "settings.providers",
-              "settings.models",
-              "settings.defaultModel",
-              "settings.apiKey",
-              "settings.baseUrl",
-              "settings.apiStyle",
-            ],
-          },
-          {
-            id: "import",
-            labelKey: "settings.import",
-            icon: <IconSnapshot size={14} />,
-            keywordKeys: [
-              "settings.importTitle",
-              "settings.importSourceClaudeCode",
-              "settings.importSourceOpenCode",
-              "settings.importSourceCodex",
-            ],
-          },
-        ],
-      },
-      {
-        id: "system",
-        items: [
-          {
-            id: "about",
-            labelKey: "settings.about",
-            icon: <IconInfo size={14} />,
-            keywordKeys: ["settings.application", "settings.logs"],
-          },
-        ],
-      },
-    ],
-    [],
-  );
+  // Nav structure comes from the shared settings index (lib/settings-search)
+  // so the global search dialog and this page stay in sync; only the icons
+  // are view-level.
+  const navGroups: NavGroup[] = useMemo(() => {
+    const iconFor: Record<SettingsTab, ReactNode> = {
+      general: <IconSettings size={14} />,
+      agent: <IconConfig size={14} />,
+      import: <IconSnapshot size={14} />,
+      about: <IconInfo size={14} />,
+    };
+    const groups = new Map<SettingsNavGroupId, NavGroup>();
+    for (const entry of SETTINGS_NAV) {
+      let group = groups.get(entry.groupId);
+      if (!group) {
+        group = {
+          id: entry.groupId,
+          labelKey: SETTINGS_GROUP_LABEL_KEYS[entry.groupId],
+          items: [],
+        };
+        groups.set(entry.groupId, group);
+      }
+      group.items.push({
+        id: entry.id,
+        labelKey: entry.labelKey,
+        icon: iconFor[entry.id],
+        keywordKeys: entry.keywordKeys,
+      });
+    }
+    return [...groups.values()];
+  }, []);
 
   // Search matches the tab label and the titles of the rows inside it, so
   // typing e.g. "theme" or "主题" surfaces Basics even though the tab is

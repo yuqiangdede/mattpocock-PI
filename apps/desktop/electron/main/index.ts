@@ -1107,6 +1107,21 @@ async function createWindow() {
             `);
             await new Promise((r) => setTimeout(r, 350));
             await shot("pi-search-query");
+            // Settings hits: "主题" resolves to 通用 tab's theme row.
+            await mainWindow!.webContents.executeJavaScript(`
+              (() => {
+                const input = document.querySelector(".search-input");
+                if (!input) return;
+                const setter = Object.getOwnPropertyDescriptor(
+                  window.HTMLInputElement.prototype,
+                  "value",
+                ).set;
+                setter.call(input, "主题");
+                input.dispatchEvent(new Event("input", { bubbles: true }));
+              })()
+            `);
+            await new Promise((r) => setTimeout(r, 350));
+            await shot("pi-search-settings");
             await setTheme("dark");
             await new Promise((r) => setTimeout(r, 250));
             await shot("pi-search-dark");
