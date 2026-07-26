@@ -99,6 +99,18 @@ export function getToolSummary(toolName: string | undefined, args: unknown) {
   return "";
 }
 
+/**
+ * Cheap "has expandable details" check. getToolSections stringifies the full
+ * args/result; collapsed rows (the default) only need to know whether the
+ * caret should show.
+ */
+export function hasToolSections(message: ToolMessageLike) {
+  if (message.toolArgs !== undefined) return true;
+  const outputValue =
+    message.toolResult !== undefined ? message.toolResult : message.content;
+  return outputValue !== undefined && outputValue !== "";
+}
+
 export function getToolSections(message: ToolMessageLike) {
   const input =
     message.toolArgs === undefined ? "" : formatToolValue(message.toolArgs);

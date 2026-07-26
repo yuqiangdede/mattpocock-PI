@@ -5,6 +5,36 @@ use uuid::Uuid;
 
 pub const PERMISSION_TIMEOUT_MS: u64 = 120_000;
 
+/// Longest string leaf kept in a permission request's args preview. Full args
+/// (e.g. a Write's whole file content) would otherwise cross every stdio/IPC
+/// hop and stall the renderer right as the dialog opens.
+const ARGS_PREVIEW_MAX_CHARS: usize = 2_000;
+
+fn preview_value(value: &serde_json::Value) -> serde_json::Value {
+    match value {
+        serde_json::Value::String(s) => {
+            let total = s.chars().count();
+            if total <= ARGS_PREVIEW_MAX_CHARS {
+                return value.clone();
+            }
+            let head: String = s.chars().take(ARGS_PREVIEW_MAX_CHARS).collect();
+            serde_json::Value::String(format!(
+                "{head}… (+{} chars)",
+                total - ARGS_PREVIEW_MAX_CHARS
+            ))
+        }
+        serde_json::Value::Array(items) => {
+            serde_json::Value::Array(items.iter().map(preview_value).collect())
+        }
+        serde_json::Value::Object(map) => serde_json::Value::Object(
+            map.iter()
+                .map(|(k, v)| (k.clone(), preview_value(v)))
+                .collect(),
+        ),
+        other => other.clone(),
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum PermissionDecision {
@@ -132,7 +162,7 @@ impl PermissionManager {
             tool_call_id: tool_call_id.to_string(),
             tool_name: tool_name.to_string(),
             risk: Self::tool_risk(tool_name),
-            args_preview,
+            args_preview: preview_value(&args_preview),
             reason: reason.to_string(),
             timeout_ms: PERMISSION_TIMEOUT_MS,
         };
@@ -263,5 +293,20 @@ mod tests {
         grants.insert("s".to_string(), vec!["Bash".to_string()]);
         let d = pm.evaluate_auto_with_permission_mode("s", "Bash", "agent", "ask", &grants);
         assert_eq!(d, Some(PermissionDecision::AllowSession));
+    }
+
+    #[test]
+    fn args_preview_truncates_long_strings() {
+        let mut pm = PermissionManager::default();
+        let content = "x".repeat(50_000);
+        let args = serde_json::json!({ "path": "a.txt", "content": content });
+        let (req, _rx) = pm.create_request("s", "tc1", "Write", args, "reason");
+        let preview = req.args_preview.get("content").unwrap().as_str().unwrap();
+        assert!(preview.chars().count() < 2_100, "content capped: {}", preview.len());
+        assert!(preview.ends_with("… (+48000 chars)"));
+        assert_eq!(
+            req.args_preview.get("path").unwrap().as_str().unwrap(),
+            "a.txt"
+        );
     }
 }

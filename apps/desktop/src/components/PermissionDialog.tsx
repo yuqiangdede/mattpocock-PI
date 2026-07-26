@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useAppStore } from "../stores/app-store";
 import { Button } from "./ui";
@@ -34,6 +34,12 @@ export function PermissionDialog() {
     })();
   }, [secondsLeft, permission, resolvePermission]);
 
+  // Stringify once per request, not on every countdown tick.
+  const argsText = useMemo(
+    () => JSON.stringify(permission?.argsPreview ?? null, null, 2),
+    [permission],
+  );
+
   if (!permission) return null;
 
   const risk = (permission.risk || "high") as "low" | "medium" | "high";
@@ -66,7 +72,7 @@ export function PermissionDialog() {
           <div className="mb-3 text-sm text-text-muted">{permission.reason}</div>
         ) : null}
         <pre className="mb-3 max-h-40 overflow-auto rounded-md-plus border border-border-subtle bg-bg-inset p-3 font-mono text-xs-plus text-text-secondary">
-          {JSON.stringify(permission.argsPreview, null, 2)}
+          {argsText}
         </pre>
         <div className="mb-3 text-xs-plus text-text-muted" role="timer">
           {t("permission.countdown", { seconds: Math.max(secondsLeft, 0) })}

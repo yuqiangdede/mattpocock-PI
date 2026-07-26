@@ -18,6 +18,7 @@ import {
   getToolDisplayName,
   getToolSections,
   getToolSummary,
+  hasToolSections,
   type ToolAction,
 } from "../lib/tool-display";
 import {
@@ -336,8 +337,10 @@ function ToolRow({ message }: { message: UiMessage }) {
     ? getToolPreviewTarget(message.toolArgs, root)
     : null;
   const terminalArtifact = action === "run" && status === "success";
-  const { input, output } = getToolSections(message);
-  const hasDetails = Boolean(input || output);
+  const hasDetails = hasToolSections(message);
+  // Streaming updates replace the message object each tick; only pay the
+  // full args/result stringify once the row is actually expanded.
+  const sections = open && hasDetails ? getToolSections(message) : null;
   const statusLabel =
     status === "running"
       ? t("chat.running")
@@ -416,10 +419,14 @@ function ToolRow({ message }: { message: UiMessage }) {
           </span>
         ) : null}
       </button>
-      {open && hasDetails ? (
+      {sections ? (
         <div className="tool-row-body" id={detailsId}>
-          {output ? <ToolSection label={t("chat.toolOutput")} value={output} /> : null}
-          {input ? <ToolSection label={t("chat.toolInput")} value={input} /> : null}
+          {sections.output ? (
+            <ToolSection label={t("chat.toolOutput")} value={sections.output} />
+          ) : null}
+          {sections.input ? (
+            <ToolSection label={t("chat.toolInput")} value={sections.input} />
+          ) : null}
         </div>
       ) : null}
     </div>

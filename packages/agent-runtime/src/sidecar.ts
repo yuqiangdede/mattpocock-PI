@@ -37,11 +37,9 @@ function respond(id: string | number, result?: unknown, error?: unknown) {
   else write({ jsonrpc: "2.0", id, result });
 }
 
-hostProxy.onNotification((method, params) => {
-  if (method === "permissions.request") {
-    notify("agent.permission", params);
-  }
-});
+// Host notifications (permissions.request never reaches us — main forwards
+// it to the renderer directly; re-emitting it here would duplicate the
+// permission dialog delivery).
 
 async function handle(method: string, params: any): Promise<unknown> {
   switch (method) {

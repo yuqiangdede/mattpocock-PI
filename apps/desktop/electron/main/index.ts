@@ -1219,25 +1219,9 @@ function wireSidecar(s: AgentSidecar) {
       }
       sendToRenderer(IPC.event.agentMessage, params);
       persistAgentEvent(envelope);
-    } else if (method === "agent.permission") {
-      const envelope: AgentEventEnvelope = {
-        sessionId: (params as any).sessionId,
-        ts: Date.now(),
-        event: {
-          type: "tool_permission_request",
-          request: {
-            requestId: (params as any).requestId,
-            sessionId: (params as any).sessionId,
-            toolCallId: (params as any).toolCallId,
-            toolName: (params as any).toolName,
-            argsPreview: (params as any).argsPreview,
-            risk: (params as any).risk,
-            reason: (params as any).reason,
-          },
-        },
-      };
-      sendToRenderer(IPC.event.agentMessage, envelope);
     }
+    // permissions.request reaches the renderer once, via wireHost; the
+    // sidecar no longer relays it (agent-sidecar.setHost filters it out).
   });
   s.onExit(({ code, signal, intentional }) => {
     if (intentional || quitting) return;
