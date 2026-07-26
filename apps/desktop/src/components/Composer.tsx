@@ -387,6 +387,9 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
 
   const onModelMenuKeyDown = (e: ReactKeyboardEvent) => {
     if (!modelOpen) return;
+    // Keys pressed while composing (IME candidate navigation/confirm) belong
+    // to the IME, not the menu.
+    if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       if (!flatModels.length) return;
@@ -458,6 +461,10 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
               value={value}
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={(e) => {
+                // An Enter that confirms an IME candidate (isComposing, or the
+                // WebKit 229 quirk) must commit the text, never send it.
+                if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229)
+                  return;
                 if (e.key === "Enter" && !e.shiftKey && enterToSend) {
                   e.preventDefault();
                   void submit();
