@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
+import { runPaletteCommand } from "../lib/commands";
 import { useAppStore } from "../stores/app-store";
 import type { CommandItem } from "@pi-desktop/shared";
 
@@ -15,10 +16,6 @@ export function CommandPalette({
   const [query, setQuery] = useState("");
   const [commands, setCommands] = useState<CommandItem[]>([]);
   const [active, setActive] = useState(0);
-  const newSession = useAppStore((s) => s.newSession);
-  const openProject = useAppStore((s) => s.openProject);
-  const setPage = useAppStore((s) => s.setPage);
-  const setSettingsTab = useAppStore((s) => s.setSettingsTab);
   const showToast = useAppStore((s) => s.showToast);
 
   useEffect(() => {
@@ -42,67 +39,8 @@ export function CommandPalette({
   if (!open) return null;
 
   const run = async (command: CommandItem) => {
-    const store = useAppStore.getState();
     try {
-      switch (command.id) {
-        case "builtin.newChat":
-        case "builtin.session.new":
-          await newSession();
-          break;
-        case "builtin.session.delete": {
-          const id = store.activeSessionId;
-          if (id) {
-            await api.deleteSession(id);
-            await store.refreshSessions();
-            await store.newSession();
-          }
-          break;
-        }
-        case "builtin.agent.abort":
-          await store.abort();
-          break;
-        case "builtin.mode.agent":
-        case "builtin.mode.chat": {
-          const mode = command.id.endsWith("agent") ? "agent" : "chat";
-          if (store.settings) {
-            const next = { ...store.settings, defaultMode: mode as "agent" | "chat" };
-            await api.setSettings(next);
-            useAppStore.setState({ settings: next });
-          }
-          break;
-        }
-        case "builtin.openProject":
-        case "builtin.project.open":
-          await openProject();
-          break;
-        case "builtin.project.clear":
-          await store.clearProject();
-          break;
-        case "builtin.openSettings":
-        case "builtin.settings.open":
-          setPage("settings");
-          break;
-        case "builtin.settings.providers":
-          setSettingsTab("agent");
-          setPage("settings");
-          break;
-        case "builtin.settings.import":
-          setSettingsTab("import");
-          setPage("settings");
-          break;
-        case "builtin.plugins.open":
-          setPage("plugins");
-          break;
-        case "builtin.plugins.loadDev":
-          await api.loadDevPlugin();
-          await store.refreshPlugins();
-          break;
-        case "builtin.logs.open":
-          await api.openLogs();
-          break;
-        default:
-          await api.executeCommand(command.id);
-      }
+      await runPaletteCommand(command.id);
       onClose();
     } catch (e) {
       showToast(e instanceof Error ? e.message : String(e), { variant: "error" });

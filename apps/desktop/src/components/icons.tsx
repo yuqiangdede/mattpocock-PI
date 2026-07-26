@@ -56,6 +56,7 @@ import {
   Settings,
   Shield,
   SlidersHorizontal,
+  Slash,
   Smile,
   Sparkles,
   Square,
@@ -129,6 +130,7 @@ export const IconFix = icon(Bug);
 export const IconKeyboard = icon(Keyboard);
 export const IconMic = icon(Mic);
 export const IconPlug = icon(Plug);
+export const IconSlash = icon(Slash);
 export const IconUser = icon(UserRound);
 export const IconSparkles = icon(Sparkles);
 export const IconBrowser = icon(AppWindow);

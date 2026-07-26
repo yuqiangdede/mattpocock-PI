@@ -10,7 +10,9 @@ import type {
   BrowserAction,
   BrowserState,
   CommandItem,
+  ComposerCommand,
   FsEntry,
+  FsIndexResult,
   FsReadResult,
   HostHealth,
   HostStatusEvent,
@@ -278,6 +280,9 @@ export const api = {
     invoke<{ entries: FsEntry[] }>(IPC.invoke.fsList, { path: path ?? "" }),
   fsRead: (path: string) => invoke<FsReadResult>(IPC.invoke.fsRead, { path }),
   fsReveal: (path: string) => invoke(IPC.invoke.fsReveal, { path }),
+  fsIndex: () => invoke<FsIndexResult>(IPC.invoke.fsIndex),
+  composerCommands: () =>
+    invoke<{ commands: ComposerCommand[] }>(IPC.invoke.composerCommands),
   windowResizeBy: (deltaWidth: number) =>
     invoke<{ applied: number }>(IPC.invoke.windowResizeBy, { deltaWidth }),
   windowControl: (action: WindowControlAction) =>

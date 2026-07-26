@@ -34,12 +34,15 @@ export function isHttpUrl(text: string): boolean {
 
 /**
  * Returns the cleaned path when `text` plausibly names a file (trailing
- * `:line[:col]` refs are stripped), otherwise null.
+ * `:line[:col]` refs are stripped), otherwise null. A leading `@` — the
+ * composer's file-reference sigil (D124) — is accepted and stripped so
+ * `@src/a.ts` previews like `src/a.ts`.
  */
 export function parseFileRef(text: string): string | null {
-  const raw = text.trim();
+  let raw = text.trim();
   if (!raw || raw.length > 512) return null;
-  if (!FILE_TOKEN_RE.test(raw)) return null;
+  if (raw.startsWith("@")) raw = raw.slice(1);
+  if (!raw || !FILE_TOKEN_RE.test(raw)) return null;
   const path = raw.replace(/:\d+(?::\d+)?$/, "");
   const base = path.split("/").pop() ?? "";
   const dotIndex = base.lastIndexOf(".");

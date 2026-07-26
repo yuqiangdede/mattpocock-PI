@@ -9,7 +9,13 @@ import type {
 import { PERMISSION_MODES } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { api } from "../lib/api";
+import { runPaletteCommand } from "../lib/commands";
+import {
+  resolveComposerCommand,
+  useComposerAutocomplete,
+} from "../lib/use-composer-autocomplete";
 import { BrandLogo } from "./BrandLogo";
+import { ComposerAutocomplete } from "./ComposerAutocomplete";
 import {
   IconArrowUp,
   IconShield,
@@ -129,6 +135,9 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
   const composerPrefill = useAppStore((s) => s.composerPrefill);
   const clearComposerPrefill = useAppStore((s) => s.clearComposerPrefill);
   const [value, setValue] = useState("");
+  const [cursor, setCursor] = useState(0);
+  const [composing, setComposing] = useState(false);
+  const [inputFocused, setInputFocused] = useState(false);
   const [permissionOpen, setPermissionOpen] = useState(false);
   const permissionRef = useRef<HTMLDivElement>(null);
   const [modelOpen, setModelOpen] = useState(false);
@@ -437,15 +446,58 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
   };
   const submit = async () => {
     const content = value.trim();
-    if (!content || isRunning || !modelReady) return;
+    if (!content || isRunning) return;
+    // Slash dispatch (D123): builtin/plugin aliases execute locally without
+    // a session or a model; templates and unknown /names stay prompt text
+    // (main expands templates). Runs before the model-ready gate on purpose.
+    if (content.startsWith("/")) {
+      const name = content.slice(1).split(/\s/, 1)[0];
+      const command = name ? await resolveComposerCommand(name) : null;
+      if (command && command.kind !== "template" && command.id) {
+        setValue("");
+        try {
+          if (command.kind === "builtin") await runPaletteCommand(command.id);
+          else await api.executeCommand(command.id);
+        } catch (e) {
+          showToast(e instanceof Error ? e.message : String(e), {
+            variant: "error",
+          });
+        }
+        return;
+      }
+    }
+    if (!modelReady) return;
     setValue("");
     await sendPrompt(content);
+  };
+
+  const composerAc = useComposerAutocomplete({
+    value,
+    cursor,
+    composing,
+    enabled: !isRunning,
+  });
+
+  const acceptCompletion = (index: number) => {
+    const result = composerAc.accept(index);
+    if (!result) return;
+    setValue(result.value);
+    setCursor(result.cursor);
+    requestAnimationFrame(() => {
+      const el = ref.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(result.cursor, result.cursor);
+    });
   };
 
   return (
     <div className={`composer-dock composer-dock-${variant}`}>
       <div className="composer-stack">
         <div className="composer-shell">
+          {inputFocused ? (
+            <ComposerAutocomplete ac={composerAc} onAccept={acceptCompletion} />
+          ) : null}
           <div className="composer-input-wrap">
             {/* Docked threads carry the brand mark; the empty home keeps a clean draft. */}
             {variant === "docked" ? (
@@ -459,12 +511,50 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
               rows={1}
               placeholder={t(variant === "home" ? "chat.placeholderHome" : "chat.placeholder")}
               value={value}
-              onChange={(e) => setValue(e.target.value)}
+              onChange={(e) => {
+                setValue(e.target.value);
+                setCursor(e.target.selectionStart ?? e.target.value.length);
+              }}
+              onSelect={(e) => {
+                setCursor(e.currentTarget.selectionStart ?? 0);
+              }}
+              onCompositionStart={() => setComposing(true)}
+              onCompositionEnd={(e) => {
+                setComposing(false);
+                setCursor(e.currentTarget.selectionStart ?? 0);
+              }}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setInputFocused(false)}
               onKeyDown={(e) => {
                 // An Enter that confirms an IME candidate (isComposing, or the
-                // WebKit 229 quirk) must commit the text, never send it.
+                // WebKit 229 quirk) must commit the text, never send it — and
+                // never drive the autocomplete menu (D125).
                 if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229)
                   return;
+                if (composerAc.open && e.key === "Escape") {
+                  // Escape closes only the menu; overlay handlers must not
+                  // also fire on the same press.
+                  e.preventDefault();
+                  e.stopPropagation();
+                  composerAc.close();
+                  return;
+                }
+                if (composerAc.hasItems) {
+                  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                    e.preventDefault();
+                    const delta = e.key === "ArrowDown" ? 1 : -1;
+                    const count = composerAc.items.length;
+                    composerAc.setHighlight(
+                      (composerAc.highlight + delta + count) % count,
+                    );
+                    return;
+                  }
+                  if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey) {
+                    e.preventDefault();
+                    acceptCompletion(composerAc.highlight);
+                    return;
+                  }
+                }
                 if (e.key === "Enter" && !e.shiftKey && enterToSend) {
                   e.preventDefault();
                   void submit();
@@ -772,7 +862,10 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                   title={
                     modelReady ? t("chat.send") : t("settings.addProvider")
                   }
-                  disabled={!value.trim() || !modelReady}
+                  disabled={
+                    !value.trim() ||
+                    (!modelReady && !value.trim().startsWith("/"))
+                  }
                   onClick={() => void submit()}
                 >
                   <IconArrowUp size={15} />

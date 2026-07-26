@@ -764,7 +764,19 @@ const MessageRow = memo(function MessageRow({
           <div className="message-bubble">
             {isUser ? (
               <div className="message-user-text selectable">
-                <LinkifiedText text={String(message.content || "")} />
+                {message.command ? (
+                  // Slash invocations show the typed form as a chip; the
+                  // expanded template body lives in `content` (hover reveals
+                  // it) and is what regenerate/reseed replay (D123).
+                  <code
+                    className="chat-command-chip"
+                    title={String(message.content || "")}
+                  >
+                    {message.command}
+                  </code>
+                ) : (
+                  <LinkifiedText text={String(message.content || "")} />
+                )}
               </div>
             ) : (
               <>
