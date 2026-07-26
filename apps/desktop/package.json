@@ -3,6 +3,11 @@
   "version": "0.1.1-rc.1",
   "private": true,
   "description": "PI-Desktop Electron application",
+  "homepage": "https://github.com/vastsa/PI-Desktop",
+  "author": {
+    "name": "vastsa",
+    "email": "hhxk666@gmail.com"
+  },
   "main": "./out/main/index.js",
   "type": "module",
   "scripts": {
