@@ -14,10 +14,11 @@ import { IconClose, IconCloudDown, IconExternal } from "./icons";
 export function UpdateBanner() {
   const { t } = useTranslation();
   const update = useUpdateState();
-  const [dismissedVersion, setDismissedVersion] = useState<string | null>(null);
+  const [dismissedState, setDismissedState] = useState<string | null>(null);
 
   if (!update?.availableVersion) return null;
-  if (update.availableVersion === dismissedVersion) return null;
+  const stateKey = `${update.availableVersion}:${update.status}`;
+  if (stateKey === dismissedState) return null;
 
   const visible =
     update.status === "downloaded" ||
@@ -39,7 +40,7 @@ export function UpdateBanner() {
           type="button"
           aria-label={t("updates.dismiss")}
           className="rounded-md p-0.5 text-text-muted hover:bg-bg-hover hover:text-text-primary"
-          onClick={() => setDismissedVersion(update.availableVersion ?? null)}
+          onClick={() => setDismissedState(stateKey)}
         >
           <IconClose className="size-3.5" />
         </button>

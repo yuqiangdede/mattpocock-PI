@@ -5,9 +5,8 @@
  * .github/workflows/release.yml. Delivery mode per install:
  *  - Windows NSIS / Linux AppImage → full in-app flow: silent background
  *    download, "restart to update" prompt, install-on-quit fallback.
- *  - macOS → unsigned builds (identity: null) can't pass Squirrel.Mac
- *    signature validation, so we only surface the new version and link to
- *    the releases page. Flips to in-app automatically once builds are signed.
+ *  - macOS → manual discovery and a releases-page link. In-app installation
+ *    remains disabled until a signed channel is explicitly qualified.
  *  - Linux deb (no $APPIMAGE in env) → notify + link, like macOS.
  *  - Unpackaged dev runs → disabled (no app-update.yml in resources).
  *
@@ -139,7 +138,11 @@ export class AppUpdaterController {
     if (this.state.mode === "disabled") {
       throw new Error("updates are disabled in development builds");
     }
-    if (this.state.status === "checking" || this.state.status === "downloading") {
+    if (
+      this.state.status === "checking" ||
+      this.state.status === "downloading" ||
+      this.state.status === "downloaded"
+    ) {
       return this.state;
     }
     this.manualRequested = Boolean(options.manual);

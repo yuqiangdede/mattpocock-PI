@@ -43,7 +43,7 @@ test("composer exposes the runtime thinking level order and provider filtering",
   assert.match(composerSource, /thinkingLevelForProvider/);
   assert.match(composerSource, /thinkingLevel:\s*level/);
   assert.match(composerSource, /composer-thinking-levels/);
-  assert.match(composerSource, /composer-thinking-section[\s\S]*providers/);
+  assert.match(composerSource, /availableThinkingLevels/);
 });
 
 test("compatible providers can enable thinking from the model menu", () => {
@@ -73,17 +73,17 @@ test("main resolves reasoning from each session's exact selected model", () => {
 });
 
 test("transcript keeps assistant thinking in a separate disclosure", () => {
-  assert.match(transcriptSource, /className="thinking-disclosure-header"/);
+  assert.match(transcriptSource, /tool-row thinking/);
+  assert.match(transcriptSource, /className="tool-row-header"/);
   assert.match(transcriptSource, /aria-expanded=\{open\}/);
   assert.match(transcriptSource, /aria-hidden=\{!open\}/);
   assert.match(transcriptSource, /inert=\{!open\}/);
   assert.match(transcriptSource, /IconSparkles/);
   assert.match(transcriptSource, /message\.thinking/);
-  assert.match(transcriptSource, /Markdown source=\{thinking\}/);
+  assert.match(transcriptSource, /thinking-prose[\s\S]*?Markdown source=\{text\}/);
   assert.match(transcriptSource, /CopyButton text=\{message\.content\}/);
   assert.match(transcriptSource, /!thinkingText\(message\)/);
-  assert.match(transcriptSource, /thinkingText\(lastVisibleMessage\)/);
-  assert.match(stylesSource, /\.thinking-disclosure-body[\s\S]*border-left/);
+  assert.match(transcriptSource, /onlyThinking = items\.every/);
   assert.match(stylesSource, /\.thinking-prose/);
 });
 
