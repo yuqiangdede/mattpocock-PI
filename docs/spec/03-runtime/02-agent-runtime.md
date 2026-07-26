@@ -66,7 +66,7 @@ interface AgentRuntime {
 7. start pi turn with the resolved session configuration and effective
    thinking level; transient provider transport failures (request timeout,
    dropped connection, 429/5xx) retry up to twice with interruptible
-   backoff before the turn is failed (D120)
+   backoff before the turn is failed (D127)
 8. stream normalized answer and thinking events to UI
 9. on tool calls, delegate to Rust host bridge with the durable `sessionId`;
    host resolves the session-bound workspace root
@@ -107,7 +107,7 @@ interface AgentRuntime {
 - Restored history also reconstructs tool call/result pairs from persisted
   tool rows (`toolCallId`/`toolArgs`/`toolResult`), so a recreated runtime
   keeps its full working context — file contents read, command output —
-  instead of collapsing to bare chat text (D120). An interrupted tool row
+  instead of collapsing to bare chat text (D127). An interrupted tool row
   restores as an errored result; a tool row whose assistant row was lost
   gets a synthesized call-only assistant carrier so call/result pairs stay
   well-formed for every provider API.

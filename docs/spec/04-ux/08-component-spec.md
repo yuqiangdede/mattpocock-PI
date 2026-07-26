@@ -89,7 +89,6 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 - Native commands that create or reload a window wait for the renderer's menu
   subscription acknowledgement instead of relying on a timing delay.
 
-
 ---
 
 ## 2. Topbar
@@ -102,7 +101,7 @@ button, durable notification inbox entry, and settings entry.
 ### 2.2 Anatomy
 
 ```text
-[☰ Sidebar] [📁 Project name] [🤖 Model: provider/model] [🛡 Mode badge] [⏹ Abort] [⚙ Settings]
+[☰ Sidebar] [📁 Project name] [🤖 Model: provider/model] [🛡 Mode badge] [⏹ Abort] [Bell · unread] [⚙ Settings]
 ```
 
 (Icons described functionally; actual render uses Lucide SVGs.)
@@ -130,6 +129,9 @@ button, durable notification inbox entry, and settings entry.
 - Every control is keyboard-reachable with Tab
 - Abort button has `aria-label="Abort active turn"`
 - Model selector announces current value via `aria-label`
+- Notification trigger has a localized accessible name containing the unread
+  count, exposes `aria-expanded`/`aria-controls`, and never relies on the badge
+  color alone
 
 ### 2.6 MVP constraints
 
@@ -210,7 +212,10 @@ Collapsed (48px):
 - Click Temporary sessions `+`: clear the workspace and create/reuse a
   path-less persistent session
 - Project overflow: switch, pin/unpin, archive/restore, close retained tab
-- Conversation overflow: pin/unpin, archive/restore, delete
+- Conversation overflow: pin/unpin, archive/restore, Create branch, open
+  folder, delete. Create branch is disabled while that conversation is
+  running; success activates the independent child session and focuses the
+  composer.
 - Sort menu: Recently updated, Created date, Oldest first, and Name; pinned
   rows stay ahead of unpinned rows. A stored `manual` compatibility value
   requires no drag-reorder UI.
@@ -462,6 +467,10 @@ Groups and session items:
   tool context do not imply project access.
 - Pin/archive actions update renderer presentation metadata; delete remains
   the explicit durable host operation.
+- Create branch snapshots the idle conversation's complete current transcript
+  into an independent session. The child stays in the same project or
+  Temporary group and becomes active; later transcript/configuration changes
+  do not affect the source. The action is disabled for a running source.
 - Selecting a conversation with a different project first activates that
   project's workspace. A running turn in the previously selected session is
   not aborted.
@@ -553,7 +562,9 @@ responses, lightweight tool activity rows, and permission cards for a session.
 ### 7.6 MVP constraints
 
 - No message search within transcript
-- No arbitrary message branching tree; regenerate variants are linear per user root turn
+- No inline message branching tree; regenerate variants remain linear per user
+  root turn. Session-level Create branch produces an independent conversation
+  row instead of adding tree chrome inside the transcript.
 - The minimap renders only when at least two visible user or assistant messages
   exist **and** the transcript content overflows one viewport (scrollHeight >
   clientHeight); tool-only rows do not create markers and a one-page transcript
@@ -902,8 +913,49 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 
 - No file attachment (deferred)
 - No image/appshot attachment stubs
-- No slash-command autocomplete in composer (command palette is separate)
 - No voice input
+
+### 11.8 Slash commands and @ file references (D123–D125, ADR 0024)
+
+The composer owns an inline autocomplete menu — one component serving two
+modes. Focus never leaves the textarea (D125).
+
+Anatomy:
+
+```text
+┌──────────────────────────────────────────────┐
+│  group label (sticky)                        │
+│  ▸ item title      argument-hint   descr.    │  ← kb-active row
+│  ▸ item title                      descr.    │
+│  …                                           │
+│  ↑↓ select · Enter confirm · Esc close       │  ← hint bar (footer)
+└──────────────────────────────────────────────┘
+[ composer textarea                            ]
+```
+
+- Anchored above the input, spanning the full composer width; same elevated
+  surface recipe as the model menu (opaque elevated background, dialog
+  shadow, subtle hairline, `--radius-lg`); max-height caps with internal
+  scroll and `scrollIntoView(nearest)` keyboard follow.
+- Slash mode (`/` typed at position 0, cursor inside the first token, no
+  whitespace yet): groups in order — prompt templates (name +
+  `argument-hint` ghost text + description, project source before
+  user-global), app commands (builtin slash aliases), plugin commands.
+  Matched characters highlight in accent.
+- File mode (`@` token at cursor, boundary-preceded): rows show file name as
+  the primary line and relative path as the secondary line; directories get
+  a trailing `/` and continue completion on accept; entries come from
+  `fs/index` (D124). A truncation footnote appears when the index is capped;
+  without a workspace the menu shows an "open a project" empty state.
+- Accepting always inserts text (`/name ` / `@path ` / `@dir/`); dispatch
+  happens only at send time (D123). Builtin/plugin dispatch bypasses the
+  model-ready gate since no prompt is sent.
+- Sent template invocations render in the transcript as a monospace command
+  chip from the message's `command` field instead of the expanded body.
+- States: keyboard-active row uses the shared `kb-active` treatment; empty
+  query lists everything (slash) / recently indexed order (file); zero
+  matches renders the localized empty row and the menu counts as closed for
+  key handling.
 
 ---
 

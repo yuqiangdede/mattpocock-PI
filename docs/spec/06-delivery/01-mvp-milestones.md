@@ -87,7 +87,7 @@ Status: **In Progress**
 Goal: daily-usable package.
 
 Deliverables:
-- packaging (**macOS arm64 only** for first release)
+- packaging (macOS arm64, Windows x64, and Linux x64 tag artifacts; D126)
 - settings polish
 - logging/error boundaries
 - session management basics
@@ -101,6 +101,8 @@ Progress:
 - [x] custom app icon (generated pi mark → `build/icon.icns`, D079)
 - [x] isolation/logging hardening (renderer sandbox D081, NDJSON log
   channels D082, crash supervision D080, window state D083)
+- [x] packaged macOS update discovery, fixed release link, typed update state,
+  and tag-workflow feed assets (manual delivery, D120 / ADR 0022)
 - [ ] full DMG + notarization — runbook ready
   ([06-release-runbook](06-release-runbook.md)); blocked only on Apple
   Developer credentials (operational, not code)
@@ -115,7 +117,8 @@ Progress:
 
 ## Release constraint
 
-First distributable release target: **macOS arm64 only** (D010).
+Tag releases publish **macOS arm64, Windows x64, and Linux x64** artifacts
+(D126 lifts the original D010 macOS-only constraint).
 
 ## Rough effort (solo)
 

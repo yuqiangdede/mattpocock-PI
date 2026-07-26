@@ -16,7 +16,7 @@ PI-Desktop.app
 
 | Process | Owns |
 |---|---|
-| Electron Main | window lifecycle, IPC fan-in/out, child process supervision |
+| Electron Main | window lifecycle, IPC fan-in/out, child process supervision, fixed-feed app update lifecycle |
 | Renderer | UI only |
 | Rust host-core | DB, tools, permissions, plugin host services, secrets adapters |
 | Node pi sidecar | pi agent loop, provider streaming, tool-call planning |
@@ -61,7 +61,12 @@ Supervision parameters (implemented in Electron main):
 4. Stop Node agent sidecar
 5. Flush/close Rust host DB
 6. Stop Rust host
-7. Close windows / exit
+7. Dispose update polling
+8. Close windows / exit
+
+`updates/install` invokes Electron's quit-and-install path only after an update
+reaches `downloaded`. Electron still emits `before-quit`, so the normal
+sidecar/host shutdown sequence runs before the updater replaces the app.
 
 ## 6. Dev vs release
 
@@ -79,6 +84,9 @@ Supervision parameters (implemented in Electron main):
 - agent sidecar runs the bundled `agent-runtime/sidecar.js` on the Electron
   binary itself with `ELECTRON_RUN_AS_NODE=1` — no separate Node runtime is
   shipped (resolves **D008**)
+- packaged builds use the Main-owned update controller. macOS and non-AppImage
+  Linux are manual-delivery modes; Windows NSIS and Linux AppImage use the
+  in-app feeds published by D126 tag releases
 
 ## 7. Acceptance
 

@@ -72,11 +72,23 @@ Required (all **implemented**):
 - Prefer official pi packages
 - No remote script execution for plugins in MVP (local install only, D009)
 
-## 7. Update security (post-MVP)
+## 7. Application update security (D120)
 
-- Signed releases (Developer ID + notarization lane exists in
-  [release runbook](../06-delivery/06-release-runbook.md))
-- Auto-update channel with signature verification — not an MVP dependency
+- Electron Main owns `electron-updater`; renderer IPC cannot provide or
+  override the fixed HTTPS GitHub owner/repository or releases URL.
+- Feed manifests bind artifacts with electron-builder hashes. An error,
+  unavailable feed, hash mismatch, or invalid updater state must not install.
+- Packaged macOS is manual-only: it detects a release and opens the fixed
+  releases page, but never downloads or installs it in-app. Enabling a signed
+  macOS in-app channel requires a later explicit decision and qualification.
+- D126 tag releases publish Windows NSIS and Linux AppImage installers plus
+  their update manifests, activating those in-app lanes. Platform signing,
+  rollback, and staged-rollout qualification remain release follow-ups.
+- The client carries no GitHub token. A private or otherwise unreachable feed
+  fails closed; automatic failures stay ambient and explicit checks expose the
+  error.
+- The Developer ID + notarization lane remains documented in the
+  [release runbook](../06-delivery/06-release-runbook.md).
 
 ## 8. Host process attack surface
 

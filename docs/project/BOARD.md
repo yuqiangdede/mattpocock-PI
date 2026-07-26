@@ -59,7 +59,13 @@ Open issue:
 - Transcript storage v7: per-session JSONL files under `sessions/` with
   SQLite reduced to an index (FTS/list/badges), append-only revisions file,
   pre-v7 databases archived via breaking reset (D119)
-- Spec corpus 0.4.4: English-first everywhere (translated runtime/plugins/
+- Conversation branching: protocol-v5 host snapshot creates an independent
+  session from an idle conversation while preserving workspace/runtime
+  configuration and remapping transcript identifiers (D122 / ADR 0023)
+- Application update delivery: Main-owned fixed feed, packaged macOS discovery
+  and manual release link, typed renderer state, and Windows NSIS/Linux
+  AppImage in-app delivery lanes (D120 / ADR 0022, published by D126)
+- Spec corpus 0.4.7: English-first everywhere (translated runtime/plugins/
   ADR docs), error-code registry unified to shared/errors.ts, e2e statuses
   synced to real automation, decisions-log restructured (A–I) with
   supersession chains, acceptance criteria evidence-tagged
@@ -67,6 +73,8 @@ Open issue:
 
 ### In Progress
 - Codex visual gold polish (ongoing capture-driven iteration)
+- Composer slash commands + @ file references wired to pi prompt templates
+  (D123–D125 / ADR 0024)
 
 ### Blocked (external)
 - Full DMG notarization — needs Apple Developer credentials; runbook ready

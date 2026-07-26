@@ -42,8 +42,13 @@ PI-Desktop uses a layered desktop architecture:
 ### 3.1 App Shell (Electron)
 - windows/menus
 - app lifecycle
-- updater placeholder
+- fixed-feed update check/download/install lifecycle
 - process boot order
+
+Electron Main exclusively owns the update client and fixed GitHub Releases
+target. The renderer can request allowlisted operations and render typed state,
+but cannot supply a feed URL or access the updater directly. App updates do
+not pass through Rust host-core or the agent sidecar (D120 / ADR 0022).
 
 ### 3.2 UI (React)
 - session UX

@@ -105,6 +105,10 @@ the visible shell context.
 - **Archive** is non-destructive. Archived rows are hidden by default,
   available through Show archived, and restorable. Archiving does not cancel
   a turn or delete a transcript.
+- **Create branch** snapshots an idle conversation's complete active
+  transcript into an independent session in the same project/Temporary scope.
+  The command is disabled while the source runs. Success selects the child and
+  focuses the composer; failure leaves the source visible and unchanged.
 - Archiving the visible conversation/project first moves the visible context
   to a non-archived sibling. With no sibling, a conversation receives a fresh
   draft in the same scope and a project clears the visible workspace; the app
@@ -135,7 +139,8 @@ the visible shell context.
   their checked state. Active session rows retain `aria-current`.
 - Toggling disclosure or a menu action keeps focus on its control. Selecting a
   project/session returns focus to the composer after loading.
-- Sort, archive, restore, pin, and close actions remain keyboard-reachable;
+- Sort, archive, restore, pin, Create branch, and close actions remain
+  keyboard-reachable;
   they cannot exist only as pointer-hover affordances.
 
 ### 1.6 Local profile footer
@@ -196,7 +201,7 @@ the visible shell context.
   presentation boundary from structured fields; persisted rows never contain
   localized prose.
 
-### 1.8 Artifact-driven work panel tabs (D119)
+### 1.8 Artifact-driven work panel tabs (D128)
 
 - The shell exposes no empty work-panel launcher, application-menu command, or
   global shortcut. An artifact trigger atomically creates or reuses its tab,
@@ -215,6 +220,26 @@ the visible shell context.
   tabs, preventing workspace-relative resources from crossing context
   boundaries. Window-state persistence records the base shell width without
   any temporary panel expansion.
+
+### 1.9 Application updates (D120)
+
+- Electron Main checks the fixed release feed 15 seconds after packaged app
+  startup and every 6 hours afterward. Development builds remain disabled.
+- Settings → Info and application-menu checks share one typed update state.
+  Manual checks expose up-to-date or error feedback; automatic failures do not
+  open a toast or ambient banner.
+- Manual delivery (`darwin` and non-AppImage Linux) stops at `available` and
+  offers the fixed GitHub Releases page. In-app delivery (Windows NSIS and
+  Linux AppImage readiness builds) automatically advances through
+  `downloading` to the stable `downloaded` state.
+- `downloaded` remains actionable until Restart to update or normal app quit;
+  later scheduled/manual checks do not replace it with `checking`.
+- The bottom-right banner appears only for manual `available`, in-app
+  `downloading`, or `downloaded`. Dismissal suppresses the current
+  version-and-status stage; a later stage such as `downloaded` appears again.
+- D126 tag releases publish all platform manifests and installers. Windows
+  NSIS and Linux AppImage therefore use the in-app lane; macOS and Linux deb
+  remain notify-and-link delivery modes.
 
 ## 2. Streaming message behavior
 
@@ -332,7 +357,7 @@ Agent calls high-risk tool
 | Provider connection test result | Success/Error | 4s/8s | Transient feedback, not blocking workflow |
 | Plugin load/unload success | Success | 4s | Confirmation of background action |
 | Settings saved | Success | 4s | Quick confirmation |
-| Auto-update available (post-MVP) | Info | persistent | Requires user attention but not blocking |
+| Manual menu update check failure | Error | 8s | Direct feedback for an explicit command |
 
 ### 6.2 Inline errors (use for)
 
@@ -343,6 +368,7 @@ Agent calls high-risk tool
 | Stream interruption | Error state on MessageBubble | Belongs to the message that failed |
 | Provider/model turn failure | Assistant error message in transcript | Keeps summary, stable code, redacted detail, and recovery action attached to the failed turn |
 | Provider configuration validation error | Inline in settings form | User needs to see which field is wrong |
+| Application update status/error | Settings → Info Updates row | Preserves the latest Main-owned state without interrupting background checks |
 | Composer validation (no model) | Disabled state + tooltip on send button | Immediate context |
 
 ### 6.3 Rules
@@ -433,6 +459,48 @@ When drag/drop is implemented, these patterns should apply:
 - Drop targets highlight with accent border during hover
 - Cancel drag with Escape
 - Drag feedback: opacity 0.5 on source, accent outline on target
+
+## 8a. Composer autocomplete (D123–D125)
+
+### 8a.1 Triggers
+
+- `/` opens command mode only when it is the first character of the input
+  and the cursor is still inside that first token (no whitespace typed yet).
+  A space after the command name closes the menu; arguments are free text.
+- `@` opens file mode when the token containing the cursor starts with `@`
+  and the character before `@` is start-of-input, whitespace, or one of the
+  pi delimiters (`"`, `'`, `=`). The query is the text between `@` and the
+  cursor; a query containing `/` matches across path segments. A quoted
+  token (`@"…`) is treated as one token until the closing quote.
+- Pasting text never opens a menu unless the caret lands inside a valid
+  trigger token.
+
+### 8a.2 Keyboard while open
+
+- ↑/↓ move the highlight with wraparound; Home/End are left to the textarea.
+- Enter / Tab accept the highlighted item; Enter never sends while the menu
+  has a highlighted item (this precedes the Enter-to-send setting, which
+  otherwise keeps its behavior).
+- Escape closes only the menu — it takes precedence over the composer's
+  "clear input or blur" Escape and must not propagate to overlay handlers.
+- Any other typing re-filters in place; zero matches behaves as closed.
+
+### 8a.3 IME (first normative IME rules)
+
+- All autocomplete key handling sits behind the standard guard
+  (`isComposing || keyCode === 229`).
+- During active composition the trigger detector neither opens, updates,
+  nor closes the menu; state re-evaluates on `compositionend`.
+- Enter that confirms an IME candidate never sends and never accepts a menu
+  item; ↑/↓ during candidate navigation belong to the IME.
+
+### 8a.4 Close and focus rules
+
+- Close on: outside mousedown, textarea blur, deleting past the trigger
+  character, session or workspace switch, accepting an item (except `@dir/`
+  continuation, which keeps the menu open on the deeper query).
+- Focus stays in the textarea for the menu's whole lifecycle (input-retained
+  overlay); the menu is never a focus trap and never steals the caret.
 
 ## 9. Scroll behavior
 

@@ -1,6 +1,6 @@
 # Open Questions
 
-> Updated for baseline `0.4.4` (M5 hardening + composer workspace-rail removal).
+> Updated for baseline `0.4.7` (application updates + three-platform release).
 > Frozen decisions live in [decisions-log.md](decisions-log.md); resolved
 > items move there instead of lingering here.
 
@@ -12,12 +12,16 @@
   (D079); renderer identity and shared `BrandLogo` usage → D094
 - zh-CN locale timeline → zh-CN strings ship alongside English and are
   asserted by UI e2e scenarios (English remains the source language)
+- Application update ownership and delivery modes → D120 / ADR 0022
 
 ## Still open
 
 ### Release / distribution (post-first-release)
-1. Auto-update channel design (D020: post-MVP; signed channel per security spec §7)
+1. When to make the release feed public or replace it with an authenticated
+   endpoint without shipping a client credential
 2. Distribution beyond DMG (Homebrew cask? direct download page?)
+3. Signed Windows/macOS in-app installation, Linux publishing, rollback, and
+   stable/prerelease rollout policy
 
 ### Marketplace (post-MVP)
 1. Official marketplace domain and provider IDs

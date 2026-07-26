@@ -57,6 +57,11 @@ Codex as a visual reference. The identity contract is deliberately small:
 - `build/icon_1024.png` is the canonical logo. `BrandLogo` imports it through
   Vite so the renderer bundle, development Dock, and packaged application all
   use the same visual asset.
+- On macOS, both development and packaged launches expose `PI-Desktop` as the
+  native application-menu name. The native About panel uses the PI-Desktop
+  name, version, and canonical icon; no stock Electron name or icon is visible.
+  Development launches use a generated branded host bundle because AppKit
+  reads this identity from the host bundle rather than Electron runtime APIs.
 - The home hero logo is 56px. Expanded/collapsed sidebar logos are 15px/18px,
   and the docked composer logo is 15px. The image keeps its native colors in
   both themes and is not replaced by a theme-tinted vector approximation.
