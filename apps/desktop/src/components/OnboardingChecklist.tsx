@@ -3,6 +3,15 @@ import { api } from "../lib/api";
 import { useAppStore } from "../stores/app-store";
 import { IconCheck } from "./icons";
 
+/** Host step ids (app.getOnboarding) mapped to locale keys under `onboarding.`. */
+const STEP_LOCALE_KEY: Record<string, string> = {
+  provider: "addProvider",
+  secret: "saveKey",
+  project: "openProject",
+  prompt: "firstPrompt",
+  plugin: "loadPlugin",
+};
+
 /** First-run inline checklist (D021): rendered on the empty chat home until
  * every step is done or the user dismisses it. State comes from the host
  * (app.getOnboarding); actions deep-link into the relevant surface. */
@@ -18,7 +27,7 @@ export function OnboardingChecklist() {
   if (steps.length === 0 || steps.every((s) => s.done)) return null;
 
   const stepLabel = (id: string, fallback: string) => {
-    const key = `onboarding.${id}`;
+    const key = `onboarding.${STEP_LOCALE_KEY[id] ?? id}`;
     const label = t(key);
     return label === key ? fallback : label;
   };
@@ -31,8 +40,17 @@ export function OnboardingChecklist() {
         setSettingsTab("agent");
         setPage("settings");
         break;
+      case "project.open":
       case "openProject":
         void openProject();
+        break;
+      case "chat.focus":
+        setPage("chat");
+        requestAnimationFrame(() => {
+          document
+            .querySelector<HTMLTextAreaElement>(".composer-input")
+            ?.focus();
+        });
         break;
       case "plugins.open":
       case "loadPlugin":
