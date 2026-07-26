@@ -28,6 +28,7 @@ export const en = {
     copy: "Copy",
     paste: "Paste",
     selectAll: "Select All",
+    search: "Search…",
     commandPalette: "Command Palette…",
     toggleSidebar: "Sidebar",
     reload: "Reload",
@@ -79,6 +80,8 @@ export const en = {
     commandPalette: "Command palette",
     back: "Back",
     forward: "Forward",
+    collapseSidebar: "Collapse sidebar",
+    expandSidebar: "Expand sidebar",
     sessionActions: "Session actions",
     sessionRunning: "Running",
     sortSessions: "Sort projects and conversations",
@@ -530,6 +533,16 @@ export const en = {
   palette: {
     placeholder: "Search commands…",
     empty: "No commands",
+  },
+  search: {
+    placeholder: "Search tasks…",
+    empty: "No matching tasks",
+    today: "Today",
+    yesterday: "Yesterday",
+    previous7Days: "Previous 7 days",
+    previous30Days: "Previous 30 days",
+    earlier: "Earlier",
+    archived: "Archived",
   },
   plugins: {
     title: "Plugins",

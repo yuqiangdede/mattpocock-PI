@@ -62,6 +62,8 @@ import { AppUpdaterController } from "./updater";
 let mainWindow: BrowserWindow | null = null;
 let windowCreationPromise: Promise<void> | null = null;
 let applicationBooted = false;
+const isDevelopmentBuild =
+  process.env.PI_DESKTOP_DEV === "1" || !app.isPackaged;
 const pendingApplicationMenuCommands: AppMenuCommand[] = [];
 type MenuRendererReadyGate = {
   window: BrowserWindow;
@@ -104,6 +106,7 @@ const updater = new AppUpdaterController({
   logger,
   send: sendToRenderer,
   currentVersion: APP_VERSION,
+  isPackaged: !isDevelopmentBuild,
 });
 
 type RuntimeProvider = {
@@ -198,7 +201,7 @@ async function listRuntimeProviders(includeDisabled = true) {
 }
 
 function applyDevelopmentBranding() {
-  if (process.platform !== "darwin" || app.isPackaged || !app.dock) return;
+  if (process.platform !== "darwin" || !isDevelopmentBuild || !app.dock) return;
 
   const iconPath = join(app.getAppPath(), "build", "icon_1024.png");
   const icon = nativeImage.createFromPath(iconPath);
@@ -513,6 +516,18 @@ async function createWindow() {
   window.webContents.on("render-process-gone", () => {
     notificationViewingSessionId = null;
   });
+
+  // Fullscreen hides the macOS traffic lights; the renderer shifts its
+  // titlebar controls left to reclaim the space.
+  const sendFullScreen = () => {
+    if (window.isDestroyed() || window.webContents.isDestroyed()) return;
+    window.webContents.send(IPC.event.windowFullScreen, {
+      fullScreen: window.isFullScreen(),
+    });
+  };
+  window.on("enter-full-screen", sendFullScreen);
+  window.on("leave-full-screen", sendFullScreen);
+  window.webContents.on("did-finish-load", sendFullScreen);
 
   // Custom window controls (Windows/Linux) need maximize state to swap the
   // maximize/restore glyph.
@@ -1054,6 +1069,45 @@ async function createWindow() {
             await shot("pi-profile-menu");
             await setTheme("light");
             await setPage("chat");
+            // Global search modal (⌘K): recents view, query view, dark theme.
+            // Close the profile menu left open by the previous scene first.
+            await mainWindow!.webContents.executeJavaScript(`
+              window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+            `);
+            await new Promise((r) => setTimeout(r, 200));
+            const openSearch = () =>
+              mainWindow!.webContents.executeJavaScript(`
+                document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }));
+              `);
+            const closeSearch = () =>
+              mainWindow!.webContents.executeJavaScript(`
+                document.querySelector(".search-input")?.dispatchEvent(
+                  new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+                );
+              `);
+            await openSearch();
+            await new Promise((r) => setTimeout(r, 450));
+            await shot("pi-search");
+            await mainWindow!.webContents.executeJavaScript(`
+              (() => {
+                const input = document.querySelector(".search-input");
+                if (!input) return;
+                const setter = Object.getOwnPropertyDescriptor(
+                  window.HTMLInputElement.prototype,
+                  "value",
+                ).set;
+                setter.call(input, "设计");
+                input.dispatchEvent(new Event("input", { bubbles: true }));
+              })()
+            `);
+            await new Promise((r) => setTimeout(r, 350));
+            await shot("pi-search-query");
+            await setTheme("dark");
+            await new Promise((r) => setTimeout(r, 250));
+            await shot("pi-search-dark");
+            await closeSearch();
+            await setTheme("light");
+            await new Promise((r) => setTimeout(r, 250));
             // Toast stack proof (ToastHost variants) in both themes.
             const raiseToasts = () =>
               mainWindow!.webContents.executeJavaScript(`
@@ -2219,7 +2273,7 @@ function registerIpc() {
     const seed =
       process.env.PI_DESKTOP_SEED_WORKSPACE ||
       process.env.PI_DESKTOP_WORKSPACE ||
-      (app.isPackaged ? "" : join(__dirname, "../../.."));
+      (isDevelopmentBuild ? join(__dirname, "../../..") : "");
     if (!res.workspace && seed) {
       try {
         res = (await host.call("workspace.set", { path: seed })) as {

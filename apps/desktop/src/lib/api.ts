@@ -295,6 +295,12 @@ export const api = {
       listener(payload as { maximized: boolean }),
     );
   },
+  onWindowFullScreen: (listener: (event: { fullScreen: boolean }) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.windowFullScreen, (payload) =>
+      listener(payload as { fullScreen: boolean }),
+    );
+  },
   onMenuCommand: (listener: (command: AppMenuCommand) => void) => {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.menuCommand, (payload) =>

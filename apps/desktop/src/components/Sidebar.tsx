@@ -6,6 +6,7 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
@@ -25,8 +26,6 @@ import {
   IconAt,
   IconBranch,
   IconChevronDown,
-  IconChevronLeft,
-  IconChevronRight,
   IconNewSession,
   IconFolder,
   IconFileText,
@@ -130,11 +129,11 @@ function compareOptionalDate(
 }
 
 export function Sidebar({
-  collapsed,
-  onOpenPalette,
+  onOpenSearch,
+  titlebarNav,
 }: {
-  collapsed: boolean;
-  onOpenPalette: () => void;
+  onOpenSearch: () => void;
+  titlebarNav?: ReactNode;
 }) {
   const { t } = useTranslation();
   const sessions = useAppStore((s) => s.sessions);
@@ -153,10 +152,6 @@ export function Sidebar({
   const setSettingsTab = useAppStore((s) => s.setSettingsTab);
   const settings = useAppStore((s) => s.settings);
   const page = useAppStore((s) => s.page);
-  const navBack = useAppStore((s) => s.navBack);
-  const navForward = useAppStore((s) => s.navForward);
-  const navIndex = useAppStore((s) => s.navIndex);
-  const navStack = useAppStore((s) => s.navStack);
   const selectSession = useAppStore((s) => s.selectSession);
   const newSession = useAppStore((s) => s.newSession);
   const forkSessionAction = useAppStore((s) => s.forkSession);
@@ -177,8 +172,6 @@ export function Sidebar({
   const setProjectSort = useAppStore((s) => s.setProjectSort);
   const showToast = useAppStore((s) => s.showToast);
 
-  const [query, setQuery] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   const [sessionMenu, setSessionMenu] = useState<string | null>(null);
@@ -283,10 +276,6 @@ export function Sidebar({
     requestAnimationFrame(() => menuFirstItemRef.current?.focus());
   }, [sessionMenu, projectMenu, sortOpen, profileOpen]);
 
-  useEffect(() => {
-    if (collapsed) closeMenus();
-  }, [collapsed, closeMenus]);
-
   const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
       event.preventDefault();
@@ -341,15 +330,9 @@ export function Sidebar({
       cleaned.push(session);
       keptEmptyScopes.add(scope);
     }
-    const q = query.trim().toLowerCase();
-    const searched = q
-      ? cleaned.filter((session) => taskTitle(session.title).toLowerCase().includes(q))
-      : cleaned;
-    return searched;
+    return cleaned;
   }, [
     sessions,
-    query,
-    taskTitle,
     activeSessionId,
     page,
     showArchived,
@@ -543,11 +526,6 @@ export function Sidebar({
     const next = !showArchived;
     setSessionArchiveVisibility(next);
     closeMenus();
-  };
-
-  const toggleSearch = () => {
-    if (searchOpen) setQuery("");
-    setSearchOpen((value) => !value);
   };
 
   const toggleSessionPin = (session: SessionSummary) => {
@@ -1052,52 +1030,9 @@ export function Sidebar({
     );
   };
 
-  const canBack = navIndex > 0;
-  const canForward = navIndex < navStack.length - 1;
-
-  if (collapsed) {
-    return (
-      <aside className="sidebar-rail">
-        <div className="sidebar-drag" />
-        <div className="no-drag flex flex-1 flex-col items-center gap-2 px-2 py-2">
-          <div className="sidebar-rail-brand" title={t("app.shellName")} aria-label={t("app.shellName")}>
-            <BrandLogo size={18} />
-          </div>
-          <button className="icon-btn" title={t("nav.newTask")} data-nav="new-task" onClick={() => void createSession()}>
-            <IconNewSession size={16} />
-          </button>
-          <button className="icon-btn" title={t("nav.search")} onClick={onOpenPalette}>
-            <IconSearch size={16} />
-          </button>
-          {projectEntries.filter((entry) => entry.open).slice(0, 5).map((entry) => (
-            <button key={entry.key} className={`icon-btn sidebar-rail-project ${entry.active ? "active" : ""}`} title={entry.path} onClick={() => void selectProject(entry.path).then((ok) => { if (ok) focusComposer(); })}>
-              <IconFolder size={16} />
-            </button>
-          ))}
-          <button className="icon-btn" title={t("nav.projects")} data-nav="projects" onClick={() => setPage("projects")}>
-            <IconFolder size={16} />
-          </button>
-          <div className="flex-1" />
-          <button className="icon-btn" title={t("nav.settings")} data-nav="settings" onClick={() => setPage("settings")}>
-            <IconSettings size={16} />
-          </button>
-        </div>
-      </aside>
-    );
-  }
-
   return (
     <aside className="sidebar">
-      <div className="sidebar-drag">
-        <div className="traffic-nav no-drag">
-          <button className="title-nav-btn" title={t("nav.back")} disabled={!canBack} onClick={() => navBack()}>
-            <IconChevronLeft size={13} />
-          </button>
-          <button className="title-nav-btn" title={t("nav.forward")} disabled={!canForward} onClick={() => navForward()}>
-            <IconChevronRight size={13} />
-          </button>
-        </div>
-      </div>
+      <div className="sidebar-drag">{titlebarNav}</div>
       <div className="no-drag flex min-h-0 flex-1 flex-col px-2 pb-1.5">
         <div className="sidebar-header">
           <div className="brand">
@@ -1105,12 +1040,10 @@ export function Sidebar({
             <span>{t("app.shellName")}</span>
           </div>
           <button
-            className={`icon-btn ${searchOpen ? "active" : ""}`}
+            className="icon-btn"
             title={t("nav.search")}
             aria-label={t("nav.search")}
-            aria-expanded={searchOpen}
-            aria-controls="sidebar-session-search"
-            onClick={toggleSearch}
+            onClick={onOpenSearch}
           >
             <IconSearch size={15} />
           </button>
@@ -1131,21 +1064,6 @@ export function Sidebar({
             <span>{t("nav.plugins")}</span>
           </button>
         </nav>
-
-        {searchOpen ? (
-          <div className="sidebar-search-wrap">
-            <IconSearch size={13} aria-hidden />
-            <input
-              id="sidebar-session-search"
-              className="sidebar-search-input"
-              aria-label={t("nav.search")}
-              placeholder={t("nav.search")}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              autoFocus
-            />
-          </div>
-        ) : null}
 
         <div className="sidebar-list-toolbar">
           <span className="sidebar-list-label">{t("nav.sessions", { defaultValue: "Sessions" })}</span>

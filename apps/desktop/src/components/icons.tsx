@@ -37,6 +37,7 @@ import {
   Keyboard,
   Link,
   Mic,
+  MessageSquare,
   MessageSquarePlus,
   MoreHorizontal,
   Palette,
@@ -85,6 +86,7 @@ export const IconArchive = icon(Archive);
 export const IconArchiveRestore = icon(ArchiveRestore);
 export const IconArrowUpDown = icon(ArrowUpDown);
 export const IconSearch = icon(Search);
+export const IconChat = icon(MessageSquare);
 /** Session creation affordance. Keep it distinct from generic add actions. */
 export const IconNewSession = icon(MessageSquarePlus);
 export const IconFolder = icon(Folder);

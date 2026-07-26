@@ -122,8 +122,14 @@ export function DesktopMenuBar({
       view: [
         {
           type: "item",
-          label: t("menu.commandPalette"),
+          label: t("menu.search"),
           accelerator: "Ctrl+K",
+          command: "openSearch",
+        },
+        {
+          type: "item",
+          label: t("menu.commandPalette"),
+          accelerator: "Ctrl+Shift+P",
           command: "openCommandPalette",
         },
         {

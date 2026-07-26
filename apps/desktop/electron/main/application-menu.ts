@@ -102,11 +102,12 @@ export function buildApplicationMenuTemplate({
     {
       label: labels.menu.view,
       submenu: [
+        appCommand(labels.menu.search, "openSearch", dispatch, "CmdOrCtrl+K"),
         appCommand(
           labels.menu.commandPalette,
           "openCommandPalette",
           dispatch,
-          "CmdOrCtrl+K",
+          "CmdOrCtrl+Shift+P",
         ),
         appCommand(
           labels.menu.toggleSidebar,

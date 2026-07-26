@@ -31,6 +31,7 @@ export const zhCN = {
     copy: "复制",
     paste: "粘贴",
     selectAll: "全选",
+    search: "搜索…",
     commandPalette: "命令面板…",
     toggleSidebar: "侧边栏",
     reload: "重新加载",
@@ -82,6 +83,8 @@ export const zhCN = {
     commandPalette: "命令面板",
     back: "后退",
     forward: "前进",
+    collapseSidebar: "收起侧边栏",
+    expandSidebar: "展开侧边栏",
     sessionActions: "会话操作",
     sessionRunning: "运行中",
     sortSessions: "项目与会话排序",
@@ -528,6 +531,16 @@ export const zhCN = {
   palette: {
     placeholder: "搜索命令…",
     empty: "没有匹配的命令",
+  },
+  search: {
+    placeholder: "搜索任务…",
+    empty: "没有匹配的任务",
+    today: "今天",
+    yesterday: "昨天",
+    previous7Days: "近 7 天",
+    previous30Days: "近 30 天",
+    earlier: "更早",
+    archived: "已归档",
   },
   plugins: {
     title: "插件",

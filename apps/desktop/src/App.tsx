@@ -17,6 +17,7 @@ import { HomeSuggestions } from "./components/HomeSuggestions";
 import { OnboardingChecklist } from "./components/OnboardingChecklist";
 import { PermissionDialog } from "./components/PermissionDialog";
 import { CommandPalette } from "./components/CommandPalette";
+import { SearchDialog } from "./components/SearchDialog";
 import { ToastHost } from "./components/Toast";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { NotificationCenter } from "./components/NotificationCenter";
@@ -32,6 +33,18 @@ import type { ToastOptions } from "./stores/app-store";
 import { api } from "./lib/api";
 import { toolWorkPanelTab } from "./lib/work-panel-tabs";
 import { BrandLogo } from "./components/BrandLogo";
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconNewSession,
+  IconSidebar,
+} from "./components/icons";
+
+const sidebarToggleShortcut =
+  typeof navigator !== "undefined" && /Mac/i.test(navigator.platform)
+    ? "⌘B"
+    : "Ctrl+B";
+
 
 class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -73,6 +86,58 @@ function projectName(path?: string | null, name?: string | null) {
   return parts[parts.length - 1] || path;
 }
 
+function TitlebarNav({
+  sidebarCollapsed,
+  onToggleSidebar,
+  onNewTask,
+}: {
+  sidebarCollapsed: boolean;
+  onToggleSidebar: () => void;
+  onNewTask: () => void;
+}) {
+  const { t } = useTranslation();
+  const navBack = useAppStore((s) => s.navBack);
+  const navForward = useAppStore((s) => s.navForward);
+  const navIndex = useAppStore((s) => s.navIndex);
+  const navStack = useAppStore((s) => s.navStack);
+  const canBack = navIndex > 0;
+  const canForward = navIndex < navStack.length - 1;
+  const toggleLabel = sidebarCollapsed
+    ? t("nav.expandSidebar")
+    : t("nav.collapseSidebar");
+  return (
+    <div className="titlebar-nav no-drag">
+      <button
+        className="title-nav-btn"
+        title={`${toggleLabel} (${sidebarToggleShortcut})`}
+        aria-label={toggleLabel}
+        aria-expanded={!sidebarCollapsed}
+        data-nav="toggle-sidebar"
+        onClick={onToggleSidebar}
+      >
+        <IconSidebar size={13} />
+      </button>
+      <button className="title-nav-btn" title={t("nav.back")} disabled={!canBack} onClick={() => navBack()}>
+        <IconChevronLeft size={13} />
+      </button>
+      <button className="title-nav-btn" title={t("nav.forward")} disabled={!canForward} onClick={() => navForward()}>
+        <IconChevronRight size={13} />
+      </button>
+      {sidebarCollapsed && (
+        <button
+          className="title-nav-btn"
+          title={t("nav.newTask")}
+          aria-label={t("nav.newTask")}
+          data-nav="new-task"
+          onClick={onNewTask}
+        >
+          <IconNewSession size={13} />
+        </button>
+      )}
+    </div>
+  );
+}
+
 function AppShell() {
   const { t } = useTranslation();
   const bootstrap = useAppStore((s) => s.bootstrap);
@@ -94,6 +159,7 @@ function AppShell() {
   const permission = useAppStore((s) => s.permission);
 
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [backendDown, setBackendDown] = useState<
     { fatal: boolean; component?: string } | null
@@ -115,6 +181,9 @@ function AppShell() {
             break;
           case "openSettings":
             store.setSettingsTab("general");
+            break;
+          case "openSearch":
+            setSearchOpen(true);
             break;
           case "openCommandPalette":
             setPaletteOpen(true);
@@ -151,6 +220,15 @@ function AppShell() {
     void api.menuRendererReady().catch(() => undefined);
     return unsubscribe;
   }, [runMenuCommand]);
+
+  useEffect(() => {
+    // Fullscreen hides the macOS traffic lights; CSS shifts titlebar
+    // controls left via this attribute.
+    const off = api.onWindowFullScreen(({ fullScreen }) => {
+      document.documentElement.dataset.fullscreen = fullScreen ? "true" : "false";
+    });
+    return off;
+  }, []);
 
   useEffect(() => {
     const viewingSessionId = page === "chat" ? activeSessionId ?? null : null;
@@ -240,9 +318,10 @@ function AppShell() {
         );
     });
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      // Codex-style global search on ⌘K; the command palette stays on ⌘⇧P.
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setPaletteOpen(true);
+        setSearchOpen(true);
       }
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "p") {
         e.preventDefault();
@@ -558,6 +637,7 @@ function AppShell() {
         <WindowControls />
         <SettingsPage />
         <PermissionDialog />
+        <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
         <ToastHost />
         <UpdateBanner />
@@ -572,13 +652,30 @@ function AppShell() {
         onCommand={runMenuCommand}
       />
       <WindowControls />
-      <Sidebar
-        collapsed={sidebarCollapsed}
-        onOpenPalette={() => setPaletteOpen(true)}
-      />
+      {!sidebarCollapsed && (
+        <Sidebar
+          onOpenSearch={() => setSearchOpen(true)}
+          titlebarNav={
+            <TitlebarNav
+              sidebarCollapsed={false}
+              onToggleSidebar={() => setSidebarCollapsed(true)}
+              onNewTask={() => void runMenuCommand("newTask")}
+            />
+          }
+        />
+      )}
 
       <section className="main-pane">
         <div className="main-titlebar">
+          {sidebarCollapsed && (
+            <div className="main-titlebar-left no-drag">
+              <TitlebarNav
+                sidebarCollapsed
+                onToggleSidebar={() => setSidebarCollapsed(false)}
+                onNewTask={() => void runMenuCommand("newTask")}
+              />
+            </div>
+          )}
           <div className="main-titlebar-right no-drag">
             <NotificationCenter />
           </div>
@@ -714,10 +811,13 @@ function AppShell() {
       </section>
 
       {workPanelOpen && (
-        <WorkPanel browserBlocked={paletteOpen || Boolean(permission)} />
+        <WorkPanel
+          browserBlocked={paletteOpen || searchOpen || Boolean(permission)}
+        />
       )}
 
       <PermissionDialog />
+      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <ToastHost />
       <UpdateBanner />
