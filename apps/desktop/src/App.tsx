@@ -1,5 +1,14 @@
-import { Component, useEffect, useMemo, useState, type ErrorInfo, type ReactNode } from "react";
+import {
+  Component,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ErrorInfo,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
+import type { AppMenuCommand } from "@pi-desktop/shared";
 import { Sidebar } from "./components/Sidebar";
 import { WorkPanel } from "./components/workpanel/WorkPanel";
 import { ChatTranscript } from "./components/ChatTranscript";
@@ -9,7 +18,10 @@ import { OnboardingChecklist } from "./components/OnboardingChecklist";
 import { PermissionDialog } from "./components/PermissionDialog";
 import { CommandPalette } from "./components/CommandPalette";
 import { ToastHost } from "./components/Toast";
+import { UpdateBanner } from "./components/UpdateBanner";
 import { NotificationCenter } from "./components/NotificationCenter";
+import { WindowControls } from "./components/WindowControls";
+import { DesktopMenuBar } from "./components/DesktopMenuBar";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { PullRequestsPage } from "./pages/PullRequestsPage";
@@ -87,6 +99,66 @@ function AppShell() {
     { fatal: boolean; component?: string } | null
   >(null);
 
+  const runMenuCommand = useCallback(
+    async (command: AppMenuCommand) => {
+      try {
+        const store = useAppStore.getState();
+        switch (command) {
+          case "newTask":
+            await store.newSession();
+            requestAnimationFrame(() =>
+              document.querySelector<HTMLTextAreaElement>(".composer-input")?.focus(),
+            );
+            break;
+          case "openProject":
+            await store.openProject();
+            break;
+          case "openSettings":
+            store.setSettingsTab("general");
+            break;
+          case "openCommandPalette":
+            setPaletteOpen(true);
+            break;
+          case "toggleSidebar":
+            setSidebarCollapsed((value) => !value);
+            break;
+          case "openHelp":
+            store.setSettingsTab("about");
+            break;
+          case "openLogs":
+            await api.openLogs();
+            break;
+          case "checkForUpdates": {
+            const updateState = await api.updatesCheck();
+            if (updateState.status === "up-to-date") {
+              showToast(t("updates.upToDate"), { variant: "success" });
+            }
+            break;
+          }
+        }
+      } catch (menuError) {
+        showToast(
+          menuError instanceof Error ? menuError.message : String(menuError),
+          { variant: "error" },
+        );
+      }
+    },
+    [showToast],
+  );
+
+  useEffect(() => {
+    const unsubscribe = api.onMenuCommand((command) => void runMenuCommand(command));
+    void api.menuRendererReady().catch(() => undefined);
+    return unsubscribe;
+  }, [runMenuCommand]);
+
+  useEffect(() => {
+    const viewingSessionId = page === "chat" ? activeSessionId ?? null : null;
+    void api
+      .setNotificationViewingSession(viewingSessionId)
+      .catch(() => undefined);
+  }, [activeSessionId, page]);
+
   useEffect(() => {
     const theme = settings?.theme ?? "system";
     const apply = () => {
@@ -107,13 +179,6 @@ function AppShell() {
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, [settings?.theme]);
-
-  useEffect(() => {
-    const viewingSessionId = page === "chat" ? activeSessionId ?? null : null;
-    void api
-      .setNotificationViewingSession(viewingSessionId)
-      .catch(() => undefined);
-  }, [activeSessionId, page]);
 
   useEffect(() => {
     void bootstrap();
@@ -486,16 +551,27 @@ function AppShell() {
   if (page === "settings") {
     return (
       <div className="app-shell settings-mode">
+        <DesktopMenuBar
+          sidebarCollapsed={sidebarCollapsed}
+          onCommand={runMenuCommand}
+        />
+        <WindowControls />
         <SettingsPage />
         <PermissionDialog />
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
         <ToastHost />
+        <UpdateBanner />
       </div>
     );
   }
 
   return (
     <div className="app-shell">
+      <DesktopMenuBar
+        sidebarCollapsed={sidebarCollapsed}
+        onCommand={runMenuCommand}
+      />
+      <WindowControls />
       <Sidebar
         collapsed={sidebarCollapsed}
         onOpenPalette={() => setPaletteOpen(true)}
@@ -644,6 +720,7 @@ function AppShell() {
       <PermissionDialog />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <ToastHost />
+      <UpdateBanner />
     </div>
   );
 }

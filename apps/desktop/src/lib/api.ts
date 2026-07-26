@@ -32,8 +32,12 @@ import type {
   TerminalExitEvent,
   ToolPermissionResolution,
   WorkspaceDiff,
+  AppMenuCommand,
   AppNotification,
+  NativeMenuAction,
   NotificationListResult,
+  UpdateState,
+  WindowControlAction,
 } from "@pi-desktop/shared";
 import { IPC } from "@pi-desktop/shared";
 
@@ -62,6 +66,7 @@ declare global {
       invoke: <T = unknown>(channel: string, ...args: unknown[]) => Promise<Result<T>>;
       on: (channel: string, listener: (...args: unknown[]) => void) => () => void;
       channels: typeof IPC;
+      platform: NodeJS.Platform;
     };
   }
 }
@@ -88,6 +93,11 @@ export const api = {
   health: () => invoke<HostHealth>(IPC.invoke.appHealth),
   getOnboarding: () => invoke<OnboardingState>(IPC.invoke.appGetOnboarding),
   dismissOnboarding: () => invoke(IPC.invoke.appDismissOnboarding),
+  updatesGetState: () => invoke<UpdateState>(IPC.invoke.updatesGetState),
+  updatesCheck: () => invoke<UpdateState>(IPC.invoke.updatesCheck),
+  updatesDownload: () => invoke<UpdateState>(IPC.invoke.updatesDownload),
+  updatesInstall: () => invoke(IPC.invoke.updatesInstall),
+  updatesOpenReleases: () => invoke(IPC.invoke.updatesOpenReleases),
   listNotifications: (input?: { unreadOnly?: boolean; limit?: number }) =>
     invoke<NotificationListResult>(IPC.invoke.notificationList, input ?? {}),
   markNotificationRead: (id: string) =>
@@ -263,6 +273,27 @@ export const api = {
   fsReveal: (path: string) => invoke(IPC.invoke.fsReveal, { path }),
   windowResizeBy: (deltaWidth: number) =>
     invoke<{ applied: number }>(IPC.invoke.windowResizeBy, { deltaWidth }),
+  windowControl: (action: WindowControlAction) =>
+    invoke<{ maximized: boolean }>(IPC.invoke.windowControl, { action }),
+  menuRendererReady: () =>
+    invoke<{ ready: boolean }>(IPC.invoke.menuRendererReady),
+  nativeMenuAction: (action: NativeMenuAction) =>
+    invoke<{ maximized: boolean; fullScreen: boolean }>(
+      IPC.invoke.nativeMenuAction,
+      { action },
+    ),
+  onWindowMaximized: (listener: (event: { maximized: boolean }) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.windowMaximized, (payload) =>
+      listener(payload as { maximized: boolean }),
+    );
+  },
+  onMenuCommand: (listener: (command: AppMenuCommand) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.menuCommand, (payload) =>
+      listener((payload as { command: AppMenuCommand }).command),
+    );
+  },
   onTerminalData: (listener: (event: TerminalDataEvent) => void) => {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.terminalData, (payload) =>
@@ -321,6 +352,12 @@ export const api = {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.notificationActivated, (payload) =>
       listener(payload as { id: string; sessionId: string }),
+    );
+  },
+  onUpdateState: (listener: (state: UpdateState) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.updatesState, (payload) =>
+      listener(payload as UpdateState),
     );
   },
 };

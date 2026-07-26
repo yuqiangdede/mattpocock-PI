@@ -4,6 +4,7 @@ import type { AppSettings, GlobalPermissionMode } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { api } from "../lib/api";
 import type { ImportCandidate } from "../lib/api";
+import { useUpdateState } from "../lib/use-update-state";
 import {
   DEFAULT_IMPORT_GROUP_BY,
   formatImportDate,
@@ -69,6 +70,89 @@ function SettingsCard({
       {title ? <h3 className="settings-card-heading">{title}</h3> : null}
       <div className="settings-panel">{children}</div>
     </section>
+  );
+}
+
+function UpdatesRow() {
+  const { t } = useTranslation();
+  const update = useUpdateState();
+  const disabled = !update || update.mode === "disabled";
+  const busy = update?.status === "checking" || update?.status === "downloading";
+
+  let action: ReactNode;
+  if (update?.status === "downloaded") {
+    action = (
+      <Button
+        variant="primary"
+        onClick={() => void api.updatesInstall().catch(() => undefined)}
+      >
+        {t("updates.restart")}
+      </Button>
+    );
+  } else if (update?.status === "available" && update.mode === "manual") {
+    action = (
+      <Button
+        variant="secondary"
+        onClick={() => void api.updatesOpenReleases().catch(() => undefined)}
+      >
+        {t("updates.viewRelease")}
+      </Button>
+    );
+  } else {
+    action = (
+      <Button
+        variant="secondary"
+        disabled={disabled || busy}
+        onClick={() => void api.updatesCheck().catch(() => undefined)}
+      >
+        {busy ? t("updates.checking") : t("updates.check")}
+      </Button>
+    );
+  }
+
+  let statusText: string | null = null;
+  if (disabled) {
+    statusText = t("updates.devDisabled");
+  } else {
+    switch (update.status) {
+      case "checking":
+        statusText = t("updates.checking");
+        break;
+      case "up-to-date":
+        statusText = t("updates.upToDate");
+        break;
+      case "available":
+        statusText = `${t("updates.available", { version: update.availableVersion })}${
+          update.mode === "manual" ? ` ${t("updates.manualHint")}` : ""
+        }`;
+        break;
+      case "downloading":
+        statusText = t("updates.downloading", {
+          percent: update.progressPercent ?? 0,
+        });
+        break;
+      case "downloaded":
+        statusText = t("updates.downloaded", {
+          version: update.availableVersion,
+        });
+        break;
+      case "error":
+        statusText = t("updates.error", { message: update.error ?? "" });
+        break;
+      default:
+        statusText = null;
+    }
+  }
+
+  return (
+    <SettingsRow title={t("updates.title")} description={t("updates.desc")}>
+      <div className="flex flex-col items-end gap-1.5">
+        {action}
+        {statusText ? (
+          <div className="text-right text-xs-plus text-text-muted">{statusText}</div>
+        ) : null}
+      </div>
+    </SettingsRow>
   );
 }
 
@@ -613,6 +697,7 @@ export function SettingsPage() {
                   {t("settings.openLogs")}
                 </Button>
               </SettingsRow>
+              <UpdatesRow />
             </SettingsCard>
           )}
 
