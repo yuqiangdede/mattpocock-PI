@@ -81,6 +81,16 @@ type AgentPromptResponse = {
 };
 ```
 
+Slash template expansion (D123): when `content` starts with `/name` and the
+name matches a loaded pi prompt template, the main-process handler expands
+the invocation (`parseCommandArgs` + `substituteArgs`) before persisting.
+The persisted user message stores `content = expanded text` plus an optional
+`command: string` field carrying the typed invocation for transcript
+display. Reseed replays `content`, so the agent context is identical across
+restarts. Builtin/plugin slash aliases never reach this channel — the
+renderer executes them locally. Unknown `/foo` passes through as literal
+content. `@path` tokens are not transformed anywhere in the pipeline (D124).
+
 Prompt execution resolves `mode`, `providerId`, `modelId`, and `thinkingLevel`
 from the durable
 session record. The renderer changes those values through
@@ -525,6 +535,48 @@ window/control({ action: WindowControlAction })
 Maximize/unmaximize changes also emit
 `window/event/maximized`. Unknown actions fail. These Electron-only channels
 do not cross into host-core and do not change the host RPC protocol version.
+
+## 13c. Composer input APIs (D123/D124, ADR 0024)
+
+Electron-only channels backing the composer autocomplete. Both are
+read-only, fail soft, and do not touch host-core or the host RPC protocol
+version.
+
+### composer/commands
+
+```ts
+composer/commands() -> { commands: ComposerCommand[] }
+
+type ComposerCommand = {
+  /** Slash name typed after "/", unique across the merged list. */
+  name: string;
+  kind: "template" | "builtin" | "plugin";
+  title: string;            // display title (templates: name)
+  description?: string;     // template frontmatter / palette title
+  argumentHint?: string;    // template frontmatter `argument-hint`
+  source?: "project" | "user"; // template provenance
+  id?: string;              // builtin/plugin palette id for execution
+};
+```
+
+Templates load from `<workspace>/.pi/prompts/*.md` and
+`~/.pi/agent/prompts/*.md` (project wins name conflicts; short TTL cache).
+Without a workspace only user-global templates, builtins, and plugin
+commands return.
+
+### fs/index
+
+```ts
+fs/index() -> { entries: FsIndexEntry[]; truncated: boolean }
+
+type FsIndexEntry = { path: string; kind: "file" | "dir" };
+```
+
+Workspace-rooted relative paths for the `@` menu: `git ls-files -co
+--exclude-standard` fast path, ignore-set recursive walk fallback,
+directories derived from file paths, 8000-entry cap with `truncated: true`,
+short TTL cache per root. Fails closed to an empty list without a
+workspace. Fuzzy filtering happens renderer-side.
 
 ## 14. Error Codes — Initial registry (extensible)
 
