@@ -62,6 +62,7 @@ test("main process registers update handlers and the auto-check lifecycle", () =
     assert.ok(mainSource.includes(channel), channel);
   }
   assert.match(mainSource, /new AppUpdaterController\(/);
+  assert.match(mainSource, /isPackaged:\s*!isDevelopmentBuild/);
   assert.match(mainSource, /updater\.startAutoCheck\(\)/);
   assert.match(mainSource, /updater\.dispose\(\)/);
 });
@@ -128,6 +129,11 @@ test("packaging publishes an electron-updater feed for GitHub Releases", () => {
   // Scoped package name is not a valid deb package/file name.
   assert.equal(pkg.build.deb.packageName, "pi-desktop");
   assert.ok(!pkg.build.deb.artifactName.includes("${name}"), "deb artifactName");
+  // GitHub asset URLs mangle spaces; keep the NSIS artifact name space-free.
+  assert.equal(pkg.build.nsis.artifactName, "PI-Desktop-Setup-${version}.${ext}");
+  // The upload step must carry every updater feed, and the release publishes
+  // all platforms unfiltered (D126).
   assert.match(releaseWorkflowSource, /release\/\*\.zip/);
-  assert.match(releaseWorkflowSource, /latest-mac\.yml/);
+  assert.match(releaseWorkflowSource, /release\/latest\*\.yml/);
+  assert.match(releaseWorkflowSource, /files: dist\/\*/);
 });

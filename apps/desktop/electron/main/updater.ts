@@ -9,9 +9,6 @@
  *    remains disabled until a signed channel is explicitly qualified.
  *  - Linux deb (no $APPIMAGE in env) → notify + link, like macOS.
  *  - Unpackaged dev runs → disabled (no app-update.yml in resources).
- *
- * NOTE: while the repository is private the feed URLs 404 for end users;
- * auto checks fail quietly and manual checks surface the error.
  */
 import { app, shell } from "electron";
 import electronUpdaterPkg from "electron-updater";

@@ -12,7 +12,7 @@
   "type": "module",
   "scripts": {
     "predev": "pnpm -C ../../packages/agent-runtime build && cargo build --manifest-path ../../Cargo.toml -p host-core",
-    "dev": "electron-vite dev",
+    "dev": "node ../../scripts/dev-electron.mjs",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "postinstall": "electron-builder install-app-deps",
@@ -137,7 +137,8 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "PI-Desktop-Setup-${version}.${ext}"
     },
     "deb": {
       "packageName": "pi-desktop",

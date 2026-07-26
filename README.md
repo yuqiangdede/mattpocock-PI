@@ -54,9 +54,9 @@ Grab the latest build from the [Releases page](https://github.com/vastsa/PI-Desk
 
 | Platform | Package | Status |
 |---|---|---|
-| macOS (Apple Silicon) | `.dmg` | ✅ Published with each release |
-| Windows (x64) | NSIS installer | 🚧 Built in CI; published installers coming soon |
-| Linux (x64) | `.AppImage` / `.deb` | 🚧 Built in CI; published installers coming soon |
+| macOS (Apple Silicon) | `.dmg` / `.zip` | ✅ Published with each release |
+| Windows (x64) | NSIS installer | ✅ Published with each release; in-app auto-update |
+| Linux (x64) | `.AppImage` / `.deb` | ✅ Published with each release; AppImage auto-updates in-app |
 
 > **macOS note:** builds are not yet code-signed or notarized. If macOS refuses to open the app, right-click it and choose **Open**, or clear the quarantine flag:
 >
@@ -86,7 +86,7 @@ The full picture lives in the [architecture spec](docs/spec/02-architecture/01-a
 
 PI-Desktop is an early preview under active development. Shipped so far: the app shell, streaming chat runtime, workspace agent tools with the permission system, the plugin foundation, and macOS packaging with update checks.
 
-Up next: signed and notarized macOS builds, published Windows/Linux installers, and the plugin marketplace protocol. See the [milestones](docs/spec/06-delivery/01-mvp-milestones.md) and the [project board](docs/project/BOARD.md).
+Up next: signed and notarized macOS builds, and the plugin marketplace protocol. See the [milestones](docs/spec/06-delivery/01-mvp-milestones.md) and the [project board](docs/project/BOARD.md).
 
 ## Development
 
