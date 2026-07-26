@@ -9,12 +9,15 @@ use tokio::sync::{mpsc, Mutex};
 
 use crate::artifacts;
 use crate::audit;
+use crate::notifications;
 use crate::permissions::{PermissionDecision, PermissionManager};
-use crate::providers::{self, ProviderCreateInput, ProviderUpdateInput};
+use crate::providers::{self, DiscoveredModelInput, ProviderCreateInput, ProviderUpdateInput};
 use crate::scheduled;
+use crate::scratch;
 use crate::sessions::{self, UiMessage};
 use crate::state::{AppState, HOST_VERSION, PROTOCOL_VERSION};
 use crate::tools::{self, ToolsExecuteParams};
+use crate::workspace;
 
 #[derive(Debug, Deserialize)]
 struct JsonRpcRequest {
@@ -46,6 +49,13 @@ struct JsonRpcNotification {
     jsonrpc: &'static str,
     method: String,
     params: Value,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CacheModelsParams {
+    provider_id: String,
+    models: Vec<DiscoveredModelInput>,
 }
 
 pub async fn serve(state: Arc<Mutex<AppState>>) -> Result<()> {
@@ -312,7 +322,7 @@ async fn handle_request(
                 "version": HOST_VERSION,
                 "capabilities": [
                     "tools", "sessions", "providers", "secrets", "plugins", "permissions",
-                    "scheduled", "artifacts", "search", "turns"
+                    "scheduled", "artifacts", "search", "turns", "notifications"
                 ]
             }))
         }
@@ -498,30 +508,20 @@ async fn handle_request(
         "providers.listModels" => {
             let provider_id = params.get("providerId").and_then(|v| v.as_str());
             let st = state.lock().await;
-            let providers = providers::list_providers(&st.db, &st.secrets, true)
+            let models = providers::list_models(&st.db, provider_id)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
-            let mut models = Vec::new();
-            for p in providers {
-                if let Some(pid) = provider_id {
-                    if p.id != pid {
-                        continue;
-                    }
-                }
-                if let Some(model) = p.default_model_id {
-                    let mut capabilities = vec!["text"];
-                    if p.supports_reasoning == Some(true) {
-                        capabilities.push("reasoning");
-                    }
-                    models.push(json!({
-                        "modelId": model,
-                        "displayName": model,
-                        "providerId": p.id,
-                        "source": "user",
-                        "capabilities": capabilities
-                    }));
-                }
-            }
             Ok(json!({ "models": models }))
+        }
+        "providers.cacheModels" => {
+            let input: CacheModelsParams = serde_json::from_value(params)
+                .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            let cached =
+                providers::cache_discovered_models(&st.db, &input.provider_id, &input.models)
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            let models = providers::list_models(&st.db, Some(&input.provider_id))
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "cached": cached, "models": models }))
         }
         "providers.testConnection" => {
             let id = params
@@ -574,6 +574,26 @@ async fn handle_request(
             .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "session": session }))
         }
+        "session.fork" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let title = params.get("title").and_then(|v| v.as_str());
+            let st = state.lock().await;
+            let session = match sessions::fork_session(&st.db, session_id, title)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+            {
+                sessions::ForkSessionResult::Created(session) => session,
+                sessions::ForkSessionResult::NotFound => {
+                    return Err(rpc_err(1007, "session not found", "NOT_FOUND"))
+                }
+                sessions::ForkSessionResult::Busy => {
+                    return Err(rpc_err(1008, "session is running", "CONFLICT"))
+                }
+            };
+            Ok(json!({ "session": session }))
+        }
         "session.get" => {
             let id = params
                 .get("id")
@@ -602,6 +622,7 @@ async fn handle_request(
                 params.get("providerId").and_then(|v| v.as_str()),
                 params.get("modelId").and_then(|v| v.as_str()),
                 thinking_level.as_deref(),
+                params.get("permissionMode").and_then(|v| v.as_str()),
             )
             .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?
             .ok_or_else(|| rpc_err(1007, "session not found", "NOT_FOUND"))?;
@@ -615,6 +636,9 @@ async fn handle_request(
             let st = state.lock().await;
             let ok = sessions::delete_session(&st.db, id)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            if ok {
+                scratch::remove_session_dir(&st.data_dir, id);
+            }
             Ok(json!({ "ok": ok }))
         }
         "session.rename" => {
@@ -793,15 +817,63 @@ async fn handle_request(
                 .and_then(|v| v.as_str())
                 .unwrap_or("completed");
             let st = state.lock().await;
-            let ok = sessions::end_turn(
+            let result = sessions::end_turn(
                 &st.db,
                 turn_id,
                 status,
                 params.get("errorCode").and_then(|v| v.as_str()),
                 params.get("usage"),
+                params
+                    .get("createNotification")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true),
             )
             .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            let mut response = json!({ "ok": result.updated });
+            if let Some(notification) = result.notification {
+                response["notification"] = json!(notification);
+            }
+            Ok(response)
+        }
+
+        "notification.list" => {
+            let unread_only = params
+                .get("unreadOnly")
+                .and_then(|value| value.as_bool())
+                .unwrap_or(false);
+            let limit = params
+                .get("limit")
+                .and_then(|value| value.as_i64())
+                .unwrap_or(crate::db::NOTIFICATION_KEEP);
+            let st = state.lock().await;
+            let (notifications, unread_count) = notifications::list(&st.db, unread_only, limit)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({
+                "notifications": notifications,
+                "unreadCount": unread_count
+            }))
+        }
+        "notification.markRead" => {
+            let id = params
+                .get("id")
+                .and_then(|value| value.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            let ok = notifications::mark_read(&st.db, id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "ok": ok }))
+        }
+        "notification.markAllRead" => {
+            let st = state.lock().await;
+            notifications::mark_all_read(&st.db)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "ok": true }))
+        }
+        "notification.clear" => {
+            let st = state.lock().await;
+            notifications::clear(&st.db).map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "ok": true }))
         }
 
         "search.query" => {
@@ -951,13 +1023,36 @@ async fn handle_request(
             let p: ToolsExecuteParams = serde_json::from_value(params.clone())
                 .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
 
-            let (auto_decision, workspace_path, pending_rx, request_opt) = {
+            let (auto_decision, workspace_path, scratch_path, pending_rx, request_opt) = {
                 let mut st = state.lock().await;
                 st.permissions.expire_stale();
-                let auto = st.permissions.evaluate_auto(
+                // Effective permission mode (D115): per-session override
+                // unless it is `inherit`, then the global settings default,
+                // then `ask`. Unknown sessions (legacy callers) resolve to
+                // the global default too.
+                let session_pm = sessions::session_permission_mode(&st.db, &p.session_id)
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                    .filter(|m| m != "inherit");
+                let effective_pm = match session_pm {
+                    Some(m) => m,
+                    None => st
+                        .db
+                        .get_setting("app")
+                        .ok()
+                        .flatten()
+                        .and_then(|s| {
+                            s.get("defaultPermissionMode")
+                                .and_then(|v| v.as_str())
+                                .map(str::to_string)
+                        })
+                        .filter(|m| sessions::is_valid_permission_mode(m) && m != "inherit")
+                        .unwrap_or_else(|| "ask".to_string()),
+                };
+                let mut auto = st.permissions.evaluate_auto_with_permission_mode(
                     &p.session_id,
                     &p.tool_name,
                     &p.mode,
+                    &effective_pm,
                     &st.session_grants,
                 );
                 // Resolve the tool root from the persisted session instead of
@@ -966,8 +1061,25 @@ async fn handle_request(
                 // Fall back to the global workspace only for legacy callers
                 // that do not have a persisted session.
                 let ws = resolve_tool_workspace(&st, &p.session_id)?;
+                let scratch = scratch::session_dir(&st.data_dir, &p.session_id);
+                // Write/Edit targeting the session scratch dir never touch
+                // the user's project — skip the prompt (D114). The lexical
+                // pre-check only decides prompting; execution still goes
+                // through the symlink-aware resolver, so it cannot be used
+                // to escape containment. Chat mode already resolved to Deny
+                // above and is unaffected.
+                if auto.is_none() && matches!(p.tool_name.as_str(), "Write" | "Edit") {
+                    if let (Some(scratch_dir), Some(path)) = (
+                        scratch.as_deref(),
+                        p.args.get("path").and_then(|v| v.as_str()),
+                    ) {
+                        if workspace::lexically_inside(scratch_dir, path) {
+                            auto = Some(PermissionDecision::AllowOnce);
+                        }
+                    }
+                }
                 if let Some(decision) = auto {
-                    (Some(decision), ws, None, None)
+                    (Some(decision), ws, scratch, None, None)
                 } else {
                     let reason = match p.tool_name.as_str() {
                         "Write" | "Edit" => "Modifies files in your workspace",
@@ -984,7 +1096,7 @@ async fn handle_request(
                         p.args.clone(),
                         reason,
                     );
-                    (None, ws, Some(rx), Some(req))
+                    (None, ws, scratch, Some(rx), Some(req))
                 }
             };
 
@@ -1069,12 +1181,24 @@ async fn handle_request(
             let mut result = if p.tool_name.starts_with("plugin_") {
                 execute_plugin_tool(&state, &tx, &p, timeout).await
             } else {
-                tools::execute_tool(ws_path.as_deref(), &p.tool_name, &p.args, timeout).await
+                tools::execute_tool(
+                    ws_path.as_deref(),
+                    scratch_path.as_deref(),
+                    &p.tool_name,
+                    &p.args,
+                    timeout,
+                )
+                .await
             };
             result.tool_call_id = p.tool_call_id.clone();
 
             let st = state.lock().await;
-            if result.ok && matches!(p.tool_name.as_str(), "Write" | "Edit") {
+            // Scratch files are temp by definition: keep them out of the
+            // artifacts table so the work panel file list only shows
+            // workspace deliverables (D114).
+            let in_scratch =
+                result.content.get("root").and_then(|v| v.as_str()) == Some("scratch");
+            if result.ok && !in_scratch && matches!(p.tool_name.as_str(), "Write" | "Edit") {
                 if let Some(rel) = result.content.get("path").and_then(|v| v.as_str()) {
                     let abs = match ws_path.as_deref() {
                         Some(root) => root.join(rel).to_string_lossy().to_string(),
@@ -1312,8 +1436,12 @@ async fn handle_request(
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::sync::Arc;
 
-    use super::resolve_tool_workspace;
+    use serde_json::json;
+    use tokio::sync::{mpsc, Mutex};
+
+    use super::{handle_request, resolve_tool_workspace};
     use crate::sessions;
     use crate::state::AppState;
 
@@ -1366,5 +1494,148 @@ mod tests {
             resolve_tool_workspace(&state, "legacy-missing-session").unwrap(),
             state.workspace.path
         );
+    }
+
+    #[tokio::test]
+    async fn provider_model_cache_roundtrips_through_rpc() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, _rx) = mpsc::unbounded_channel();
+
+        let created = handle_request(
+            state.clone(),
+            "providers.create",
+            json!({
+                "name": "Local catalog",
+                "baseUrl": "http://localhost:11434/v1",
+                "authKind": "none",
+                "defaultModelId": "model-a"
+            }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let provider_id = created["provider"]["id"].as_str().unwrap();
+
+        let cached = handle_request(
+            state.clone(),
+            "providers.cacheModels",
+            json!({
+                "providerId": provider_id,
+                "models": [
+                    {
+                        "modelId": "model-a",
+                        "displayName": "Model A",
+                        "capabilities": ["text"]
+                    },
+                    {
+                        "modelId": "model-b",
+                        "displayName": "Model B",
+                        "capabilities": ["text", "reasoning"]
+                    }
+                ]
+            }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(cached["cached"], 2);
+
+        let listed = handle_request(
+            state,
+            "providers.listModels",
+            json!({ "providerId": provider_id }),
+            tx,
+        )
+        .await
+        .unwrap();
+        assert_eq!(listed["models"].as_array().unwrap().len(), 2);
+        assert_eq!(listed["models"][1]["modelId"], "model-b");
+        assert_eq!(listed["models"][1]["capabilities"][1], "reasoning");
+    }
+
+    #[tokio::test]
+    async fn notification_rpc_lifecycle() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let session = sessions::create_session(
+            &app_state.db,
+            Some("RPC task".into()),
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        let turn = sessions::begin_turn(&app_state.db, &session.id, None, None).unwrap();
+        sessions::end_turn(&app_state.db, &turn, "completed", None, None, true).unwrap();
+        let visible_turn = sessions::begin_turn(&app_state.db, &session.id, None, None).unwrap();
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, _rx) = mpsc::unbounded_channel();
+
+        let ended_visible = handle_request(
+            state.clone(),
+            "session.endTurn",
+            json!({
+                "turnId": visible_turn,
+                "status": "completed",
+                "createNotification": false
+            }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(ended_visible, json!({ "ok": true }));
+
+        let listed = handle_request(
+            state.clone(),
+            "notification.list",
+            json!({ "unreadOnly": true, "limit": 10 }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(listed["unreadCount"], 1);
+        assert_eq!(listed["notifications"][0]["kind"], "task.completed");
+        assert_eq!(listed["notifications"][0]["sessionTitle"], "RPC task");
+        let id = listed["notifications"][0]["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        let marked = handle_request(
+            state.clone(),
+            "notification.markRead",
+            json!({ "id": id }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(marked, json!({ "ok": true }));
+        let marked_all = handle_request(
+            state.clone(),
+            "notification.markAllRead",
+            json!({}),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(marked_all, json!({ "ok": true }));
+        let cleared = handle_request(state.clone(), "notification.clear", json!({}), tx)
+            .await
+            .unwrap();
+        assert_eq!(cleared, json!({ "ok": true }));
+
+        let remaining: i64 = state
+            .lock()
+            .await
+            .db
+            .conn()
+            .query_row("SELECT COUNT(*) FROM notifications", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(remaining, 0);
     }
 }

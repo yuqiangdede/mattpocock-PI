@@ -8,7 +8,7 @@ use std::process::Stdio;
 use std::time::Instant;
 use tokio::process::Command;
 
-use crate::workspace::resolve_in_workspace;
+use crate::workspace::{resolve_tool_path, ToolRoot};
 
 pub mod shell;
 
@@ -62,19 +62,28 @@ pub fn truncate_output(text: &str) -> (String, bool) {
 
 pub async fn execute_tool(
     workspace: Option<&Path>,
+    scratch: Option<&Path>,
     tool_name: &str,
     args: &Value,
     timeout_ms: u64,
 ) -> ToolsExecuteResult {
     let started = Instant::now();
     let tool_call_id = "local".to_string();
+    // Scratch is created lazily, and only for tools that can produce files
+    // there — Read/Glob/Grep on a session that never wrote scratch files
+    // should not leave empty directories behind.
+    if matches!(tool_name, "Write" | "Edit" | "Bash") {
+        if let Some(dir) = scratch {
+            let _ = std::fs::create_dir_all(dir);
+        }
+    }
     let result = match tool_name {
-        "Read" => tool_read(workspace, args),
+        "Read" => tool_read(workspace, scratch, args),
         "Glob" => tool_glob(workspace, args),
         "Grep" => tool_grep(workspace, args),
-        "Write" => tool_write(workspace, args),
-        "Edit" => tool_edit(workspace, args),
-        "Bash" => tool_bash(workspace, args, timeout_ms).await,
+        "Write" => tool_write(workspace, scratch, args),
+        "Edit" => tool_edit(workspace, scratch, args),
+        "Bash" => tool_bash(workspace, scratch, args, timeout_ms).await,
         other if other.starts_with("plugin_") => Err((
             "TOOL_NOT_FOUND".into(),
             format!(
@@ -110,13 +119,35 @@ fn require_workspace(workspace: Option<&Path>) -> Result<&Path, (String, String)
     workspace.ok_or_else(|| ("WORKSPACE_REQUIRED".into(), "No workspace is open".into()))
 }
 
-fn tool_read(workspace: Option<&Path>, args: &Value) -> Result<Value, (String, String)> {
+/// Path shown to the model and recorded downstream: workspace files keep the
+/// familiar workspace-relative form; scratch files stay absolute so they are
+/// unambiguous (the model addresses scratch by absolute path only).
+fn display_tool_path(root_kind: ToolRoot, workspace_root: &Path, resolved: &Path) -> String {
+    match root_kind {
+        ToolRoot::Workspace => relative_display(workspace_root, resolved),
+        ToolRoot::Scratch => resolved.to_string_lossy().to_string(),
+    }
+}
+
+fn root_label(root_kind: ToolRoot) -> &'static str {
+    match root_kind {
+        ToolRoot::Workspace => "workspace",
+        ToolRoot::Scratch => "scratch",
+    }
+}
+
+fn tool_read(
+    workspace: Option<&Path>,
+    scratch: Option<&Path>,
+    args: &Value,
+) -> Result<Value, (String, String)> {
     let root = require_workspace(workspace)?;
     let path = args
         .get("path")
         .and_then(|v| v.as_str())
         .ok_or_else(|| ("INVALID_ARGUMENT".into(), "path required".into()))?;
-    let resolved = resolve_in_workspace(root, path).map_err(|e| (e.clone(), e))?;
+    let (resolved, root_kind) =
+        resolve_tool_path(root, scratch, path).map_err(|e| (e.clone(), e))?;
     const MAX_READ_BYTES: u64 = 512 * 1024;
     if let Ok(meta) = std::fs::metadata(&resolved) {
         if meta.len() > MAX_READ_BYTES {
@@ -134,13 +165,18 @@ fn tool_read(workspace: Option<&Path>, args: &Value) -> Result<Value, (String, S
         .map_err(|e| ("TOOL_FAILED".into(), format!("read failed: {e}")))?;
     let (content, truncated) = truncate_output(&content);
     Ok(json!({
-        "path": relative_display(root, &resolved),
+        "path": display_tool_path(root_kind, root, &resolved),
+        "root": root_label(root_kind),
         "content": content,
         "truncated": truncated,
     }))
 }
 
-fn tool_write(workspace: Option<&Path>, args: &Value) -> Result<Value, (String, String)> {
+fn tool_write(
+    workspace: Option<&Path>,
+    scratch: Option<&Path>,
+    args: &Value,
+) -> Result<Value, (String, String)> {
     let root = require_workspace(workspace)?;
     let path = args
         .get("path")
@@ -150,7 +186,8 @@ fn tool_write(workspace: Option<&Path>, args: &Value) -> Result<Value, (String, 
         .get("content")
         .and_then(|v| v.as_str())
         .ok_or_else(|| ("INVALID_ARGUMENT".into(), "content required".into()))?;
-    let resolved = resolve_in_workspace(root, path).map_err(|e| (e.clone(), e))?;
+    let (resolved, root_kind) =
+        resolve_tool_path(root, scratch, path).map_err(|e| (e.clone(), e))?;
     if let Some(parent) = resolved.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| ("TOOL_FAILED".into(), format!("mkdir failed: {e}")))?;
@@ -158,12 +195,17 @@ fn tool_write(workspace: Option<&Path>, args: &Value) -> Result<Value, (String, 
     std::fs::write(&resolved, content)
         .map_err(|e| ("TOOL_FAILED".into(), format!("write failed: {e}")))?;
     Ok(json!({
-        "path": relative_display(root, &resolved),
+        "path": display_tool_path(root_kind, root, &resolved),
+        "root": root_label(root_kind),
         "bytes": content.len(),
     }))
 }
 
-fn tool_edit(workspace: Option<&Path>, args: &Value) -> Result<Value, (String, String)> {
+fn tool_edit(
+    workspace: Option<&Path>,
+    scratch: Option<&Path>,
+    args: &Value,
+) -> Result<Value, (String, String)> {
     let root = require_workspace(workspace)?;
     let path = args
         .get("path")
@@ -179,7 +221,8 @@ fn tool_edit(workspace: Option<&Path>, args: &Value) -> Result<Value, (String, S
         .or_else(|| args.get("newString"))
         .and_then(|v| v.as_str())
         .ok_or_else(|| ("INVALID_ARGUMENT".into(), "new_string required".into()))?;
-    let resolved = resolve_in_workspace(root, path).map_err(|e| (e.clone(), e))?;
+    let (resolved, root_kind) =
+        resolve_tool_path(root, scratch, path).map_err(|e| (e.clone(), e))?;
     let original = std::fs::read_to_string(&resolved)
         .map_err(|e| ("TOOL_FAILED".into(), format!("read failed: {e}")))?;
     if !original.contains(old_str) {
@@ -189,7 +232,8 @@ fn tool_edit(workspace: Option<&Path>, args: &Value) -> Result<Value, (String, S
     std::fs::write(&resolved, &updated)
         .map_err(|e| ("TOOL_FAILED".into(), format!("write failed: {e}")))?;
     Ok(json!({
-        "path": relative_display(root, &resolved),
+        "path": display_tool_path(root_kind, root, &resolved),
+        "root": root_label(root_kind),
         "replacements": 1,
     }))
 }
@@ -282,6 +326,7 @@ fn tool_grep(workspace: Option<&Path>, args: &Value) -> Result<Value, (String, S
 
 async fn tool_bash(
     workspace: Option<&Path>,
+    scratch: Option<&Path>,
     args: &Value,
     timeout_ms: u64,
 ) -> Result<Value, (String, String)> {
@@ -300,6 +345,11 @@ async fn tool_bash(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
+    if let Some(scratch_dir) = scratch {
+        // Shell commands drop temp files via $PI_SCRATCH_DIR instead of the
+        // workspace (D114); the dir was created by execute_tool above.
+        cmd.env("PI_SCRATCH_DIR", scratch_dir);
+    }
     #[cfg(windows)]
     {
         // CREATE_NO_WINDOW: bash.exe must not flash a console over the GUI.
@@ -360,7 +410,12 @@ async fn tool_bash(
 }
 
 fn relative_display(root: &Path, path: &Path) -> String {
-    path.strip_prefix(root)
+    // `path` comes back canonicalized from the resolver; strip against the
+    // canonical root spelling too, or symlinked roots (macOS /var vs
+    // /private/var) would render absolute.
+    let canonical_root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    path.strip_prefix(&canonical_root)
+        .or_else(|_| path.strip_prefix(root))
         .unwrap_or(path)
         .to_string_lossy()
         .to_string()
@@ -370,7 +425,7 @@ pub fn builtin_tool_defs() -> Value {
     json!([
         {
             "name": "Read",
-            "description": "Read a file inside the workspace",
+            "description": "Read a file inside the workspace or the session scratch directory",
             "risk": "low",
             "parameters": {
                 "type": "object",
@@ -403,7 +458,7 @@ pub fn builtin_tool_defs() -> Value {
         },
         {
             "name": "Write",
-            "description": "Create or overwrite a file inside the workspace",
+            "description": "Create or overwrite a file inside the workspace or the session scratch directory",
             "risk": "high",
             "parameters": {
                 "type": "object",
@@ -416,7 +471,7 @@ pub fn builtin_tool_defs() -> Value {
         },
         {
             "name": "Edit",
-            "description": "Replace text in a workspace file",
+            "description": "Replace text in a workspace or scratch-directory file",
             "risk": "high",
             "parameters": {
                 "type": "object",
@@ -453,6 +508,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let result = execute_tool(
             Some(dir.path()),
+            None,
             "Bash",
             &serde_json::json!({ "command": "head -c 200000 /dev/zero | tr '\\0' 'a'" }),
             15_000,
@@ -470,6 +526,7 @@ mod tests {
         std::fs::write(&big, "a".repeat(600 * 1024)).unwrap();
         let result = execute_tool(
             Some(dir.path()),
+            None,
             "Read",
             &serde_json::json!({ "path": "big.txt" }),
             5_000,
@@ -477,5 +534,77 @@ mod tests {
         .await;
         assert!(!result.ok);
         assert_eq!(result.error_code.as_deref(), Some("TOOL_FAILED"));
+    }
+
+    #[tokio::test]
+    async fn write_and_read_in_scratch_root() {
+        let ws = tempfile::tempdir().unwrap();
+        let data = tempfile::tempdir().unwrap();
+        // Not created up front: execute_tool creates it lazily for Write.
+        let scratch = data.path().join("scratch/session-1");
+        let target = scratch.join("notes/tmp.txt");
+        let write = execute_tool(
+            Some(ws.path()),
+            Some(&scratch),
+            "Write",
+            &serde_json::json!({ "path": target.to_str().unwrap(), "content": "scratch!" }),
+            5_000,
+        )
+        .await;
+        assert!(write.ok, "scratch write failed: {:?}", write.content);
+        assert_eq!(write.content["root"].as_str(), Some("scratch"));
+        // Workspace stayed clean.
+        assert_eq!(std::fs::read_dir(ws.path()).unwrap().count(), 0);
+
+        let read = execute_tool(
+            Some(ws.path()),
+            Some(&scratch),
+            "Read",
+            &serde_json::json!({ "path": target.to_str().unwrap() }),
+            5_000,
+        )
+        .await;
+        assert!(read.ok, "scratch read failed: {:?}", read.content);
+        assert_eq!(read.content["content"].as_str(), Some("scratch!"));
+        assert_eq!(read.content["root"].as_str(), Some("scratch"));
+    }
+
+    #[tokio::test]
+    async fn workspace_write_reports_workspace_root() {
+        let ws = tempfile::tempdir().unwrap();
+        let scratch = tempfile::tempdir().unwrap();
+        let result = execute_tool(
+            Some(ws.path()),
+            Some(scratch.path()),
+            "Write",
+            &serde_json::json!({ "path": "a.txt", "content": "hi" }),
+            5_000,
+        )
+        .await;
+        assert!(result.ok);
+        assert_eq!(result.content["root"].as_str(), Some("workspace"));
+        assert_eq!(result.content["path"].as_str(), Some("a.txt"));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn bash_exposes_scratch_dir_env() {
+        let ws = tempfile::tempdir().unwrap();
+        let data = tempfile::tempdir().unwrap();
+        let scratch = data.path().join("scratch/session-2");
+        let result = execute_tool(
+            Some(ws.path()),
+            Some(&scratch),
+            "Bash",
+            &serde_json::json!({ "command": "printf %s \"$PI_SCRATCH_DIR\"" }),
+            15_000,
+        )
+        .await;
+        assert!(result.ok, "bash failed: {:?}", result.content);
+        assert_eq!(
+            result.content["stdout"].as_str(),
+            Some(scratch.to_str().unwrap())
+        );
+        assert!(scratch.is_dir(), "scratch dir created for Bash");
     }
 }

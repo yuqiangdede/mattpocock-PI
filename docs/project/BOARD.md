@@ -53,6 +53,12 @@ Open issue:
 - M5 hardening: renderer sandbox + prod CSP (D081), NDJSON log channels
   with redaction/rotation (D082), crash supervision + degradation UI
   (D080), window state persistence (D083), app icon (D079)
+- Cross-platform shell readiness: native macOS application menu plus
+  Windows/Linux frameless menus, window controls, and native-runner package
+  configurations (D118)
+- Transcript storage v7: per-session JSONL files under `sessions/` with
+  SQLite reduced to an index (FTS/list/badges), append-only revisions file,
+  pre-v7 databases archived via breaking reset (D119)
 - Spec corpus 0.4.4: English-first everywhere (translated runtime/plugins/
   ADR docs), error-code registry unified to shared/errors.ts, e2e statuses
   synced to real automation, decisions-log restructured (A–I) with
@@ -69,7 +75,7 @@ Open issue:
 ### Backlog
 - Playwright automated desktop e2e (UI-driven journeys)
 - Marketplace
-- Windows/Linux packaging
+- Windows/Linux release qualification (native CI, signing, upgrade tests)
 - Skills depth / MCP / additional locales (post-MVP)
 
 ## Validation snapshot (2026-07-25, late evening — post impl-audit fixes)

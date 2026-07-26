@@ -1,6 +1,48 @@
-export const PROTOCOL_VERSION = 3 as const;
+export const PROTOCOL_VERSION = 5 as const;
 export const APP_NAME = "PI-Desktop";
-export const APP_VERSION = "0.1.0";
+export const APP_VERSION = "0.1.1";
+
+export const APP_MENU_COMMANDS = [
+  "newTask",
+  "openProject",
+  "openSettings",
+  "openSearch",
+  "openCommandPalette",
+  "toggleSidebar",
+  "openHelp",
+  "openLogs",
+  "checkForUpdates",
+] as const;
+
+export type AppMenuCommand = (typeof APP_MENU_COMMANDS)[number];
+
+export const NATIVE_MENU_ACTIONS = [
+  "undo",
+  "redo",
+  "cut",
+  "copy",
+  "paste",
+  "selectAll",
+  "reload",
+  "zoomIn",
+  "zoomOut",
+  "resetZoom",
+  "toggleFullScreen",
+  "minimize",
+  "toggleMaximize",
+  "close",
+] as const;
+
+export type NativeMenuAction = (typeof NATIVE_MENU_ACTIONS)[number];
+
+export const WINDOW_CONTROL_ACTIONS = [
+  "getState",
+  "minimize",
+  "toggleMaximize",
+  "close",
+] as const;
+
+export type WindowControlAction = (typeof WINDOW_CONTROL_ACTIONS)[number];
 
 export const IPC = {
   invoke: {
@@ -8,11 +50,23 @@ export const IPC = {
     appHealth: "pi-desktop/app/health",
     appGetOnboarding: "pi-desktop/app/getOnboarding",
     appDismissOnboarding: "pi-desktop/app/dismissOnboarding",
+    updatesGetState: "pi-desktop/updates/getState",
+    updatesCheck: "pi-desktop/updates/check",
+    updatesDownload: "pi-desktop/updates/download",
+    updatesInstall: "pi-desktop/updates/install",
+    updatesOpenReleases: "pi-desktop/updates/openReleases",
+    notificationList: "pi-desktop/notification/list",
+    notificationMarkRead: "pi-desktop/notification/markRead",
+    notificationMarkAllRead: "pi-desktop/notification/markAllRead",
+    notificationClear: "pi-desktop/notification/clear",
+    notificationShowNative: "pi-desktop/notification/showNative",
+    notificationSetViewingSession: "pi-desktop/notification/setViewingSession",
     agentPrompt: "pi-desktop/agent/prompt",
     agentAbort: "pi-desktop/agent/abort",
     agentGetStatus: "pi-desktop/agent/getStatus",
     sessionList: "pi-desktop/session/list",
     sessionCreate: "pi-desktop/session/create",
+    sessionFork: "pi-desktop/session/fork",
     sessionGet: "pi-desktop/session/get",
     sessionDelete: "pi-desktop/session/delete",
     sessionRename: "pi-desktop/session/rename",
@@ -23,6 +77,7 @@ export const IPC = {
     sessionSaveRevision: "pi-desktop/session/saveRevision",
     sessionListRevisions: "pi-desktop/session/listRevisions",
     sessionActivateRevision: "pi-desktop/session/activateRevision",
+    sessionOpenFolder: "pi-desktop/session/openFolder",
     settingsGet: "pi-desktop/settings/get",
     settingsSet: "pi-desktop/settings/set",
     secretsSet: "pi-desktop/secrets/set",
@@ -56,6 +111,7 @@ export const IPC = {
     logOpenFolder: "pi-desktop/log/openFolder",
     composerPickFiles: "pi-desktop/composer/pickFiles",
     composerPickPhotos: "pi-desktop/composer/pickPhotos",
+    composerCommands: "pi-desktop/composer/commands",
     workspaceDiff: "pi-desktop/workspace/diff",
     terminalCreate: "pi-desktop/terminal/create",
     terminalWrite: "pi-desktop/terminal/write",
@@ -70,7 +126,11 @@ export const IPC = {
     fsList: "pi-desktop/fs/list",
     fsRead: "pi-desktop/fs/read",
     fsReveal: "pi-desktop/fs/reveal",
+    fsIndex: "pi-desktop/fs/index",
     windowResizeBy: "pi-desktop/window/resizeBy",
+    windowControl: "pi-desktop/window/control",
+    menuRendererReady: "pi-desktop/menu/rendererReady",
+    nativeMenuAction: "pi-desktop/menu/nativeAction",
   },
   event: {
     agentMessage: "pi-desktop/agent/event/message",
@@ -80,6 +140,12 @@ export const IPC = {
     terminalExit: "pi-desktop/terminal/event/exit",
     browserState: "pi-desktop/browser/event/state",
     browserPreview: "pi-desktop/browser/event/preview",
+    windowMaximized: "pi-desktop/window/event/maximized",
+    windowFullScreen: "pi-desktop/window/event/fullscreen",
+    menuCommand: "pi-desktop/menu/event/command",
+    notificationChanged: "pi-desktop/notification/event/changed",
+    notificationActivated: "pi-desktop/notification/event/activated",
+    updatesState: "pi-desktop/updates/event/state",
   },
 } as const;
 

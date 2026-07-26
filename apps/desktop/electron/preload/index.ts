@@ -20,6 +20,10 @@ const api = {
     return () => ipcRenderer.removeListener(channel, wrapped);
   },
   channels: IPC,
+  // Synchronous platform info so the renderer can style window chrome
+  // (traffic lights on macOS vs. controls overlay on Windows/Linux)
+  // before first paint, without an IPC round-trip.
+  platform: process.platform,
 };
 
 contextBridge.exposeInMainWorld("piDesktop", api);

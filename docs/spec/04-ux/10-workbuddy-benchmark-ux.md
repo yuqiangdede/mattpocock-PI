@@ -126,12 +126,13 @@ writes results to workspace memory/config — a form disguised as a chat.
 
 ### 3.7 Artifacts view (from 我的文件)
 Sessions produce files the user later can't find without scrolling the
-transcript. **Spec**: an "Artifacts" surface (context-panel tab first;
-possibly a destination later) listing files created/modified by agent runs,
-**grouped by session**, columns name / kind / session / time, click to
-reveal in Finder or open diff. Data source: existing tool-call audit log
-(Write/Edit events) — no new runtime tracking needed. Skip the cloud-drive
-tab (no cloud storage in scope).
+transcript. **Adopted first step in D119**: clicking a file artifact creates a
+path-keyed, closeable work-panel tab, and successful workspace Write/Edit
+artifacts open Review. These renderer tabs are transient views, not a second
+persistence model; the host-owned `artifacts` table remains authoritative.
+A future dedicated Artifacts destination may list files grouped by session
+with name / kind / session / time columns and Finder/diff actions. Skip the
+cloud-drive tab (no cloud storage in scope).
 
 ### 3.8 Workspace-scoped session tree (from 空间)
 WorkBuddy nests tasks under the folder-bound Space they ran in, with `+`

@@ -1,6 +1,6 @@
 {
   "name": "@pi-desktop/agent-runtime",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -20,7 +20,7 @@
     "bundle": "esbuild src/sidecar.ts --bundle --platform=node --format=esm --outfile=dist-bundle/sidecar.js --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "clean": "rm -rf dist dist-bundle"
+    "clean": "node -e \"fs.rmSync('dist',{recursive:true,force:true});fs.rmSync('dist-bundle',{recursive:true,force:true})\""
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "^0.82.0",

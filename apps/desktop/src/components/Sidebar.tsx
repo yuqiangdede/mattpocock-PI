@@ -6,6 +6,7 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
@@ -23,9 +24,8 @@ import {
   IconArchiveRestore,
   IconArrowUpDown,
   IconAt,
+  IconBranch,
   IconChevronDown,
-  IconChevronLeft,
-  IconChevronRight,
   IconNewSession,
   IconFolder,
   IconFileText,
@@ -129,11 +129,11 @@ function compareOptionalDate(
 }
 
 export function Sidebar({
-  collapsed,
-  onOpenPalette,
+  onOpenSearch,
+  titlebarNav,
 }: {
-  collapsed: boolean;
-  onOpenPalette: () => void;
+  onOpenSearch: () => void;
+  titlebarNav?: ReactNode;
 }) {
   const { t } = useTranslation();
   const sessions = useAppStore((s) => s.sessions);
@@ -152,12 +152,9 @@ export function Sidebar({
   const setSettingsTab = useAppStore((s) => s.setSettingsTab);
   const settings = useAppStore((s) => s.settings);
   const page = useAppStore((s) => s.page);
-  const navBack = useAppStore((s) => s.navBack);
-  const navForward = useAppStore((s) => s.navForward);
-  const navIndex = useAppStore((s) => s.navIndex);
-  const navStack = useAppStore((s) => s.navStack);
   const selectSession = useAppStore((s) => s.selectSession);
   const newSession = useAppStore((s) => s.newSession);
+  const forkSessionAction = useAppStore((s) => s.forkSession);
   const openProject = useAppStore((s) => s.openProject);
   const clearProject = useAppStore((s) => s.clearProject);
   const activateProject = useAppStore((s) => s.activateProject);
@@ -175,8 +172,6 @@ export function Sidebar({
   const setProjectSort = useAppStore((s) => s.setProjectSort);
   const showToast = useAppStore((s) => s.showToast);
 
-  const [query, setQuery] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   const [sessionMenu, setSessionMenu] = useState<string | null>(null);
@@ -220,6 +215,39 @@ export function Sidebar({
     });
   }, []);
 
+  // Context-menu variant: anchor to the pointer. The menu is positioned by
+  // its right edge, so keep that edge far enough from the left border for
+  // the 184px menu to stay on screen.
+  const placeMenuAtPoint = useCallback((x: number, y: number) => {
+    setMenuPosition({
+      top: Math.max(8, Math.min(y + 4, window.innerHeight - 220)),
+      right: Math.min(
+        Math.max(8, window.innerWidth - x),
+        Math.max(8, window.innerWidth - 192),
+      ),
+    });
+  }, []);
+
+  const openSessionRowMenu = useCallback(
+    (sessionId: string, trigger: HTMLButtonElement | null) => {
+      menuTriggerRef.current = trigger;
+      setSortOpen(false);
+      setProjectMenu(null);
+      setSessionMenu(sessionId);
+    },
+    [],
+  );
+
+  const openProjectRowMenu = useCallback(
+    (projectKey: string, trigger: HTMLButtonElement | null) => {
+      menuTriggerRef.current = trigger;
+      setSortOpen(false);
+      setSessionMenu(null);
+      setProjectMenu(projectKey);
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!profileOpen && !sortOpen && !sessionMenu && !projectMenu) return;
     const onPointer = (e: MouseEvent) => {
@@ -248,10 +276,6 @@ export function Sidebar({
     requestAnimationFrame(() => menuFirstItemRef.current?.focus());
   }, [sessionMenu, projectMenu, sortOpen, profileOpen]);
 
-  useEffect(() => {
-    if (collapsed) closeMenus();
-  }, [collapsed, closeMenus]);
-
   const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
       event.preventDefault();
@@ -261,7 +285,7 @@ export function Sidebar({
     if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
     const items = Array.from(
       event.currentTarget.querySelectorAll<HTMLButtonElement>(
-        '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]',
+        '[role="menuitem"]:not(:disabled), [role="menuitemradio"]:not(:disabled), [role="menuitemcheckbox"]:not(:disabled)',
       ),
     );
     if (!items.length) return;
@@ -306,15 +330,9 @@ export function Sidebar({
       cleaned.push(session);
       keptEmptyScopes.add(scope);
     }
-    const q = query.trim().toLowerCase();
-    const searched = q
-      ? cleaned.filter((session) => taskTitle(session.title).toLowerCase().includes(q))
-      : cleaned;
-    return searched;
+    return cleaned;
   }, [
     sessions,
-    query,
-    taskTitle,
     activeSessionId,
     page,
     showArchived,
@@ -510,11 +528,6 @@ export function Sidebar({
     closeMenus();
   };
 
-  const toggleSearch = () => {
-    if (searchOpen) setQuery("");
-    setSearchOpen((value) => !value);
-  };
-
   const toggleSessionPin = (session: SessionSummary) => {
     toggleSessionPinned(session.id);
     closeMenus();
@@ -600,6 +613,25 @@ export function Sidebar({
     }
   };
 
+  const openSessionFolder = async (session: SessionSummary) => {
+    closeMenus(false);
+    try {
+      await (await import("../lib/api")).api.openSessionFolder(session.id);
+    } catch (error) {
+      reportError(error);
+    }
+  };
+
+  const forkSession = async (session: SessionSummary) => {
+    closeMenus(false);
+    try {
+      await forkSessionAction(session.id);
+      focusComposer();
+    } catch (error) {
+      reportError(error);
+    }
+  };
+
   const toggleProjectPin = (entry: ProjectEntry) => {
     toggleProjectPinned(entry.path);
     closeMenus();
@@ -679,6 +711,17 @@ export function Sidebar({
         key={session.id}
         className={`thread-item ${active ? "active" : ""} ${archived ? "archived" : ""}`}
         data-sidebar-session-row={session.id}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          placeMenuAtPoint(event.clientX, event.clientY);
+          openSessionRowMenu(
+            session.id,
+            event.currentTarget.querySelector<HTMLButtonElement>(
+              '[data-action="session-menu"]',
+            ),
+          );
+        }}
       >
         <button
           type="button"
@@ -707,11 +750,8 @@ export function Sidebar({
                 closeMenus();
                 return;
               }
-              menuTriggerRef.current = event.currentTarget;
               placeMenu(event);
-              setSortOpen(false);
-              setProjectMenu(null);
-              setSessionMenu(session.id);
+              openSessionRowMenu(session.id, event.currentTarget);
             }}
           >
             <IconMore size={14} />
@@ -732,7 +772,20 @@ export function Sidebar({
         aria-labelledby={projectId}
         data-sidebar-project-group={entry.key}
       >
-        <div className="sidebar-session-group-header">
+        <div
+          className="sidebar-session-group-header"
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            placeMenuAtPoint(event.clientX, event.clientY);
+            openProjectRowMenu(
+              entry.key,
+              event.currentTarget.querySelector<HTMLButtonElement>(
+                ".project-more",
+              ),
+            );
+          }}
+        >
           <button
             type="button"
             id={projectId}
@@ -776,11 +829,8 @@ export function Sidebar({
                   closeMenus();
                   return;
                 }
-                menuTriggerRef.current = event.currentTarget;
                 placeMenu(event);
-                setSortOpen(false);
-                setSessionMenu(null);
-                setProjectMenu(entry.key);
+                openProjectRowMenu(entry.key, event.currentTarget);
               }}
             >
               <IconMore size={14} />
@@ -891,6 +941,25 @@ export function Sidebar({
             <button
               type="button"
               role="menuitem"
+              data-action="fork-session"
+              disabled={Boolean(runningSessions[session.id])}
+              onClick={() => void forkSession(session)}
+            >
+              <IconBranch size={14} />
+              {t("nav.createBranch")}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              data-action="open-session-folder"
+              onClick={() => void openSessionFolder(session)}
+            >
+              <IconFolder size={14} />
+              {t("nav.openTaskFolder", { defaultValue: "Open folder" })}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
               className="danger"
               data-action="delete-session"
               onClick={() => void deleteSession(session)}
@@ -961,52 +1030,9 @@ export function Sidebar({
     );
   };
 
-  const canBack = navIndex > 0;
-  const canForward = navIndex < navStack.length - 1;
-
-  if (collapsed) {
-    return (
-      <aside className="sidebar-rail">
-        <div className="sidebar-drag" />
-        <div className="no-drag flex flex-1 flex-col items-center gap-2 px-2 py-2">
-          <div className="sidebar-rail-brand" title={t("app.shellName")} aria-label={t("app.shellName")}>
-            <BrandLogo size={18} />
-          </div>
-          <button className="icon-btn" title={t("nav.newTask")} data-nav="new-task" onClick={() => void createSession()}>
-            <IconNewSession size={16} />
-          </button>
-          <button className="icon-btn" title={t("nav.search")} onClick={onOpenPalette}>
-            <IconSearch size={16} />
-          </button>
-          {projectEntries.filter((entry) => entry.open).slice(0, 5).map((entry) => (
-            <button key={entry.key} className={`icon-btn sidebar-rail-project ${entry.active ? "active" : ""}`} title={entry.path} onClick={() => void selectProject(entry.path).then((ok) => { if (ok) focusComposer(); })}>
-              <IconFolder size={16} />
-            </button>
-          ))}
-          <button className="icon-btn" title={t("nav.projects")} data-nav="projects" onClick={() => setPage("projects")}>
-            <IconFolder size={16} />
-          </button>
-          <div className="flex-1" />
-          <button className="icon-btn" title={t("nav.settings")} data-nav="settings" onClick={() => setPage("settings")}>
-            <IconSettings size={16} />
-          </button>
-        </div>
-      </aside>
-    );
-  }
-
   return (
     <aside className="sidebar">
-      <div className="sidebar-drag">
-        <div className="traffic-nav no-drag">
-          <button className="title-nav-btn" title={t("nav.back")} disabled={!canBack} onClick={() => navBack()}>
-            <IconChevronLeft size={13} />
-          </button>
-          <button className="title-nav-btn" title={t("nav.forward")} disabled={!canForward} onClick={() => navForward()}>
-            <IconChevronRight size={13} />
-          </button>
-        </div>
-      </div>
+      <div className="sidebar-drag">{titlebarNav}</div>
       <div className="no-drag flex min-h-0 flex-1 flex-col px-2 pb-1.5">
         <div className="sidebar-header">
           <div className="brand">
@@ -1014,12 +1040,10 @@ export function Sidebar({
             <span>{t("app.shellName")}</span>
           </div>
           <button
-            className={`icon-btn ${searchOpen ? "active" : ""}`}
+            className="icon-btn"
             title={t("nav.search")}
             aria-label={t("nav.search")}
-            aria-expanded={searchOpen}
-            aria-controls="sidebar-session-search"
-            onClick={toggleSearch}
+            onClick={onOpenSearch}
           >
             <IconSearch size={15} />
           </button>
@@ -1040,21 +1064,6 @@ export function Sidebar({
             <span>{t("nav.plugins")}</span>
           </button>
         </nav>
-
-        {searchOpen ? (
-          <div className="sidebar-search-wrap">
-            <IconSearch size={13} aria-hidden />
-            <input
-              id="sidebar-session-search"
-              className="sidebar-search-input"
-              aria-label={t("nav.search")}
-              placeholder={t("nav.search")}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              autoFocus
-            />
-          </div>
-        ) : null}
 
         <div className="sidebar-list-toolbar">
           <span className="sidebar-list-label">{t("nav.sessions", { defaultValue: "Sessions" })}</span>

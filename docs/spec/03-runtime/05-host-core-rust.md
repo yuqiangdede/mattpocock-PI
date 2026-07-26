@@ -17,7 +17,8 @@ It does **not** replace pi. It provides safe host capabilities to:
 3. Permission policy evaluation
 4. Plugin registry/install/lifecycle services
 5. Contribution registration bookkeeping (with TS side)
-6. Persistence adapters (sessions/settings metadata)
+6. Persistence adapters (sessions/settings metadata and the durable
+   notification inbox)
 7. Secrets storage integration points
 8. Audit logging for sensitive actions
 
@@ -41,6 +42,7 @@ crates/host-core/
  workspace/
  plugins/
  storage/
+ notifications.rs
  secrets/
  audit/
  util/
@@ -60,6 +62,7 @@ Domains:
 - `permissions.*`
 - `plugins.*`
 - `session.*` (adapter level)
+- `notification.*` (adapter level; durable inbox)
 - `settings.*` (adapter level)
 - `secrets.*`
 - `audit.*`
@@ -73,6 +76,7 @@ plugins.list
 plugins.load_dev
 workspace.set
 secrets.set
+notification.list
 ```
 
 ## 6. Security invariants
@@ -95,3 +99,6 @@ secrets.set
 2. healthcheck RPC succeeds
 3. at least one tool path executes through Rust
 4. permission deny path works
+5. unseen completed/failed turns create exactly one durable notification
+   through the `session.endTurn` transaction; results already visible in the
+   focused current chat and aborted turns create none

@@ -326,11 +326,13 @@ codes map to a canonical parent until emitted (§3.6 there).
 | `PROVIDER_UNAUTHORIZED` | live | invalid/expired key or denied auth | re-enter secret / check account |
 | `PROVIDER_RATE_LIMITED` | live | 429 / quota | retry later / switch model |
 | `PROVIDER_SECRET_MISSING` | live | enabled provider without secret | complete setup |
+| `MODEL_NOT_CONFIGURED` | live | no selected model or provider rejects selected model with 404 | select or configure an available model |
 | `PROVIDER_ERROR` | live | other upstream provider failure | retry / inspect details |
+| `NETWORK_ERROR` | live | provider endpoint cannot be reached | check network and base URL |
 | `STREAM_FAILED` | live | stream dropped mid-turn | retry turn |
 | `PROVIDER_BASE_URL_INVALID` | reserved → `PROVIDER_ERROR` | malformed or unreachable base URL | fix endpoint |
 | `PROVIDER_PROTOCOL_MISMATCH` | reserved → `PROVIDER_ERROR` | wrong protocol for endpoint | switch protocol profile |
-| `PROVIDER_MODEL_NOT_FOUND` | reserved → `PROVIDER_ERROR` | model id unknown for provider | refresh catalog or custom id |
+| `PROVIDER_MODEL_NOT_FOUND` | reserved → `MODEL_NOT_CONFIGURED` | model id unknown for provider | refresh catalog or custom id |
 | `PROVIDER_TIMEOUT` | reserved → `TIMEOUT` | network or server timeout | retry / check network |
 | `PROVIDER_UNSUPPORTED_CAPABILITY` | reserved → `PROVIDER_ERROR` | tools/vision/reasoning unsupported | switch model or disable feature |
 | `PROVIDER_DISABLED` | reserved → `MODEL_NOT_CONFIGURED` | provider exists but disabled | enable provider |

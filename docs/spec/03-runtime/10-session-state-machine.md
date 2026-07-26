@@ -39,13 +39,30 @@ accept_prompt
    any background session
 7. A tool transition retains the originating session's persisted project root;
    it never adopts the newly active project's root
+8. `session.endTurn` moves only a `running` turn to terminal. In that same
+   transaction, unseen `completed` inserts `task.completed`, unseen `error`
+   inserts `task.failed`, and a result already visible in the focused current
+   chat or any `aborted` turn inserts no notification (D117). Repeated terminal
+   calls are no-ops.
+9. Fork is allowed only while the source is idle. The child begins idle with
+   no turn or waiting-permission state. Electron returns `AGENT_BUSY` for its
+   active runtime guard and normalizes the host's persisted running-turn
+   `CONFLICT` fallback to the same IPC error. Neither path produces a partial
+   child.
 
 ## 4. Persistence points
 
+Message persistence is two-step per 04-data-storage §5 (D119): fsync'd
+transcript-file line first, index transaction second.
+
 - user message: on accept
-- turn run row: on start + terminal update
+- turn run row: on start + terminal `session.endTurn` update
+- notification row: same transaction as an unseen completed/error terminal
+  update; never for a visible-current result or abort
 - assistant/tool messages: on message_end/tool_end
 - mode/project fields: on change
+- fork snapshot: new transcript file plus one child session/index transaction;
+  source persistence remains untouched
 
 ## 5. Acceptance
 
@@ -54,3 +71,7 @@ accept_prompt
 3. waiting_permission is visible in UI status
 4. sessions in two retained project tabs may run independently without
    transcript-event or workspace-root crossover
+5. each unseen completed/failed turn produces exactly one notification record
+   while a visible-current result or aborted turn produces none
+6. an idle fork starts as an independent idle session; a busy source cannot
+   produce a child

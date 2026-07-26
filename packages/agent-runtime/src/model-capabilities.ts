@@ -4,7 +4,9 @@ import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 export {
   clampThinkingLevel,
   type ThinkingCapabilitySet,
+  type ModelWireCompat,
 } from "./thinking-level.js";
+import type { ModelWireCompat } from "./thinking-level.js";
 
 export type ModelCapabilityInput = {
   vendorKey: string;
@@ -117,5 +119,125 @@ export function resolveThinkingCapabilities(
   return {
     supportsReasoning: false,
     supportedThinkingLevels: ["off"],
+  };
+}
+
+/** Map a stored provider apiStyle onto the pi-ai wire api (runtime binding). */
+function wireApiForStyle(apiStyle?: string): string {
+  switch (apiStyle) {
+    case "responses":
+      return "openai-responses";
+    case "anthropic_messages":
+      return "anthropic-messages";
+    case "google_generative_ai":
+      return "google-generative-ai";
+    default:
+      return "openai-completions";
+  }
+}
+
+/** Separators after which a catalog id counts as a prefix of a gateway id
+ * (mimo-v2.5-pro-think -> mimo-v2.5-pro), so "-think"/"-nothink"/date-suffix
+ * aliases inherit the upstream dialect while mimo-v2.50 does not. */
+const MODEL_ID_BOUNDARY = new Set(["-", "_", ".", ":", "@", "/"]);
+
+type CatalogModel = ReturnType<
+  ReturnType<typeof builtinModels>["getModels"]
+>[number];
+
+/** Rank same-id catalog entries: prefer the canonical vendor entry, which
+ * states a thinking dialect and/or an expressible off value, over aggregator
+ * mirrors (opencode-go, cloudflare-ai-gateway, …) that only carry host
+ * quirks and would resolve to "no thinking info". */
+function wireInfoScore(model: CatalogModel): number {
+  const compat = (model.compat ?? {}) as Record<string, unknown>;
+  let score = 0;
+  if (typeof compat.thinkingFormat === "string") score += 4;
+  if (typeof model.thinkingLevelMap?.off === "string") score += 2;
+  if (model.thinkingLevelMap) score += 1;
+  return score;
+}
+
+/**
+ * Resolve wire-dialect hints (thinking format + level value mapping) for an
+ * endpoint from the pi-ai catalog. Custom gateways usually proxy catalogued
+ * models under the upstream id (sometimes with an alias suffix), and speak
+ * the upstream's thinking dialect, so the catalog entry — matched exactly or
+ * by boundary-prefix — is the best available source. Returns undefined when
+ * nothing thinking-relevant is known; the runtime then keeps today's plain
+ * OpenAI behavior.
+ */
+export function resolveModelWireCompat(input: {
+  vendorKey: string;
+  modelId: string;
+  apiStyle?: string;
+}): ModelWireCompat | undefined {
+  const api = wireApiForStyle(input.apiStyle);
+  const requestedId = input.modelId.trim().toLowerCase();
+  if (!requestedId) return undefined;
+
+  const catalog = getBuiltinCatalog();
+  const vendorModel = catalog.getModel(input.vendorKey, input.modelId);
+  let match =
+    vendorModel && vendorModel.api === api && vendorModel.reasoning
+      ? vendorModel
+      : undefined;
+  if (!match) {
+    const candidates = catalog
+      .getModels()
+      .filter((model) => model.api === api && model.reasoning);
+    const exact = candidates
+      .filter((model) => model.id.toLowerCase() === requestedId)
+      .sort((a, b) => wireInfoScore(b) - wireInfoScore(a));
+    match =
+      exact[0] ??
+      candidates
+        .filter((model) => {
+          const id = model.id.toLowerCase();
+          return (
+            requestedId.length > id.length &&
+            requestedId.startsWith(id) &&
+            MODEL_ID_BOUNDARY.has(requestedId.charAt(id.length))
+          );
+        })
+        .sort(
+          (a, b) =>
+            b.id.length - a.id.length || wireInfoScore(b) - wireInfoScore(a),
+        )[0];
+  }
+  if (!match) return undefined;
+
+  const source = (match.compat ?? {}) as Record<string, unknown>;
+  const compat: NonNullable<ModelWireCompat["compat"]> = {};
+  if (typeof source.thinkingFormat === "string") {
+    compat.thinkingFormat = source.thinkingFormat;
+  }
+  if (typeof source.requiresReasoningContentOnAssistantMessages === "boolean") {
+    compat.requiresReasoningContentOnAssistantMessages =
+      source.requiresReasoningContentOnAssistantMessages;
+  }
+  if (typeof source.supportsReasoningEffort === "boolean") {
+    compat.supportsReasoningEffort = source.supportsReasoningEffort;
+  }
+  if (
+    source.chatTemplateKwargs &&
+    typeof source.chatTemplateKwargs === "object"
+  ) {
+    compat.chatTemplateKwargs = {
+      ...(source.chatTemplateKwargs as Record<string, unknown>),
+    };
+  }
+
+  const thinkingLevelMap = match.thinkingLevelMap
+    ? ({ ...match.thinkingLevelMap } as NonNullable<
+        ModelWireCompat["thinkingLevelMap"]
+      >)
+    : undefined;
+
+  const hasCompat = Object.keys(compat).length > 0;
+  if (!hasCompat && !thinkingLevelMap) return undefined;
+  return {
+    ...(hasCompat ? { compat } : {}),
+    ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
   };
 }

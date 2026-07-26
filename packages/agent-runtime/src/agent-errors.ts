@@ -23,6 +23,19 @@ const NETWORK_PATTERN =
 const CONTEXT_PATTERN =
   /context[ _-]?length|maximum context|context window|too many tokens|prompt is too long|input token count|exceeds the (?:maximum|model)|token limit/i;
 
+function redactSensitiveErrorText(message: string): string {
+  return message
+    .replace(
+      /(["']?authorization["']?\s*[:=]\s*["']?\s*bearer\s+)[^\s,"'}]+/gi,
+      "$1[REDACTED]",
+    )
+    .replace(
+      /(["']?(?:api[_-]?key|access[_-]?token|password)["']?\s*[:=]\s*["']?)[^"',}\s]+/gi,
+      "$1[REDACTED]",
+    )
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
+}
+
 /**
  * Probe the HTTP status across SDK error shapes: `status`/`statusCode`
  * fields (walking the `cause` chain), then a leading "<status>:" or a
@@ -70,10 +83,11 @@ export function classifyAgentError(err: unknown): ClassifiedAgentError {
       : err instanceof Error
         ? err.message
         : String(err);
+  const safeMessage = redactSensitiveErrorText(rawMessage);
   const message =
-    rawMessage.length > MAX_ERROR_MESSAGE_CHARS
-      ? `${rawMessage.slice(0, MAX_ERROR_MESSAGE_CHARS)}…`
-      : rawMessage;
+    safeMessage.length > MAX_ERROR_MESSAGE_CHARS
+      ? `${safeMessage.slice(0, MAX_ERROR_MESSAGE_CHARS)}…`
+      : safeMessage;
   const result = (code: string, retriable: boolean): ClassifiedAgentError => ({
     code,
     message,

@@ -68,6 +68,16 @@ describe("classifyAgentError", () => {
     });
   });
 
+  it("redacts secrets before exposing provider error details", () => {
+    const classified = classifyAgentError(
+      '401: {"api_key":"sk-secret","Authorization":"Bearer token-secret"}',
+    );
+
+    expect(classified.message).not.toContain("sk-secret");
+    expect(classified.message).not.toContain("token-secret");
+    expect(classified.message).toContain("[REDACTED]");
+  });
+
   it("truncates oversized provider bodies", () => {
     const { message } = classifyAgentError(`500: ${"x".repeat(5000)}`);
     expect(message.length).toBeLessThan(700);

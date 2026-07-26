@@ -92,6 +92,30 @@ pub struct ProviderUpdateInput {
     pub enabled: Option<bool>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelCatalogItem {
+    pub provider_id: String,
+    pub model_id: String,
+    pub display_name: String,
+    pub source: String,
+    #[serde(default)]
+    pub capabilities: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_window: Option<u32>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscoveredModelInput {
+    pub model_id: String,
+    pub display_name: String,
+    #[serde(default)]
+    pub capabilities: Vec<String>,
+    #[serde(default)]
+    pub context_window: Option<u32>,
+}
+
 const PROVIDER_SELECT: &str =
     "SELECT id, name, vendor_key, type, protocol, enabled, base_url, auth_kind, secret_ref,
             default_model_id, api_style, config_json, created_at, updated_at
@@ -397,6 +421,95 @@ pub fn list_providers(
     let mut stmt = db.conn().prepare_cached(&sql)?;
     let rows = stmt.query_map([], |row| provider_from_row(row, secrets))?;
     Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+pub fn list_models(db: &Database, provider_id: Option<&str>) -> Result<Vec<ModelCatalogItem>> {
+    let (sql, bind_provider) = match provider_id {
+        Some(id) => (
+            "SELECT provider_id, model_id, display_name, source,
+                    capabilities_json, context_window
+             FROM models
+             WHERE provider_id = ?1
+             ORDER BY display_name COLLATE NOCASE, model_id",
+            Some(id),
+        ),
+        None => (
+            "SELECT provider_id, model_id, display_name, source,
+                    capabilities_json, context_window
+             FROM models
+             ORDER BY provider_id, display_name COLLATE NOCASE, model_id",
+            None,
+        ),
+    };
+    let mut stmt = db.conn().prepare_cached(sql)?;
+    let parse = |row: &rusqlite::Row<'_>| -> rusqlite::Result<ModelCatalogItem> {
+        let raw_capabilities: String = row.get(4)?;
+        let capabilities = serde_json::from_str(&raw_capabilities).unwrap_or_default();
+        Ok(ModelCatalogItem {
+            provider_id: row.get(0)?,
+            model_id: row.get(1)?,
+            display_name: row.get(2)?,
+            source: row.get(3)?,
+            capabilities,
+            context_window: row
+                .get::<_, Option<i64>>(5)?
+                .and_then(|value| u32::try_from(value).ok()),
+        })
+    };
+    let rows = if let Some(id) = bind_provider {
+        stmt.query_map(params![id], parse)?
+    } else {
+        stmt.query_map([], parse)?
+    };
+    Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+/// Merge live discovery results into the durable catalog cache. User-created
+/// rows are authoritative and stale cache remains available if discovery fails.
+pub fn cache_discovered_models(
+    db: &Database,
+    provider_id: &str,
+    models: &[DiscoveredModelInput],
+) -> Result<usize> {
+    let tx = db.conn().unchecked_transaction()?;
+    let now = now_ms();
+    let mut changed = 0;
+    {
+        let mut stmt = tx.prepare_cached(
+            "INSERT INTO models (
+                provider_id, model_id, display_name, source,
+                capabilities_json, context_window, updated_at
+             ) VALUES (?1, ?2, ?3, 'discovered', ?4, ?5, ?6)
+             ON CONFLICT(provider_id, model_id) DO UPDATE SET
+                display_name = excluded.display_name,
+                capabilities_json = excluded.capabilities_json,
+                context_window = excluded.context_window,
+                updated_at = excluded.updated_at
+             WHERE models.source != 'user'",
+        )?;
+        for model in models {
+            let model_id = model.model_id.trim();
+            if model_id.is_empty() {
+                continue;
+            }
+            let display_name = model.display_name.trim();
+            let display_name = if display_name.is_empty() {
+                model_id
+            } else {
+                display_name
+            };
+            changed += stmt.execute(params![
+                provider_id,
+                model_id,
+                display_name,
+                serde_json::to_string(&model.capabilities)?,
+                model.context_window,
+                now,
+            ])?;
+        }
+    }
+    tx.commit()?;
+    Ok(changed)
 }
 
 pub fn create_provider(
@@ -882,5 +995,99 @@ mod tests {
         assert!(config["compatibility"]
             .get("supportedThinkingLevels")
             .is_none());
+    }
+
+    #[test]
+    fn discovered_models_are_cached_without_overwriting_user_rows() {
+        let (_dir, db, secrets) = test_context();
+        let provider = create_provider(
+            &db,
+            &secrets,
+            ProviderCreateInput {
+                name: "Catalog".into(),
+                vendor_key: None,
+                provider_type: None,
+                protocol: None,
+                base_url: Some("http://localhost:11434/v1".into()),
+                auth_kind: Some("none".into()),
+                default_model_id: Some("model-a".into()),
+                secret_value: None,
+                api_style: Some("chat_completions".into()),
+                context_window: None,
+                max_output_tokens: None,
+                temperature: None,
+                supports_reasoning: None,
+                supported_thinking_levels: None,
+            },
+        )
+        .unwrap();
+        db.conn()
+            .execute(
+                "INSERT INTO models (
+                    provider_id, model_id, display_name, source,
+                    capabilities_json, updated_at
+                 ) VALUES (?1, 'user-model', 'Custom label', 'user', '[\"tools\"]', ?2)",
+                params![provider.id, now_ms()],
+            )
+            .unwrap();
+
+        let changed = cache_discovered_models(
+            &db,
+            &provider.id,
+            &[
+                DiscoveredModelInput {
+                    model_id: "model-b".into(),
+                    display_name: "Beta".into(),
+                    capabilities: vec!["text".into()],
+                    context_window: None,
+                },
+                DiscoveredModelInput {
+                    model_id: "model-a".into(),
+                    display_name: "Alpha".into(),
+                    capabilities: vec!["text".into()],
+                    context_window: Some(128_000),
+                },
+            ],
+        )
+        .unwrap();
+        assert_eq!(changed, 2);
+
+        cache_discovered_models(
+            &db,
+            &provider.id,
+            &[
+                DiscoveredModelInput {
+                    model_id: "model-a".into(),
+                    display_name: "Alpha updated".into(),
+                    capabilities: vec!["text".into(), "reasoning".into()],
+                    context_window: Some(256_000),
+                },
+                DiscoveredModelInput {
+                    model_id: "user-model".into(),
+                    display_name: "Remote label".into(),
+                    capabilities: vec!["text".into()],
+                    context_window: None,
+                },
+            ],
+        )
+        .unwrap();
+
+        let models = list_models(&db, Some(&provider.id)).unwrap();
+        assert_eq!(models.len(), 3);
+        let alpha = models
+            .iter()
+            .find(|model| model.model_id == "model-a")
+            .unwrap();
+        assert_eq!(alpha.display_name, "Alpha updated");
+        assert_eq!(alpha.capabilities, vec!["text", "reasoning"]);
+        assert_eq!(alpha.context_window, Some(256_000));
+        assert!(models.iter().any(|model| model.model_id == "model-b"));
+        let custom = models
+            .iter()
+            .find(|model| model.model_id == "user-model")
+            .unwrap();
+        assert_eq!(custom.display_name, "Custom label");
+        assert_eq!(custom.source, "user");
+        assert_eq!(custom.capabilities, vec!["tools"]);
     }
 }

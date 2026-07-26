@@ -29,6 +29,9 @@ Principles:
 | `terminal` | Work panel PTY create/write/resize/dispose + data/exit events |
 | `browser` | Work panel embedded preview navigation/bounds/visibility + state events |
 | `fs` | Work panel workspace file listing/reading/reveal (read-only) |
+| `window` | Frameless window state and minimize/maximize/close controls |
+| `menu` | Allowlisted application-menu commands and native editing/window actions |
+| `notification` | Durable inbox list/read/clear and new/activated events |
 
 ## 3. Channel Conventions
 
@@ -77,6 +80,16 @@ type AgentPromptResponse = {
  turnId: string;
 };
 ```
+
+Slash template expansion (D123): when `content` starts with `/name` and the
+name matches a loaded pi prompt template, the main-process handler expands
+the invocation (`parseCommandArgs` + `substituteArgs`) before persisting.
+The persisted user message stores `content = expanded text` plus an optional
+`command: string` field carrying the typed invocation for transcript
+display. Reseed replays `content`, so the agent context is identical across
+restarts. Builtin/plugin slash aliases never reach this channel — the
+renderer executes them locally. Unknown `/foo` passes through as literal
+content. `@path` tokens are not transformed anywhere in the pipeline (D124).
 
 Prompt execution resolves `mode`, `providerId`, `modelId`, and `thinkingLevel`
 from the durable
@@ -165,6 +178,78 @@ type AgentEvent =
 > These are **UI-normalized events**, not a pass-through of raw pi events.
 > `packages/agent-runtime` is responsible for mapping pi events to this model.
 
+## 6a. Notification API (D117, protocol v4)
+
+Durable inbox requests are allowlisted preload invokes that Electron forwards
+to the singular host RPC domain without renderer access to SQLite:
+
+- `pi-desktop/notification/list({ unreadOnly?, limit? })`
+- `pi-desktop/notification/markRead({ id })`
+- `pi-desktop/notification/markAllRead()`
+- `pi-desktop/notification/clear()`
+
+The renderer invokes
+`pi-desktop/notification/setViewingSession({ sessionId })` whenever the chat
+page's active session changes; `sessionId: null` clears the viewing context on
+non-chat pages. Electron combines this hint with Main-owned window
+visibility/focus at the terminal event boundary. It also invokes
+`pi-desktop/notification/showNative({ id, sessionId, title, body })` after
+localizing a new record. This Electron-only request never crosses into the host
+RPC domain.
+
+```ts
+type AppNotification = {
+  id: string;
+  kind: "task.completed" | "task.failed";
+  sessionId: string;
+  sessionTitle: string;
+  turnId: string;
+  errorCode?: string;
+  createdAt: string;
+  readAt?: string | null;
+};
+
+type NotificationListResult = {
+  notifications: AppNotification[];
+  unreadCount: number;
+};
+
+type NotificationChangedEvent = {
+  notification: AppNotification;
+};
+
+type NotificationActivatedEvent = {
+  id: string;
+  sessionId: string;
+};
+```
+
+Main sends two events:
+
+- `pi-desktop/notification/event/changed` after `session.endTurn` returns a
+  newly inserted record. Renderer merges the record into its bounded local list
+  and recalculates the exact unread count. A terminal result already visible in
+  the focused current chat, repeated terminal updates, and aborted turns emit
+  nothing.
+- `pi-desktop/notification/event/activated` after the user clicks Electron's
+  native system notification. Renderer follows its existing session-selection
+  path, including project activation for a project-bound session.
+
+Electron owns the native surface while the renderer derives localized
+title/body text from the structured record. Electron accepts `showNative` only
+for a valid notification/session pair, shows a native notification only when
+the main window is unfocused and the platform API is supported, then
+restores/shows and focuses the window before emitting `activated`. There is no
+native notification while focused and no permission, scheduled-reminder, or
+plugin source in this contract. Native delivery is best-effort; the durable
+inbox remains authoritative when the OS suppresses a banner.
+
+The viewing-session hint is advisory and fail-safe: missing, stale, hidden, or
+unfocused renderer state creates the durable notification. Suppression occurs
+only when the main window is visible and focused and the reported chat session
+matches the finishing session. Window creation, renderer reload, and renderer
+process loss clear the hint before any later terminal event is evaluated.
+
 ## 7. Session API
 
 ```ts
@@ -187,6 +272,7 @@ type UiMessage = {
  role: "user" | "assistant" | "system" | "tool";
  content: string;
  thinking?: string; // assistant reasoning, never folded into content
+ error?: AppError;  // structured failure owned by this assistant turn
  createdAt: string;
  // status/tool fields omitted here
 };
@@ -196,7 +282,7 @@ type SessionDetail = SessionSummary & {
 };
 ```
 
-Electron main enriches session list/get/create/configure results with effective
+Electron main enriches session list/get/create/fork/configure results with effective
 reasoning capability for that session's exact `(providerId, modelId)`. Missing
 provider/model metadata yields `supportsReasoning: false` and `off`; the Rust
 host remains authoritative only for the durable `thinkingLevel`.
@@ -205,6 +291,7 @@ Minimal interface:
 
 - `session/list`
 - `session/create`
+- `session/fork({ sessionId, title? }) -> { session: SessionDetail }`
 - `session/get`
 - `session/delete`
 - `session/rename`
@@ -214,9 +301,24 @@ Minimal interface:
 Import candidates carry `projectPath: string | null`. A successful import
 refreshes both sessions and the durable Projects index.
 
+`session/fork` is a protocol-v5 channel that creates an independent
+session from the source session's current active transcript. Electron rejects
+the request with `AGENT_BUSY` while that source session has an active turn.
+Electron owns localization and supplies the user-facing branch title; the host
+fallback title is reserved for non-UI callers.
+The host assigns a new session id, message ids, and tool-call ids; it copies
+the durable project/provider/model/mode/thinking/permission configuration but
+does not copy turns, notifications, artifacts, scratch data, permission
+grants, or regenerate revisions. The source session remains unchanged.
+
 Protocol version 2 adds `thinkingLevel`, `UiMessage.thinking`, and
 `message_update.deltaThinking`. A v1 peer must fail the version check instead
 of silently discarding these fields.
+
+`UiMessage.error` is an optional additive field. Provider failures attach the
+same normalized `AppError` carried by the lifecycle `error` event to the
+assistant message before `message_end`. Error messages persist with the
+transcript but are excluded from restored model context.
 
 ## 8. Settings / Secrets API
 
@@ -290,9 +392,18 @@ type ToolPermissionResolution = {
 
 ## 11. Version Compatibility
 
-- IPC contract version field: `protocolVersion: 1`
+- IPC/host contract version field: `protocolVersion: 5`
 - Breaking changes must bump the version and record an ADR
 - renderer and main validate the version at startup; on mismatch, prompt to upgrade/reinstall
+- Protocol v4 adds notification records, channels, and the
+  notification-bearing `session.endTurn` result. A v3 peer is rejected rather
+  than silently losing durable completion/failure events.
+- The optional viewing-session invoke and `createNotification` end-turn field
+  are additive v4 behavior. Older callers omit the field and retain the
+  fail-safe default of creating notifications.
+- Protocol v5 adds the required `session/fork` snapshot operation. A v4 peer is
+  rejected before chat becomes interactive instead of exposing a branch
+  command that can only fail at invocation time (ADR 0023).
 
 ## 12. Plugin API (host UI side)
 
@@ -371,6 +482,101 @@ without one.
 - `fs/reveal({path})` → reveal in Finder
 - Every path resolves inside the workspace root; traversal outside is
   rejected (`INVALID_ARGUMENT`).
+
+## 13b. Desktop Menu and Window APIs
+
+The preload exposes a synchronous, read-only `platform: NodeJS.Platform`
+value so the renderer chooses native macOS chrome or Windows/Linux frameless
+chrome before first paint.
+
+Main-to-renderer application commands use one allowlisted event:
+
+```ts
+type AppMenuCommand =
+  | "newTask" | "openProject" | "openSettings"
+  | "openCommandPalette" | "toggleSidebar"
+  | "openHelp" | "openLogs" | "checkForUpdates";
+
+event: menu/event/command { command: AppMenuCommand }
+
+menu/rendererReady() -> { ready: true }
+```
+
+The renderer subscribes to `menu/event/command` before invoking
+`menu/rendererReady`. Main waits for that acknowledgement when a native menu
+command creates or reloads a window, so startup timing cannot drop the first
+command.
+
+Renderer-owned Windows/Linux menus execute editing and window operations
+through `menu/nativeAction`. Its request is restricted to the exported
+`NATIVE_MENU_ACTIONS` tuple; unknown values fail rather than becoming a
+generic main-process command surface:
+
+```ts
+type NativeMenuAction =
+  | "undo" | "redo" | "cut" | "copy" | "paste" | "selectAll"
+  | "reload" | "zoomIn" | "zoomOut" | "resetZoom"
+  | "toggleFullScreen" | "minimize" | "toggleMaximize" | "close";
+
+menu/nativeAction({ action: NativeMenuAction })
+  -> { maximized: boolean; fullScreen: boolean }
+```
+
+`window/control` accepts the exported `WINDOW_CONTROL_ACTIONS` tuple:
+
+```ts
+type WindowControlAction =
+  | "getState" | "minimize" | "toggleMaximize" | "close";
+
+window/control({ action: WindowControlAction })
+  -> { maximized: boolean }
+```
+
+Maximize/unmaximize changes also emit
+`window/event/maximized`. Unknown actions fail. These Electron-only channels
+do not cross into host-core and do not change the host RPC protocol version.
+
+## 13c. Composer input APIs (D123/D124, ADR 0024)
+
+Electron-only channels backing the composer autocomplete. Both are
+read-only, fail soft, and do not touch host-core or the host RPC protocol
+version.
+
+### composer/commands
+
+```ts
+composer/commands() -> { commands: ComposerCommand[] }
+
+type ComposerCommand = {
+  /** Slash name typed after "/", unique across the merged list. */
+  name: string;
+  kind: "template" | "builtin" | "plugin";
+  title: string;            // display title (templates: name)
+  description?: string;     // template frontmatter / palette title
+  argumentHint?: string;    // template frontmatter `argument-hint`
+  source?: "project" | "user"; // template provenance
+  id?: string;              // builtin/plugin palette id for execution
+};
+```
+
+Templates load from `<workspace>/.pi/prompts/*.md` and
+`~/.pi/agent/prompts/*.md` (project wins name conflicts; short TTL cache).
+Without a workspace only user-global templates, builtins, and plugin
+commands return.
+
+### fs/index
+
+```ts
+fs/index() -> { entries: FsIndexEntry[]; truncated: boolean }
+
+type FsIndexEntry = { path: string; kind: "file" | "dir" };
+```
+
+Workspace-rooted relative paths for the `@` menu: `git ls-files -co
+--exclude-standard` fast path, ignore-set recursive walk fallback,
+directories derived from file paths, 8000-entry cap with `truncated: true`,
+short TTL cache per root. Fails closed to an empty list without a
+workspace. Fuzzy filtering happens renderer-side.
 
 ## 14. Error Codes — Initial registry (extensible)
 

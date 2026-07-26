@@ -111,7 +111,11 @@ export class AgentSidecar {
     this.host = host;
     this.unsubscribeHost?.();
     this.unsubscribeHost = host.onNotification((method, params) => {
-      // Forward host notifications to sidecar
+      // Forward host notifications to sidecar. permissions.request stays out:
+      // the renderer already gets it straight from wireHost, and bouncing it
+      // through the sidecar delivered the dialog twice with the full args
+      // payload re-serialized across two extra stdio hops.
+      if (method === "permissions.request") return;
       const payload =
         JSON.stringify({
           jsonrpc: "2.0",

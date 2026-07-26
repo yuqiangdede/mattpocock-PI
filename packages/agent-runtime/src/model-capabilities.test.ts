@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   clampThinkingLevel,
+  resolveModelWireCompat,
   resolveThinkingCapabilities,
   type ModelCapabilities,
 } from "./model-capabilities.js";
@@ -96,5 +97,56 @@ describe("resolveThinkingCapabilities", () => {
     };
     expect(clampThinkingLevel(capabilities, "minimal")).toBe("low");
     expect(clampThinkingLevel(capabilities, "max")).toBe("high");
+  });
+});
+
+describe("resolveModelWireCompat", () => {
+  it("adopts the thinking dialect for an exact vendor model", () => {
+    const wire = resolveModelWireCompat({
+      vendorKey: "xiaomi",
+      modelId: "mimo-v2.5",
+    });
+
+    expect(wire?.compat?.thinkingFormat).toBe("deepseek");
+    expect(wire?.compat?.requiresReasoningContentOnAssistantMessages).toBe(
+      true,
+    );
+  });
+
+  it("matches gateway alias ids by boundary prefix across vendors", () => {
+    // Custom gateways expose catalogued models under alias suffixes such as
+    // mimo-v2.5-pro-think; the upstream dialect still applies.
+    const wire = resolveModelWireCompat({
+      vendorKey: "custom",
+      modelId: "mimo-v2.5-pro-think",
+      apiStyle: "chat_completions",
+    });
+
+    expect(wire?.compat?.thinkingFormat).toBe("deepseek");
+  });
+
+  it("keeps explicit catalog off values for effort-style endpoints", () => {
+    const wire = resolveModelWireCompat({
+      vendorKey: "custom",
+      modelId: "gpt-5.1",
+      apiStyle: "responses",
+    });
+
+    expect(wire?.thinkingLevelMap?.off).toBe("none");
+  });
+
+  it("requires a separator boundary for prefix matches", () => {
+    expect(
+      resolveModelWireCompat({ vendorKey: "custom", modelId: "mimo-v2.50" }),
+    ).toBeUndefined();
+  });
+
+  it("returns undefined for unknown models", () => {
+    expect(
+      resolveModelWireCompat({
+        vendorKey: "custom",
+        modelId: "totally-unknown-model",
+      }),
+    ).toBeUndefined();
   });
 });

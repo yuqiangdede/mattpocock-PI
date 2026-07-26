@@ -17,7 +17,8 @@
 
 - Full automated test suite in MVP phase (document scenarios first; automate later).
 - Performance / stress testing (post-MVP).
-- Cross-platform testing (macOS arm64 only for first release — D010).
+- Windows/Linux release qualification (macOS arm64 remains the first-release
+  acceptance platform per D010; readiness scenarios may be documented).
 - Plugin marketplace scenarios (post-MVP).
 - Remote gateway / control-plane scenarios (post-MVP — ADR 0004 / baseline #20).
 
@@ -35,7 +36,7 @@
 |---|---|---|---|
 | **Unit** | Single module, no IPC | Many | Vitest / Rust #[test] |
 | **Integration** | IPC contract, host↔renderer, host↔sidecar | Moderate | Vitest + IPC mocks or live Electron |
-| **E2E** | Full user journey through the desktop app | ~55 functional + US-UI visual catalog | protocol smoke + Electron probes now; Playwright later |
+| **E2E** | Full user journey through the desktop app | ~65 functional + US-UI visual catalog | protocol smoke + Electron probes now; Playwright later |
 
 **Strategy**: document all E2E scenarios now; write unit/integration tests alongside code; automate E2E after M5.
 
@@ -59,7 +60,7 @@
 
 | Requirement | Detail |
 |---|---|
-| Platform | macOS arm64 (D010) |
+| Platform | macOS arm64 for release acceptance (D010); native Windows/Linux runners for shell-readiness scenarios |
 | Profile | Clean `~/.pi-desktop` profile (no prior config) |
 | Fixtures | Sample project directory (`examples/fixtures/sample-project/`) |
 | Sample plugin | `examples/plugins/hello` loaded from local path |
@@ -113,11 +114,11 @@ Each scenario is documented in this format:
 #### E2E-003: Rust host healthcheck responds
 
 - **Preconditions**: App is running; Rust host-core sidecar started.
-- **Steps**: 1) Electron handshakes with protocol version 3. 2) Call the host
-  healthcheck RPC. 3) Repeat boot with a version 2 host fixture.
-- **Expected**: The version 3 host returns `ok` and the handshake is logged.
-  The stale version 2 host is rejected before chat becomes interactive, so
-  regenerate cannot silently run without revision RPC support.
+- **Steps**: 1) Electron handshakes with protocol version 4. 2) Call the host
+  healthcheck RPC. 3) Repeat boot with a version 3 host fixture.
+- **Expected**: The version 4 host returns `ok` and the handshake is logged.
+  The stale version 3 host is rejected before chat becomes interactive, so
+  notification records cannot be silently lost at turn completion.
 - **Specs linked**: `03-runtime/05-host-core-rust.md`, `03-runtime/06-host-rpc-protocol.md`
 - **Acceptance**: A (bridge normal)
 - **Milestone**: M1
@@ -298,6 +299,36 @@ Each scenario is documented in this format:
 - **Milestone**: M3
 - **Status**: Automated (protocol smoke: PATH_OUTSIDE_WORKSPACE)
 
+#### E2E-019a: Scratch-directory writes stay out of the workspace (D114)
+
+- **Preconditions**: Agent mode; project open; session started.
+- **Steps**: 1) Ask the agent to produce a temporary/intermediate file (e.g. a one-off script). 2) Observe where it writes and whether a permission card appears. 3) Check `git status` and the work-panel state. 4) Delete the session and check `<data_dir>/scratch/`.
+- **Expected**: The file lands under `<data_dir>/scratch/<sessionId>/` without a permission card; project `git status` stays clean; no file or Review artifact tab opens for the scratch write; deleting the session removes the scratch directory.
+- **Specs linked**: `03-runtime/03-tools-and-permissions.md §4b`, `03-runtime/04-data-storage.md`
+- **Acceptance**: E (temp files isolated from workspace)
+- **Milestone**: M5
+- **Status**: Partially automated (host-core unit tests: dual-root resolve, scratch write/read, PI_SCRATCH_DIR, sweep)
+
+#### E2E-019b: Scratch containment matches workspace defenses (D114)
+
+- **Preconditions**: Agent mode; project open.
+- **Steps**: 1) Attempt Write with `..` traversal from the scratch root. 2) Attempt Write through a symlink planted inside scratch pointing outside. 3) Attempt scratch writes in Chat mode.
+- **Expected**: Both escapes return `PATH_OUTSIDE_WORKSPACE`; Chat mode still returns `WRITE_DISABLED_IN_CHAT` even for scratch paths.
+- **Specs linked**: `03-runtime/03-tools-and-permissions.md §4b`
+- **Acceptance**: E (scratch root cannot be escaped)
+- **Milestone**: M5
+- **Status**: Automated (host-core unit tests)
+
+#### E2E-019c: Permission modes govern high-risk approval (D115)
+
+- **Preconditions**: Agent mode; project open; global default `ask`.
+- **Steps**: 1) With the session on inherit, ask the agent to write a workspace file — expect a permission card. 2) Switch the session chip to Accept edits; repeat — expect no card for Write/Edit but still a card for Bash. 3) Switch to Auto — expect no card for Bash either. 4) Set the global default to Accept edits in Settings and reset the session to inherit — expect Write/Edit auto-allowed. 5) Switch the session to Chat mode with Auto set — expect Write denied (`WRITE_DISABLED_IN_CHAT`).
+- **Expected**: Effective mode = session override → global default → ask; chat-mode hard deny outranks every mode; the composer chip always displays the effective mode.
+- **Specs linked**: `03-runtime/03-tools-and-permissions.md §6`, `03-runtime/04-data-storage.md`
+- **Acceptance**: E (permission modes resolve and enforce host-side)
+- **Milestone**: M5
+- **Status**: Partially automated (host-core unit tests: evaluate matrix, chat-deny precedence, session grants under ask)
+
 ### Session Persistence
 
 #### E2E-020: Session survives restart
@@ -415,25 +446,28 @@ Each scenario is documented in this format:
 - **Milestone**: M3
 - **Status**: Draft
 
-#### E2E-042: Storage v1 migrates atomically to host-owned schema v2
+#### E2E-042: Pre-v7 storage archives via breaking reset; transcripts live in session files
 
-- **Preconditions**: A fixture data directory contains a valid v1
-  `pi.sqlite`, representative settings, project-bound and temporary sessions,
-  transcript messages, audit events, and a legacy scheduled-task JSON file.
-- **Steps**: 1) Start host-core against the fixture. 2) Query projects,
-  sessions, transcripts, settings, audit events, and scheduled tasks through
-  host RPC. 3) Stop and restart host-core. 4) Run the same queries again.
-- **Expected**: Host-core creates exactly one `pi.sqlite.v1.bak`, advances
-  `PRAGMA user_version` to 2, preserves recoverable data, imports scheduled
-  tasks without duplicate rows, exposes canonical project paths and transcript
-  blocks through RPC, and returns identical logical results after restart. No
-  Electron-owned persistence file remains authoritative.
+- **Preconditions**: A fixture data directory contains a `pi.sqlite` whose
+  `PRAGMA user_version` is between 1 and 6 (pre-D119 content-in-DB schema)
+  with representative rows.
+- **Steps**: 1) Start host-core against the fixture. 2) Create a session and
+  append messages through host RPC. 3) Stop and restart host-core. 4) Reload
+  the session through RPC and inspect the data directory.
+- **Expected**: Host-core renames the legacy file to exactly one
+  `pi.sqlite.v6.bak`, bootstraps a fresh schema-v7 database (index-only
+  `messages`), writes `sessions/<id>.jsonl` with a session-header line plus
+  one line per message, reloads the transcript from the file after restart
+  with identical logical results, and deleting the session removes both the
+  index rows and the session files. No Electron-owned persistence file is
+  authoritative.
 - **Specs linked**: `03-runtime/04-data-storage.md`,
   `03-runtime/06-host-rpc-protocol.md`, ADR 0014
-- **Acceptance**: F (persistence), H (migration failures are diagnosable)
+- **Acceptance**: F (persistence), H (reset failures are diagnosable)
 - **Milestone**: M2
-- **Status**: Unit-covered (`db::tests::migrates_v1_file_and_leaves_backup`,
-  `scheduled::tests::import_is_idempotent_and_preserves_fields`); full fixture
+- **Status**: Unit-covered (`db::tests::archives_pre_v7_database_and_starts_fresh`,
+  `sessions::tests::transcript_survives_reopen_from_file`,
+  `sessions::tests::delete_session_removes_transcript_files`); full fixture
   scenario Draft
 
 ### Plugin Load / Command / Disable
@@ -532,13 +566,28 @@ Each scenario is documented in this format:
 
 #### E2E-031: Error codes are stable and readable
 
-- **Preconditions**: Trigger an error condition.
-- **Steps**: 1) Cause a known error (e.g. invalid provider key). 2) Observe error display.
-- **Expected**: Error shows a stable `AppError` code; human-readable message present.
-- **Specs linked**: `03-runtime/08-error-codes.md`
-- **Acceptance**: H (errors expose stable codes)
+- **Preconditions**: App launched through the normal desktop development
+  command; provider configured.
+- **Steps**: 1) Select or enter a model ID that the provider rejects. 2) Send a
+  prompt. 3) Inspect the assistant error message and its detail disclosure. 4)
+  Switch sessions and reload the failed session. 5) Repeat with an invalid
+  provider key.
+- **Expected**: The run stops and the transcript contains one durable
+  `role=assistant`, `status=error` message instead of a toast, floating banner,
+  or blank row. It shows a localized summary and stable
+  `MODEL_NOT_CONFIGURED` or `PROVIDER_UNAUTHORIZED` code. Details expose the
+  redacted provider response plus provider/model IDs and can be copied; no API
+  key or Authorization value appears. The configuration failure links to
+  settings, retriable failures offer Retry, the composer becomes usable again,
+  and reload preserves the error message. The development launch executes a
+  sidecar rebuilt from current runtime source.
+- **Specs linked**: `03-runtime/02-agent-runtime.md`,
+  `03-runtime/07-process-model.md`, `03-runtime/08-error-codes.md`
+- **Acceptance**: C (failed chat settles), H (errors expose stable codes)
 - **Milestone**: M2
-- **Status**: Draft
+- **Status**: Unit-covered (agent-runtime error message/redaction, host
+  persistence, desktop transcript contract, and predev build contract); full
+  Electron UI scenario Draft
 
 ### Hardening (M5)
 
@@ -818,20 +867,27 @@ Each scenario is documented in this format:
 #### E2E-056: Work panel shell docking and persistence
 
 - **Preconditions**: App running with any workspace state.
-- **Steps**: 1) Toggle the panel via the titlebar button and via Cmd/Ctrl+J.
-  2) Verify the welcome chooser, then switch across all four tools using the
-  right rail. 3) Drag the left-edge handle below 320px and beyond every upper
-  bound at 960px, 1200px, and 1600px window widths. 4) Shrink the window under
-  the current panel width and test a short window height. 5) Relaunch the app.
-- **Expected**: The panel docks as a third shell column (main pane shrinks —
-  no overlay), every open lands on the welcome chooser, and the chooser is
-  vertically centered with spare height while safely top-aligning and
-  scrolling at short heights. Tools switch without losing terminal state.
-  Width clamps to
+- **Steps**: 1) Relaunch and inspect the titlebar, application menu, and
+  Cmd/Ctrl+J. 2) Open two distinct file artifacts, the same first file again,
+  a URL preview, and a completed command artifact. 3) Close an inactive tab,
+  then the active middle and edge tabs. 4) Use the sole collapse control and
+  trigger another artifact. 5) Switch sessions and projects with tabs open.
+  6) Drag the left-edge handle below 320px and beyond every upper bound at
+  960px, 1200px, and 1600px window widths. 7) Relaunch.
+- **Expected**: Startup shows no panel, welcome chooser, fixed tool buttons,
+  titlebar/menu launcher, or Cmd/Ctrl+J action. Each artifact atomically opens
+  the docked third column and creates or activates one closeable top tab; file
+  tabs are path-keyed, repeated resources deduplicate, and tabs scroll without
+  colliding with the collapse control while keeping the active tab visible.
+  Active close selects the right neighbor then left; closing the last tab hides
+  the panel. Collapse retains runtime
+  tabs but hides the panel until another artifact reopens it. Width clamps to
   `320px–min(720px, 60vw, viewport − visible sidebar − 360px)`, re-clamps on
-  window resize, and never squeezes MainChat below 360px in the supported
-  shell. `{open, width}` are restored after relaunch. The former context-panel
-  overlay no longer exists; the titlebar button reflects open state.
+  window resize, and never squeezes MainChat below 360px in the supported shell.
+  Session/workspace changes clear tabs before relative resources can cross
+  contexts. Only `{width}` is restored after relaunch; open state and tabs
+  reset, and temporary panel expansion does not enlarge the restored base
+  window. The former context-panel overlay no longer exists.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/08-component-spec.md`
 - **Acceptance**: F (persistence), Quality
 - **Milestone**: M5
@@ -840,15 +896,17 @@ Each scenario is documented in this format:
 #### E2E-057: Review tab reflects the git working tree
 
 - **Preconditions**: A git workspace with a clean tree; agent configured.
-- **Steps**: 1) Open the review tab (clean state). 2) Ask the agent to edit a
-  tracked file and create a new file. 3) Wait for the turn to finish. 4) Edit
-  a file outside the app and press refresh. 5) Open the panel in a
-  non-git folder and with no workspace.
-- **Expected**: Clean tree shows the "no changes" empty state; agent
-  Write/Edit/Bash completions refresh the diff automatically (debounced) with
+- **Steps**: 1) Ask the active agent to edit a tracked workspace file and
+  create a new one. 2) Repeat with a failed Write, a scratch Write, and a Write
+  in a background project session. 3) Edit a file outside the app and press
+  refresh after Review is open. 4) Inspect Review in a non-git folder.
+- **Expected**: Each successful active-session workspace Write/Edit creates or
+  activates one deduplicated Review tab and refreshes the diff automatically
+  (debounced) with
   per-file status badges, +/− counts, and colored unified hunks (untracked
-  files included); manual refresh picks up external edits; non-git and
-  no-workspace states render their dedicated copy. Binary and >200KB patches
+  files included). Failed/scratch/background writes do not open or steal focus;
+  background invalidation remains scoped. Manual refresh picks up external
+  edits; non-git and no-workspace states render their dedicated copy. Binary and >200KB patches
   render as capped rows without hunks; >100 changed files shows the
   truncation notice.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md` §13a, `04-ux/08-component-spec.md` §5
@@ -858,9 +916,11 @@ Each scenario is documented in this format:
 
 #### E2E-058: Interactive terminal session lifecycle
 
-- **Preconditions**: A workspace is open; work panel visible.
-- **Steps**: 1) Open the terminal tab and run `pwd` and `ls`. 2) Switch to
-  another tab and back. 3) Close and reopen the panel. 4) Drag-resize the
+- **Preconditions**: A workspace is open; a successful completed-command
+  artifact exists.
+- **Steps**: 1) Activate the completed command artifact to create Terminal,
+  then run `pwd` and `ls`. 2) Switch to another artifact tab and back. 3)
+  Collapse and reopen via another command artifact. 4) Drag-resize the
   panel and toggle light/dark theme. 5) Run `exit`. 6) Restart via the
   overlay button. 7) Quit the app and check for orphan shells.
 - **Expected**: The shell starts in the workspace directory as a login
@@ -876,8 +936,8 @@ Each scenario is documented in this format:
 
 #### E2E-059: Embedded browser preview isolation and overlays
 
-- **Preconditions**: A local dev server is running; work panel open.
-- **Steps**: 1) Enter `localhost:<port>` without a scheme and submit.
+- **Preconditions**: A local dev server is running; a URL or BrowserPreview artifact exists.
+- **Steps**: 1) Activate the artifact, enter `localhost:<port>` without a scheme, and submit.
   2) Navigate site links; use back/forward/reload/stop. 3) Trigger a
   `window.open` popup and a permission-requesting page (e.g. notification
   prompt). 4) Open the command palette, then a tool permission dialog, then
@@ -898,9 +958,10 @@ Each scenario is documented in this format:
 
 #### E2E-060: Files tab browsing stays inside the workspace
 
-- **Preconditions**: Workspace with nested folders, a large file (>512KB), an
-  image, and a binary file.
-- **Steps**: 1) Browse the tree, expanding nested folders. 2) Open a source
+- **Preconditions**: Workspace with file artifacts for nested source, large
+  (>512KB), image, and binary files.
+- **Steps**: 1) Activate each file artifact and verify a distinct path-keyed
+  top tab; browse the tree, expanding nested folders. 2) Open a source
   file, the image, the binary, and the large file. 3) Use reveal-in-Finder.
   4) Attempt a traversal read (`../outside`) via devtools IPC. 5) Switch
   workspaces.
@@ -1022,6 +1083,123 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`home-empty-layout.test.mjs`); full UI scenario Draft
 
+#### E2E-064: Durable notification inbox records terminal task outcomes
+
+- **Preconditions**: Two durable sessions exist; a deterministic provider can
+  complete one turn, fail one turn with a stable error code, and abort one
+  turn; notification inbox starts empty.
+- **Steps**: 1) Focus and view session A, then complete a turn in A. 2) While
+  still focused on A, fail a turn in background session B. 3) Unfocus the
+  window and complete another turn in A. 4) Abort a fourth turn. 5) Repeat each
+  terminal RPC. 6) Open the bell and switch between All and Unread. 7) Mark one
+  row read, close/reopen the popover, and restart the app. 8) Select the other
+  row. 9) Generate a host fixture with 205 eligible terminal turns. 10) Use
+  Mark all read, then Clear.
+- **Expected**: A's visible-current completion creates no row. Exactly two rows
+  exist, newest first: the unfocused A completion and background B failure,
+  with localized labels, snapshotted session titles, and B's stable code.
+  Abort/repeated terminal calls create no row. Badge and Unread show the exact
+  unread count without opening implicitly reading rows. Read state and both
+  records survive restart. Row selection marks it read and activates its bound
+  project/session. The fixture retains exactly the newest 200 rows. Mark all
+  preserves rows with zero unread; Clear empties only the inbox and leaves
+  sessions, turns, and transcripts intact.
+- **Specs linked**: `03-runtime/04-data-storage.md`,
+  `03-runtime/06-host-rpc-protocol.md`, `03-runtime/01-ipc-protocol.md`,
+  `04-ux/08-component-spec.md`, `08-meta/decisions-log.md` (D117)
+- **Acceptance**: C (turn completion), F (persistence), Quality
+- **Milestone**: M5
+- **Status**: Draft
+
+#### E2E-065: Native task notifications are unfocused-only and activate sessions
+
+- **Preconditions**: Native notifications are supported; sessions A and B
+  exist; the main window can be focused, unfocused, hidden, and minimized.
+- **Steps**: 1) Keep the app focused on A and complete a turn in A. 2) While
+  still focused on A, complete a turn in B. 3) Unfocus the app while A remains
+  current and complete another turn in A. 4) Click A's native notification. 5)
+  Minimize the app, fail another turn, and click its native notification. 6)
+  Unfocus the app and abort a turn. 7) Repeat with native delivery suppressed
+  by the OS.
+- **Expected**: Focused-current A creates neither inbox row nor native banner.
+  Focused-background B creates an inbox row without a native banner. Unfocused
+  current A and the minimized failure each create one durable row and one
+  localized native notification. Clicking restores, shows, and focuses the
+  main window before activating the matching session; no event opens the wrong
+  currently selected session. Abort shows neither surface. OS suppression does
+  not lose the durable row or surface a misleading app error.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`,
+  `04-ux/09-interaction-patterns.md`, `08-meta/decisions-log.md` (D117)
+- **Acceptance**: C (turn completion), Quality
+- **Milestone**: M5
+- **Status**: Draft
+
+#### E2E-066: Provider model catalog survives restart and offline refresh
+
+- **Preconditions**: A saved provider has returned at least two models from its
+  discovery endpoint and the resulting catalog is stored in `models`.
+- **Steps**: 1) Quit and restart the app. 2) Disconnect the provider endpoint.
+  3) Open the composer model picker. 4) Wait for background refresh to fail.
+  5) Reconnect the endpoint with one renamed model and one additional model,
+  then update the provider configuration and reopen the picker.
+- **Expected**: The first picker open renders the prior catalog without starting
+  from an empty list. Offline refresh preserves every cached entry and the
+  configured-model fallback. After reconnection, live results update the
+  renderer and persist to Rust-owned SQLite. User-defined model rows remain
+  unchanged, and the newly discovered model remains available after another
+  restart.
+- **Specs linked**: `03-runtime/04-data-storage.md`,
+  `03-runtime/12-provider-config-schema.md`,
+  `03-runtime/13-model-catalog-and-selection.md`, `04-ux/08-component-spec.md`
+- **Acceptance**: B (model config), F (persistence), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`providers::tests`, `model-cache.test.mjs`); full
+  restart/offline UI scenario Draft
+
+#### E2E-067: Platform application menus and window chrome
+
+- **Preconditions**: Native macOS, Windows, and Linux runners; built desktop
+  app; English and zh-CN locales available. The Windows/Linux harness can set
+  `PI_DESKTOP_START_MAXIMIZED=1` before launch so Main maximizes the hidden
+  native window before renderer mount.
+- **Steps**: 1) On macOS, open every system menu and invoke New Task, Open
+  Project, Settings, Command Palette, sidebar toggle, editing,
+  zoom/fullscreen, Window, Help, Logs, and Check for Updates actions. Verify
+  the update status reports that the current fixture version is up to date.
+  2) Repeat through the visible Windows/Linux menubar using pointer and
+  F10/arrow/Home/End/Enter/Space/Escape/Tab navigation; verify Shift+F10 is not
+  consumed or redirected to File, invoke Edit actions after focusing an
+  editor, and invoke Check for Updates from Help with the same status result.
+  3) Close the macOS window, immediately invoke two native menu
+  commands, and acknowledge renderer readiness after the replacement loads.
+  Verify one window and one delivery per command. 4) Minimize, maximize,
+  restore, and close on Windows/Linux. 5) Start
+  the renderer while its native window is already maximized and inspect the
+  initial queried glyph/state. 6) Attempt unknown menu/window IPC actions
+  while a window exists and after it closes. 7) Build each target on its
+  native runner from a clean release-host directory.
+- **Expected**: macOS follows native menu conventions and accelerators.
+  Windows/Linux show localized File/Edit/View/Window/Help menus without
+  colliding with drag regions or right-side controls; keyboard focus and
+  checked sidebar state remains accurate, and no work-panel launcher is
+  present. Check for Updates invokes the allowlisted update command from both
+  menu surfaces and shows the resulting up-to-date state. Replacement-window
+  commands wait for renderer readiness without
+  creating duplicate windows or losing events. Window controls match native state and
+  have accessible names. Unknown actions fail closed. Each package contains
+  the target-native host binary (`.exe` only on Windows). Passing this scenario
+  on Windows/Linux proves shell readiness, not first-release qualification.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`,
+  `04-ux/01-ui-ia.md`, `04-ux/02-i18n-english-first.md`,
+  `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`,
+  `04-ux/09-interaction-patterns.md`, `06-delivery/06-release-runbook.md`,
+  `08-meta/decisions-log.md` (D118)
+- **Acceptance**: A (app startup), Quality
+- **Milestone**: M5 on macOS; post-MVP release qualification on Windows/Linux
+- **Status**: Unit-covered (`window-menu.test.mjs`); Electron boot probe covers
+  platform bridge, native menu installation, and the pre-render maximize
+  fixture on Windows/Linux; native visual scenario Draft
+
 ## 8. Traceability Matrix
 
 
@@ -1030,16 +1208,16 @@ Each scenario is documented in this format:
 
 | Acceptance | Scenarios |
 |---|---|
-| A — App startup | E2E-001, E2E-002, E2E-003, E2E-004 |
-| B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055 |
-| C — Chat & stream | E2E-008, E2E-009, E2E-010, E2E-011, E2E-040, E2E-047, E2E-048, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-060, E2E-061, E2E-062 |
+| A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067 |
+| B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066 |
+| C — Chat & stream | E2E-008, E2E-009, E2E-010, E2E-011, E2E-031, E2E-040, E2E-047, E2E-048, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-060, E2E-061, E2E-062, E2E-064, E2E-065 |
 | D — Workspace | E2E-012, E2E-013, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060 |
 | E — Tools & permissions | E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040, E2E-049 |
-| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062 |
+| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066 |
 | G — Plugins | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026 |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-049 |
-| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063 |
+| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 |
 
 | Milestone | Scenarios |
 |---|---|
@@ -1047,7 +1225,7 @@ Each scenario is documented in this format:
 | M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-020, E2E-021, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042 |
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
-| M5 | E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063 (+ packaging scenarios in release runbook) |
+| M5 | E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS) (+ packaging scenarios in release runbook) |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
@@ -1480,7 +1658,8 @@ This test plan spec is accepted when:
 - Start a visible turn in project A, switch to project B while it runs, and
   inspect both sidebar status indicators.
 - Expect A's turn to continue in the background, B's composer/context to show
-  only B, and tool output/artifacts from A to remain rooted in A.
+  only B, and tool output/artifacts from A to remain rooted in A without
+  opening or activating a work-panel tab over B.
 - Open a Temporary session and invoke a workspace-required tool; expect the
   normal `WORKSPACE_REQUIRED` result rather than inheritance from B.
 
@@ -1520,3 +1699,19 @@ This test plan spec is accepted when:
 - Suggestion cards remain fully visible without being covered by the composer;
   short windows scroll the stack rather than stacking layers on top of cards.
 - Card click still prefills the composer and focuses the draft.
+
+
+### US-UI-65 Durable notification inbox (D117)
+- Verify a focused-current completion leaves the inbox unchanged, then
+  populate it through background/unfocused completed and failed task rows,
+  including one long session title. Inspect the titlebar and popover in
+  light/dark themes at default and narrow supported widths.
+- Expect a stable 32px bell control, non-overlapping `1`–`99` / `99+` badge,
+  dense 360px-or-narrower list, localized kind/session/time/error content, and
+  distinct text/icon/unread-dot semantics without nested cards or clipped text.
+- Switch All/Unread; use Tab, arrow keys, Home/End, Enter/Space, Escape, and
+  outside click. Focus order remains predictable, row activation opens the
+  correct session, and Escape restores focus to the bell.
+- Mark all read and Clear expose icon tooltips/accessible names, disabled and
+  empty states remain understandable, and reduced-motion mode changes the
+  popover instantly without suppressing focus or unread state.

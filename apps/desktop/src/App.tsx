@@ -1,5 +1,14 @@
-import { Component, useEffect, useMemo, useState, type ErrorInfo, type ReactNode } from "react";
+import {
+  Component,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ErrorInfo,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
+import type { AppMenuCommand } from "@pi-desktop/shared";
 import { Sidebar } from "./components/Sidebar";
 import { WorkPanel } from "./components/workpanel/WorkPanel";
 import { ChatTranscript } from "./components/ChatTranscript";
@@ -8,7 +17,12 @@ import { HomeSuggestions } from "./components/HomeSuggestions";
 import { OnboardingChecklist } from "./components/OnboardingChecklist";
 import { PermissionDialog } from "./components/PermissionDialog";
 import { CommandPalette } from "./components/CommandPalette";
+import { SearchDialog } from "./components/SearchDialog";
 import { ToastHost } from "./components/Toast";
+import { UpdateBanner } from "./components/UpdateBanner";
+import { NotificationCenter } from "./components/NotificationCenter";
+import { WindowControls } from "./components/WindowControls";
+import { DesktopMenuBar } from "./components/DesktopMenuBar";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { PullRequestsPage } from "./pages/PullRequestsPage";
@@ -17,8 +31,20 @@ import { PluginsPage } from "./pages/PluginsPage";
 import { useAppStore } from "./stores/app-store";
 import type { ToastOptions } from "./stores/app-store";
 import { api } from "./lib/api";
+import { toolWorkPanelTab } from "./lib/work-panel-tabs";
 import { BrandLogo } from "./components/BrandLogo";
-import { IconPanel } from "./components/icons";
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconNewSession,
+  IconSidebar,
+} from "./components/icons";
+
+const sidebarToggleShortcut =
+  typeof navigator !== "undefined" && /Mac/i.test(navigator.platform)
+    ? "⌘B"
+    : "Ctrl+B";
+
 
 class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -60,11 +86,64 @@ function projectName(path?: string | null, name?: string | null) {
   return parts[parts.length - 1] || path;
 }
 
+function TitlebarNav({
+  sidebarCollapsed,
+  onToggleSidebar,
+  onNewTask,
+}: {
+  sidebarCollapsed: boolean;
+  onToggleSidebar: () => void;
+  onNewTask: () => void;
+}) {
+  const { t } = useTranslation();
+  const navBack = useAppStore((s) => s.navBack);
+  const navForward = useAppStore((s) => s.navForward);
+  const navIndex = useAppStore((s) => s.navIndex);
+  const navStack = useAppStore((s) => s.navStack);
+  const canBack = navIndex > 0;
+  const canForward = navIndex < navStack.length - 1;
+  const toggleLabel = sidebarCollapsed
+    ? t("nav.expandSidebar")
+    : t("nav.collapseSidebar");
+  return (
+    <div className="titlebar-nav no-drag">
+      <button
+        className="title-nav-btn"
+        title={`${toggleLabel} (${sidebarToggleShortcut})`}
+        aria-label={toggleLabel}
+        aria-expanded={!sidebarCollapsed}
+        data-nav="toggle-sidebar"
+        onClick={onToggleSidebar}
+      >
+        <IconSidebar size={13} />
+      </button>
+      <button className="title-nav-btn" title={t("nav.back")} disabled={!canBack} onClick={() => navBack()}>
+        <IconChevronLeft size={13} />
+      </button>
+      <button className="title-nav-btn" title={t("nav.forward")} disabled={!canForward} onClick={() => navForward()}>
+        <IconChevronRight size={13} />
+      </button>
+      {sidebarCollapsed && (
+        <button
+          className="title-nav-btn"
+          title={t("nav.newTask")}
+          aria-label={t("nav.newTask")}
+          data-nav="new-task"
+          onClick={onNewTask}
+        >
+          <IconNewSession size={13} />
+        </button>
+      )}
+    </div>
+  );
+}
+
 function AppShell() {
   const { t } = useTranslation();
   const bootstrap = useAppStore((s) => s.bootstrap);
   const ready = useAppStore((s) => s.ready);
   const page = useAppStore((s) => s.page);
+  const activeSessionId = useAppStore((s) => s.activeSessionId);
   const messages = useAppStore((s) => s.messages);
   const error = useAppStore((s) => s.error);
   const errorCode = useAppStore((s) => s.errorCode);
@@ -77,14 +156,86 @@ function AppShell() {
   const workspace = useAppStore((s) => s.workspace);
   const openProject = useAppStore((s) => s.openProject);
   const workPanelOpen = useAppStore((s) => s.workPanelOpen);
-  const toggleWorkPanel = useAppStore((s) => s.toggleWorkPanel);
   const permission = useAppStore((s) => s.permission);
 
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [backendDown, setBackendDown] = useState<
     { fatal: boolean; component?: string } | null
   >(null);
+
+  const runMenuCommand = useCallback(
+    async (command: AppMenuCommand) => {
+      try {
+        const store = useAppStore.getState();
+        switch (command) {
+          case "newTask":
+            await store.newSession();
+            requestAnimationFrame(() =>
+              document.querySelector<HTMLTextAreaElement>(".composer-input")?.focus(),
+            );
+            break;
+          case "openProject":
+            await store.openProject();
+            break;
+          case "openSettings":
+            store.setSettingsTab("general");
+            break;
+          case "openSearch":
+            setSearchOpen(true);
+            break;
+          case "openCommandPalette":
+            setPaletteOpen(true);
+            break;
+          case "toggleSidebar":
+            setSidebarCollapsed((value) => !value);
+            break;
+          case "openHelp":
+            store.setSettingsTab("about");
+            break;
+          case "openLogs":
+            await api.openLogs();
+            break;
+          case "checkForUpdates": {
+            const updateState = await api.updatesCheck();
+            if (updateState.status === "up-to-date") {
+              showToast(t("updates.upToDate"), { variant: "success" });
+            }
+            break;
+          }
+        }
+      } catch (menuError) {
+        showToast(
+          menuError instanceof Error ? menuError.message : String(menuError),
+          { variant: "error" },
+        );
+      }
+    },
+    [showToast],
+  );
+
+  useEffect(() => {
+    const unsubscribe = api.onMenuCommand((command) => void runMenuCommand(command));
+    void api.menuRendererReady().catch(() => undefined);
+    return unsubscribe;
+  }, [runMenuCommand]);
+
+  useEffect(() => {
+    // Fullscreen hides the macOS traffic lights; CSS shifts titlebar
+    // controls left via this attribute.
+    const off = api.onWindowFullScreen(({ fullScreen }) => {
+      document.documentElement.dataset.fullscreen = fullScreen ? "true" : "false";
+    });
+    return off;
+  }, []);
+
+  useEffect(() => {
+    const viewingSessionId = page === "chat" ? activeSessionId ?? null : null;
+    void api
+      .setNotificationViewingSession(viewingSessionId)
+      .catch(() => undefined);
+  }, [activeSessionId, page]);
 
   useEffect(() => {
     const theme = settings?.theme ?? "system";
@@ -115,7 +266,7 @@ function AppShell() {
     // Agent-driven HTML preview: surface the browser tab when the agent
     // opens a workspace file in the embedded browser (BrowserPreview tool).
     const offBrowserPreview = api.onBrowserPreview(() => {
-      useAppStore.getState().setWorkPanelTab("browser");
+      useAppStore.getState().openWorkPanelTab(toolWorkPanelTab("browser"));
     });
     const offHostStatus = api.onHostStatus((status) => {
       if (status.ok) {
@@ -132,10 +283,45 @@ function AppShell() {
         useAppStore.setState({ isRunning: false });
       }
     });
+    const offNotificationChanged = api.onNotificationChanged((notification) => {
+      useAppStore.getState().receiveNotification(notification);
+      const failed = notification.kind === "task.failed";
+      const title = t(
+        failed ? "notifications.failedTitle" : "notifications.completedTitle",
+        { sessionTitle: notification.sessionTitle },
+      );
+      const body = failed
+        ? notification.errorCode
+          ? t("notifications.failedBodyWithCode", { code: notification.errorCode })
+          : t("notifications.failedBody")
+        : t("notifications.completedBody");
+      void api
+        .showNativeNotification({
+          id: notification.id,
+          sessionId: notification.sessionId,
+          title,
+          body,
+        })
+        .catch(() => undefined);
+    });
+    const offNotificationActivated = api.onNotificationActivated(({ id }) => {
+      void useAppStore
+        .getState()
+        .openNotification(id)
+        .catch((activationError) =>
+          showToast(
+            activationError instanceof Error
+              ? activationError.message
+              : String(activationError),
+            { variant: "error" },
+          ),
+        );
+    });
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      // Codex-style global search on ⌘K; the command palette stays on ⌘⇧P.
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setPaletteOpen(true);
+        setSearchOpen(true);
       }
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "p") {
         e.preventDefault();
@@ -149,10 +335,6 @@ function AppShell() {
         e.preventDefault();
         setSidebarCollapsed((v) => !v);
       }
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "j") {
-        e.preventDefault();
-        useAppStore.getState().toggleWorkPanel();
-      }
     };
     window.addEventListener("keydown", onKey);
     return () => {
@@ -160,6 +342,8 @@ function AppShell() {
       offToast();
       offBrowserPreview();
       offHostStatus();
+      offNotificationChanged();
+      offNotificationActivated();
       window.removeEventListener("keydown", onKey);
     };
   }, [bootstrap, handleAgentEvent, showToast, abort, t]);
@@ -177,6 +361,8 @@ function AppShell() {
   }, [t]);
 
   useEffect(() => {
+    const originalRefreshNotifications =
+      useAppStore.getState().refreshNotifications;
     (window as any).__PI_DESKTOP__ = {
       setPage: (page: string) => useAppStore.getState().setPage(page as any),
       refreshProviders: () => useAppStore.getState().refreshProviders(),
@@ -188,6 +374,23 @@ function AppShell() {
       clearProject: () => useAppStore.getState().clearProject(),
       showToast: (message: string, opts?: ToastOptions) =>
         useAppStore.getState().showToast(message, opts),
+      openWorkPanelArtifact: (
+        kind: "review" | "terminal" | "browser" | "file",
+        resource?: string,
+      ) => {
+        if (!(window as any).__PI_CAPTURE__) return;
+        if (kind === "file" && resource) {
+          useAppStore.getState().openFileInWorkPanel(resource);
+          return;
+        }
+        if (kind !== "file") {
+          useAppStore.getState().openWorkPanelTab(toolWorkPanelTab(kind));
+        }
+      },
+      collapseWorkPanel: () => {
+        if (!(window as any).__PI_CAPTURE__) return;
+        useAppStore.getState().collapseWorkPanel();
+      },
       seedTranscript: (count = 12) => {
         // Capture-only transcript fixture (conversation minimap scenes);
         // count 0 restores the empty transcript for later scenes.
@@ -277,6 +480,42 @@ function AppShell() {
           })),
         });
       },
+      seedNotifications: (count = 105) => {
+        // Capture-only notification fixture; count 0 restores an empty inbox.
+        if (!(window as any).__PI_CAPTURE__) return;
+        if (count <= 0) {
+          useAppStore.setState({
+            notifications: [],
+            unreadNotificationCount: 0,
+            refreshNotifications: originalRefreshNotifications,
+          });
+          return;
+        }
+        const now = Date.now();
+        const titles = [
+          "重新设计设置页面插件板块手机端 UI 布局并验证所有断点",
+          "修复 host-core 启动失败并补充错误恢复测试",
+          "同步代码",
+        ];
+        const notifications = Array.from({ length: count }, (_, index) => ({
+          id: `capture-notification-${index}`,
+          kind: index === 1 ? ("task.failed" as const) : ("task.completed" as const),
+          sessionId: `capture-session-${index}`,
+          sessionTitle: titles[index] ?? `后台任务 ${index + 1}`,
+          turnId: `capture-turn-${index}`,
+          ...(index === 1 ? { errorCode: "MODEL_REQUEST_TIMEOUT" } : {}),
+          createdAt: new Date(now - (index + 1) * 60_000).toISOString(),
+          readAt: index === 2 ? new Date(now - 30_000).toISOString() : null,
+        }));
+        useAppStore.setState({
+          notifications,
+          unreadNotificationCount: notifications.reduce(
+            (total, notification) => total + (notification.readAt ? 0 : 1),
+            0,
+          ),
+          refreshNotifications: async () => undefined,
+        });
+      },
       ensureVisualFixtures: async () => {
         // Destructive fixture seeding is capture-rig only; the rig sets
         // __PI_CAPTURE__ before invoking (see electron/main capture suite).
@@ -359,6 +598,9 @@ function AppShell() {
       },
     };
     return () => {
+      useAppStore.setState({
+        refreshNotifications: originalRefreshNotifications,
+      });
       try {
         delete (window as any).__PI_DESKTOP__;
       } catch {
@@ -388,31 +630,54 @@ function AppShell() {
   if (page === "settings") {
     return (
       <div className="app-shell settings-mode">
+        <DesktopMenuBar
+          sidebarCollapsed={sidebarCollapsed}
+          onCommand={runMenuCommand}
+        />
+        <WindowControls />
         <SettingsPage />
         <PermissionDialog />
+        <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
         <ToastHost />
+        <UpdateBanner />
       </div>
     );
   }
 
   return (
     <div className="app-shell">
-      <Sidebar
-        collapsed={sidebarCollapsed}
-        onOpenPalette={() => setPaletteOpen(true)}
+      <DesktopMenuBar
+        sidebarCollapsed={sidebarCollapsed}
+        onCommand={runMenuCommand}
       />
+      <WindowControls />
+      {!sidebarCollapsed && (
+        <Sidebar
+          onOpenSearch={() => setSearchOpen(true)}
+          titlebarNav={
+            <TitlebarNav
+              sidebarCollapsed={false}
+              onToggleSidebar={() => setSidebarCollapsed(true)}
+              onNewTask={() => void runMenuCommand("newTask")}
+            />
+          }
+        />
+      )}
 
       <section className="main-pane">
         <div className="main-titlebar">
+          {sidebarCollapsed && (
+            <div className="main-titlebar-left no-drag">
+              <TitlebarNav
+                sidebarCollapsed
+                onToggleSidebar={() => setSidebarCollapsed(false)}
+                onNewTask={() => void runMenuCommand("newTask")}
+              />
+            </div>
+          )}
           <div className="main-titlebar-right no-drag">
-            <button
-              className={`title-nav-btn ${workPanelOpen ? "active" : ""}`}
-              title={t("nav.toggleWorkPanel")}
-              onClick={toggleWorkPanel}
-            >
-              <IconPanel size={14} />
-            </button>
+            <NotificationCenter />
           </div>
         </div>
 
@@ -546,12 +811,16 @@ function AppShell() {
       </section>
 
       {workPanelOpen && (
-        <WorkPanel browserBlocked={paletteOpen || Boolean(permission)} />
+        <WorkPanel
+          browserBlocked={paletteOpen || searchOpen || Boolean(permission)}
+        />
       )}
 
       <PermissionDialog />
+      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <ToastHost />
+      <UpdateBanner />
     </div>
   );
 }

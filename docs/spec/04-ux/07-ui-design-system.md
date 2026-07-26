@@ -319,7 +319,12 @@ standard opaque elevated-menu surface, subtle border, and dialog shadow. Its
 first block repeats the local identity with the same glyph and two-line text,
 followed by a divider and compact Settings / Logs / Theme rows.
 
-Toolbar: traffic lights `{x:16,y:16}` in 46px titlebar.
+Toolbar: 46px on every platform. macOS places traffic lights at
+`{x:16,y:16}`. Windows/Linux reserve the left side for the localized
+application menubar and the rightmost 112px for three frameless-window
+controls. Menu popovers use the standard opaque elevated-menu surface,
+`radius-sm`, subtle border, and dialog shadow; they are never translucent
+over readable content.
 
 Composer elevation (Codex `elevation-prominent`):
 

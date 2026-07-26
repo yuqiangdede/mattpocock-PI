@@ -1,10 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
-import type { ProviderPublic, ThinkingLevel } from "@pi-desktop/shared";
+import type {
+  PermissionMode,
+  ProviderPublic,
+  ThinkingLevel,
+} from "@pi-desktop/shared";
+import { PERMISSION_MODES } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { api } from "../lib/api";
+import { runPaletteCommand } from "../lib/commands";
+import {
+  resolveComposerCommand,
+  useComposerAutocomplete,
+} from "../lib/use-composer-autocomplete";
 import { BrandLogo } from "./BrandLogo";
+import { ComposerAutocomplete } from "./ComposerAutocomplete";
 import {
   IconArrowUp,
   IconShield,
@@ -54,6 +65,20 @@ const THINKING_LEVEL_I18N_KEYS: Record<ThinkingLevel, string> = {
 function isThinkingLevel(value: unknown): value is ThinkingLevel {
   return typeof value === "string" && THINKING_LEVELS.includes(value as ThinkingLevel);
 }
+
+function isPermissionMode(value: unknown): value is PermissionMode {
+  return (
+    typeof value === "string" &&
+    PERMISSION_MODES.includes(value as PermissionMode)
+  );
+}
+
+const PERMISSION_MODE_I18N_KEYS: Record<PermissionMode, string> = {
+  inherit: "chat.permissionInherit",
+  ask: "chat.permissionAsk",
+  "accept-edits": "chat.permissionAcceptEdits",
+  auto: "chat.permissionAuto",
+};
 
 function providerThinkingLevels(provider?: ProviderPublic | null): ThinkingLevel[] {
   if (!provider?.supportsReasoning) return [];
@@ -110,6 +135,11 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
   const composerPrefill = useAppStore((s) => s.composerPrefill);
   const clearComposerPrefill = useAppStore((s) => s.clearComposerPrefill);
   const [value, setValue] = useState("");
+  const [cursor, setCursor] = useState(0);
+  const [composing, setComposing] = useState(false);
+  const [inputFocused, setInputFocused] = useState(false);
+  const [permissionOpen, setPermissionOpen] = useState(false);
+  const permissionRef = useRef<HTMLDivElement>(null);
   const [modelOpen, setModelOpen] = useState(false);
   const [modelQuery, setModelQuery] = useState("");
   const [modelHighlight, setModelHighlight] = useState(-1);
@@ -193,8 +223,39 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
     requestAnimationFrame(() => modelSearchRef.current?.focus());
   }, [modelOpen]);
 
+  useEffect(() => {
+    if (!permissionOpen) return;
+    const onPointer = (e: MouseEvent) => {
+      if (!permissionRef.current?.contains(e.target as Node))
+        setPermissionOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPermissionOpen(false);
+    };
+    window.addEventListener("mousedown", onPointer);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onPointer);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [permissionOpen]);
+
   const activeSession = sessions.find((session) => session.id === activeSessionId);
   const mode = activeSession?.mode ?? settings?.defaultMode ?? "agent";
+  // Permission mode (D115): the chip shows the effective mode — session
+  // override, else the global default. `inherit` renders as the global value
+  // with an "(default)" marker in the menu.
+  const globalPermissionMode: PermissionMode =
+    settings?.defaultPermissionMode ?? "ask";
+  const sessionPermissionMode: PermissionMode = isPermissionMode(
+    activeSession?.permissionMode,
+  )
+    ? activeSession.permissionMode
+    : "inherit";
+  const effectivePermissionMode: Exclude<PermissionMode, "inherit"> =
+    sessionPermissionMode === "inherit"
+      ? (globalPermissionMode as Exclude<PermissionMode, "inherit">)
+      : sessionPermissionMode;
   const provider = providers.find(
     (candidate) =>
       candidate.id ===
@@ -335,6 +396,9 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
 
   const onModelMenuKeyDown = (e: ReactKeyboardEvent) => {
     if (!modelOpen) return;
+    // Keys pressed while composing (IME candidate navigation/confirm) belong
+    // to the IME, not the menu.
+    if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       if (!flatModels.length) return;
@@ -382,15 +446,58 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
   };
   const submit = async () => {
     const content = value.trim();
-    if (!content || isRunning || !modelReady) return;
+    if (!content || isRunning) return;
+    // Slash dispatch (D123): builtin/plugin aliases execute locally without
+    // a session or a model; templates and unknown /names stay prompt text
+    // (main expands templates). Runs before the model-ready gate on purpose.
+    if (content.startsWith("/")) {
+      const name = content.slice(1).split(/\s/, 1)[0];
+      const command = name ? await resolveComposerCommand(name) : null;
+      if (command && command.kind !== "template" && command.id) {
+        setValue("");
+        try {
+          if (command.kind === "builtin") await runPaletteCommand(command.id);
+          else await api.executeCommand(command.id);
+        } catch (e) {
+          showToast(e instanceof Error ? e.message : String(e), {
+            variant: "error",
+          });
+        }
+        return;
+      }
+    }
+    if (!modelReady) return;
     setValue("");
     await sendPrompt(content);
+  };
+
+  const composerAc = useComposerAutocomplete({
+    value,
+    cursor,
+    composing,
+    enabled: !isRunning,
+  });
+
+  const acceptCompletion = (index: number) => {
+    const result = composerAc.accept(index);
+    if (!result) return;
+    setValue(result.value);
+    setCursor(result.cursor);
+    requestAnimationFrame(() => {
+      const el = ref.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(result.cursor, result.cursor);
+    });
   };
 
   return (
     <div className={`composer-dock composer-dock-${variant}`}>
       <div className="composer-stack">
         <div className="composer-shell">
+          {inputFocused ? (
+            <ComposerAutocomplete ac={composerAc} onAccept={acceptCompletion} />
+          ) : null}
           <div className="composer-input-wrap">
             {/* Docked threads carry the brand mark; the empty home keeps a clean draft. */}
             {variant === "docked" ? (
@@ -404,8 +511,50 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
               rows={1}
               placeholder={t(variant === "home" ? "chat.placeholderHome" : "chat.placeholder")}
               value={value}
-              onChange={(e) => setValue(e.target.value)}
+              onChange={(e) => {
+                setValue(e.target.value);
+                setCursor(e.target.selectionStart ?? e.target.value.length);
+              }}
+              onSelect={(e) => {
+                setCursor(e.currentTarget.selectionStart ?? 0);
+              }}
+              onCompositionStart={() => setComposing(true)}
+              onCompositionEnd={(e) => {
+                setComposing(false);
+                setCursor(e.currentTarget.selectionStart ?? 0);
+              }}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setInputFocused(false)}
               onKeyDown={(e) => {
+                // An Enter that confirms an IME candidate (isComposing, or the
+                // WebKit 229 quirk) must commit the text, never send it — and
+                // never drive the autocomplete menu (D125).
+                if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229)
+                  return;
+                if (composerAc.open && e.key === "Escape") {
+                  // Escape closes only the menu; overlay handlers must not
+                  // also fire on the same press.
+                  e.preventDefault();
+                  e.stopPropagation();
+                  composerAc.close();
+                  return;
+                }
+                if (composerAc.hasItems) {
+                  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                    e.preventDefault();
+                    const delta = e.key === "ArrowDown" ? 1 : -1;
+                    const count = composerAc.items.length;
+                    composerAc.setHighlight(
+                      (composerAc.highlight + delta + count) % count,
+                    );
+                    return;
+                  }
+                  if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey) {
+                    e.preventDefault();
+                    acceptCompletion(composerAc.highlight);
+                    return;
+                  }
+                }
                 if (e.key === "Enter" && !e.shiftKey && enterToSend) {
                   e.preventDefault();
                   void submit();
@@ -443,6 +592,68 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                     : t("settings.modeAgent")}
                 </span>
               </button>
+              {mode === "agent" ? (
+                <div className="composer-permission" ref={permissionRef}>
+                  <button
+                    className={`icon-btn mode-chip ${permissionOpen ? "active" : ""}`}
+                    title={t("chat.permissionMode")}
+                    aria-haspopup="menu"
+                    aria-expanded={permissionOpen}
+                    disabled={isRunning || !activeSession}
+                    onClick={() => setPermissionOpen((v) => !v)}
+                  >
+                    <span className="text-sm">
+                      {t(PERMISSION_MODE_I18N_KEYS[effectivePermissionMode])}
+                    </span>
+                    <IconChevronDown size={12} />
+                  </button>
+                  {permissionOpen && (
+                    <div className="composer-model-menu composer-permission-menu" role="menu">
+                      {(["inherit", "ask", "accept-edits", "auto"] as const).map(
+                        (candidate) => (
+                          <button
+                            key={candidate}
+                            type="button"
+                            role="menuitemradio"
+                            aria-checked={sessionPermissionMode === candidate}
+                            className={`composer-plus-item ${
+                              sessionPermissionMode === candidate ? "active" : ""
+                            }`}
+                            onClick={async () => {
+                              setPermissionOpen(false);
+                              try {
+                                await configureActiveSession({
+                                  mode,
+                                  providerId: provider?.id,
+                                  modelId,
+                                  thinkingLevel,
+                                  permissionMode: candidate,
+                                });
+                              } catch (e) {
+                                showToast(
+                                  e instanceof Error ? e.message : String(e),
+                                  { variant: "error" },
+                                );
+                              }
+                            }}
+                          >
+                            <span className="flex-1 text-left">
+                              {candidate === "inherit"
+                                ? `${t(PERMISSION_MODE_I18N_KEYS[globalPermissionMode])} · ${t(
+                                    "chat.permissionInherit",
+                                  )}`
+                                : t(PERMISSION_MODE_I18N_KEYS[candidate])}
+                            </span>
+                            {sessionPermissionMode === candidate ? (
+                              <IconCheck size={13} />
+                            ) : null}
+                          </button>
+                        ),
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </div>
 
             <div className="composer-right">
@@ -651,7 +862,10 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                   title={
                     modelReady ? t("chat.send") : t("settings.addProvider")
                   }
-                  disabled={!value.trim() || !modelReady}
+                  disabled={
+                    !value.trim() ||
+                    (!modelReady && !value.trim().startsWith("/"))
+                  }
                   onClick={() => void submit()}
                 >
                   <IconArrowUp size={15} />

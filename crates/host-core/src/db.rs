@@ -4,16 +4,17 @@ use serde::Serialize;
 use serde_json::Value;
 use std::path::Path;
 
-/// Storage schema v4 (docs/spec/03-runtime/04-data-storage.md).
-///
-/// v3 added per-session thinking levels.  v4 adds durable regenerate history
-/// so discarded assistant/tool tails can be browsed like ChatGPT variants.
-pub const SCHEMA_VERSION: i64 = 4;
+/// Storage schema v7 (docs/spec/03-runtime/04-data-storage.md): SQLite holds
+/// index data only; transcript content lives in per-session JSONL files
+/// (D119, `transcripts.rs`).
+pub const SCHEMA_VERSION: i64 = 7;
 
 /// Audit rows older than this are pruned at boot.
 const AUDIT_RETENTION_MS: i64 = 90 * 24 * 3600 * 1000;
 /// task_runs kept per task after the boot prune.
 const TASK_RUNS_KEEP: i64 = 100;
+/// Durable notification rows kept globally.
+pub const NOTIFICATION_KEEP: i64 = 200;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -140,6 +141,8 @@ CREATE TABLE sessions (
   thinking_level TEXT NOT NULL DEFAULT 'off'
                 CHECK (thinking_level IN ('off', 'minimal', 'low', 'medium',
                                           'high', 'xhigh', 'max')),
+  permission_mode TEXT NOT NULL DEFAULT 'inherit'
+                CHECK (permission_mode IN ('inherit', 'ask', 'accept-edits', 'auto')),
   source      TEXT,
   pinned      INTEGER NOT NULL DEFAULT 0,
   last_seq    INTEGER NOT NULL DEFAULT 0,
@@ -164,6 +167,20 @@ CREATE TABLE turns (
 );
 CREATE INDEX idx_turns_session ON turns(session_id, started_at DESC);
 
+CREATE TABLE notifications (
+  id         TEXT PRIMARY KEY,
+  kind       TEXT NOT NULL CHECK (kind IN ('task.completed', 'task.failed')),
+  session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  session_title TEXT NOT NULL,
+  turn_id    TEXT NOT NULL UNIQUE,
+  error_code TEXT,
+  created_at INTEGER NOT NULL,
+  read_at    INTEGER
+);
+CREATE INDEX idx_notifications_created ON notifications(created_at DESC);
+CREATE INDEX idx_notifications_unread
+  ON notifications(created_at DESC) WHERE read_at IS NULL;
+
 CREATE TABLE messages (
   mid          INTEGER PRIMARY KEY,
   id           TEXT NOT NULL UNIQUE,
@@ -174,8 +191,6 @@ CREATE TABLE messages (
   tool_name    TEXT,
   is_error     INTEGER NOT NULL DEFAULT 0,
   text         TEXT,
-  content_json TEXT NOT NULL,
-  meta_json    TEXT,
   created_at   INTEGER NOT NULL,
   UNIQUE (session_id, seq)
 );
@@ -214,7 +229,7 @@ CREATE TABLE message_revisions (
   root_user_id    TEXT NOT NULL,
   revision_index  INTEGER NOT NULL,
   is_active       INTEGER NOT NULL DEFAULT 0,
-  messages_json   TEXT NOT NULL,
+  message_count   INTEGER NOT NULL DEFAULT 0,
   created_at      INTEGER NOT NULL,
   UNIQUE (session_id, root_user_id, revision_index)
 );
@@ -267,6 +282,9 @@ CREATE INDEX idx_audit_session ON audit_log(session_id, ts) WHERE session_id IS 
 
 pub struct Database {
     conn: Connection,
+    /// App data directory (the sqlite file's parent); transcript files live
+    /// under `<data_dir>/sessions/` (D119).
+    data_dir: std::path::PathBuf,
 }
 
 pub fn now_ms() -> i64 {
@@ -288,24 +306,23 @@ pub fn ms_to_ts(ms: i64) -> String {
 }
 
 impl Database {
-    /// Open (creating or migrating as needed) the app database inside
-    /// `data_dir`: `pi.sqlite`, migrating a legacy v1 `settings.sqlite` once.
+    /// Open (creating as needed) the app database inside `data_dir`.
     pub fn open_in_dir(data_dir: &Path) -> Result<Self> {
-        let v2_path = data_dir.join("pi.sqlite");
-        let v1_path = data_dir.join("settings.sqlite");
-        if !v2_path.exists() && v1_path.exists() {
-            migrate_v1_file(&v1_path, &v2_path)
-                .context("migrate legacy settings.sqlite to pi.sqlite")?;
-        }
-        Self::open(&v2_path)
+        Self::open(&data_dir.join("pi.sqlite"))
     }
 
-    /// Open a specific database file, bootstrapping the latest schema on a fresh
-    /// file. Fails on files with an unknown newer schema.
+    /// Open a specific database file, bootstrapping the latest schema on a
+    /// fresh file. A pre-v7 file is archived and replaced by a fresh one
+    /// (D119 breaking reset — content moved to transcript files, no data
+    /// migration); files with an unknown newer schema fail.
     pub fn open(path: &Path) -> Result<Self> {
-        if let Some(parent) = path.parent() {
+        if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
             std::fs::create_dir_all(parent)?;
         }
+        let data_dir = match path.parent() {
+            Some(p) if !p.as_os_str().is_empty() => p.to_path_buf(),
+            _ => std::path::PathBuf::from("."),
+        };
         let conn = Connection::open(path).context("open sqlite")?;
         conn.execute_batch(
             r#"
@@ -339,34 +356,27 @@ impl Database {
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
                 tx.commit()?;
             }
-            2 => {
-                // Keep additive migrations transactional so a crash cannot
-                // leave a half-migrated database claiming a newer version.
-                let tx = conn.unchecked_transaction()?;
-                tx.execute_batch(
-                    "ALTER TABLE sessions
-                     ADD COLUMN thinking_level TEXT NOT NULL DEFAULT 'off'
-                     CHECK (thinking_level IN
-                       ('off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'));",
-                )?;
-                tx.pragma_update(None, "user_version", 3)?;
-                tx.commit()?;
-                migrate_to_v4(&conn)?;
-            }
-            3 => {
-                migrate_to_v4(&conn)?;
+            legacy @ 1..=6 => {
+                let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
+                drop(conn);
+                archive_legacy_db(path, legacy)?;
+                return Self::open(path);
             }
             SCHEMA_VERSION => {}
-            // Future migrations chain here (5, 6, …) once they exist.
             other => {
                 return Err(anyhow!(
                     "database schema version {other} is newer than supported {SCHEMA_VERSION}"
                 ));
             }
         }
-        let db = Self { conn };
+        let db = Self { conn, data_dir };
         db.boot_maintenance()?;
         Ok(db)
+    }
+
+    /// App data directory hosting the DB and the transcript file store.
+    pub fn data_dir(&self) -> &Path {
+        &self.data_dir
     }
 
     /// Crash recovery + retention, run once per process at open.
@@ -393,6 +403,15 @@ impl Database {
                ) WHERE rn > ?1
              )",
             params![TASK_RUNS_KEEP],
+        )?;
+        self.conn.execute(
+            "DELETE FROM notifications
+             WHERE id IN (
+               SELECT id FROM notifications
+               ORDER BY created_at DESC, id DESC
+               LIMIT -1 OFFSET ?1
+             )",
+            params![NOTIFICATION_KEEP],
         )?;
         let _ = self.conn.execute_batch("PRAGMA incremental_vacuum;");
         Ok(())
@@ -484,364 +503,42 @@ impl Database {
     }
 }
 
-// ---- additive schema migrations -----------------------------------------
+// ---- legacy database reset ----------------------------------------------
 
-fn migrate_to_v4(conn: &Connection) -> Result<()> {
-    let tx = conn.unchecked_transaction()?;
-    tx.execute_batch(
-        r#"
-        CREATE TABLE IF NOT EXISTS message_revisions (
-          id              TEXT PRIMARY KEY,
-          session_id      TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-          root_user_id    TEXT NOT NULL,
-          revision_index  INTEGER NOT NULL,
-          is_active       INTEGER NOT NULL DEFAULT 0,
-          messages_json   TEXT NOT NULL,
-          created_at      INTEGER NOT NULL,
-          UNIQUE (session_id, root_user_id, revision_index)
-        );
-        CREATE INDEX IF NOT EXISTS idx_message_revisions_root
-          ON message_revisions(session_id, root_user_id, revision_index);
-        "#,
-    )?;
-    tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
-    tx.commit()?;
+/// Breaking reset for pre-v7 files (D119): transcript content moved out of
+/// SQLite and old schemas get no data migration. The file (WAL folded back in
+/// by the caller) is archived next to itself for manual recovery; `-wal` /
+/// `-shm` leftovers are removed so the fresh database starts clean.
+fn archive_legacy_db(path: &Path, version: i64) -> Result<()> {
+    let bak = path.with_extension("sqlite.v6.bak");
+    // Keep the newest archive if several legacy files are opened in sequence.
+    let _ = std::fs::remove_file(&bak);
+    std::fs::rename(path, &bak)
+        .with_context(|| format!("archive {} -> {}", path.display(), bak.display()))?;
+    for suffix in ["-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{suffix}", path.display()));
+    }
+    tracing::warn!(
+        from_version = version,
+        archived = %bak.display(),
+        "pre-v7 database archived; starting fresh (D119 transcript-file reset)"
+    );
     Ok(())
-}
-
-// ---- legacy v1 → latest schema migration ------------------------------------
-
-fn table_exists(conn: &Connection, name: &str) -> Result<bool> {
-    let n: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?1",
-        params![name],
-        |r| r.get(0),
-    )?;
-    Ok(n > 0)
-}
-
-/// One-shot migration: build a fresh `pi.sqlite` from a legacy v1
-/// `settings.sqlite`, then rename the old file to `settings.sqlite.v1.bak`.
-/// On failure the partial destination file is removed and the v1 file stays
-/// untouched.
-fn migrate_v1_file(v1_path: &Path, v2_path: &Path) -> Result<()> {
-    // Fold WAL content into the main file so the backup rename is complete.
-    {
-        let old = Connection::open(v1_path)?;
-        let _ = old.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
-    }
-
-    let result = (|| -> Result<()> {
-        let old = Connection::open(v1_path)?;
-        let new = Database::open(v2_path)?;
-        let conn = new.conn();
-        let tx = conn.unchecked_transaction()?;
-
-        // settings → kv(app, *)
-        if table_exists(&old, "settings")? {
-            let mut stmt = old.prepare("SELECT key, value_json FROM settings")?;
-            let mut rows = stmt.query([])?;
-            while let Some(row) = rows.next()? {
-                let key: String = row.get(0)?;
-                let raw: String = row.get(1)?;
-                tx.execute(
-                    "INSERT OR REPLACE INTO kv (ns, key, value_json, updated_at)
-                     VALUES ('app', ?1, ?2, ?3)",
-                    params![key, raw, now_ms()],
-                )?;
-            }
-        }
-
-        // workspace singleton → projects + kv(app, currentProjectId)
-        if table_exists(&old, "workspace")? {
-            let path: Option<String> = old
-                .query_row("SELECT path FROM workspace WHERE id = 1", [], |r| r.get(0))
-                .unwrap_or(None);
-            if let Some(path) = path.filter(|p| !p.is_empty()) {
-                if let Some(pid) = upsert_project_row(&tx, &path, true)? {
-                    tx.execute(
-                        "INSERT OR REPLACE INTO kv (ns, key, value_json, updated_at)
-                         VALUES ('app', 'currentProjectId', ?1, ?2)",
-                        params![pid.to_string(), now_ms()],
-                    )?;
-                }
-            }
-        }
-
-        // providers: headers_json + compatibility_json fold into config_json
-        if table_exists(&old, "providers")? {
-            let mut stmt = old.prepare(
-                "SELECT id, name, vendor_key, type, protocol, enabled, base_url, auth_kind,
-                        secret_ref, headers_json, api_style, compatibility_json,
-                        default_model_id, created_at, updated_at
-                 FROM providers",
-            )?;
-            let mut rows = stmt.query([])?;
-            while let Some(row) = rows.next()? {
-                let headers: String = row.get(9)?;
-                let compat: String = row.get(11)?;
-                let config = serde_json::json!({
-                    "headers": serde_json::from_str::<Value>(&headers)
-                        .unwrap_or_else(|_| serde_json::json!({})),
-                    "compatibility": serde_json::from_str::<Value>(&compat)
-                        .unwrap_or_else(|_| serde_json::json!({})),
-                });
-                let created: String = row.get(13)?;
-                let updated: String = row.get(14)?;
-                tx.execute(
-                    "INSERT INTO providers (
-                        id, name, vendor_key, type, protocol, enabled, base_url, auth_kind,
-                        secret_ref, api_style, default_model_id, config_json,
-                        created_at, updated_at
-                     ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)",
-                    params![
-                        row.get::<_, String>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, String>(2)?,
-                        row.get::<_, String>(3)?,
-                        row.get::<_, String>(4)?,
-                        row.get::<_, i64>(5)?,
-                        row.get::<_, Option<String>>(6)?,
-                        row.get::<_, String>(7)?,
-                        row.get::<_, Option<String>>(8)?,
-                        row.get::<_, Option<String>>(10)?,
-                        row.get::<_, Option<String>>(12)?,
-                        config.to_string(),
-                        ts_to_ms(&created),
-                        ts_to_ms(&updated),
-                    ],
-                )?;
-            }
-        }
-
-        // provider_models → models (source = 'user')
-        if table_exists(&old, "provider_models")? {
-            let mut stmt = old.prepare(
-                "SELECT provider_id, model_id, display_name, context_window,
-                        max_output_tokens, capabilities_json, updated_at
-                 FROM provider_models",
-            )?;
-            let mut rows = stmt.query([])?;
-            while let Some(row) = rows.next()? {
-                let updated: String = row.get(6)?;
-                tx.execute(
-                    "INSERT OR IGNORE INTO models (
-                        provider_id, model_id, display_name, source,
-                        capabilities_json, context_window, max_output_tokens, updated_at
-                     ) VALUES (?1, ?2, ?3, 'user', ?4, ?5, ?6, ?7)",
-                    params![
-                        row.get::<_, String>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, String>(2)?,
-                        row.get::<_, String>(5)?,
-                        row.get::<_, Option<i64>>(3)?,
-                        row.get::<_, Option<i64>>(4)?,
-                        ts_to_ms(&updated),
-                    ],
-                )?;
-            }
-        }
-
-        // secrets_meta: provider_id generalizes to owner_kind/owner_id
-        if table_exists(&old, "secrets_meta")? {
-            let mut stmt = old.prepare(
-                "SELECT secret_ref, provider_id, kind, backend, updated_at FROM secrets_meta",
-            )?;
-            let mut rows = stmt.query([])?;
-            while let Some(row) = rows.next()? {
-                let updated: String = row.get(4)?;
-                tx.execute(
-                    "INSERT OR REPLACE INTO secrets_meta
-                        (secret_ref, owner_kind, owner_id, kind, backend, updated_at)
-                     VALUES (?1, 'provider', ?2, ?3, ?4, ?5)",
-                    params![
-                        row.get::<_, String>(0)?,
-                        row.get::<_, Option<String>>(1)?,
-                        row.get::<_, String>(2)?,
-                        row.get::<_, String>(3)?,
-                        ts_to_ms(&updated),
-                    ],
-                )?;
-            }
-        }
-
-        // sessions + messages
-        if table_exists(&old, "sessions")? {
-            let mut stmt = old.prepare(
-                "SELECT id, title, project_path, model_id, provider_id, mode,
-                        created_at, updated_at
-                 FROM sessions",
-            )?;
-            let mut rows = stmt.query([])?;
-            while let Some(row) = rows.next()? {
-                let id: String = row.get(0)?;
-                let project_path: Option<String> = row.get(2)?;
-                let created: String = row.get(6)?;
-                let updated: String = row.get(7)?;
-                let project_id: Option<i64> = match project_path.as_deref() {
-                    Some(p) if !p.is_empty() => upsert_project_row(&tx, p, false)?,
-                    _ => None,
-                };
-                // `import-claude-code-x` came from the deterministic importer
-                // id scheme; recover the source token (longest match first).
-                let source = id.strip_prefix("import-").map(|rest| {
-                    for known in ["claude-code", "opencode", "codex", "pi"] {
-                        if rest.starts_with(&format!("{known}-")) {
-                            return known.to_string();
-                        }
-                    }
-                    "external".to_string()
-                });
-                tx.execute(
-                    "INSERT INTO sessions (
-                        id, title, project_id, provider_id, model_id, mode, source,
-                        created_at, updated_at
-                     ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
-                    params![
-                        id,
-                        row.get::<_, String>(1)?,
-                        project_id,
-                        row.get::<_, Option<String>>(4)?,
-                        row.get::<_, Option<String>>(3)?,
-                        row.get::<_, String>(5)?,
-                        source,
-                        ts_to_ms(&created),
-                        ts_to_ms(&updated),
-                    ],
-                )?;
-            }
-        }
-
-        if table_exists(&old, "messages")? {
-            let mut stmt = old.prepare(
-                "SELECT id, session_id, role, content, status, tool_name, tool_call_id,
-                        tool_status, tool_args_json, tool_result_json, is_error,
-                        created_at, sort_index
-                 FROM messages ORDER BY session_id, sort_index ASC",
-            )?;
-            let mut rows = stmt.query([])?;
-            while let Some(row) = rows.next()? {
-                let role: String = row.get(2)?;
-                let content: String = row.get(3)?;
-                let status: Option<String> = row.get(4)?;
-                let tool_name: Option<String> = row.get(5)?;
-                let tool_call_id: Option<String> = row.get(6)?;
-                let tool_status: Option<String> = row.get(7)?;
-                let tool_args: Option<String> = row.get(8)?;
-                let tool_result: Option<String> = row.get(9)?;
-                let is_error: i64 = row.get(10)?;
-                let created: String = row.get(11)?;
-                let seq: i64 = row.get(12)?;
-
-                let parse = |s: &Option<String>| -> Option<Value> {
-                    s.as_ref().and_then(|raw| serde_json::from_str(raw).ok())
-                };
-                let (content_json, text) = if role == "tool" {
-                    let mut block = serde_json::json!({ "type": "tool_call" });
-                    let obj = block.as_object_mut().unwrap();
-                    if let Some(v) = tool_call_id.clone() {
-                        obj.insert("callId".into(), Value::String(v));
-                    }
-                    if let Some(v) = tool_name.clone() {
-                        obj.insert("name".into(), Value::String(v));
-                    }
-                    if let Some(v) = parse(&tool_args) {
-                        obj.insert("args".into(), v);
-                    }
-                    if let Some(v) = parse(&tool_result) {
-                        obj.insert("result".into(), v);
-                    }
-                    if let Some(v) = tool_status.clone() {
-                        obj.insert("status".into(), Value::String(v));
-                    }
-                    if is_error != 0 {
-                        obj.insert("isError".into(), Value::Bool(true));
-                    }
-                    if !content.is_empty() {
-                        obj.insert("text".into(), Value::String(content.clone()));
-                    }
-                    (Value::Array(vec![block]).to_string(), None::<String>)
-                } else {
-                    (
-                        serde_json::json!([{ "type": "text", "text": content }]).to_string(),
-                        Some(content),
-                    )
-                };
-                let meta = status.map(|s| serde_json::json!({ "status": s }).to_string());
-                tx.execute(
-                    "INSERT INTO messages (
-                        id, session_id, seq, role, tool_name, is_error, text,
-                        content_json, meta_json, created_at
-                     ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
-                    params![
-                        row.get::<_, String>(0)?,
-                        row.get::<_, String>(1)?,
-                        seq,
-                        role,
-                        tool_name,
-                        is_error,
-                        text,
-                        content_json,
-                        meta,
-                        ts_to_ms(&created),
-                    ],
-                )?;
-            }
-            tx.execute_batch(
-                "UPDATE sessions SET last_seq = COALESCE(
-                   (SELECT MAX(seq) FROM messages WHERE messages.session_id = sessions.id), -1
-                 ) + 1;",
-            )?;
-        }
-
-        // audit_log: integer pk, ms timestamps
-        if table_exists(&old, "audit_log")? {
-            let mut stmt =
-                old.prepare("SELECT ts, kind, session_id, payload_json FROM audit_log")?;
-            let mut rows = stmt.query([])?;
-            while let Some(row) = rows.next()? {
-                let ts: String = row.get(0)?;
-                tx.execute(
-                    "INSERT INTO audit_log (ts, kind, session_id, payload_json)
-                     VALUES (?1, ?2, ?3, ?4)",
-                    params![
-                        ts_to_ms(&ts),
-                        row.get::<_, String>(1)?,
-                        row.get::<_, Option<String>>(2)?,
-                        row.get::<_, String>(3)?,
-                    ],
-                )?;
-            }
-        }
-
-        tx.commit()?;
-        Ok(())
-    })();
-
-    match result {
-        Ok(()) => {
-            let bak = v1_path.with_extension("sqlite.v1.bak");
-            std::fs::rename(v1_path, &bak).with_context(|| {
-                format!("backup rename {} -> {}", v1_path.display(), bak.display())
-            })?;
-            // Stale WAL/SHM siblings of the renamed file are harmless leftovers.
-            for suffix in ["-wal", "-shm"] {
-                let _ = std::fs::remove_file(format!("{}{suffix}", v1_path.display()));
-            }
-            Ok(())
-        }
-        Err(e) => {
-            for suffix in ["", "-wal", "-shm"] {
-                let _ = std::fs::remove_file(format!("{}{suffix}", v2_path.display()));
-            }
-            Err(e)
-        }
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn table_exists(conn: &Connection, name: &str) -> bool {
+        conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?1",
+            params![name],
+            |r| r.get::<_, i64>(0),
+        )
+        .map(|n| n > 0)
+        .unwrap_or(false)
+    }
 
     #[test]
     fn fresh_open_creates_latest_schema() {
@@ -859,6 +556,7 @@ mod tests {
             "models",
             "sessions",
             "turns",
+            "notifications",
             "messages",
             "message_revisions",
             "artifacts",
@@ -867,7 +565,7 @@ mod tests {
             "secrets_meta",
             "audit_log",
         ] {
-            assert!(table_exists(db.conn(), table).unwrap(), "missing {table}");
+            assert!(table_exists(db.conn(), table), "missing {table}");
         }
         let thinking_column: (String, String) = db
             .conn()
@@ -880,143 +578,73 @@ mod tests {
             )
             .unwrap();
         assert_eq!(thinking_column, ("thinking_level".into(), "'off'".into()));
+
+        // v7: transcript payloads live in per-session files, not columns.
+        for (table, column) in [
+            ("messages", "content_json"),
+            ("messages", "meta_json"),
+            ("message_revisions", "messages_json"),
+        ] {
+            let n: i64 = db
+                .conn()
+                .query_row(
+                    &format!(
+                        "SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = ?1"
+                    ),
+                    params![column],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(n, 0, "{table}.{column} must not exist in v7");
+        }
     }
 
     #[test]
-    fn migrates_v2_sessions_to_v3_thinking_level() {
+    fn archives_pre_v7_database_and_starts_fresh() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("pi.sqlite");
-
-        // Build a genuine v2 fixture from the current schema by removing only
-        // the additive v3 column.  This keeps the migration test aligned with
-        // all other v2 tables and triggers instead of relying on a toy schema.
-        let v2_column = r#"  thinking_level TEXT NOT NULL DEFAULT 'off'
-                CHECK (thinking_level IN ('off', 'minimal', 'low', 'medium',
-                                          'high', 'xhigh', 'max')),
-"#;
-        let v4_table = r#"CREATE TABLE message_revisions (
-  id              TEXT PRIMARY KEY,
-  session_id      TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-  root_user_id    TEXT NOT NULL,
-  revision_index  INTEGER NOT NULL,
-  is_active       INTEGER NOT NULL DEFAULT 0,
-  messages_json   TEXT NOT NULL,
-  created_at      INTEGER NOT NULL,
-  UNIQUE (session_id, root_user_id, revision_index)
-);
-CREATE INDEX idx_message_revisions_root
-  ON message_revisions(session_id, root_user_id, revision_index);
-
-"#;
-        let schema_v2 = SCHEMA_LATEST.replace(v2_column, "").replace(v4_table, "");
-        assert_ne!(schema_v2, SCHEMA_LATEST, "v2 fixture must omit thinking_level");
-        assert!(!schema_v2.contains("message_revisions"));
         {
             let conn = Connection::open(&path).unwrap();
-            conn.execute_batch(&schema_v2).unwrap();
-            conn.pragma_update(None, "user_version", 2).unwrap();
-            conn.execute(
-                "INSERT INTO sessions
-                    (id, title, mode, created_at, updated_at)
-                 VALUES ('legacy', 'Legacy', 'chat', 1, 2)",
-                [],
+            conn.execute_batch(
+                "CREATE TABLE sessions (id TEXT PRIMARY KEY);
+                 INSERT INTO sessions (id) VALUES ('legacy');",
             )
             .unwrap();
+            conn.pragma_update(None, "user_version", 6).unwrap();
         }
 
         let db = Database::open(&path).unwrap();
         let version: i64 = db
             .conn()
-            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
         assert_eq!(version, SCHEMA_VERSION);
-        let (level, title): (String, String) = db
+        let sessions: i64 = db
             .conn()
-            .query_row(
-                "SELECT thinking_level, title FROM sessions WHERE id = 'legacy'",
-                [],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
+            .query_row("SELECT COUNT(*) FROM sessions", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(level, "off");
-        assert_eq!(title, "Legacy");
+        assert_eq!(sessions, 0, "fresh database starts empty");
 
-        // Reopening is a no-op and does not attempt to add the column again.
+        let bak = dir.path().join("pi.sqlite.v6.bak");
+        assert!(bak.exists(), "legacy file is archived for manual recovery");
+        let old = Connection::open(&bak).unwrap();
+        let preserved: i64 = old
+            .query_row("SELECT COUNT(*) FROM sessions", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(preserved, 1, "archive keeps the legacy data");
+
+        // Reopening the fresh v7 file is a plain open, not another reset.
         drop(db);
         let db = Database::open(&path).unwrap();
-        let count: i64 = db
+        let version: i64 = db
             .conn()
-            .query_row(
-                "SELECT COUNT(*) FROM pragma_table_info('sessions')
-                 WHERE name = 'thinking_level'",
-                [],
-                |row| row.get(0),
-            )
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(count, 1);
+        assert_eq!(version, SCHEMA_VERSION);
+        assert!(table_exists(db.conn(), "messages"));
     }
 
     #[test]
-    fn migrates_v3_to_v4_message_revisions() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("pi.sqlite");
-
-        let v4_table = r#"CREATE TABLE message_revisions (
-  id              TEXT PRIMARY KEY,
-  session_id      TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-  root_user_id    TEXT NOT NULL,
-  revision_index  INTEGER NOT NULL,
-  is_active       INTEGER NOT NULL DEFAULT 0,
-  messages_json   TEXT NOT NULL,
-  created_at      INTEGER NOT NULL,
-  UNIQUE (session_id, root_user_id, revision_index)
-);
-CREATE INDEX idx_message_revisions_root
-  ON message_revisions(session_id, root_user_id, revision_index);
-
-"#;
-        let schema_v3 = SCHEMA_LATEST.replace(v4_table, "");
-        assert_ne!(schema_v3, SCHEMA_LATEST, "v3 fixture must omit message_revisions");
-        {
-            let conn = Connection::open(&path).unwrap();
-            conn.execute_batch(&schema_v3).unwrap();
-            conn.pragma_update(None, "user_version", 3).unwrap();
-            conn.execute(
-                "INSERT INTO sessions
-                    (id, title, mode, thinking_level, created_at, updated_at)
-                 VALUES ('legacy', 'Legacy', 'chat', 'off', 1, 2)",
-                [],
-            )
-            .unwrap();
-        }
-
-        let db = Database::open(&path).unwrap();
-        let version: i64 = db
-            .conn()
-            .query_row("PRAGMA user_version", [], |row| row.get(0))
-            .unwrap();
-        assert_eq!(version, SCHEMA_VERSION);
-        assert!(table_exists(db.conn(), "message_revisions").unwrap());
-
-        // FK cascade: deleting the parent session clears revisions.
-        db.conn()
-            .execute(
-                "INSERT INTO message_revisions
-                    (id, session_id, root_user_id, revision_index, is_active, messages_json, created_at)
-                 VALUES ('r1', 'legacy', 'u1', 1, 1, '[]', 3)",
-                [],
-            )
-            .unwrap();
-        db.conn()
-            .execute("DELETE FROM sessions WHERE id = 'legacy'", [])
-            .unwrap();
-        let remaining: i64 = db
-            .conn()
-            .query_row("SELECT COUNT(*) FROM message_revisions", [], |row| row.get(0))
-            .unwrap();
-        assert_eq!(remaining, 0);
-    }
-
     fn kv_roundtrip_and_delete() {
         let dir = tempfile::tempdir().unwrap();
         let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
@@ -1081,123 +709,4 @@ CREATE INDEX idx_message_revisions_root
         assert_eq!(db.list_projects().unwrap().len(), 1);
     }
 
-    #[test]
-    fn migrates_v1_file_and_leaves_backup() {
-        let dir = tempfile::tempdir().unwrap();
-        let v1 = dir.path().join("settings.sqlite");
-        {
-            let conn = Connection::open(&v1).unwrap();
-            conn.execute_batch(
-                r#"
-                CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-                CREATE TABLE settings (key TEXT PRIMARY KEY, value_json TEXT NOT NULL);
-                CREATE TABLE providers (
-                  id TEXT PRIMARY KEY, name TEXT NOT NULL, vendor_key TEXT NOT NULL,
-                  type TEXT NOT NULL, protocol TEXT NOT NULL,
-                  enabled INTEGER NOT NULL DEFAULT 1, base_url TEXT,
-                  auth_kind TEXT NOT NULL, secret_ref TEXT,
-                  headers_json TEXT NOT NULL DEFAULT '{}', api_style TEXT,
-                  compatibility_json TEXT NOT NULL DEFAULT '{}',
-                  default_model_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
-                );
-                CREATE TABLE sessions (
-                  id TEXT PRIMARY KEY, title TEXT NOT NULL, project_path TEXT,
-                  model_id TEXT, provider_id TEXT, mode TEXT NOT NULL DEFAULT 'agent',
-                  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
-                );
-                CREATE TABLE messages (
-                  id TEXT PRIMARY KEY, session_id TEXT NOT NULL, role TEXT NOT NULL,
-                  content TEXT NOT NULL, status TEXT, tool_name TEXT, tool_call_id TEXT,
-                  tool_status TEXT, tool_args_json TEXT, tool_result_json TEXT,
-                  is_error INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL,
-                  sort_index INTEGER NOT NULL
-                );
-                CREATE TABLE workspace (id INTEGER PRIMARY KEY CHECK (id = 1), path TEXT, name TEXT);
-                INSERT INTO workspace (id, path, name) VALUES (1, '/tmp/proj', 'proj');
-                INSERT INTO settings (key, value_json) VALUES ('app', '{"theme":"dark"}');
-                INSERT INTO providers VALUES ('p1','Anthropic','anthropic','native','anthropic',
-                  1,NULL,'api_key','secret/p1','{"x-a":"1"}',NULL,'{"json":true}','claude-x',
-                  '2025-01-01T00:00:00Z','2025-01-01T00:00:00Z');
-                INSERT INTO sessions VALUES ('import-claude-code-abc','Imported','/tmp/proj',
-                  'claude-x','p1','agent','2025-01-01T00:00:00Z','2025-01-02T00:00:00Z');
-                INSERT INTO messages (id, session_id, role, content, is_error, created_at, sort_index)
-                  VALUES ('m1','import-claude-code-abc','user','你好世界 hello',0,'2025-01-01T00:00:01Z',0);
-                INSERT INTO messages (id, session_id, role, content, tool_name, tool_call_id,
-                  tool_status, tool_args_json, is_error, created_at, sort_index)
-                  VALUES ('m2','import-claude-code-abc','tool','done','Write','c1','success',
-                  '{"path":"a.txt"}',0,'2025-01-01T00:00:02Z',1);
-                "#,
-            )
-            .unwrap();
-        }
-
-        let db = Database::open_in_dir(dir.path()).unwrap();
-        assert!(dir.path().join("pi.sqlite").exists());
-        assert!(dir.path().join("settings.sqlite.v1.bak").exists());
-        assert!(!v1.exists());
-
-        assert_eq!(
-            db.kv_get("app", "app").unwrap().unwrap(),
-            serde_json::json!({ "theme": "dark" })
-        );
-        let (source, last_seq, project_id): (Option<String>, i64, Option<i64>) = db
-            .conn()
-            .query_row(
-                "SELECT source, last_seq, project_id FROM sessions WHERE id = 'import-claude-code-abc'",
-                [],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-            )
-            .unwrap();
-        assert_eq!(source.as_deref(), Some("claude-code"));
-        assert_eq!(last_seq, 2);
-        let ppath = db.project_path(project_id.unwrap()).unwrap();
-        assert_eq!(ppath.as_deref(), Some("/tmp/proj"));
-
-        let config: String = db
-            .conn()
-            .query_row(
-                "SELECT config_json FROM providers WHERE id = 'p1'",
-                [],
-                |r| r.get(0),
-            )
-            .unwrap();
-        let config: Value = serde_json::from_str(&config).unwrap();
-        assert_eq!(config["headers"]["x-a"], "1");
-        assert_eq!(config["compatibility"]["json"], true);
-
-        // FTS picked up the migrated user message (CJK substring; trigram
-        // needs >= 3 chars, shorter queries go through the LIKE fallback).
-        let hits: i64 = db
-            .conn()
-            .query_row(
-                "SELECT COUNT(*) FROM messages_fts WHERE messages_fts MATCH '好世界'",
-                [],
-                |r| r.get(0),
-            )
-            .unwrap();
-        assert_eq!(hits, 1);
-
-        // Tool row became a tool_call block.
-        let content: String = db
-            .conn()
-            .query_row(
-                "SELECT content_json FROM messages WHERE id = 'm2'",
-                [],
-                |r| r.get(0),
-            )
-            .unwrap();
-        let blocks: Value = serde_json::from_str(&content).unwrap();
-        assert_eq!(blocks[0]["type"], "tool_call");
-        assert_eq!(blocks[0]["name"], "Write");
-        assert_eq!(blocks[0]["args"]["path"], "a.txt");
-
-        // Migration is not re-run: reopening keeps data.
-        drop(db);
-        let db2 = Database::open_in_dir(dir.path()).unwrap();
-        let n: i64 = db2
-            .conn()
-            .query_row("SELECT COUNT(*) FROM sessions", [], |r| r.get(0))
-            .unwrap();
-        assert_eq!(n, 1);
-    }
 }

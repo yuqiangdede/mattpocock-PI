@@ -1,8 +1,8 @@
 # PI-Desktop Baseline Freeze
 
-- Baseline Version: `0.4.3`
-- Date: `2026-07-26`
-- Status: `Frozen for implementation details (provider + runtime safety + M5 hardening + settings IA + sidebar organization)`
+- Baseline Version: `0.4.7`
+- Date: `2026-07-27`
+- Status: `Frozen for implementation details (provider + runtime safety + M5 hardening + settings IA + sidebar organization + app update delivery + three-platform release)`
 - Language policy: **English-first**
 - Backend policy: **Rust host core + pi agent sidecar**
 
@@ -15,7 +15,13 @@
 > settings content cap with the window-responsive D092 / ADR 0015 layout.
 > `0.4.3` adopts retained multi-project sidebar tabs, non-destructive
 > project/session organization, and session-rooted tool isolation through
-> D093 / ADR 0016.
+> D093 / ADR 0016. `0.4.4` removes the passive composer context rail through
+> D095. `0.4.5` freezes end-to-end thinking levels and provider presets through
+> D096/D102 and ADR 0018. `0.4.6` supersedes D020's blanket deferral with the
+> packaged application update modes in D120 / ADR 0022 while preserving D010.
+> `0.4.7` lifts D010's macOS-only release scope through D126: tag builds
+> publish installers and electron-updater feeds for macOS arm64, Windows x64,
+> and Linux x64.
 
 ## Frozen Decisions
 
@@ -45,7 +51,8 @@
 24. Plugin market: **protocol defined, implementation postponed**
 25. Plugin package format: **`.piplug` (zip)**
 26. Plugin trust first step: **sha256 checksum; signature later**
-27. First release platform: **macOS arm64 only**
+27. First release platform: **macOS arm64 only** — lifted in `0.4.7`/D126;
+    tag builds now publish all three desktop platforms
 28. TS schema library: **typebox**
 29. i18n library: **i18next**
 30. Bash in M3: **non-interactive only**

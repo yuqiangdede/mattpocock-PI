@@ -1,3 +1,5 @@
+import type { AppError } from "./errors.js";
+
 export type Mode = "chat" | "agent";
 export const THINKING_LEVELS = [
   "off",
@@ -11,6 +13,12 @@ export const THINKING_LEVELS = [
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
 export type Risk = "low" | "medium" | "high";
 export type PermissionDecision = "allow-once" | "allow-session" | "deny";
+/** Permission mode (D115): how high-risk tool calls are approved.
+ * `inherit` (sessions only) falls back to the global default. */
+export const PERMISSION_MODES = ["inherit", "ask", "accept-edits", "auto"] as const;
+export type PermissionMode = (typeof PERMISSION_MODES)[number];
+/** Global default: `inherit` is not meaningful at the settings level. */
+export type GlobalPermissionMode = Exclude<PermissionMode, "inherit">;
 
 export type UiMessageRole = "user" | "assistant" | "system" | "tool";
 
@@ -36,12 +44,20 @@ export type UiMessage = {
   providerId?: string;
   /** Token usage for the assistant turn, when the provider reported it. */
   usage?: MessageUsage;
+  /** Structured failure attached to the assistant turn that failed. */
+  error?: AppError;
   /** Stable regenerate-family key shared across rewritten user prompts. */
   revisionRootId?: string;
   /** Total regenerate variants for this user root turn. */
   revisionCount?: number;
   /** 1-based active variant index for this user root turn. */
   activeRevision?: number;
+  /**
+   * Typed slash invocation ("/name args") when this user message was
+   * produced by a prompt-template command; `content` holds the expanded
+   * text the model sees (D123). Transcript renders this as a chip.
+   */
+  command?: string;
   toolName?: string;
   toolCallId?: string;
   toolStatus?: "running" | "success" | "error" | "denied";
@@ -60,6 +76,8 @@ export type SessionSummary = {
   providerId?: string;
   mode: Mode;
   thinkingLevel: ThinkingLevel;
+  /** Per-session permission mode; `inherit` follows the global default (D115). */
+  permissionMode: PermissionMode;
   /** Effective capability for this session's exact provider/model pair. */
   supportsReasoning?: boolean;
   supportedThinkingLevels?: ThinkingLevel[];
@@ -152,6 +170,24 @@ export type AgentEventEnvelope = {
   turnId?: string;
   ts: number;
   event: AgentEvent;
+};
+
+export type AppNotificationKind = "task.completed" | "task.failed";
+
+export type AppNotification = {
+  id: string;
+  kind: AppNotificationKind;
+  sessionId: string;
+  sessionTitle: string;
+  turnId: string;
+  errorCode?: string;
+  createdAt: string;
+  readAt?: string | null;
+};
+
+export type NotificationListResult = {
+  notifications: AppNotification[];
+  unreadCount: number;
 };
 
 export type ProjectWorkspace = {
@@ -251,7 +287,11 @@ export type AppSettings = {
   defaultProviderId?: string;
   defaultModelId?: string;
   defaultMode: Mode;
+  /** Global permission mode default; sessions with `inherit` follow this. */
+  defaultPermissionMode?: GlobalPermissionMode;
   theme: "system" | "light" | "dark";
+  /** UI language; `auto` (and absent) follows the OS locale. */
+  language?: "auto" | "en" | "zh-CN";
   enterToSend: boolean;
   onboardingDismissed: boolean;
 };
@@ -275,6 +315,22 @@ export type CommandItem = {
   keywords?: string[];
   source: "builtin" | "plugin";
   pluginId?: string;
+};
+
+/** One entry of the composer "/" menu, merged from three sources (D123). */
+export type ComposerCommand = {
+  /** Slash name typed after "/"; unique across the merged list. */
+  name: string;
+  kind: "template" | "builtin" | "plugin";
+  /** Display title (templates use their name). */
+  title: string;
+  description?: string;
+  /** Template frontmatter `argument-hint`, shown as ghost text. */
+  argumentHint?: string;
+  /** Template provenance; project templates override user-global ones. */
+  source?: "project" | "user";
+  /** Palette command id for builtin/plugin execution. */
+  id?: string;
 };
 
 export type AppVersionInfo = {
@@ -302,6 +358,38 @@ export type HostStatusEvent = {
   restarted?: boolean;
   fatal?: boolean;
   message?: string;
+};
+
+/**
+ * How app updates are delivered on this install:
+ *  - in-app: electron-updater downloads and installs (Windows NSIS, Linux AppImage)
+ *  - manual: we only detect new versions and link to the releases page
+ *    (unsigned macOS builds, Linux deb)
+ *  - disabled: development / unpackaged build
+ */
+export type UpdateMode = "in-app" | "manual" | "disabled";
+
+export type UpdateStatus =
+  | "idle"
+  | "checking"
+  | "available"
+  | "up-to-date"
+  | "downloading"
+  | "downloaded"
+  | "error";
+
+/** Snapshot pushed on the `updatesState` event and returned by updates IPC. */
+export type UpdateState = {
+  mode: UpdateMode;
+  status: UpdateStatus;
+  currentVersion: string;
+  availableVersion?: string;
+  /** 0-100 while status is "downloading". */
+  progressPercent?: number;
+  error?: string;
+  /** True when the transition came from a user-initiated check. */
+  manual?: boolean;
+  releasesUrl: string;
 };
 
 export type OnboardingState = {
@@ -411,4 +499,16 @@ export type FsReadResult = {
   /** Base64 data URL when kind is "image". */
   dataUrl?: string;
   size: number;
+};
+
+/** Workspace-relative entry of the `fs/index` snapshot for the "@" menu (D124). */
+export type FsIndexEntry = {
+  path: string;
+  kind: "dir" | "file";
+};
+
+export type FsIndexResult = {
+  entries: FsIndexEntry[];
+  /** True when the index hit its entry cap and results were dropped. */
+  truncated: boolean;
 };

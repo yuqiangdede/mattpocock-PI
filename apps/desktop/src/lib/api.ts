@@ -10,7 +10,9 @@ import type {
   BrowserAction,
   BrowserState,
   CommandItem,
+  ComposerCommand,
   FsEntry,
+  FsIndexResult,
   FsReadResult,
   HostHealth,
   HostStatusEvent,
@@ -32,6 +34,12 @@ import type {
   TerminalExitEvent,
   ToolPermissionResolution,
   WorkspaceDiff,
+  AppMenuCommand,
+  AppNotification,
+  NativeMenuAction,
+  NotificationListResult,
+  UpdateState,
+  WindowControlAction,
 } from "@pi-desktop/shared";
 import { IPC } from "@pi-desktop/shared";
 
@@ -60,6 +68,7 @@ declare global {
       invoke: <T = unknown>(channel: string, ...args: unknown[]) => Promise<Result<T>>;
       on: (channel: string, listener: (...args: unknown[]) => void) => () => void;
       channels: typeof IPC;
+      platform: NodeJS.Platform;
     };
   }
 }
@@ -86,21 +95,49 @@ export const api = {
   health: () => invoke<HostHealth>(IPC.invoke.appHealth),
   getOnboarding: () => invoke<OnboardingState>(IPC.invoke.appGetOnboarding),
   dismissOnboarding: () => invoke(IPC.invoke.appDismissOnboarding),
+  updatesGetState: () => invoke<UpdateState>(IPC.invoke.updatesGetState),
+  updatesCheck: () => invoke<UpdateState>(IPC.invoke.updatesCheck),
+  updatesDownload: () => invoke<UpdateState>(IPC.invoke.updatesDownload),
+  updatesInstall: () => invoke(IPC.invoke.updatesInstall),
+  updatesOpenReleases: () => invoke(IPC.invoke.updatesOpenReleases),
+  listNotifications: (input?: { unreadOnly?: boolean; limit?: number }) =>
+    invoke<NotificationListResult>(IPC.invoke.notificationList, input ?? {}),
+  markNotificationRead: (id: string) =>
+    invoke<{ ok: boolean }>(IPC.invoke.notificationMarkRead, { id }),
+  markAllNotificationsRead: () =>
+    invoke<{ ok: boolean }>(IPC.invoke.notificationMarkAllRead),
+  clearNotifications: () =>
+    invoke<{ ok: boolean }>(IPC.invoke.notificationClear),
+  showNativeNotification: (input: {
+    id: string;
+    sessionId: string;
+    title: string;
+    body: string;
+  }) => invoke<{ shown: boolean }>(IPC.invoke.notificationShowNative, input),
+  setNotificationViewingSession: (sessionId: string | null) =>
+    invoke<{ ok: boolean }>(IPC.invoke.notificationSetViewingSession, {
+      sessionId,
+    }),
   listSessions: () =>
     invoke<{ sessions: SessionSummary[] }>(IPC.invoke.sessionList),
   createSession: (input?: Partial<SessionSummary>) =>
     invoke<{ session: SessionSummary }>(IPC.invoke.sessionCreate, input ?? {}),
+  forkSession: (sessionId: string, title?: string) =>
+    invoke<{ session: SessionDetail }>(IPC.invoke.sessionFork, {
+      sessionId,
+      title,
+    }),
   getSession: (id: string) =>
     invoke<{ session: SessionDetail | null }>(IPC.invoke.sessionGet, id),
   deleteSession: (id: string) => invoke(IPC.invoke.sessionDelete, id),
+  openSessionFolder: (id: string) =>
+    invoke<{ ok: boolean; path: string }>(IPC.invoke.sessionOpenFolder, id),
   renameSession: (id: string, title: string) =>
     invoke(IPC.invoke.sessionRename, id, title),
   configureSession: (
     id: string,
-    config: Pick<
-      SessionSummary,
-      "mode" | "providerId" | "modelId" | "thinkingLevel"
-    >,
+    config: Pick<SessionSummary, "mode" | "providerId" | "modelId"> &
+      Partial<Pick<SessionSummary, "thinkingLevel" | "permissionMode">>,
   ) =>
     invoke<{ session: SessionSummary }>(
       IPC.invoke.sessionConfigure,
@@ -132,10 +169,11 @@ export const api = {
     baseUrl?: string;
     apiKey?: string;
     apiStyle?: string;
+    source?: "cache" | "refresh";
   }) =>
     invoke<{
       models: ModelInfo[];
-      source: "remote" | "fallback";
+      source: "cache" | "remote" | "fallback";
       error?: string;
     }>(IPC.invoke.providersListModels, input),
   getProject: () =>
@@ -242,8 +280,38 @@ export const api = {
     invoke<{ entries: FsEntry[] }>(IPC.invoke.fsList, { path: path ?? "" }),
   fsRead: (path: string) => invoke<FsReadResult>(IPC.invoke.fsRead, { path }),
   fsReveal: (path: string) => invoke(IPC.invoke.fsReveal, { path }),
+  fsIndex: () => invoke<FsIndexResult>(IPC.invoke.fsIndex),
+  composerCommands: () =>
+    invoke<{ commands: ComposerCommand[] }>(IPC.invoke.composerCommands),
   windowResizeBy: (deltaWidth: number) =>
     invoke<{ applied: number }>(IPC.invoke.windowResizeBy, { deltaWidth }),
+  windowControl: (action: WindowControlAction) =>
+    invoke<{ maximized: boolean }>(IPC.invoke.windowControl, { action }),
+  menuRendererReady: () =>
+    invoke<{ ready: boolean }>(IPC.invoke.menuRendererReady),
+  nativeMenuAction: (action: NativeMenuAction) =>
+    invoke<{ maximized: boolean; fullScreen: boolean }>(
+      IPC.invoke.nativeMenuAction,
+      { action },
+    ),
+  onWindowMaximized: (listener: (event: { maximized: boolean }) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.windowMaximized, (payload) =>
+      listener(payload as { maximized: boolean }),
+    );
+  },
+  onWindowFullScreen: (listener: (event: { fullScreen: boolean }) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.windowFullScreen, (payload) =>
+      listener(payload as { fullScreen: boolean }),
+    );
+  },
+  onMenuCommand: (listener: (command: AppMenuCommand) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.menuCommand, (payload) =>
+      listener((payload as { command: AppMenuCommand }).command),
+    );
+  },
   onTerminalData: (listener: (event: TerminalDataEvent) => void) => {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.terminalData, (payload) =>
@@ -286,6 +354,28 @@ export const api = {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.hostStatus, (payload) =>
       listener(payload as HostStatusEvent),
+    );
+  },
+  onNotificationChanged: (
+    listener: (notification: AppNotification) => void,
+  ) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.notificationChanged, (payload) =>
+      listener((payload as { notification: AppNotification }).notification),
+    );
+  },
+  onNotificationActivated: (
+    listener: (event: { id: string; sessionId: string }) => void,
+  ) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.notificationActivated, (payload) =>
+      listener(payload as { id: string; sessionId: string }),
+    );
+  },
+  onUpdateState: (listener: (state: UpdateState) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.updatesState, (payload) =>
+      listener(payload as UpdateState),
     );
   },
 };

@@ -25,7 +25,7 @@ if (!existsSync(hostBin)) {
 }
 
 const host = new HostClient(hostBin, { PI_DESKTOP_DATA_DIR: dataDir });
-await host.call("app.handshake", { protocolVersion: 3 });
+await host.call("app.handshake", { protocolVersion: 4 });
 const provider = await host.call("providers.create", {
   name: "Live",
   baseUrl: BASE_URL,

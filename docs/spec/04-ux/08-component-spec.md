@@ -43,12 +43,11 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 | Default | Sidebar expanded, work panel hidden |
 | Narrow (<640px) | Sidebar auto-collapses to icon rail |
 | Narrow window with panel open | Work panel width re-clamps to 60vw |
-| Fullscreen | Topbar remains; sidebar/panel toggle |
+| Fullscreen | Topbar remains; sidebar toggle and artifact-driven panel stay available |
 
 ### 1.4 Interactions
 
 - Sidebar toggle: keyboard shortcut + hamburger button in topbar
-- Work panel toggle: Cmd/Ctrl+J + panel button in topbar
 - Work panel resize: left-edge drag handle (§5.4)
 - Window resize: responsive collapse per [07-ui-design-system.md](07-ui-design-system.md) §10.1
 
@@ -64,13 +63,41 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   the sidebar may retain several project tabs/groups
 - No status bar (deferred)
 
+### 1.7 Platform application chrome
+
+| Platform | Top-level chrome | Application menu |
+|---|---|---|
+| macOS | Native inset traffic lights at `{x:16,y:16}` | System menu: PI-Desktop, File, Edit, View, Window, Help |
+| Windows | Frameless 46px titlebar; minimize/maximize/close at right | Localized File, Edit, View, Window, Help menubar |
+| Linux | Frameless 46px titlebar; minimize/maximize/close at right | Localized File, Edit, View, Window, Help menubar |
+
+- Both menu surfaces expose New Task, Open Project, Settings, Command Palette,
+  Sidebar, standard editing, zoom/fullscreen, window, Help, and
+  Logs actions where the platform convention permits. Check for Updates is
+  available from the macOS App menu and the Windows/Linux Help menu.
+- The Windows/Linux menubar uses `role=menubar`; popovers use `role=menu`,
+  separators, menu items, and checked menu-item semantics for visible panels.
+- Window buttons have localized tooltips and accessible names. The maximize
+  glyph reflects the initial native state plus later maximize/unmaximize
+  events.
+- F10 focuses the Windows/Linux File trigger. Arrow keys move between menus
+  and items; Home/End move to boundaries; Tab exits; Escape closes the
+  popover and restores trigger focus. Shift+F10 is not consumed by the
+  menubar and remains available to the focused content.
+- The menubar uses roving tab focus. Editing actions restore the previously
+  focused editor before invoking the native web-contents operation.
+- Native commands that create or reload a window wait for the renderer's menu
+  subscription acknowledgement instead of relying on a timing delay.
+
+
 ---
 
 ## 2. Topbar
 
 ### 2.1 Purpose
 
-Global controls bar: project identity, model selection, mode indicator, abort button, settings entry.
+Global controls bar: project identity, model selection, mode indicator, abort
+button, durable notification inbox entry, and settings entry.
 
 ### 2.2 Anatomy
 
@@ -96,6 +123,7 @@ Global controls bar: project identity, model selection, mode indicator, abort bu
 | Mode badge | "Agent" or "Chat" badge | same | same | same |
 | Abort button | hidden | visible, accent-hover pulse | hidden | hidden |
 | Project name | workspace folder name | same | same | "No project" muted |
+| Notification bell | visible; no badge at zero unread | same; badge may update for any completed background turn | same | visible |
 
 ### 2.5 Accessibility
 
@@ -106,7 +134,9 @@ Global controls bar: project identity, model selection, mode indicator, abort bu
 ### 2.6 MVP constraints
 
 - No search field in topbar (deferred)
-- No notification indicator (deferred)
+- Notification history is the bounded D117 inbox; scheduled reminders,
+  permission-request notifications, and notification preferences remain out of
+  scope
 
 ---
 
@@ -329,15 +359,15 @@ preview), and Files (workspace browser). Codex-parity surface.
 
 ```text
 +--------------------------------------+
-| Active tool / Tools            [×]   |  header 46px, drag region
+| App.tsx [×] | Review [×]       [◧]  |  dynamic tabs + collapse, 46px
 +--------------------------------------+
-| Active tab body                 | R  |
+| Active tab body                      |
 |  Review: file cards + unified diff   |
 |  Terminal: xterm host                |
 |  Browser: URL bar + preview surface  |
-|  Files: tree + file viewer       | A  |
-|                                  | I  |
-|                                  | L  |
+|  Files: tree + file viewer            |
+|                                      |
+|                                      |
 +--------------------------------------+
 ^ 6px resize handle on the left edge
 ```
@@ -346,28 +376,38 @@ preview), and Files (workspace browser). Codex-parity surface.
 
 | State | Behavior |
 |---|---|
-| Closed (default) | Not rendered; titlebar toggle inactive |
-| Open | Docked flex row right of the main pane; opens on the welcome chooser; width 320–`min(720, 60vw, viewport − visible sidebar − 360px)` |
-| Welcome | Title, subtitle, and four tool choices form one vertically centered column while spare height exists; short heights safely top-align and scroll without clipping |
+| Closed (default) | Not rendered; no manual open control and no retained tabs after startup |
+| Open | Docked flex row right of the main pane; opened by an artifact with width 320–`min(720, 60vw, viewport − visible sidebar − 360px)` |
+| Multiple artifacts | Tabs follow first-open order, scroll horizontally, keep the active tab visible, and preserve readable labels at the panel minimum |
 | Resizing | Live width follows pointer while preserving a 360px MainChat; committed (and persisted) on release |
 | No workspace | Each tab renders its own "open a project" empty state |
 | Narrow window | Width re-clamps on window resize; the 320px panel minimum wins only when the supported shell itself cannot satisfy both minima |
 
 ### 5.4 Interactions
 
-- Toggle: titlebar panel button or Cmd/Ctrl+J; close button in the header.
-- Tab switch: right-edge vertical rail; selecting a tool also opens the panel
-  when driven programmatically. Every explicit panel open returns to the
-  welcome chooser. Terminal stays mounted across switches so the PTY and
-  scrollback survive; other tabs mount on demand.
+- Trigger: file/URL references, BrowserPreview, and completed-command artifacts
+  create/activate their resource tab. Successful active-session workspace
+  Write/Edit artifacts create/activate Review. Repeated resources deduplicate.
+- Tab close: closing an active tab selects its right neighbor, then its left;
+  closing the last tab hides the panel. The panel-level collapse control hides
+  the panel without deleting the runtime tab set; a later artifact reopens it.
+  Terminal mounts only after its first command artifact and stays mounted while
+  its tab exists so the PTY and scrollback survive switches.
+- Context change: selecting another session or workspace closes the panel and
+  drops its runtime tabs before rendering the new context. Relative file tabs
+  can therefore never be reinterpreted against a different workspace.
 - Resize: pointer drag on the left-edge handle.
-- Persistence: `{open, tab, width}` in localStorage `pi.desktop.workPanel`.
+- Persistence: only `{width}` in localStorage `pi.desktop.workPanel`; open and
+  tabs reset on app startup. OS window-state persistence excludes width added
+  by an open work panel, so relaunch starts at the same base shell width.
 
 ### 5.5 Accessibility
 
-- `<aside>` landmark; tab strip is a `nav` with `aria-label`
+- `<aside>` landmark; the top strip uses `nav`, `role="tablist"`, and a
+  localized `aria-label`; each resource uses `role="tab"`, `aria-selected`,
+  `aria-controls`, and a corresponding `role="tabpanel"`
 - Resize handle: `role="separator"` `aria-orientation="vertical"`
-- Close button and every tab expose localized titles
+- Every tab close and the sole panel collapse button expose localized names
 
 ### 5.6 MVP constraints
 
@@ -593,7 +633,7 @@ Single message render — either user (plaintext) or assistant (markdown streami
 | Streaming | accent left rule on the answer surface; content grows |
 | Thinking streaming | disclosure open; answer bubble omitted until answer text exists |
 | Complete | no streaming rule; full rendered markdown |
-| Error | error border; error message inline with retry prompt |
+| Error | assistant error card in transcript; localized summary + stable code; details disclosure opens to redacted provider response, provider/model IDs, and copy action; retriable failures show Retry and configuration failures show Open settings |
 
 ### 8.5 Accessibility
 
@@ -886,11 +926,13 @@ Dropdown in Topbar showing current provider/model pair. Allows switching models 
 | Configured | shows current provider/model, clickable |
 | No provider | "Add provider" muted text + link to settings |
 | Running | disabled, shows current model |
-| Dropdown open | list of available models grouped by provider |
+| Dropdown open | cached available models grouped by provider; refreshes in background |
 
 ### 12.4 Interactions
 
 - Click: opens dropdown with provider/model list
+- Cached provider models are available on the first open after restart; a
+  background refresh updates the list without clearing it first
 - Select: switches model for current session
 - Keyboard: up/down arrow in dropdown, Enter to select, Escape to close
 
@@ -1092,7 +1134,7 @@ dismissToast(id: number); // ToastHost internal / tests
 | No caller timers | Auto-dismiss is owned by the toast system; callers must not `setTimeout`-clear |
 | i18n | Messages come from the i18n catalog (D073); raw host/provider error strings pass through unchanged |
 | Not for blocking flows | Anything needing a decision uses PermissionDialog / dialog surfaces, not a toast |
-| Not for inline validation | Field-level errors render next to the field; the chat error banner (`MODEL_NOT_CONFIGURED` etc.) stays inline |
+| Not for inline validation | Field-level errors render next to the field; message-bound provider failures render as assistant error messages in the transcript |
 | Host-pushed toasts | Plugin/main-process toasts arrive via `api.onToast` and render as `info` |
 
 ### 17.5 Behavior
@@ -1210,7 +1252,103 @@ Modern model-configuration surface for adding OpenAI-compatible providers, revie
 
 ---
 
-## 20. Acceptance criteria (all components)
+## 20. NotificationInbox (D117)
+
+### 20.1 Purpose
+
+Expose the bounded, host-owned history of task completion and failure events
+the user did not already see in the focused current chat, without turning
+transient toasts into history. The inbox is local-only and durable across app
+restarts.
+
+### 20.2 Anatomy
+
+```text
+Titlebar                                               Popover (360px max)
+[Bell (12)]  ->  [Notifications]       [All | Unread] [Mark all read] [Clear]
+                 ------------------------------------------------------------
+                 [unread dot] [check] Task completed              2m
+                                      Session title
+                 ------------------------------------------------------------
+                              [x]     Task failed                  9m
+                                      Session title · ERROR_CODE
+```
+
+- Trigger: 32px Lucide `Bell` icon button in the right titlebar actions. A
+  compact badge renders `1`–`99` and `99+`; its accessible label retains the
+  exact count (the durable store is capped at 200).
+- Popover: width `min(360px, calc(100vw - 24px))`, no taller than the available
+  window below the 46px titlebar, with one internally scrollable row list.
+- Header: localized title, `All` / `Unread` segmented filter, Lucide
+  `CheckCheck` mark-all-read button, and Lucide `Trash2` clear button. Icon-only
+  actions carry localized tooltips and accessible names.
+- Row: unread dot, semantic completion/failure icon, localized event label,
+  snapshotted session title, optional stable failure code, and localized
+  relative time. Rows are dense list items separated by hairlines, not cards.
+- Display title/body are derived at render time from `kind`, `sessionTitle`,
+  and optional `errorCode`; no localized title/body string is persisted.
+
+### 20.3 States
+
+| State | Behavior |
+|---|---|
+| No unread | Bell has no badge; Mark all read is disabled |
+| Unread | Badge shows count; unread rows carry dot and stronger label weight |
+| All empty | Centered compact “No notifications” empty state; list actions disabled |
+| Unread empty | “You're all caught up”; All filter remains available |
+| Loading/refresh | Preserve current rows and filter; disable mutations until refresh settles |
+| Mutation failure | Keep the existing list and announce an error toast; do not optimistically lose rows |
+
+### 20.4 Interactions
+
+- Bell toggles the popover. Opening does not implicitly mark anything read.
+- `All` shows the newest retained rows; `Unread` filters to `readAt == null`.
+- Selecting a row first calls `notification.markRead`, closes the popover, then
+  activates the row's durable session (including its project when applicable)
+  and scrolls the transcript to its latest content.
+- Mark all read is idempotent and preserves rows. Clear deletes every inbox
+  row but never deletes a session, transcript, or turn.
+- `notification.changed` updates the visible list and badge. Opening the
+  popover also refreshes the bounded list from host-core. A
+  `notification.activated` event from Electron follows the same session
+  activation path as a row click.
+- Completion/failure enters the durable inbox unless the main window is
+  visible/focused and the exact finishing session is the current chat. A
+  focused background session still enters the inbox without a native banner;
+  an unfocused current session enters the inbox and receives a native banner.
+  Clicking the banner restores/shows and focuses the main window before
+  emitting `notification.activated` for the matching session.
+- Aborted turns, permission requests, scheduled reminders, and plugin
+  notifications do not enter this inbox.
+
+### 20.5 Accessibility
+
+- Popover is a labelled, non-modal `role="dialog"`; the row collection is a
+  semantic list and every row is one button with a complete localized name.
+- Opening focuses the first unread row, otherwise the first row, otherwise the
+  `All` filter. `ArrowUp` / `ArrowDown`, `Home`, and `End` move among rows;
+  `Enter` / `Space` activate the focused row.
+- `Tab` follows DOM order through filters, header actions, and rows without a
+  focus trap. `Escape` or outside press closes the popover; Escape restores
+  focus to the bell.
+- Badge changes are announced through one polite status region using the exact
+  unread count. Completion/failure meaning uses icon, text, and accessible
+  name, never color alone.
+- Native notification accessibility and activation semantics use the platform
+  API; the renderer does not recreate native banners.
+
+### 20.6 Constraints
+
+- The list contains only `task.completed` and `task.failed` records produced
+  from unseen terminal agent turns. Visible-current results and `aborted` turns
+  are intentionally silent.
+- At most 200 newest rows are retained globally. There is no pagination,
+  scheduled notification source, permission-notification source, preferences
+  page, notification permission prompt, or cloud sync.
+
+---
+
+## 21. Acceptance criteria (all components)
 
 1. All components use semantic color tokens from [07-ui-design-system.md](07-ui-design-system.md) — no raw hex
 2. All interactive elements have visible focus rings (2px accent, offset 2px)
@@ -1231,3 +1369,6 @@ Modern model-configuration surface for adding OpenAI-compatible providers, revie
 14. Session import defaults to source grouping, offers project-path grouping, collapses all groups after scan/group changes, and exposes accessible group disclosure state per §18
 15. Imported project paths materialize exactly once in the durable Projects index; path-less imports remain Temporary sessions and no filesystem directory is created
 16. ProviderStudio shows hero summary + add dialog + provider cards; secrets never render raw; test/default/delete remain keyboard reachable
+17. NotificationInbox exposes All/Unread views, exact unread badge semantics,
+    row activation, mark-all-read and clear actions; it is keyboard-operable
+    and never treats a visible-current or aborted turn as a notification

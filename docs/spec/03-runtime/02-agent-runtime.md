@@ -64,11 +64,18 @@ interface AgentRuntime {
 5. reject if session busy
 6. persist user message
 7. start pi turn with the resolved session configuration and effective
-   thinking level
+   thinking level; transient provider transport failures (request timeout,
+   dropped connection, 429/5xx) retry up to twice with interruptible
+   backoff before the turn is failed (D120)
 8. stream normalized answer and thinking events to UI
 9. on tool calls, delegate to Rust host bridge with the durable `sessionId`;
    host resolves the session-bound workspace root
-10. finalize and persist answer/thinking blocks independently
+10. if pi finishes a message with `stopReason: "error"`, finalize any partial
+    assistant bubble with a structured `UiMessage.error`, persist it in the
+    transcript, and emit a normalized lifecycle `error` event carrying the
+    same provider `AppError`; even a failure with no answer text remains a
+    visible assistant error message
+11. finalize and persist successful answer/thinking blocks independently
 
 ## 5b. Mode defaults
 
@@ -97,6 +104,18 @@ interface AgentRuntime {
   `deltaText`.
 - Restored assistant history reconstructs separate text and thinking blocks
   before the next turn.
+- Restored history also reconstructs tool call/result pairs from persisted
+  tool rows (`toolCallId`/`toolArgs`/`toolResult`), so a recreated runtime
+  keeps its full working context — file contents read, command output —
+  instead of collapsing to bare chat text (D120). An interrupted tool row
+  restores as an errored result; a tool row whose assistant row was lost
+  gets a synthesized call-only assistant carrier so call/result pairs stay
+  well-formed for every provider API.
+- Failed assistant messages remain durable diagnostic transcript entries but
+  are never restored into pi model context on a later turn.
+- A forked session receives a new session id and no shared runtime. Its first
+  prompt creates a fresh pi runtime and restores context only from the child
+  transcript, including the remapped tool call/result pairs.
 
 ## 6. Providers & models
 
@@ -167,7 +186,10 @@ Implemented: streaming turns over the OpenAI-compatible protocol path
 (universal escape hatch, D024); one active turn per session enforced with
 `AGENT_BUSY`; real `turnId` returned per accepted prompt; provider failures
 mapped to `PROVIDER_UNAUTHORIZED` / `PROVIDER_RATE_LIMITED` /
-`STREAM_FAILED` / `TURN_ABORTED` where detectable.
+`MODEL_NOT_CONFIGURED` / `STREAM_FAILED` / `TURN_ABORTED` where detectable.
+The desktop development lifecycle rebuilds `packages/agent-runtime/dist`
+before Electron starts so the spawned sidecar always executes the current
+normalization and error-mapping source.
 
 Tracked gaps (post-MVP backlog): richer system prompt composition (§7) and
 provider/model catalog discovery beyond the currently wired paths.

@@ -3,8 +3,10 @@ import {
   BrowserWindow,
   dialog,
   ipcMain,
+  Menu,
   nativeImage,
   nativeTheme,
+  Notification as SystemNotification,
   screen,
   shell,
 } from "electron";
@@ -15,20 +17,31 @@ import { existsSync, mkdirSync } from "node:fs";
 import {
   APP_NAME,
   APP_VERSION,
+  APP_MENU_COMMANDS,
   ErrorCodes,
   IPC,
   IPC_WHITELIST,
+  NATIVE_MENU_ACTIONS,
   PROTOCOL_VERSION,
   THINKING_LEVELS,
+  WINDOW_CONTROL_ACTIONS,
   err,
   ok,
   type AgentEventEnvelope,
+  type AppMenuCommand,
+  type AppNotification,
+  type NativeMenuAction,
   type Result,
   type ThinkingLevel,
+  type WindowControlAction,
 } from "@pi-desktop/shared";
 import {
   clampThinkingLevel,
+  resolveModelWireCompat,
   resolveThinkingCapabilities,
+  expandSlashInvocation,
+  loadComposerTemplates,
+  type ComposerTemplate,
   type ThinkingCapabilities,
 } from "@pi-desktop/agent-runtime";
 import { HostProcess } from "./host-process";
@@ -40,14 +53,31 @@ import { PtyManager } from "./terminal";
 import { BrowserPane, resolveLocalFile } from "./browser-view";
 import { discoverProviderModels } from "./model-discovery";
 import { listDir, readWorkspaceFile, resolveWithinRoot } from "./fs-panel";
+import { getWorkspaceFileIndex } from "./fs-index";
+import { builtinComposerCommands, builtinPaletteItems } from "./builtin-commands";
 import {
   convertSession,
   scanAllSources,
   type ExternalSessionSummary,
   type ExternalSource,
 } from "./importers";
+import { installApplicationMenu } from "./application-menu";
+import { AppUpdaterController } from "./updater";
 
 let mainWindow: BrowserWindow | null = null;
+let windowCreationPromise: Promise<void> | null = null;
+let applicationBooted = false;
+const isDevelopmentBuild =
+  process.env.PI_DESKTOP_DEV === "1" || !app.isPackaged;
+const pendingApplicationMenuCommands: AppMenuCommand[] = [];
+type MenuRendererReadyGate = {
+  window: BrowserWindow;
+  ready: boolean;
+  promise: Promise<void>;
+  resolve: () => void;
+};
+let menuRendererReadyGate: MenuRendererReadyGate | null = null;
+let panelWindowWidthOffset = 0;
 let host: HostProcess | null = null;
 let sidecar: AgentSidecar | null = null;
 let quitting = false;
@@ -76,6 +106,13 @@ const logger = new Logger(
   dataDir,
   process.env.NODE_ENV === "production" ? "info" : "debug",
 );
+
+const updater = new AppUpdaterController({
+  logger,
+  send: sendToRenderer,
+  currentVersion: APP_VERSION,
+  isPackaged: !isDevelopmentBuild,
+});
 
 type RuntimeProvider = {
   id: string;
@@ -169,7 +206,7 @@ async function listRuntimeProviders(includeDisabled = true) {
 }
 
 function applyDevelopmentBranding() {
-  if (process.platform !== "darwin" || app.isPackaged || !app.dock) return;
+  if (process.platform !== "darwin" || !isDevelopmentBuild || !app.dock) return;
 
   const iconPath = join(app.getAppPath(), "build", "icon_1024.png");
   const icon = nativeImage.createFromPath(iconPath);
@@ -185,7 +222,120 @@ function applyDevelopmentBranding() {
 
 function sendToRenderer(channel: string, payload: unknown) {
   if (!IPC_WHITELIST.has(channel)) return;
-  mainWindow?.webContents.send(channel, payload);
+  const window = mainWindow;
+  if (
+    !window ||
+    window.isDestroyed() ||
+    window.webContents.isDestroyed()
+  ) {
+    return;
+  }
+  window.webContents.send(channel, payload);
+}
+
+function resetMenuRendererReady(window: BrowserWindow) {
+  menuRendererReadyGate?.resolve();
+  let resolve: () => void = () => undefined;
+  const promise = new Promise<void>((ready) => {
+    resolve = ready;
+  });
+  menuRendererReadyGate = {
+    window,
+    ready: false,
+    promise,
+    resolve,
+  };
+}
+
+function markMenuRendererReady(window: BrowserWindow): boolean {
+  const gate = menuRendererReadyGate;
+  if (gate?.window !== window || window.isDestroyed()) return false;
+  gate.ready = true;
+  gate.resolve();
+  return true;
+}
+
+async function waitForMenuRenderer(window: BrowserWindow): Promise<boolean> {
+  const gate = menuRendererReadyGate;
+  if (gate?.window !== window) return false;
+  await gate.promise;
+  return (
+    menuRendererReadyGate === gate &&
+    gate.ready &&
+    mainWindow === window &&
+    !window.isDestroyed() &&
+    !window.webContents.isDestroyed()
+  );
+}
+
+async function ensureWindow(): Promise<boolean> {
+  if (windowCreationPromise) {
+    await windowCreationPromise;
+    return true;
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) return false;
+
+  const creation = createWindow();
+  windowCreationPromise = creation;
+  try {
+    await creation;
+    return true;
+  } finally {
+    if (windowCreationPromise === creation) windowCreationPromise = null;
+  }
+}
+
+async function deliverApplicationMenuCommand(command: AppMenuCommand) {
+  await ensureWindow();
+  const window = mainWindow;
+  if (!window || window.isDestroyed()) return;
+  if (!(await waitForMenuRenderer(window))) return;
+  if (window.isMinimized()) window.restore();
+  window.show();
+  window.focus();
+  sendToRenderer(IPC.event.menuCommand, { command });
+}
+
+function dispatchApplicationMenuCommand(command: AppMenuCommand) {
+  if (!APP_MENU_COMMANDS.includes(command)) return;
+  if (!applicationBooted) {
+    pendingApplicationMenuCommands.push(command);
+    return;
+  }
+  void deliverApplicationMenuCommand(command).catch((error) => {
+    logger.app("error", "application menu command failed", {
+      data: String(error),
+    });
+  });
+}
+
+let appliedMenuLocale: string | null = null;
+
+/** (Re)install the native menu; a saved non-auto language overrides the OS locale. */
+function applyApplicationMenuLanguage(language?: unknown) {
+  const locale =
+    typeof language === "string" && language && language !== "auto"
+      ? language
+      : app.getLocale();
+  if (appliedMenuLocale === locale) return;
+  appliedMenuLocale = locale;
+  installApplicationMenu({
+    locale,
+    dispatch: dispatchApplicationMenuCommand,
+  });
+}
+
+function flushPendingApplicationMenuCommands() {
+  const commands = pendingApplicationMenuCommands.splice(0);
+  void (async () => {
+    for (const command of commands) {
+      await deliverApplicationMenuCommand(command);
+    }
+  })().catch((error) => {
+    logger.app("error", "queued application menu command failed", {
+      data: String(error),
+    });
+  });
 }
 
 function wrap<T>(fn: () => Promise<T>): Promise<Result<T>> {
@@ -250,6 +400,8 @@ async function importLegacyScheduled() {
 const activeTurns = new Map<string, string>();
 /** sessionId → scheduled task_run id awaiting completion. */
 const scheduledRunsBySession = new Map<string, string>();
+/** Session currently rendered on the chat page; focus remains Main-owned. */
+let notificationViewingSessionId: string | null = null;
 /** Preserve tool metadata until the result is persisted at tool_end. */
 const activeToolCalls = new Map<
   string,
@@ -258,6 +410,16 @@ const activeToolCalls = new Map<
 
 function activeToolCallKey(sessionId: string, toolCallId: string) {
   return `${sessionId}:${toolCallId}`;
+}
+
+function shouldCreateTaskNotification(sessionId: string) {
+  const userIsViewingResult =
+    mainWindow !== null &&
+    !mainWindow.isDestroyed() &&
+    mainWindow.isVisible() &&
+    mainWindow.isFocused() &&
+    notificationViewingSessionId === sessionId;
+  return !userIsViewingResult;
 }
 
 async function withGitBranch<T extends { path?: string; name?: string } | null | undefined>(
@@ -315,6 +477,8 @@ function writeWindowState(state: WindowState) {
 }
 
 async function createWindow() {
+  panelWindowWidthOffset = 0;
+  notificationViewingSessionId = null;
   const savedState = await readWindowState();
   mainWindow = new BrowserWindow({
     ...(savedState ?? { width: 1200, height: 800 }),
@@ -325,8 +489,15 @@ async function createWindow() {
     title: APP_NAME,
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#181818" : "#ffffff",
     show: false,
-    titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 16, y: 16 },
+    // One frameless look everywhere: macOS keeps inset traffic lights;
+    // Windows/Linux hide native chrome entirely — the renderer draws its
+    // own Codex-style window controls (see WindowControls.tsx).
+    ...(process.platform === "darwin"
+      ? {
+          titleBarStyle: "hiddenInset" as const,
+          trafficLightPosition: { x: 16, y: 16 },
+        }
+      : { frame: false }),
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
       contextIsolation: true,
@@ -334,17 +505,66 @@ async function createWindow() {
       sandbox: true,
     },
   });
+  const window = mainWindow;
+  resetMenuRendererReady(window);
+  const isLiveWindow = () =>
+    mainWindow === window &&
+    !window.isDestroyed() &&
+    !window.webContents.isDestroyed();
 
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+  window.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url);
     return { action: "deny" };
   });
+  window.webContents.on("did-start-loading", () => {
+    notificationViewingSessionId = null;
+    if (mainWindow === window) resetMenuRendererReady(window);
+  });
+  window.webContents.on("render-process-gone", () => {
+    notificationViewingSessionId = null;
+  });
 
-  browserPane.setWindow(mainWindow);
-  mainWindow.on("closed", () => browserPane.setWindow(null));
+  // Fullscreen hides the macOS traffic lights; the renderer shifts its
+  // titlebar controls left to reclaim the space.
+  const sendFullScreen = () => {
+    if (window.isDestroyed() || window.webContents.isDestroyed()) return;
+    window.webContents.send(IPC.event.windowFullScreen, {
+      fullScreen: window.isFullScreen(),
+    });
+  };
+  window.on("enter-full-screen", sendFullScreen);
+  window.on("leave-full-screen", sendFullScreen);
+  window.webContents.on("did-finish-load", sendFullScreen);
+
+  // Custom window controls (Windows/Linux) need maximize state to swap the
+  // maximize/restore glyph.
+  if (process.platform !== "darwin") {
+    const sendMaximized = () => {
+      if (window.isDestroyed() || window.webContents.isDestroyed()) return;
+      window.webContents.send(IPC.event.windowMaximized, {
+        maximized: window.isMaximized(),
+      });
+    };
+    window.on("maximize", sendMaximized);
+    window.on("unmaximize", sendMaximized);
+    // Native-runner E2E fixture: establish the initial native state before
+    // the renderer mounts, then let WindowControls query it through IPC.
+    if (process.env.PI_DESKTOP_START_MAXIMIZED === "1") window.maximize();
+  }
+
+  browserPane.setWindow(window);
+  window.on("closed", () => {
+    if (menuRendererReadyGate?.window === window) {
+      menuRendererReadyGate.resolve();
+      menuRendererReadyGate = null;
+    }
+    if (mainWindow !== window) return;
+    mainWindow = null;
+    browserPane.setWindow(null);
+  });
 
   // Block navigation away from the app shell (dev server origin or local file).
-  mainWindow.webContents.on("will-navigate", (event, url) => {
+  window.webContents.on("will-navigate", (event, url) => {
     const devOrigin = process.env.ELECTRON_RENDERER_URL;
     if (devOrigin && url.startsWith(devOrigin)) return;
     event.preventDefault();
@@ -356,6 +576,7 @@ async function createWindow() {
   let boundsGuard = false;
   let boundsTimer: NodeJS.Timeout | null = null;
   let pinUntil = 0;
+  let captureViewportOverride = false;
   let lastCgAt = 0;
   let lastCg: { x: number; y: number; width: number; height: number } | null = null;
   let missingCgStreak = 0;
@@ -393,8 +614,8 @@ async function createWindow() {
   };
 
   const ensureStableBounds = (force = false) => {
-    if (!mainWindow || boundsGuard) return;
-    const electronBounds = mainWindow.getBounds();
+    if (!isLiveWindow() || boundsGuard || captureViewportOverride) return;
+    const electronBounds = window.getBounds();
     const cg = readCgBounds();
     if (!cg && cgHelperAvailable) missingCgStreak += 1;
     else missingCgStreak = 0;
@@ -409,25 +630,25 @@ async function createWindow() {
 
     boundsGuard = true;
     try {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.setMinimumSize(1040, 700);
+      if (window.isMinimized()) window.restore();
+      window.setMinimumSize(1040, 700);
       // Prefer normal layer so CG helpers and Stage Manager stay stable.
-      mainWindow.setAlwaysOnTop(false);
-      mainWindow.show();
-      mainWindow.focus();
-      mainWindow.moveTop();
+      window.setAlwaysOnTop(false);
+      window.show();
+      window.focus();
+      window.moveTop();
       if (shelved) {
-        mainWindow.hide();
-        mainWindow.setBounds({ ...CODEX_BOUNDS }, false);
-        mainWindow.show();
+        window.hide();
+        window.setBounds({ ...CODEX_BOUNDS }, false);
+        window.show();
       } else {
-        mainWindow.setBounds({ ...CODEX_BOUNDS }, false);
+        window.setBounds({ ...CODEX_BOUNDS }, false);
       }
-      mainWindow.setSize(CODEX_BOUNDS.width, CODEX_BOUNDS.height, false);
-      mainWindow.setPosition(CODEX_BOUNDS.x, CODEX_BOUNDS.y, false);
+      window.setSize(CODEX_BOUNDS.width, CODEX_BOUNDS.height, false);
+      window.setPosition(CODEX_BOUNDS.x, CODEX_BOUNDS.y, false);
       // Brief pin only when actively recovering from a shelf.
       if (shelved || electronTiny) {
-        mainWindow.setAlwaysOnTop(true, "floating");
+        window.setAlwaysOnTop(true, "floating");
         pinUntil = Date.now() + 4000;
       } else {
         pinUntil = 0;
@@ -438,7 +659,7 @@ async function createWindow() {
         electron: electronBounds,
         cg,
         shelved,
-        afterElectron: mainWindow.getBounds(),
+        afterElectron: window.getBounds(),
         afterCg: readCgBounds(),
       });
     } finally {
@@ -453,33 +674,39 @@ async function createWindow() {
     boundsTimer = setTimeout(() => ensureStableBounds(false), 100);
   };
 
-  mainWindow.on("show", () => ensureStableBounds(false));
-  mainWindow.on("focus", () => ensureStableBounds(false));
-  mainWindow.on("restore", () => ensureStableBounds(false));
-  mainWindow.on("resize", scheduleBoundsCheck);
-  mainWindow.on("move", scheduleBoundsCheck);
+  window.on("show", () => ensureStableBounds(false));
+  window.on("focus", () => ensureStableBounds(false));
+  window.on("restore", () => ensureStableBounds(false));
+  window.on("resize", scheduleBoundsCheck);
+  window.on("move", scheduleBoundsCheck);
 
   // Persist last good user bounds so relaunch restores them.
   let saveTimer: NodeJS.Timeout | null = null;
   const scheduleStateSave = () => {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-      if (!mainWindow || mainWindow.isDestroyed() || boundsGuard) return;
-      if (mainWindow.isMinimized() || mainWindow.isFullScreen()) return;
-      const b = mainWindow.getBounds();
-      if (b.width >= 1040 && b.height >= 700) writeWindowState(b);
+      if (!isLiveWindow() || boundsGuard) return;
+      if (window.isMinimized() || window.isFullScreen()) return;
+      const bounds = window.getBounds();
+      const persistedBounds = {
+        ...bounds,
+        width: bounds.width - panelWindowWidthOffset,
+      };
+      if (persistedBounds.width >= 1040 && persistedBounds.height >= 700) {
+        writeWindowState(persistedBounds);
+      }
     }, 600);
   };
-  mainWindow.on("resize", scheduleStateSave);
-  mainWindow.on("move", scheduleStateSave);
+  window.on("resize", scheduleStateSave);
+  window.on("move", scheduleStateSave);
 
   const boundsWatchdog = setInterval(() => {
-    if (!mainWindow || mainWindow.isDestroyed()) {
+    if (!isLiveWindow()) {
       clearInterval(boundsWatchdog);
       return;
     }
     const cg = readCgBounds();
-    const electronBounds = mainWindow.getBounds();
+    const electronBounds = window.getBounds();
     if (!cg && cgHelperAvailable) missingCgStreak += 1;
     else missingCgStreak = 0;
     const shelved =
@@ -493,20 +720,25 @@ async function createWindow() {
     }
     if (Date.now() > pinUntil) {
       try {
-        mainWindow.setAlwaysOnTop(false);
+        window.setAlwaysOnTop(false);
       } catch {
         // ignore
       }
     }
   }, 1500);
-  mainWindow.on("closed", () => clearInterval(boundsWatchdog));
+  window.on("closed", () => {
+    if (boundsTimer) clearTimeout(boundsTimer);
+    if (saveTimer) clearTimeout(saveTimer);
+    clearInterval(boundsWatchdog);
+  });
 
-  mainWindow.once("ready-to-show", () => {
+  window.once("ready-to-show", () => {
+    if (!isLiveWindow()) return;
     // Capture runs need the deterministic Codex footprint; normal launches
     // must respect restored user bounds and only fix real shelf states.
     ensureStableBounds(process.env.PI_DESKTOP_CAPTURE === "1");
-    mainWindow?.show();
-    mainWindow?.focus();
+    window.show();
+    window.focus();
     // Burst re-assert only while Stage Manager initially settles / shelves us.
     for (const ms of [100, 250, 500, 1000, 2000, 3500, 5000, 8000, 12000]) {
       setTimeout(() => ensureStableBounds(false), ms);
@@ -624,34 +856,28 @@ async function createWindow() {
             const composerProbe = await mainWindow!.webContents.executeJavaScript(`(() => { const ta=document.querySelector("textarea.composer-input"); if(!ta) return null; const r=ta.getBoundingClientRect(); return {value:ta.value, ph:ta.placeholder, h:ta.offsetHeight, y:Math.round(r.y), mark:document.querySelector(".composer-thread-mark")?.textContent||""}; })()`);
             console.log("COMPOSER_PROBE", composerProbe);
             await shot("pi-final");
-            // Work panel scenes: welcome tool list, then the four tools via
-            // the vertical rail (D097–D100).
-            const clickPanelToggle = () =>
+            // Work panel scenes are opened by simulated artifacts; production
+            // exposes no empty/manual panel entry point (D119).
+            const openPanelArtifact = (kind: string, resource?: string) =>
               mainWindow!.webContents.executeJavaScript(
-                `document.querySelector('.main-titlebar-right .title-nav-btn')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`,
+                `window.__PI_DESKTOP__?.openWorkPanelArtifact(${JSON.stringify(kind)}, ${JSON.stringify(resource)})`,
               );
-            const clickPanelTab = (index: number) =>
-              mainWindow!.webContents.executeJavaScript(
-                `document.querySelectorAll('.work-panel-rail-btn')[${index}]?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`,
-              );
-            await clickPanelToggle();
-            await new Promise((r) => setTimeout(r, 500));
-            await shot("pi-panel-welcome");
-            await clickPanelTab(0);
+            await openPanelArtifact("review");
             await new Promise((r) => setTimeout(r, 500));
             await shot("pi-panel-review");
-            await clickPanelTab(1);
+            await openPanelArtifact("terminal");
             // The PTY needs a beat for the login shell prompt to settle.
             await new Promise((r) => setTimeout(r, 1200));
             await shot("pi-panel-terminal");
-            await clickPanelTab(2);
+            await openPanelArtifact("browser");
             await new Promise((r) => setTimeout(r, 400));
             await shot("pi-panel-browser");
-            await clickPanelTab(3);
+            await openPanelArtifact("file", "apps/desktop/src/App.tsx");
             await new Promise((r) => setTimeout(r, 500));
             await shot("pi-panel-files");
-            await clickPanelTab(0);
-            await clickPanelToggle();
+            await mainWindow!.webContents.executeJavaScript(
+              `window.__PI_DESKTOP__?.collapseWorkPanel()`,
+            );
             await new Promise((r) => setTimeout(r, 300));
             // Open composer + menu for chrome parity proof.
             await mainWindow!.webContents.executeJavaScript(`
@@ -676,6 +902,40 @@ async function createWindow() {
             await mainWindow!.webContents.executeJavaScript(`
               document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
             `);
+            // Composer autocomplete scenes (D123–D125): "/" command menu and
+            // "@" file menu. React's controlled textarea needs the native
+            // value setter + input event to register the draft.
+            const setComposerDraft = (draft: string) =>
+              mainWindow!.webContents.executeJavaScript(`
+                (() => {
+                  const ta = document.querySelector("textarea.composer-input");
+                  if (!ta) return false;
+                  ta.focus();
+                  const set = Object.getOwnPropertyDescriptor(
+                    HTMLTextAreaElement.prototype,
+                    "value",
+                  ).set;
+                  set.call(ta, ${JSON.stringify(draft)});
+                  ta.dispatchEvent(new Event("input", { bubbles: true }));
+                  return true;
+                })()
+              `);
+            await setComposerDraft("/");
+            await new Promise((r) => setTimeout(r, 450));
+            const slashProbe = await mainWindow!.webContents.executeJavaScript(
+              `(() => { const m = document.querySelector(".composer-autocomplete"); return m ? { rows: m.querySelectorAll(".composer-ac-item").length, groups: [...m.querySelectorAll(".composer-model-group-label")].map((g) => g.textContent) } : null; })()`,
+            );
+            console.log("COMPOSER_AC_SLASH", slashProbe);
+            await shot("pi-composer-slash");
+            await setComposerDraft("@");
+            await new Promise((r) => setTimeout(r, 450));
+            const atProbe = await mainWindow!.webContents.executeJavaScript(
+              `(() => { const m = document.querySelector(".composer-autocomplete"); return m ? { rows: m.querySelectorAll(".composer-ac-item").length, empty: m.querySelector(".composer-model-empty")?.textContent || "" } : null; })()`,
+            );
+            console.log("COMPOSER_AC_AT", atProbe);
+            await shot("pi-composer-at");
+            await setComposerDraft("");
+            await new Promise((r) => setTimeout(r, 200));
             // Conversation minimap: seed a capture-only transcript, magnify
             // mid-rail (Dock effect + preview popover), then restore.
             await mainWindow!.webContents.executeJavaScript(
@@ -703,6 +963,89 @@ async function createWindow() {
               `void window.__PI_DESKTOP__?.seedTranscript?.(0)`,
             );
             await new Promise((r) => setTimeout(r, 250));
+            // Notification inbox: mixed status, long title, read state, 99+ badge,
+            // both themes, then the responsive fixed-position popover.
+            const openNotificationFixture = async () => {
+              await mainWindow!.webContents.executeJavaScript(`
+                window.__PI_DESKTOP__?.seedNotifications?.(105);
+                document.querySelector('.notification-trigger')?.dispatchEvent(
+                  new MouseEvent('click', { bubbles: true })
+                );
+              `);
+              // Opening refreshes the durable inbox; reapply the capture-only
+              // fixture after that request settles.
+              await new Promise((r) => setTimeout(r, 350));
+              await mainWindow!.webContents.executeJavaScript(
+                `window.__PI_DESKTOP__?.seedNotifications?.(105)`,
+              );
+              await new Promise((r) => setTimeout(r, 150));
+            };
+            const probeNotificationFixture = async (scene: string) => {
+              const probe = await mainWindow!.webContents.executeJavaScript(`(() => {
+                const popover = document.querySelector('.notification-popover');
+                const title = document.querySelector('.notification-item-title');
+                const badge = document.querySelector('.notification-badge');
+                if (!popover || !title) return null;
+                const rect = popover.getBoundingClientRect();
+                const titleStyle = getComputedStyle(title);
+                return {
+                  scene: ${JSON.stringify(scene)},
+                  viewport: { width: innerWidth, height: innerHeight },
+                  popover: {
+                    left: Math.round(rect.left),
+                    top: Math.round(rect.top),
+                    right: Math.round(rect.right),
+                    bottom: Math.round(rect.bottom),
+                    position: getComputedStyle(popover).position,
+                  },
+                  withinViewport:
+                    rect.left >= 0 && rect.top >= 0 &&
+                    rect.right <= innerWidth && rect.bottom <= innerHeight,
+                  badge: badge?.textContent?.trim() || '',
+                  rowCount: document.querySelectorAll('.notification-item').length,
+                  unreadRows: document.querySelectorAll('.notification-item.unread').length,
+                  failedRows: document.querySelectorAll('.notification-kind-icon.failed').length,
+                  titleTruncated:
+                    title.scrollWidth > title.clientWidth &&
+                    titleStyle.textOverflow === 'ellipsis',
+                };
+              })()`);
+              console.log("NOTIFICATION_PROBE", probe);
+            };
+            await setTheme("light");
+            await setPage("chat");
+            await openNotificationFixture();
+            await probeNotificationFixture("light");
+            await shot("pi-notifications-light");
+            await mainWindow!.webContents.executeJavaScript(`
+              document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            `);
+            await setTheme("dark");
+            await openNotificationFixture();
+            await probeNotificationFixture("dark");
+            await shot("pi-notifications-dark");
+            await mainWindow!.webContents.executeJavaScript(`
+              document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            `);
+            captureViewportOverride = true;
+            try {
+              mainWindow!.setMinimumSize(420, 640);
+              mainWindow!.setSize(420, 760, false);
+              await new Promise((r) => setTimeout(r, 250));
+              await setTheme("light");
+              await openNotificationFixture();
+              await probeNotificationFixture("narrow");
+              await shot("pi-notifications-narrow");
+              await mainWindow!.webContents.executeJavaScript(`
+                document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+                window.__PI_DESKTOP__?.seedNotifications?.(0);
+              `);
+            } finally {
+              mainWindow!.setSize(CODEX_BOUNDS.width, CODEX_BOUNDS.height, false);
+              mainWindow!.setMinimumSize(1040, 700);
+              captureViewportOverride = false;
+            }
+            await new Promise((r) => setTimeout(r, 300));
             // Destination + theme captures (robust via __PI_DESKTOP__ hooks).
             await setTheme("dark");
             await setPage("chat");
@@ -747,7 +1090,7 @@ async function createWindow() {
             await shot("pi-settings-models");
             await mainWindow!.webContents.executeJavaScript(`
               (() => {
-                const edit = [...document.querySelectorAll('.provider-card-actions button')][0];
+                const edit = [...document.querySelectorAll('.provider-row-actions .provider-icon-btn')][0];
                 const add = document.querySelector('.provider-section-head button');
                 (edit ?? add)?.dispatchEvent(new MouseEvent('click',{bubbles:true}));
               })()
@@ -767,6 +1110,64 @@ async function createWindow() {
             await shot("pi-profile-menu");
             await setTheme("light");
             await setPage("chat");
+            // Global search modal (⌘K): recents view, query view, dark theme.
+            // Close the profile menu left open by the previous scene first.
+            await mainWindow!.webContents.executeJavaScript(`
+              window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+            `);
+            await new Promise((r) => setTimeout(r, 200));
+            const openSearch = () =>
+              mainWindow!.webContents.executeJavaScript(`
+                document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }));
+              `);
+            const typeSearch = (value: string) =>
+              mainWindow!.webContents.executeJavaScript(`
+                (() => {
+                  const input = document.querySelector(".search-input");
+                  if (!input) return;
+                  const setter = Object.getOwnPropertyDescriptor(
+                    window.HTMLInputElement.prototype,
+                    "value",
+                  ).set;
+                  setter.call(input, ${JSON.stringify(value)});
+                  input.dispatchEvent(new Event("input", { bubbles: true }));
+                })()
+              `);
+            const searchKey = (key: string) =>
+              mainWindow!.webContents.executeJavaScript(`
+                document.querySelector(".search-input")?.dispatchEvent(
+                  new KeyboardEvent("keydown", { key: ${JSON.stringify(key)}, bubbles: true }),
+                );
+              `);
+            await openSearch();
+            await new Promise((r) => setTimeout(r, 450));
+            await shot("pi-search");
+            await typeSearch("设计");
+            await new Promise((r) => setTimeout(r, 350));
+            await shot("pi-search-query");
+            // Settings hits: "主题" resolves to 通用 tab's theme row.
+            await typeSearch("主题");
+            await new Promise((r) => setTimeout(r, 350));
+            await shot("pi-search-settings");
+            await setTheme("dark");
+            await new Promise((r) => setTimeout(r, 250));
+            await shot("pi-search-dark");
+            await setTheme("light");
+            await new Promise((r) => setTimeout(r, 250));
+            // Page hits: "插件" surfaces the plugins page entry.
+            await typeSearch("插件");
+            await new Promise((r) => setTimeout(r, 350));
+            await shot("pi-search-pages");
+            // Anchor flash: Enter on the 主题 settings hit lands on 基础 and
+            // flashes the theme row.
+            await typeSearch("主题");
+            await new Promise((r) => setTimeout(r, 350));
+            await searchKey("ArrowDown");
+            await searchKey("Enter");
+            await new Promise((r) => setTimeout(r, 400));
+            await shot("pi-search-anchor");
+            await setPage("chat");
+            await new Promise((r) => setTimeout(r, 250));
             // Toast stack proof (ToastHost variants) in both themes.
             const raiseToasts = () =>
               mainWindow!.webContents.executeJavaScript(`
@@ -795,12 +1196,12 @@ async function createWindow() {
   });
 
   if (process.env.ELECTRON_RENDERER_URL) {
-    await mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
+    await window.loadURL(process.env.ELECTRON_RENDERER_URL);
     if (process.env.PI_DESKTOP_DEVTOOLS === "1") {
-      mainWindow.webContents.openDevTools({ mode: "detach" });
+      window.webContents.openDevTools({ mode: "detach" });
     }
   } else {
-    await mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
+    await window.loadFile(join(__dirname, "../renderer/index.html"));
   }
 }
 
@@ -933,25 +1334,9 @@ function wireSidecar(s: AgentSidecar) {
       }
       sendToRenderer(IPC.event.agentMessage, params);
       persistAgentEvent(envelope);
-    } else if (method === "agent.permission") {
-      const envelope: AgentEventEnvelope = {
-        sessionId: (params as any).sessionId,
-        ts: Date.now(),
-        event: {
-          type: "tool_permission_request",
-          request: {
-            requestId: (params as any).requestId,
-            sessionId: (params as any).sessionId,
-            toolCallId: (params as any).toolCallId,
-            toolName: (params as any).toolName,
-            argsPreview: (params as any).argsPreview,
-            risk: (params as any).risk,
-            reason: (params as any).reason,
-          },
-        },
-      };
-      sendToRenderer(IPC.event.agentMessage, envelope);
     }
+    // permissions.request reaches the renderer once, via wireHost; the
+    // sidecar no longer relays it (agent-sidecar.setHost filters it out).
   });
   s.onExit(({ code, signal, intentional }) => {
     if (intentional || quitting) return;
@@ -1033,8 +1418,21 @@ function finishTurn(
   const turnId = activeTurns.get(sessionId);
   activeTurns.delete(sessionId);
   if (host && turnId) {
+    const createNotification = shouldCreateTaskNotification(sessionId);
     void host
-      .call("session.endTurn", { turnId, status, errorCode })
+      .call<{ ok: boolean; notification?: AppNotification }>("session.endTurn", {
+        turnId,
+        status,
+        errorCode,
+        createNotification,
+      })
+      .then((result) => {
+        if (result.notification) {
+          sendToRenderer(IPC.event.notificationChanged, {
+            notification: result.notification,
+          });
+        }
+      })
       .catch((e) =>
         logger.app("warn", "endTurn failed", { sessionId, data: String(e) }),
       );
@@ -1168,15 +1566,15 @@ function persistAgentEvent(envelope: AgentEventEnvelope) {
     return;
   }
   if (event.type === "message_end" && event.message.role === "assistant") {
-    // A turn that dies before producing any text leaves an empty bubble with
-    // status error/aborted — not worth a transcript row (the error banner and
-    // turn status carry the failure).
+    // Empty aborted bubbles are not useful transcript rows. Structured
+    // provider failures remain durable assistant messages so their details
+    // stay attached to the failed turn after reload.
     const failed =
       event.message.status === "error" || event.message.status === "aborted";
     const empty =
       !(event.message.content || "").trim() &&
       !(event.message.thinking || "").trim();
-    if (failed && empty) return;
+    if (failed && empty && !event.message.error) return;
     void host
       .call("session.appendMessage", {
         sessionId: envelope.sessionId,
@@ -1338,6 +1736,87 @@ function registerIpc() {
     return { ok: true };
   });
 
+  handle(IPC.invoke.updatesGetState, async () => updater.getState());
+
+  handle(IPC.invoke.updatesCheck, async () => updater.check({ manual: true }));
+
+  handle(IPC.invoke.updatesDownload, async () => updater.download());
+
+  handle(IPC.invoke.updatesInstall, async () => {
+    updater.install();
+    return { ok: true };
+  });
+
+  handle(IPC.invoke.updatesOpenReleases, async () => {
+    await updater.openReleases();
+    return { ok: true };
+  });
+
+  handle(IPC.invoke.notificationList, async (input: {
+    unreadOnly?: boolean;
+    limit?: number;
+  } = {}) => {
+    if (!host) throw new Error("host unavailable");
+    return host.call("notification.list", input);
+  });
+
+  handle(IPC.invoke.notificationMarkRead, async (input: { id?: string } = {}) => {
+    if (!host) throw new Error("host unavailable");
+    return host.call("notification.markRead", input);
+  });
+
+  handle(IPC.invoke.notificationMarkAllRead, async () => {
+    if (!host) throw new Error("host unavailable");
+    return host.call("notification.markAllRead");
+  });
+
+  handle(IPC.invoke.notificationClear, async () => {
+    if (!host) throw new Error("host unavailable");
+    return host.call("notification.clear");
+  });
+
+  handle(
+    IPC.invoke.notificationSetViewingSession,
+    async (input: { sessionId?: unknown } = {}) => {
+      const sessionId =
+        typeof input.sessionId === "string" ? input.sessionId.trim() : "";
+      notificationViewingSessionId = sessionId || null;
+      return { ok: true };
+    },
+  );
+
+  handle(IPC.invoke.notificationShowNative, async (input: {
+    id?: string;
+    sessionId?: string;
+    title?: string;
+    body?: string;
+  } = {}) => {
+    if (
+      !mainWindow ||
+      mainWindow.isDestroyed() ||
+      mainWindow.isFocused() ||
+      !SystemNotification.isSupported()
+    ) {
+      return { shown: false };
+    }
+    const id = String(input.id ?? "");
+    const sessionId = String(input.sessionId ?? "");
+    const title = String(input.title ?? "").trim().slice(0, 100);
+    const body = String(input.body ?? "").trim().slice(0, 240);
+    if (!id || !sessionId || !title) return { shown: false };
+
+    const notification = new SystemNotification({ title, body });
+    notification.on("click", () => {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+      sendToRenderer(IPC.event.notificationActivated, { id, sessionId });
+    });
+    notification.show();
+    return { shown: true };
+  });
+
   handle(IPC.invoke.sessionList, async () => {
     if (!host) throw new Error("host unavailable");
     const [result, providers] = await Promise.all([
@@ -1360,6 +1839,49 @@ function registerIpc() {
     const providers = await listRuntimeProviders();
     return { ...res, session: enrichSession(res.session, providers) };
   });
+  handle(
+    IPC.invoke.sessionFork,
+    async (input: { sessionId?: string; title?: string } = {}) => {
+      if (!host) throw new Error("host unavailable");
+      const sessionId = String(input.sessionId ?? "").trim();
+      if (!sessionId) {
+        throw Object.assign(new Error("sessionId required"), {
+          errorCode: ErrorCodes.INVALID_ARGUMENT,
+        });
+      }
+      if (activeTurns.has(sessionId)) {
+        throw Object.assign(new Error("Cannot fork a running session"), {
+          errorCode: ErrorCodes.AGENT_BUSY,
+        });
+      }
+      // Resolve enrichment before the mutation so a provider-list failure
+      // cannot report a failed IPC after the child has already been committed.
+      const providers = await listRuntimeProviders();
+      let result: { session?: RuntimeSession | null };
+      try {
+        result = await host.call("session.fork", {
+          sessionId,
+          title: String(input.title ?? "").trim() || undefined,
+        });
+      } catch (error: any) {
+        if (error?.data?.errorCode === ErrorCodes.CONFLICT) {
+          throw Object.assign(new Error("Cannot fork a running session"), {
+            errorCode: ErrorCodes.AGENT_BUSY,
+          });
+        }
+        throw error;
+      }
+      if (!result.session) return result;
+      logger.app("info", "session forked", {
+        sessionId: (result.session as { id?: string }).id,
+        data: { sourceSessionId: sessionId },
+      });
+      return {
+        ...result,
+        session: enrichSession(result.session, providers),
+      };
+    },
+  );
   handle(IPC.invoke.sessionGet, async (id: string) => {
     if (!host) throw new Error("host unavailable");
     const [result, providers] = await Promise.all([
@@ -1369,6 +1891,39 @@ function registerIpc() {
     return result.session
       ? { ...result, session: enrichSession(result.session, providers) }
       : result;
+  });
+  handle(IPC.invoke.sessionOpenFolder, async (id: string) => {
+    if (!host) throw new Error("host unavailable");
+    const sessionId = String(id ?? "").trim();
+    if (!sessionId) {
+      throw Object.assign(new Error("sessionId required"), {
+        errorCode: ErrorCodes.INVALID_ARGUMENT,
+      });
+    }
+    // Resolve the folder in main from the session record so the renderer
+    // never passes a raw filesystem path over IPC.
+    const res = await host.call<{
+      session?: { projectPath?: string } | null;
+    }>("session.get", { id: sessionId });
+    if (!res.session) {
+      throw Object.assign(new Error("session not found"), {
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+    const projectPath = res.session.projectPath?.trim();
+    // Project sessions open their project folder; temporary sessions open
+    // the per-session scratch dir (D114), created on demand so the folder
+    // opens even before the agent has written anything there.
+    const target = projectPath || join(dataDir, "scratch", sessionId);
+    if (!projectPath) mkdirSync(target, { recursive: true });
+    if (!existsSync(target)) {
+      throw Object.assign(new Error("folder not found"), {
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+    const openError = await shell.openPath(target);
+    if (openError) throw new Error(openError);
+    return { ok: true, path: target };
   });
   handle(IPC.invoke.sessionDelete, async (id: string) => {
     if (!host) throw new Error("host unavailable");
@@ -1465,6 +2020,7 @@ function registerIpc() {
         providerId?: string;
         modelId?: string;
         thinkingLevel?: ThinkingLevel;
+        permissionMode?: "inherit" | "ask" | "accept-edits" | "auto";
       },
     ) => {
       if (!host) throw new Error("host unavailable");
@@ -1533,7 +2089,11 @@ function registerIpc() {
   });
   handle(IPC.invoke.settingsSet, async (settings: unknown) => {
     if (!host) throw new Error("host unavailable");
-    return host.call("settings.set", settings);
+    const result = await host.call("settings.set", settings);
+    applyApplicationMenuLanguage(
+      (settings as { language?: unknown } | null)?.language,
+    );
+    return result;
   });
 
   handle(IPC.invoke.providersList, async () => {
@@ -1616,11 +2176,12 @@ function registerIpc() {
     async (
       input?:
         | string
-        | {
+          | {
             providerId?: string;
             baseUrl?: string;
             apiKey?: string;
             apiStyle?: string;
+            source?: "cache" | "refresh";
           },
     ) => {
       if (!host) throw new Error("host unavailable");
@@ -1631,6 +2192,57 @@ function registerIpc() {
         : undefined;
       const baseUrl = (req.baseUrl ?? provider?.baseUrl ?? "").trim();
       const apiStyle = req.apiStyle ?? provider?.apiStyle ?? "chat_completions";
+      const decorate = (model: {
+        modelId: string;
+        displayName: string;
+        capabilities?: string[];
+        contextWindow?: number;
+        source?: "bundled" | "discovered" | "user";
+      }) => {
+        const capabilities = new Set(model.capabilities ?? ["text"]);
+        capabilities.add("text");
+        const thinking = resolveThinkingCapabilities({
+          vendorKey: provider?.vendorKey || "custom",
+          modelId: model.modelId,
+          supportsReasoning: provider?.supportsReasoning,
+          supportedThinkingLevels: provider?.supportedThinkingLevels,
+        });
+        if (thinking.supportsReasoning) capabilities.add("reasoning");
+        else capabilities.delete("reasoning");
+        return {
+          modelId: model.modelId,
+          displayName: model.displayName,
+          providerId: provider?.id ?? "",
+          contextWindow: model.contextWindow,
+          capabilities: [...capabilities],
+          supportedThinkingLevels: thinking.supportedThinkingLevels,
+          source: model.source ?? ("discovered" as const),
+        };
+      };
+
+      if (req.source === "cache" && provider) {
+        const cached = await host.call<{
+          models: Array<{
+            modelId: string;
+            displayName: string;
+            capabilities?: string[];
+            contextWindow?: number;
+            source?: "bundled" | "discovered" | "user";
+          }>;
+        }>("providers.listModels", { providerId: provider.id });
+        if (cached.models.length > 0) {
+          return { models: cached.models.map(decorate), source: "cache" as const };
+        }
+        const fallback = provider.defaultModelId
+          ? [decorate({
+              modelId: provider.defaultModelId,
+              displayName: provider.defaultModelId,
+              source: "user",
+            })]
+          : [];
+        return { models: fallback, source: "fallback" as const };
+      }
+
       // Dialog edits can omit the key to reuse the stored secret; the raw key
       // never travels back to the renderer either way.
       let apiKey = req.apiKey ?? "";
@@ -1640,28 +2252,43 @@ function registerIpc() {
         });
         apiKey = secret.value ?? "";
       }
-      const decorate = (model: { modelId: string; displayName: string }) => {
-        const thinking = resolveThinkingCapabilities({
-          vendorKey: provider?.vendorKey || "custom",
-          modelId: model.modelId,
-          supportsReasoning: provider?.supportsReasoning,
-          supportedThinkingLevels: provider?.supportedThinkingLevels,
-        });
-        return {
-          modelId: model.modelId,
-          displayName: model.displayName,
-          providerId: provider?.id ?? "",
-          capabilities: thinking.supportsReasoning ? ["text", "reasoning"] : ["text"],
-          supportedThinkingLevels: thinking.supportedThinkingLevels,
-          source: "discovered" as const,
-        };
-      };
       let discoveryError: string | undefined;
       if (baseUrl) {
         try {
           const discovered = await discoverProviderModels({ baseUrl, apiKey, apiStyle });
           if (discovered.length > 0) {
-            return { models: discovered.map(decorate), source: "remote" };
+            const models = discovered.map(decorate);
+            const savedBaseUrl = (provider?.baseUrl ?? "").trim().replace(/\/+$/, "");
+            const requestBaseUrl = baseUrl.replace(/\/+$/, "");
+            const usesSavedEndpoint =
+              !!provider &&
+              requestBaseUrl === savedBaseUrl &&
+              apiStyle === (provider.apiStyle ?? "chat_completions");
+            if (usesSavedEndpoint) {
+              try {
+                const latestProvider = (await listRuntimeProviders()).find(
+                  (candidate) => candidate.id === provider.id,
+                );
+                const endpointStillCurrent =
+                  (latestProvider?.baseUrl ?? "").trim().replace(/\/+$/, "") ===
+                    requestBaseUrl &&
+                  (latestProvider?.apiStyle ?? "chat_completions") === apiStyle;
+                if (endpointStillCurrent) {
+                  await host.call("providers.cacheModels", {
+                    providerId: provider.id,
+                    models,
+                  });
+                }
+              } catch (e) {
+                logger.app("warn", "model cache update failed", {
+                  data: {
+                    providerId: provider.id,
+                    error: e instanceof Error ? e.message : String(e),
+                  },
+                });
+              }
+            }
+            return { models, source: "remote" as const };
           }
         } catch (e) {
           discoveryError = e instanceof Error ? e.message : String(e);
@@ -1706,7 +2333,7 @@ function registerIpc() {
     const seed =
       process.env.PI_DESKTOP_SEED_WORKSPACE ||
       process.env.PI_DESKTOP_WORKSPACE ||
-      (app.isPackaged ? "" : join(__dirname, "../../.."));
+      (isDevelopmentBuild ? join(__dirname, "../../..") : "");
     if (!res.workspace && seed) {
       try {
         res = (await host.call("workspace.set", { path: seed })) as {
@@ -1909,6 +2536,81 @@ function registerIpc() {
     return { ok: true };
   });
 
+  // Composer input APIs (D123/D124, ADR 0024). Both fail soft: the menus
+  // simply have less to show when the workspace or host is unavailable.
+  const optionalWorkspaceRoot = async (): Promise<string | null> => {
+    try {
+      return await requireWorkspaceRoot();
+    } catch {
+      return null;
+    }
+  };
+
+  let composerTemplateCache: {
+    key: string;
+    at: number;
+    templates: ComposerTemplate[];
+  } | null = null;
+  const loadComposerTemplatesCached = async (
+    root: string | null,
+  ): Promise<ComposerTemplate[]> => {
+    const key = root ?? "";
+    const now = Date.now();
+    if (
+      composerTemplateCache &&
+      composerTemplateCache.key === key &&
+      now - composerTemplateCache.at < 5000
+    ) {
+      return composerTemplateCache.templates;
+    }
+    const { templates, diagnostics } = await loadComposerTemplates(root);
+    for (const diagnostic of diagnostics) {
+      logger.app("warn", "composer template diagnostic", { data: diagnostic });
+    }
+    composerTemplateCache = { key, at: now, templates };
+    return templates;
+  };
+
+  handle(IPC.invoke.fsIndex, async () => {
+    const root = await optionalWorkspaceRoot();
+    if (!root) return { entries: [], truncated: false };
+    return getWorkspaceFileIndex(root);
+  });
+
+  handle(IPC.invoke.composerCommands, async () => {
+    const root = await optionalWorkspaceRoot();
+    const templates = await loadComposerTemplatesCached(root).catch(() => []);
+    const templateCommands = templates.map((template) => ({
+      name: template.name,
+      kind: "template" as const,
+      title: template.name,
+      ...(template.description ? { description: template.description } : {}),
+      ...(template.argumentHint ? { argumentHint: template.argumentHint } : {}),
+      source: template.source,
+    }));
+    const pluginCommands = plugins.getCommands().map((command) => ({
+      name: command.id,
+      kind: "plugin" as const,
+      title: command.title,
+      ...(command.category ? { description: command.category } : {}),
+      id: command.id,
+    }));
+    // One namespace: builtin aliases win, then project templates, then user
+    // templates, then plugin commands (spec 04 §7).
+    const merged = new Map<
+      string,
+      ReturnType<typeof builtinComposerCommands>[number]
+    >();
+    for (const command of [
+      ...builtinComposerCommands(),
+      ...templateCommands,
+      ...pluginCommands,
+    ]) {
+      if (!merged.has(command.name)) merged.set(command.name, command);
+    }
+    return { commands: [...merged.values()] };
+  });
+
   // Grow/shrink the window horizontally, keeping the left edge anchored so
   // the chat column keeps its width when the work panel opens. Returns the
   // delta actually applied (0 when maximized/fullscreen or out of room).
@@ -1937,10 +2639,123 @@ function registerIpc() {
         width = Math.min(width, workRight - x);
       }
       mainWindow.setBounds({ x, y: bounds.y, width, height: bounds.height }, false);
-      return { applied: width - bounds.width };
+      const applied = width - bounds.width;
+      panelWindowWidthOffset = Math.max(0, panelWindowWidthOffset + applied);
+      return { applied };
     },
   );
 
+
+  // Custom window-chrome buttons on Windows/Linux (renderer-drawn).
+  handle(
+    IPC.invoke.windowControl,
+    async (input: { action?: string } = {}) => {
+      if (
+        !input.action ||
+        !WINDOW_CONTROL_ACTIONS.includes(input.action as WindowControlAction)
+      ) {
+        throw new Error("unsupported window control action");
+      }
+      if (!mainWindow || mainWindow.isDestroyed()) return { maximized: false };
+      const window = mainWindow;
+      switch (input.action as WindowControlAction) {
+        case "getState":
+          break;
+        case "minimize":
+          window.minimize();
+          break;
+        case "toggleMaximize":
+          if (window.isMaximized()) window.unmaximize();
+          else window.maximize();
+          break;
+        case "close":
+          window.close();
+          break;
+      }
+      return {
+        maximized: !window.isDestroyed() && window.isMaximized(),
+      };
+    },
+  );
+
+  ipcMain.handle(IPC.invoke.menuRendererReady, async (event) =>
+    wrap(async () => {
+      const window = BrowserWindow.fromWebContents(event.sender);
+      if (!window || window !== mainWindow || !markMenuRendererReady(window)) {
+        throw new Error("menu renderer is not attached to the main window");
+      }
+      return { ready: true };
+    }),
+  );
+
+  handle(
+    IPC.invoke.nativeMenuAction,
+    async (input: { action?: string } = {}) => {
+      if (
+        !input.action ||
+        !NATIVE_MENU_ACTIONS.includes(input.action as NativeMenuAction)
+      ) {
+        throw new Error("unsupported native menu action");
+      }
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        return { maximized: false, fullScreen: false };
+      }
+
+      const window = mainWindow;
+      const action = input.action as NativeMenuAction;
+      const contents = window.webContents;
+      switch (action) {
+        case "undo":
+          contents.undo();
+          break;
+        case "redo":
+          contents.redo();
+          break;
+        case "cut":
+          contents.cut();
+          break;
+        case "copy":
+          contents.copy();
+          break;
+        case "paste":
+          contents.paste();
+          break;
+        case "selectAll":
+          contents.selectAll();
+          break;
+        case "reload":
+          contents.reload();
+          break;
+        case "zoomIn":
+          contents.setZoomFactor(Math.min(3, contents.getZoomFactor() * 1.1));
+          break;
+        case "zoomOut":
+          contents.setZoomFactor(Math.max(0.5, contents.getZoomFactor() / 1.1));
+          break;
+        case "resetZoom":
+          contents.setZoomFactor(1);
+          break;
+        case "toggleFullScreen":
+          window.setFullScreen(!window.isFullScreen());
+          break;
+        case "minimize":
+          window.minimize();
+          break;
+        case "toggleMaximize":
+          if (window.isMaximized()) window.unmaximize();
+          else window.maximize();
+          break;
+        case "close":
+          window.close();
+          break;
+      }
+
+      return {
+        maximized: !window.isDestroyed() && window.isMaximized(),
+        fullScreen: !window.isDestroyed() && window.isFullScreen(),
+      };
+    },
+  );
 
   handle(IPC.invoke.pullsList, async () => {
     if (!host) throw new Error("host unavailable");
@@ -2161,6 +2976,18 @@ function registerIpc() {
       thinkingCapabilities,
       normalizeThinkingLevel(session.thinkingLevel),
     );
+    // Wire-dialect hints from the pi-ai catalog (exact or alias-suffix model
+    // id match). Without them, thinking "off" emits no request parameter on
+    // custom OpenAI-compatible endpoints and default-on reasoners (e.g.
+    // MiMo *-think) keep thinking. Resolved here because the sidecar never
+    // loads the catalog.
+    const modelCompat = thinkingCapabilities.supportsReasoning
+      ? resolveModelWireCompat({
+          vendorKey: provider.vendorKey || "custom",
+          modelId,
+          apiStyle: provider.apiStyle,
+        })
+      : undefined;
 
     // Open a durable turn row, then persist the user message under it.
     const turn = await host
@@ -2171,6 +2998,30 @@ function registerIpc() {
       })
       .catch(() => null);
     if (turn) activeTurns.set(req.sessionId, turn.turnId);
+
+    // Slash template expansion (D123, ADR 0024): templates expand before
+    // persistence so reseed replays exactly what the model saw; the typed
+    // form rides along as `command` for transcript display. Builtin/plugin
+    // slash aliases never reach this channel, and unknown /names stay
+    // literal text.
+    let promptContent = req.content;
+    let slashCommand: string | undefined;
+    if (req.content.startsWith("/")) {
+      try {
+        const root = await optionalWorkspaceRoot();
+        const templates = await loadComposerTemplatesCached(root);
+        const expansion = expandSlashInvocation(req.content, templates);
+        if (expansion) {
+          promptContent = expansion.expanded;
+          slashCommand = expansion.command;
+        }
+      } catch (error) {
+        logger.app("warn", "slash expansion failed; sending literal text", {
+          sessionId: req.sessionId,
+          data: String(error),
+        });
+      }
+    }
 
     // Persist user message
     const revisionMeta = (req as any).__revisionMeta as
@@ -2183,9 +3034,10 @@ function registerIpc() {
     const userMessage = {
       id: crypto.randomUUID(),
       role: "user" as const,
-      content: req.content,
+      content: promptContent,
       createdAt: new Date().toISOString(),
       status: "complete" as const,
+      ...(slashCommand ? { command: slashCommand } : {}),
       ...(revisionMeta?.revisionCount
         ? {
             revisionRootId: revisionMeta.rootUserId,
@@ -2216,9 +3068,13 @@ function registerIpc() {
         "agent.prompt",
         {
           sessionId: req.sessionId,
-          content: req.content,
+          content: promptContent,
           mode: session.mode || settings.defaultMode || "agent",
           thinkingLevel,
+          // Per-session scratch dir for temp files (D114). Same layout as
+          // host-core computes from its data dir; host-core is the enforcing
+          // side, this only tells the model where scratch lives.
+          scratchDir: join(dataDir, "scratch", req.sessionId),
           provider: {
             id: provider.id,
             name: provider.name,
@@ -2234,6 +3090,7 @@ function registerIpc() {
             contextWindow: provider.contextWindow,
             maxOutputTokens: provider.maxOutputTokens,
             temperature: provider.temperature,
+            ...(modelCompat ? { modelCompat } : {}),
           },
           // Registered plugin agent tools join the model's toolset; execution
           // round-trips host -> main (plugins.execute) -> plugin JS.
@@ -2326,21 +3183,7 @@ function registerIpc() {
 
   handle(IPC.invoke.commandPaletteSearch, async (query: string) => {
     const q = (query || "").toLowerCase();
-    const builtin = [
-      { id: "builtin.session.new", title: "New task", category: "Session", keywords: ["new", "chat", "task"], source: "builtin" as const },
-      { id: "builtin.session.delete", title: "Delete current task", category: "Session", keywords: ["delete", "remove", "session"], source: "builtin" as const },
-      { id: "builtin.agent.abort", title: "Abort current run", category: "Session", keywords: ["stop", "abort", "cancel"], source: "builtin" as const },
-      { id: "builtin.mode.agent", title: "Switch to Agent mode", category: "Session", keywords: ["mode", "agent"], source: "builtin" as const },
-      { id: "builtin.mode.chat", title: "Switch to Chat mode (read-only)", category: "Session", keywords: ["mode", "chat", "read-only"], source: "builtin" as const },
-      { id: "builtin.project.open", title: "Open project", category: "Project", keywords: ["open", "folder", "workspace"], source: "builtin" as const },
-      { id: "builtin.project.clear", title: "Clear project", category: "Project", keywords: ["clear", "close", "workspace"], source: "builtin" as const },
-      { id: "builtin.settings.open", title: "Open settings", category: "App", keywords: ["settings", "preferences"], source: "builtin" as const },
-      { id: "builtin.settings.providers", title: "Open provider settings", category: "Settings", keywords: ["provider", "model", "key"], source: "builtin" as const },
-      { id: "builtin.settings.import", title: "Import from other tools", category: "Settings", keywords: ["import", "claude", "codex", "opencode", "pi", "migrate"], source: "builtin" as const },
-      { id: "builtin.plugins.open", title: "Open plugins", category: "Plugins", keywords: ["plugins", "extensions"], source: "builtin" as const },
-      { id: "builtin.plugins.loadDev", title: "Load development plugin", category: "Plugins", keywords: ["load", "dev", "plugin"], source: "builtin" as const },
-      { id: "builtin.logs.open", title: "Open logs folder", category: "Diagnostics", keywords: ["logs", "diagnostics"], source: "builtin" as const },
-    ];
+    const builtin = builtinPaletteItems();
     const pluginCmds = plugins.getCommands().map((c) => ({
       id: c.id,
       title: c.title,
@@ -2381,7 +3224,18 @@ function registerIpc() {
 
 app.whenReady().then(async () => {
   applyDevelopmentBranding();
+  app.setName(APP_NAME);
+  app.setAboutPanelOptions({
+    applicationName: APP_NAME,
+    applicationVersion: APP_VERSION,
+    version: APP_VERSION,
+  });
+  installApplicationMenu({
+    locale: app.getLocale(),
+    dispatch: dispatchApplicationMenuCommand,
+  });
   registerIpc();
+  updater.startAutoCheck();
   let bootError: unknown = null;
   try {
     await bootBackends();
@@ -2392,7 +3246,17 @@ app.whenReady().then(async () => {
       data: String(e),
     });
   }
-  await createWindow();
+  if (host) {
+    try {
+      const stored = (await host.call("settings.get")) as {
+        language?: unknown;
+      } | null;
+      applyApplicationMenuLanguage(stored?.language);
+    } catch {
+      // keep the OS-locale menu until settings can be read again
+    }
+  }
+  await ensureWindow();
   // createWindow awaits the initial load (loadFile resolves on
   // did-finish-load), so the page is up; give React a beat to mount its
   // event subscriptions before pushing the boot outcome.
@@ -2403,6 +3267,8 @@ app.whenReady().then(async () => {
         ? { component: "host", fatal: true, message: String(bootError) }
         : {}),
     });
+    applicationBooted = true;
+    flushPendingApplicationMenuCommands();
   }, 300);
 
   // Headless boot probe for automated e2e (scripts/e2e-electron-boot.mjs):
@@ -2418,13 +3284,23 @@ app.whenReady().then(async () => {
                  return { ok: false, reason: "preload api missing" };
                }
                const version = await api.invoke(api.channels.invoke.appGetVersion);
+               const windowState =
+                 api.platform === "darwin"
+                   ? null
+                   : await api.invoke(api.channels.invoke.windowControl, {
+                       action: "getState",
+                     });
                return {
                  ok: version?.ok === true,
                  version: version?.data?.version,
                  hostProtocol: version?.data?.hostProtocolVersion,
+                 platform: api.platform,
+                 maximized: windowState?.data?.maximized ?? null,
                };
              })()`,
           );
+          probe.appName = app.getName();
+          probe.menuCount = Menu.getApplicationMenu()?.items.length ?? 0;
           console.log("BOOT_PROBE", JSON.stringify(probe));
         } catch (e) {
           console.log(
@@ -2481,6 +3357,7 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   quitting = true;
+  updater.dispose();
   logger.app("info", "app shutdown");
   ptys.disposeAll();
   browserPane.dispose();
@@ -2489,5 +3366,5 @@ app.on("before-quit", () => {
 });
 
 app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) void createWindow();
+  if (BrowserWindow.getAllWindows().length === 0) void ensureWindow();
 });

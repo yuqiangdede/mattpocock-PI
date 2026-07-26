@@ -13,12 +13,13 @@
 |---|---|---|
 | `Cmd/Ctrl + Shift + P` | Open command palette | Global (D014) |
 | `Cmd/Ctrl + N` | New chat/session | Global |
-| `Cmd/Ctrl + W` | Close/delete current session | Global (with confirm) |
+| `Cmd/Ctrl + O` | Open project | Global |
+| `Cmd/Ctrl + W` | Close window | Global |
 | `Cmd/Ctrl + ,` | Open settings | Global |
 | `Cmd/Ctrl + B` | Toggle sidebar | Global |
-| `Cmd/Ctrl + E` | Toggle context panel | Global |
 | `Cmd/Ctrl + .` | Abort active turn | Global (same as abort button) |
-| `Cmd/Ctrl + K` | Focus model selector | Topbar context |
+| `Cmd/Ctrl + K` | Open command palette | Global |
+| `F10` | Focus application menubar | Windows/Linux |
 
 ### 1.2 Chat context shortcuts
 
@@ -40,13 +41,40 @@
 
 ### 1.4 Shortcut rules
 
-- All shortcuts are discoverable via command palette search (keyword "shortcut" or "keybinding")
+- Application-menu shortcuts are discoverable through visible menu
+  accelerators. Command-only shortcuts remain discoverable via command palette
+  search (keyword "shortcut" or "keybinding").
 - Shortcuts must not conflict with macOS system shortcuts or common browser shortcuts
 - Never override `Cmd/Ctrl + C`, `Cmd/Ctrl + V`, `Cmd/Ctrl + A`, `Cmd/Ctrl + S`
 - Shortcuts are consistent across macOS (Cmd) and Windows/Linux (Ctrl)
-- Shortcut changes require updating the command palette metadata
+- Command-only shortcut changes require updating the command palette metadata;
+  native roles and visible application-menu accelerators remain menu-owned
 
-### 1.5 Sidebar project and conversation organization
+### 1.5 Platform application menus
+
+- macOS application-menu accelerators dispatch the same allowlisted shell
+  commands as renderer controls. Native Edit/View/Window roles retain
+  platform text-editing, zoom, fullscreen, hide, and quit behavior.
+- Windows/Linux F10 focuses File while Shift+F10 is not consumed by the
+  menubar and remains available to focused content. Enter, Space, or ArrowDown
+  opens the focused menu at its first item; ArrowUp opens it at its last item.
+  Left/Right moves between top-level menus; Up/Down wraps through menu items;
+  Home/End move to boundaries; Tab exits; Escape closes and restores trigger
+  focus.
+- Top-level items use roving tab focus. Keyboard-invoked editing actions
+  restore the previously focused editor before dispatch.
+- Opening one Windows/Linux menu and hovering another transfers the open
+  popover and focus without changing titlebar geometry. Outside pointer press
+  dismisses it.
+- Main queues native commands until the renderer acknowledges that its menu
+  event subscription is active. Closing and recreating a window resets this
+  handshake.
+- Frameless minimize, maximize/restore, and close controls remain outside the
+  drag region. Maximize state is queried on mount and updated from native
+  window events, so the restore affordance never depends only on optimistic
+  renderer state.
+
+### 1.6 Sidebar project and conversation organization
 
 The sidebar is a path-keyed presentation of host-owned projects and sessions.
 Several project groups may be retained while exactly one workspace supplies
@@ -127,6 +155,66 @@ the visible shell context.
   directly to Settings → Info.
 - Collapsing the sidebar closes the menu and restores the collapsed rail's
   normal navigation state.
+
+### 1.7 Notification inbox (D117)
+
+#### Event-to-surface flow
+
+1. Renderer reports the current chat's session id to Electron Main; navigating
+   away clears it. Main combines this hint with its own window visibility and
+   focus state when a turn reaches `completed` or `error`.
+2. If the exact finishing session is already visible in the focused window,
+   `session.endTurn` closes the turn without inserting a notification. Any
+   background session or unfocused/hidden window creates the durable record.
+   An `aborted` turn never creates one.
+3. Electron emits `notification.changed` to every live renderer so the bell
+   badge and currently open inbox refresh.
+4. If the main window is focused, no other surface appears. If it is
+   unfocused and native notifications are supported, Electron shows one
+   platform notification derived from the event kind and session title.
+5. Clicking the native notification shows/restores and focuses the main
+   window, then emits `notification.activated { sessionId }`.
+6. Renderer activation selects the bound project when present, loads the
+   session, and focuses the transcript/composer using the same path as an inbox
+   row click. Native and in-app activation must not diverge.
+
+#### Popover behavior
+
+- Bell click toggles the non-modal popover; a second click, Escape, or outside
+  press closes it. Escape restores focus to the bell.
+- Opening preserves the most recently selected `All` / `Unread` filter for the
+  current renderer lifetime and never marks rows read implicitly.
+- Arrow keys move through rows with wrap disabled; `Home` / `End` jump to the
+  first/last row; Enter/Space marks the row read and activates its session.
+- Mark all read updates every unread row in one host transaction. Clear
+  removes all inbox rows in one host transaction. Both operations are
+  idempotent, refresh the exact unread count, and leave sessions/turns intact.
+- The renderer does not synthesize notification records from stream events.
+  Host-core's unique `turn_id` is the exactly-once boundary across repeated
+  terminal updates, renderer reloads, and process restarts.
+- All visible event labels and native title/body strings are localized at the
+  presentation boundary from structured fields; persisted rows never contain
+  localized prose.
+
+### 1.8 Artifact-driven work panel tabs (D119)
+
+- The shell exposes no empty work-panel launcher, application-menu command, or
+  global shortcut. An artifact trigger atomically creates or reuses its tab,
+  activates it, and opens the panel.
+- File tabs use normalized paths as identity. Review, Terminal, and Browser are
+  singletons; repeated triggers preserve tab order and activate the existing tab.
+- Every tab has its own close control. Closing the active tab selects the right
+  neighbor, then the left; closing the final tab hides the panel. The separate
+  panel collapse control hides the panel without deleting tabs.
+- A successful active-session workspace Write/Edit opens Review. Failed and
+  scratch writes do not; background-session artifacts stay rooted in their
+  session and never take focus from the current project.
+- Terminal mounts only after a command artifact opens it and remains mounted
+  across tab switches while that tab exists.
+- Selecting another session or workspace closes the panel and clears retained
+  tabs, preventing workspace-relative resources from crossing context
+  boundaries. Window-state persistence records the base shell width without
+  any temporary panel expansion.
 
 ## 2. Streaming message behavior
 
@@ -253,12 +341,16 @@ Agent calls high-risk tool
 | Tool call failure | Error state on ToolCallCard | Context-dependent, user needs to see which tool failed |
 | Permission denial | Resolved state on PermissionCard | Already inline, part of conversation flow |
 | Stream interruption | Error state on MessageBubble | Belongs to the message that failed |
+| Provider/model turn failure | Assistant error message in transcript | Keeps summary, stable code, redacted detail, and recovery action attached to the failed turn |
 | Provider configuration validation error | Inline in settings form | User needs to see which field is wrong |
 | Composer validation (no model) | Disabled state + tooltip on send button | Immediate context |
 
 ### 6.3 Rules
 
 - Never use toast for errors that are tied to a specific message or tool call
+- Assistant error detail uses a keyboard-operable disclosure with
+  `aria-expanded` / `aria-controls`; it is open on first render so the provider
+  response is immediately discoverable, and supports copying the redacted text
 - Never use inline error for transient background operations (plugin load, connection test)
 - Toasts stack vertically, newest on top, at top-center
 - Error toasts require manual dismiss or timeout at 8s (longer than success)
@@ -284,6 +376,8 @@ Agent calls high-risk tool
 | Abort completed | Composer textarea |
 | Command palette closed | Previously focused element |
 | Dialog closed | Previously focused element |
+| Notification popover closed with Escape | Notification bell |
+| Notification row/native notification activated | Activated session composer after transcript load |
 
 ### 7.3 Focus trap
 
@@ -398,6 +492,7 @@ This does not prevent state changes — it makes them instant.
 | Scroll-to-bottom button fade-in | 150ms opacity | instant appear |
 | Toast slide-in | 200ms slide | instant appear |
 | Modal/dialog enter | 300ms fade+scale | instant appear |
+| Notification popover enter | menu-scale/fade token | instant appear |
 
 ## 11. Acceptance criteria
 
@@ -420,3 +515,9 @@ This does not prevent state changes — it makes them instant.
     shell workspace without redirecting background session tool roots
 15. Drag/manual reorder is not implemented; `manual` remains a compatibility
     value and future drag patterns follow §8
+16. Completed and failed turns appear exactly once in the durable inbox;
+    aborted turns never appear
+17. All/Unread, mark-all-read, clear, row activation, Escape/focus restore, and
+    arrow/Home/End keyboard navigation behave as documented in §1.7
+18. Native notifications appear only while the main window is unfocused and
+    their activation focuses the window and opens the corresponding session

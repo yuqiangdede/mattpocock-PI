@@ -10,8 +10,10 @@ import {
   createProvider,
   Type,
   type Api,
+  type AssistantMessage,
   type Model,
   type ProviderStreams,
+  type ToolResultMessage,
   type Usage,
 } from "@earendil-works/pi-ai";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
@@ -28,7 +30,7 @@ import type {
 } from "@pi-desktop/shared";
 import type { HostClient } from "./host-client.js";
 import { classifyAgentError } from "./agent-errors.js";
-import { clampThinkingLevel } from "./thinking-level.js";
+import { clampThinkingLevel, type ModelWireCompat } from "./thinking-level.js";
 
 
 function usageFromPi(usage: Usage | undefined | null): MessageUsage | undefined {
@@ -76,6 +78,10 @@ export type RuntimeProviderConfig = {
   maxOutputTokens?: number;
   /** Sampling temperature override; omitted keeps the provider default. */
   temperature?: number;
+  /** Wire-dialect hints resolved from the pi-ai catalog by the main process
+   * (the sidecar never loads the catalog). Controls how thinking on/off is
+   * expressed on custom OpenAI-compatible endpoints. */
+  modelCompat?: ModelWireCompat;
 };
 
 const DEFAULT_CONTEXT_WINDOW = 128_000;
@@ -138,6 +144,10 @@ export type AgentRuntimeOptions = {
   history?: UiMessage[];
   /** Plugin agent tools to expose to the model this session. */
   pluginTools?: PluginToolDef[];
+  /** Absolute per-session scratch directory for temporary files (D114).
+   * Advertised to the model in the system prompt; host-core enforces it as
+   * a second containment root. */
+  scratchDir?: string;
   onEvent: (envelope: AgentEventEnvelope) => void;
 };
 
@@ -197,6 +207,77 @@ function assistantContent(content: unknown): AssistantContent {
   return { text, thinking, hasText, hasThinking };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function safeJson(value: unknown): string {
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
+}
+
+/** Rebuild a pi-ai tool result from a persisted tool row. Rows that never
+ * finished (app quit / abort mid-tool) restore as errored results so the
+ * model knows the call produced nothing. */
+function toolResultFromUi(
+  m: UiMessage,
+  timestamp: number,
+): ToolResultMessage {
+  const raw = m.toolResult as
+    | { content?: unknown; details?: unknown }
+    | string
+    | null
+    | undefined;
+  const blocks: ToolResultMessage["content"] = [];
+  const rawBlocks =
+    isRecord(raw) && Array.isArray(raw.content) ? raw.content : undefined;
+  if (rawBlocks) {
+    for (const b of rawBlocks) {
+      if (!isRecord(b)) continue;
+      if (b.type === "text" && typeof b.text === "string") {
+        blocks.push({ type: "text", text: b.text });
+      } else if (
+        b.type === "image" &&
+        typeof b.data === "string" &&
+        typeof b.mimeType === "string"
+      ) {
+        blocks.push({ type: "image", data: b.data, mimeType: b.mimeType });
+      }
+    }
+  } else if (typeof raw === "string" && raw.trim()) {
+    blocks.push({ type: "text", text: raw });
+  } else if (raw !== undefined && raw !== null) {
+    blocks.push({ type: "text", text: safeJson(raw) });
+  }
+  const interrupted = m.toolStatus === "running";
+  if (blocks.length === 0) {
+    blocks.push({
+      type: "text",
+      text: interrupted
+        ? "[tool call was interrupted before a result was recorded]"
+        : "[no tool result recorded]",
+    });
+  }
+  return {
+    role: "toolResult",
+    toolCallId: m.toolCallId ?? "",
+    toolName: m.toolName ?? "",
+    content: blocks,
+    ...(isRecord(raw) && raw.details !== undefined
+      ? { details: raw.details }
+      : {}),
+    isError:
+      interrupted ||
+      m.toolStatus === "error" ||
+      m.toolStatus === "denied" ||
+      m.isError === true,
+    timestamp,
+  };
+}
+
 export class DesktopAgentRuntime {
   private agent: Agent;
   private turnId?: string;
@@ -209,6 +290,7 @@ export class DesktopAgentRuntime {
   private onEvent: (envelope: AgentEventEnvelope) => void;
   private currentAssistant?: UiMessage;
   private pluginTools: PluginToolDef[];
+  private scratchDir?: string;
 
   constructor(opts: AgentRuntimeOptions) {
     this.sessionId = opts.sessionId;
@@ -218,6 +300,7 @@ export class DesktopAgentRuntime {
     this.host = opts.host;
     this.onEvent = opts.onEvent;
     this.pluginTools = opts.pluginTools ?? [];
+    this.scratchDir = opts.scratchDir;
 
     const model = this.buildModel();
     const tools = this.buildTools();
@@ -247,6 +330,12 @@ export class DesktopAgentRuntime {
       streamFn: (m, context, options) =>
         models.streamSimple(m, context, {
           ...options,
+          // Transient provider failures (request timeouts, dropped
+          // connections, 429/5xx) retry with interruptible backoff instead
+          // of failing the turn. A failed turn pushes the user into
+          // regenerate, which forks the transcript and reseeds the agent —
+          // far more expensive than a retry.
+          maxRetries: 2,
           ...(temperature !== undefined ? { temperature } : {}),
         }),
       getApiKey: async () => runtimeApiKey,
@@ -263,6 +352,13 @@ export class DesktopAgentRuntime {
             process.platform === "win32"
               ? "Shell commands run in Git Bash (POSIX bash on Windows). Always write bash/POSIX syntax with forward-slash paths — never cmd.exe or PowerShell syntax."
               : "Shell commands run in bash. Write bash/POSIX syntax.",
+            // Session scratch directory (D114): temp files must not dirty
+            // the user's workspace or its git status.
+            ...(this.scratchDir
+              ? [
+                  `Your scratch directory for this session is \`${this.scratchDir}\` (in Bash: $PI_SCRATCH_DIR). Write ALL temporary and intermediate files there using absolute paths — one-off scripts, downloaded data, drafts, experiment output — never into the workspace. Only write into the workspace when the file is a deliverable the user asked for. Scratch files persist across turns of this session and are cleaned up automatically when the session is deleted.`,
+                ]
+              : []),
           ].join("\n\n"),
         model,
         tools,
@@ -321,14 +417,20 @@ export class DesktopAgentRuntime {
       (this.provider.temperature ?? null) === (provider.temperature ?? null) &&
       this.provider.supportsReasoning === provider.supportsReasoning &&
       currentThinkingLevels === nextThinkingLevels &&
+      safeJson(this.provider.modelCompat ?? null) ===
+        safeJson(provider.modelCompat ?? null) &&
       this.thinkingLevel === clampThinkingLevel(provider, thinkingLevel) &&
       current === next
     );
   }
 
-  /* Rebuild pi-ai messages from the persisted transcript. Tool rows are
-   * transcript-only (call/result pairs can't be reconstructed reliably), so
-   * only user/assistant text is restored. */
+  /* Rebuild pi-ai messages from the persisted transcript, including tool
+   * call/result pairs — tool rows persist toolCallId/toolName/toolArgs and
+   * the result, which is everything the model context needs. Losing them
+   * (the pre-D120 behavior) collapsed a reseeded session to bare chat text:
+   * the model forgot every file it had read and, seeing its own history
+   * "answer" without visible tool use, stopped calling tools altogether.
+   * Failed assistant turns stay transcript-only. */
   private historyToAgentMessages(history: UiMessage[]): AgentMessage[] {
     const zeroUsage: Usage = {
       input: 0,
@@ -338,44 +440,99 @@ export class DesktopAgentRuntime {
       totalTokens: 0,
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
     };
+    const api = apiBindingForStyle(this.provider.apiStyle).api;
     const messages: AgentMessage[] = [];
+    // Tool rows attach their calls to the assistant message that made them
+    // (the nearest one above), keeping each call adjacent to its result as
+    // the provider APIs require.
+    let toolCarrier: AssistantMessage | undefined;
     for (const m of history) {
       const timestamp = Date.parse(m.createdAt) || Date.now();
       if (m.role === "user") {
+        toolCarrier = undefined;
         if (!(m.content || "").trim()) continue;
         messages.push({ role: "user", content: m.content, timestamp });
       } else if (m.role === "assistant") {
-        const content = [];
+        toolCarrier = undefined;
+        // Failed provider responses belong in the transcript for diagnosis,
+        // but must never become model context on the next turn.
+        if (m.status === "error" || m.isError || m.error) continue;
+        const content: AssistantMessage["content"] = [];
         if (m.thinking?.trim()) {
           content.push({ type: "thinking" as const, thinking: m.thinking });
         }
         if (m.content?.trim()) {
           content.push({ type: "text" as const, text: m.content });
         }
-        if (content.length === 0) continue;
-        messages.push({
+        // Kept even when empty: a call-only turn has no text of its own and
+        // becomes the carrier for the tool rows that follow. Assistants that
+        // end up with no content and no calls are dropped at the end.
+        const assistant: AssistantMessage = {
           role: "assistant",
           content,
-          api: apiBindingForStyle(this.provider.apiStyle).api,
+          api,
           provider: this.provider.id,
           model: this.provider.modelId,
           usage: zeroUsage,
           stopReason: "stop",
           timestamp,
+        };
+        messages.push(assistant);
+        toolCarrier = assistant;
+      } else if (m.role === "tool") {
+        if (!m.toolCallId || !m.toolName) continue;
+        if (!toolCarrier) {
+          // Tool row whose assistant row was lost (truncated branch):
+          // synthesize a carrier so the call/result pair stays well-formed.
+          toolCarrier = {
+            role: "assistant",
+            content: [],
+            api,
+            provider: this.provider.id,
+            model: this.provider.modelId,
+            usage: zeroUsage,
+            stopReason: "toolUse",
+            timestamp,
+          };
+          messages.push(toolCarrier);
+        }
+        toolCarrier.content.push({
+          type: "toolCall",
+          id: m.toolCallId,
+          name: m.toolName,
+          arguments: isRecord(m.toolArgs)
+            ? (m.toolArgs as Record<string, unknown>)
+            : {},
         });
+        toolCarrier.stopReason = "toolUse";
+        messages.push(toolResultFromUi(m, timestamp));
       }
     }
-    return messages;
+    return messages.filter(
+      (message) => message.role !== "assistant" || message.content.length > 0,
+    );
   }
 
   private buildModel(): Model<Api> {
-    const thinkingLevelMap: Partial<Record<ThinkingLevel, string | null>> = {};
+    const wire = this.provider.modelCompat;
+    // Seed with catalog wire values so "off" emits an explicit disable —
+    // e.g. off -> "none" (gpt-5.1-style reasoning_effort) — instead of no
+    // parameter, which leaves default-on reasoners thinking.
+    const thinkingLevelMap: Partial<Record<ThinkingLevel, string | null>> = {
+      ...(wire?.thinkingLevelMap ?? {}),
+    };
+    const supported = this.provider.supportedThinkingLevels ?? ["off"];
     for (const level of THINKING_LEVELS) {
-      if (!(this.provider.supportedThinkingLevels ?? ["off"]).includes(level)) {
+      if (!supported.includes(level)) {
         thinkingLevelMap[level] = null;
       } else if (level === "xhigh" || level === "max") {
         // pi-ai requires extended levels to be explicitly opted into.
-        thinkingLevelMap[level] = level;
+        if (typeof thinkingLevelMap[level] !== "string") {
+          thinkingLevelMap[level] = level;
+        }
+      } else if (thinkingLevelMap[level] === null) {
+        // The provider's declared support wins over a catalog null.
+        delete thinkingLevelMap[level];
       }
     }
 
@@ -393,19 +550,41 @@ export class DesktopAgentRuntime {
       contextWindow: this.provider.contextWindow || DEFAULT_CONTEXT_WINDOW,
       maxTokens: this.provider.maxOutputTokens || DEFAULT_MAX_TOKENS,
       ...(binding.api === "openai-completions"
-        ? { compat: { supportsDeveloperRole: false } }
-        : {}),
+        ? { compat: { ...(wire?.compat ?? {}), supportsDeveloperRole: false } }
+        : wire?.compat
+          ? { compat: { ...wire.compat } }
+          : {}),
     } as Model<Api>;
   }
 
   private buildTools(): AgentTool[] {
+    // With a scratch dir provisioned, file tools accept absolute paths into
+    // it as a second root (D114); keep the wording in sync with host-core.
+    const scratchPathHint = this.scratchDir
+      ? " `path` is workspace-relative, or an absolute path inside the session scratch directory."
+      : "";
+    const describe = (toolName: string): string => {
+      switch (toolName) {
+        case "BrowserPreview":
+          return "Open a workspace HTML file in PI-Desktop's built-in browser panel. `path` is workspace-relative (e.g. \"demo/index.html\"). The preview live-reloads on later edits to the file or its sibling assets, so call once per page.";
+        case "Read":
+          return `Read a file.${scratchPathHint}`;
+        case "Write":
+          return `Create or overwrite a file. Deliverables go into the workspace; temporary/intermediate files go into the scratch directory.${scratchPathHint}`;
+        case "Edit":
+          return `Replace text in a file (first occurrence of old_string).${scratchPathHint}`;
+        case "Bash":
+          return this.scratchDir
+            ? "Run a non-interactive shell command in the workspace root. $PI_SCRATCH_DIR points at the session scratch directory for temporary files."
+            : "Run a non-interactive shell command in the workspace root.";
+        default:
+          return `${toolName} tool via PI-Desktop host-core`;
+      }
+    };
     const exec = (toolName: string): AgentTool => ({
       name: toolName,
       label: toolName,
-      description:
-        toolName === "BrowserPreview"
-          ? "Open a workspace HTML file in PI-Desktop's built-in browser panel. `path` is workspace-relative (e.g. \"demo/index.html\"). The preview live-reloads on later edits to the file or its sibling assets, so call once per page."
-          : `${toolName} tool via PI-Desktop host-core`,
+      description: describe(toolName),
       parameters: Type.Object(
         toolName === "Read" || toolName === "BrowserPreview"
           ? { path: Type.String() }
@@ -562,6 +741,17 @@ export class DesktopAgentRuntime {
             | undefined;
           const failed = stopReason === "error";
           const aborted = stopReason === "aborted";
+          const errorMessage =
+            failed &&
+            typeof (event.message as any).errorMessage === "string" &&
+            (event.message as any).errorMessage
+              ? ((event.message as any).errorMessage as string)
+              : failed
+                ? "provider stream failed"
+                : undefined;
+          const classifiedError = errorMessage
+            ? classifyAgentError(errorMessage)
+            : undefined;
           const nextText = content.hasText
             ? content.text
             : this.currentAssistant.content;
@@ -581,16 +771,14 @@ export class DesktopAgentRuntime {
             modelId: this.provider.modelId,
             providerId: this.provider.id,
             ...(usage ? { usage } : {}),
+            ...(classifiedError
+              ? { error: classifiedError, isError: true }
+              : {}),
           };
           this.emit({ type: "message_end", message: this.currentAssistant });
           this.currentAssistant = undefined;
-          if (failed) {
-            const errorMessage =
-              typeof (event.message as any).errorMessage === "string" &&
-              (event.message as any).errorMessage
-                ? ((event.message as any).errorMessage as string)
-                : "provider stream failed";
-            this.emit({ type: "error", error: classifyAgentError(errorMessage) });
+          if (classifiedError) {
+            this.emit({ type: "error", error: classifiedError });
           }
         }
         break;
@@ -634,9 +822,31 @@ export class DesktopAgentRuntime {
 
   /** Resolve a bubble left in "streaming" when the run dies without a
    * message_end (rejected prompt), so the transcript never sticks mid-stream. */
-  private finalizeCurrentAssistant(status: "error" | "aborted") {
-    if (!this.currentAssistant) return;
-    this.currentAssistant = { ...this.currentAssistant, status };
+  private finalizeCurrentAssistant(
+    status: "error" | "aborted",
+    error?: ReturnType<typeof classifyAgentError>,
+  ) {
+    if (!this.currentAssistant) {
+      if (status !== "error" || !error) return;
+      this.currentAssistant = {
+        id: randomUUID(),
+        role: "assistant",
+        content: "",
+        createdAt: nowIso(),
+        status,
+        modelId: this.provider.modelId,
+        providerId: this.provider.id,
+        error,
+        isError: true,
+      };
+      this.emit({ type: "message_start", message: this.currentAssistant });
+    } else {
+      this.currentAssistant = {
+        ...this.currentAssistant,
+        status,
+        ...(error ? { error, isError: true } : {}),
+      };
+    }
     this.emit({ type: "message_end", message: this.currentAssistant });
     this.currentAssistant = undefined;
   }
@@ -652,8 +862,10 @@ export class DesktopAgentRuntime {
       await this.agent.prompt(content);
       await this.agent.waitForIdle();
     } catch (err) {
+      const classifiedError = classifyAgentError(err);
       this.finalizeCurrentAssistant(
-        classifyAgentError(err).code === "TURN_ABORTED" ? "aborted" : "error",
+        classifiedError.code === "TURN_ABORTED" ? "aborted" : "error",
+        classifiedError.code === "TURN_ABORTED" ? undefined : classifiedError,
       );
       throw err;
     }

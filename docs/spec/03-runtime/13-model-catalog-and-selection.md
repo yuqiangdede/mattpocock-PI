@@ -72,11 +72,23 @@ If user selects model tagged without tools while in Agent mode:
 3. keep user-defined models
 4. return counts: added/updated/failed providers
 
+The desktop uses stale-while-revalidate for configured providers:
+
+1. hydrate each saved provider's last catalog from Rust-owned SQLite during
+   renderer bootstrap
+2. render that catalog immediately in the composer picker and saved-provider
+   edit dialog
+3. perform at most one live refresh per provider per renderer lifetime
+4. merge a successful response into SQLite and replace the renderer snapshot
+5. reset the renderer refresh marker after provider configuration changes so
+   the next picker open revalidates the endpoint
+
 ## 7. Offline behavior
 
 If refresh fails / offline:
 
 - use cached catalog
+- never clear an already-rendered cached list or flash an empty picker
 - allow custom model id
 - still allow providers with known model ids
 
@@ -180,6 +192,8 @@ Warnings are non-blocking unless execution is impossible.
 - [ ] custom model id path works without catalog hit
 - [ ] recent models surface in the picker
 - [ ] refresh merges into cache and picker (never destructively replaces)
+- [ ] restart hydrates the prior catalog before live refresh, and offline
+      refresh keeps the cached picker populated
 - [ ] capability badges visible
 - [ ] session model change applies to next turn only
 - [ ] reasoning selector is capability-gated and sparse level sets clamp the

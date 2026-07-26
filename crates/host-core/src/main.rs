@@ -1,15 +1,18 @@
 mod artifacts;
 mod audit;
 mod db;
+mod notifications;
 mod permissions;
 mod plugins;
 mod providers;
 mod rpc;
 mod scheduled;
+mod scratch;
 mod secrets;
 mod sessions;
 mod state;
 mod tools;
+mod transcripts;
 mod workspace;
 
 use std::sync::Arc;
@@ -40,8 +43,21 @@ async fn main() -> anyhow::Result<()> {
     std::fs::create_dir_all(data_dir.join("plugins/installed"))?;
     std::fs::create_dir_all(data_dir.join("plugins/data"))?;
     std::fs::create_dir_all(data_dir.join("cache"))?;
+    std::fs::create_dir_all(data_dir.join("scratch"))?;
 
     let state = Arc::new(Mutex::new(AppState::open(&data_dir)?));
     tracing::info!(path = %data_dir.display(), "host-core starting");
+    {
+        // Sweep orphaned/stale session scratch dirs left behind by crashes or
+        // deletions that bypassed session.delete (D114).
+        let st = state.lock().await;
+        // Only sweep with a real session list: an empty fallback on a db
+        // error would wipe scratch dirs of sessions that still exist.
+        if let Ok(list) = sessions::list_sessions(&st.db) {
+            let live: std::collections::HashSet<String> =
+                list.into_iter().map(|s| s.id).collect();
+            scratch::sweep(&data_dir, &live);
+        }
+    }
     rpc::serve(state).await
 }

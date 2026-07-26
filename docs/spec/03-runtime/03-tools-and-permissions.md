@@ -1,6 +1,6 @@
 # 03. Tools and Permissions
 
-> Decisions applied: D003, D004, D005, D006, D013, D015, D093
+> Decisions applied: D003, D004, D005, D006, D013, D015, D093, D114, D115
 
 ## 0. Frozen policy summary
 
@@ -50,6 +50,45 @@ Every tool must have:
 - After normalization they must still reside within the workspace
 - `..` escapes are forbidden
 - Symlinks that escape the workspace are rejected
+- Exception (D114): absolute paths inside the session scratch directory are a
+  second legal root for `Read`/`Write`/`Edit` — see §4b. Both roots run the
+  same lexical + symlink containment defense; everything else remains
+  `PATH_OUTSIDE_WORKSPACE`.
+
+## 4b. Session scratch directory (D114)
+
+Temporary/intermediate files an agent produces (one-off scripts, downloaded
+data, drafts) must not dirty the user's project or its git status. Each
+session gets a scratch directory outside the workspace:
+
+```text
+<data_dir>/scratch/<sessionId>/
+```
+
+- **Addressing.** The model addresses scratch by absolute path only; the path
+  is advertised in the system prompt. Relative tool paths always resolve
+  against the workspace. `Bash` additionally exports `PI_SCRATCH_DIR`.
+- **Containment.** `resolve_tool_path` tries the workspace root first, then
+  the scratch root, applying the identical two-layer defense (lexical `..`
+  normalization + canonicalized-ancestor symlink check) to each. A symlink
+  planted inside scratch cannot reach the workspace or anywhere else.
+- **Permissions.** `Write`/`Edit` whose `path` is lexically inside the
+  session's scratch root auto-allow without a permission card — they cannot
+  touch the project. The lexical check only skips the prompt; execution still
+  goes through the full resolver, so it is not an escape vector. Chat mode
+  still denies Write/Edit/Bash entirely (D004 unchanged).
+- **Artifacts.** Successful scratch writes are not recorded in the
+  `artifacts` table; artifact-driven file tabs represent workspace
+  deliverables only, while the Files surface may still browse the active
+  workspace. Tool results carry `root: "workspace" | "scratch"` to make this
+  decision and the UI rendering explicit.
+- **Tool coverage.** `Read`/`Write`/`Edit` are dual-root. `Glob`/`Grep`
+  remain workspace-only (the model lists scratch via `ls $PI_SCRATCH_DIR`).
+  `BrowserPreview` remains workspace-relative in v1.
+- **Lifecycle.** Created lazily on the first `Write`/`Edit`/`Bash` of a
+  session. Deleted with `session.delete`. A startup sweep removes scratch
+  dirs whose session no longer exists and dirs untouched for over 7 days
+  (crash/force-quit fallback; no scheduled job needed).
 - A project switch does not redirect or cancel a background session's tools;
   sessions A and B remain sandboxed to projects A and B respectively.
 - A Temporary/path-less session has no workspace root, even if another project
@@ -105,6 +144,39 @@ Initial denylist (extensible):
 May be added later:
 - `allow-always-for-tool`
 - `allow-always-for-command-pattern`
+
+### Permission Modes (D115)
+
+How high-risk tool calls get approved is governed by a **permission mode**:
+
+| Mode | Write/Edit | Bash / plugin tools |
+|---|---|---|
+| `ask` (default) | confirm | confirm |
+| `accept-edits` | auto-allow | confirm |
+| `auto` | auto-allow | auto-allow |
+
+Resolution order per tool call (host-core `tools.execute`):
+
+1. Session's persisted `permission_mode`, unless it is `inherit`
+2. Global `defaultPermissionMode` from app settings (`ask` / `accept-edits` / `auto`)
+3. `ask`
+
+Rules:
+
+- The session value is stored in `sessions.permission_mode`
+  (`inherit | ask | accept-edits | auto`, default `inherit`, schema v5) and
+  set via `session.configure` `permissionMode`.
+- **Chat mode's hard deny wins over every permission mode** — `auto` cannot
+  re-enable Write/Edit/Bash in chat (D004 unchanged).
+- Low-risk tools (`Read`/`Glob`/`Grep`) auto-allow in every mode, as before.
+- `allow-session` grants continue to work under `ask` and stay scoped to the
+  session; under `accept-edits`/`auto` they are simply never needed.
+- Scratch-directory writes (D114) stay prompt-free in every mode.
+- UI: Settings → segmented global default; composer shows a per-session chip
+  (agent mode only) whose menu offers inherit-default plus the three
+  overrides. The chip displays the effective mode.
+- Enforcement lives in host-core only; the sidecar/model is never told the
+  mode and cannot influence it.
 
 ## 7. Permission Flow
 

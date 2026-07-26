@@ -18,10 +18,17 @@ const mainSource = await readFile(
   new URL("../electron/main/index.ts", import.meta.url),
   "utf8",
 );
-const settingsSource = await readFile(
-  new URL("../src/pages/SettingsPage.tsx", import.meta.url),
-  "utf8",
-);
+// Provider thinking config lives in the provider settings components, not the
+// settings page shell.
+const settingsSource = (
+  await Promise.all(
+    [
+      "../src/components/settings/ProvidersSection.tsx",
+      "../src/components/settings/ProviderDialog.tsx",
+      "../src/components/settings/provider-form.ts",
+    ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
+  )
+).join("\n");
 const stylesSource = await readFile(
   new URL("../src/styles/globals.css", import.meta.url),
   "utf8",
@@ -36,7 +43,7 @@ test("composer exposes the runtime thinking level order and provider filtering",
   assert.match(composerSource, /thinkingLevelForProvider/);
   assert.match(composerSource, /thinkingLevel:\s*level/);
   assert.match(composerSource, /composer-thinking-levels/);
-  assert.match(composerSource, /composer-thinking-section[\s\S]*providers/);
+  assert.match(composerSource, /availableThinkingLevels/);
 });
 
 test("compatible providers can enable thinking from the model menu", () => {
@@ -60,24 +67,23 @@ test("main resolves reasoning from each session's exact selected model", () => {
   assert.match(mainSource, /sessions:\s*result\.sessions\.map/);
   assert.match(mainSource, /enrichProvider\(provider, modelId\)/);
   // Discovered models are stamped with reasoning capability per model id.
-  assert.match(
-    mainSource,
-    /thinking\.supportsReasoning \? \["text", "reasoning"\] : \["text"\]/,
-  );
+  assert.match(mainSource, /thinking\.supportsReasoning/);
+  assert.match(mainSource, /capabilities\.add\("reasoning"\)/);
+  assert.match(mainSource, /capabilities\.delete\("reasoning"\)/);
 });
 
 test("transcript keeps assistant thinking in a separate disclosure", () => {
-  assert.match(transcriptSource, /className="thinking-disclosure-header"/);
+  assert.match(transcriptSource, /tool-row thinking/);
+  assert.match(transcriptSource, /className="tool-row-header"/);
   assert.match(transcriptSource, /aria-expanded=\{open\}/);
   assert.match(transcriptSource, /aria-hidden=\{!open\}/);
   assert.match(transcriptSource, /inert=\{!open\}/);
   assert.match(transcriptSource, /IconSparkles/);
   assert.match(transcriptSource, /message\.thinking/);
-  assert.match(transcriptSource, /Markdown source=\{thinking\}/);
+  assert.match(transcriptSource, /thinking-prose[\s\S]*?Markdown source=\{text\}/);
   assert.match(transcriptSource, /CopyButton text=\{message\.content\}/);
   assert.match(transcriptSource, /!thinkingText\(message\)/);
-  assert.match(transcriptSource, /thinkingText\(lastVisibleMessage\)/);
-  assert.match(stylesSource, /\.thinking-disclosure-body[\s\S]*border-left/);
+  assert.match(transcriptSource, /onlyThinking = items\.every/);
   assert.match(stylesSource, /\.thinking-prose/);
 });
 

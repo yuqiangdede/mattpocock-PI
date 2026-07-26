@@ -96,10 +96,10 @@ async function main() {
   const host = new Host(hostBin, dataDir);
   try {
     // E2E-003 host health / handshake
-    const hs = await host.call("app.handshake", { protocolVersion: 3 });
+    const hs = await host.call("app.handshake", { protocolVersion: 4 });
     record(
       "E2E-003-handshake",
-      hs.protocolVersion === 3,
+      hs.protocolVersion === 4,
       `v=${hs.protocolVersion}`,
     );
     const health = await host.call("app.health");
@@ -150,6 +150,57 @@ async function main() {
       "E2E-020-session-persist",
       got.session?.messages?.length === 1,
       `messages=${got.session?.messages?.length}`,
+    );
+
+    // Durable notification lifecycle: terminal turns create one inbox item,
+    // read state mutates in place, and clear removes the retained history.
+    const notificationTurn = await host.call("session.beginTurn", {
+      sessionId: session.session.id,
+      providerId: created.provider.id,
+      modelId: MODEL,
+    });
+    const ended = await host.call("session.endTurn", {
+      turnId: notificationTurn.turnId,
+      status: "completed",
+    });
+    const notificationList = await host.call("notification.list", { limit: 20 });
+    const notification = notificationList.notifications?.[0];
+    record(
+      "E2E-035-notification-created",
+      ended.notification?.id === notification?.id &&
+        notification?.kind === "task.completed" &&
+        notificationList.unreadCount === 1,
+      notification?.id,
+    );
+    const visibleTurn = await host.call("session.beginTurn", {
+      sessionId: session.session.id,
+      providerId: created.provider.id,
+      modelId: MODEL,
+    });
+    const visibleEnded = await host.call("session.endTurn", {
+      turnId: visibleTurn.turnId,
+      status: "completed",
+      createNotification: false,
+    });
+    const afterVisible = await host.call("notification.list", { limit: 20 });
+    record(
+      "E2E-064-visible-notification-suppressed",
+      visibleEnded.ok === true &&
+        visibleEnded.notification === undefined &&
+        afterVisible.notifications?.length === 1 &&
+        afterVisible.unreadCount === 1,
+    );
+    await host.call("notification.markRead", { id: notification?.id });
+    const readList = await host.call("notification.list", { unreadOnly: true });
+    record(
+      "E2E-035-notification-read",
+      readList.unreadCount === 0 && readList.notifications?.length === 0,
+    );
+    await host.call("notification.clear");
+    const clearedList = await host.call("notification.list");
+    record(
+      "E2E-035-notification-clear",
+      clearedList.unreadCount === 0 && clearedList.notifications?.length === 0,
     );
 
     // workspace + tools

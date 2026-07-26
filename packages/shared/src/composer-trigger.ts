@@ -1,0 +1,124 @@
+/**
+ * Trigger detection and completion insertion for the composer autocomplete
+ * (D123–D125). Pure string/cursor math so the exact "/"+"@" grammar is unit
+ * tested away from React and IME timing.
+ *
+ * Grammar mirrors the pi CLI editor:
+ * - "/" opens command mode only as the very first character of the draft,
+ *   while the cursor is still inside that first whitespace-free token.
+ * - "@" opens file mode when the token containing the cursor starts with
+ *   "@" and the character before it is start-of-input, whitespace, or one
+ *   of the pi delimiters (" ' =). A `@"` prefix starts a quoted token that
+ *   may contain spaces until its closing quote.
+ */
+
+export type ComposerTriggerMode = "slash" | "file";
+
+export type ComposerTrigger = {
+  mode: ComposerTriggerMode;
+  /** Filter text (after "/" or "@", quotes stripped). */
+  query: string;
+  /** Index of the trigger character ("/" or "@") in the draft. */
+  tokenStart: number;
+  /** End of the replaced region — always the cursor position. */
+  tokenEnd: number;
+};
+
+const WHITESPACE = new Set([" ", "\t", "\n", "\r"]);
+/** Characters that end the token scan-back, per pi's autocomplete. */
+const DELIMITERS = new Set([" ", "\t", "\n", "\r", '"', "'", "="]);
+
+function isBoundary(value: string, index: number): boolean {
+  if (index <= 0) return true;
+  return DELIMITERS.has(value[index - 1]);
+}
+
+/** Detect the active autocomplete trigger for a draft + cursor, if any. */
+export function detectTrigger(
+  value: string,
+  cursor: number,
+): ComposerTrigger | null {
+  if (cursor < 0 || cursor > value.length) return null;
+
+  // Slash mode: draft starts with "/", cursor inside the first token.
+  if (value.startsWith("/") && cursor >= 1) {
+    const head = value.slice(1, cursor);
+    let hasWhitespace = false;
+    for (const ch of head) {
+      if (WHITESPACE.has(ch)) {
+        hasWhitespace = true;
+        break;
+      }
+    }
+    if (!hasWhitespace) {
+      return { mode: "slash", query: head, tokenStart: 0, tokenEnd: cursor };
+    }
+  }
+
+  // File mode, quoted form first: @"query with spaces
+  // Scan back for a `@"` whose "@" sits at a boundary with no closing
+  // quote between the opening one and the cursor.
+  for (let i = cursor - 1; i >= 0; i -= 1) {
+    const ch = value[i];
+    if (ch === '"') {
+      // A bare closing quote before the cursor ends any quoted token.
+      if (i > 0 && value[i - 1] === "@" && isBoundary(value, i - 1)) {
+        const query = value.slice(i + 1, cursor);
+        if (!query.includes('"') && !query.includes("\n")) {
+          return {
+            mode: "file",
+            query,
+            tokenStart: i - 1,
+            tokenEnd: cursor,
+          };
+        }
+      }
+      break;
+    }
+    if (ch === "\n") break;
+  }
+
+  // File mode, plain token: scan back to the nearest delimiter.
+  let start = cursor;
+  while (start > 0 && !DELIMITERS.has(value[start - 1])) start -= 1;
+  const token = value.slice(start, cursor);
+  if (token.startsWith("@") && isBoundary(value, start)) {
+    return {
+      mode: "file",
+      query: token.slice(1),
+      tokenStart: start,
+      tokenEnd: cursor,
+    };
+  }
+
+  return null;
+}
+
+/** Insertion text for an accepted slash command: `/name ` ready for args. */
+export function formatCommandInsert(name: string): string {
+  return `/${name} `;
+}
+
+/**
+ * Insertion text for an accepted file entry. Files end with a space so the
+ * prompt continues naturally; directories end with "/" (quote left open for
+ * spaced paths) so completion continues into the directory (D124).
+ */
+export function formatFileInsert(path: string, kind: "dir" | "file"): string {
+  const needsQuote = /\s/.test(path);
+  if (kind === "dir") {
+    return needsQuote ? `@"${path}/` : `@${path}/`;
+  }
+  return needsQuote ? `@"${path}" ` : `@${path} `;
+}
+
+/** Replace the trigger token with `insert`, returning the new draft+cursor. */
+export function applyCompletion(
+  value: string,
+  trigger: ComposerTrigger,
+  insert: string,
+): { value: string; cursor: number } {
+  const before = value.slice(0, trigger.tokenStart);
+  const after = value.slice(trigger.tokenEnd);
+  return { value: before + insert + after, cursor: before.length + insert.length };
+}

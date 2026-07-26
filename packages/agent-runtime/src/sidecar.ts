@@ -12,6 +12,7 @@ import {
   normalizeSupportedThinkingLevels,
   normalizeThinkingLevel,
 } from "./sidecar-config.js";
+import type { ModelWireCompat } from "./thinking-level.js";
 import type {
   AgentEventEnvelope,
   Mode,
@@ -37,11 +38,9 @@ function respond(id: string | number, result?: unknown, error?: unknown) {
   else write({ jsonrpc: "2.0", id, result });
 }
 
-hostProxy.onNotification((method, params) => {
-  if (method === "permissions.request") {
-    notify("agent.permission", params);
-  }
-});
+// Host notifications (permissions.request never reaches us — main forwards
+// it to the renderer directly; re-emitting it here would duplicate the
+// permission dialog delivery).
 
 async function handle(method: string, params: any): Promise<unknown> {
   switch (method) {
@@ -68,6 +67,8 @@ async function handle(method: string, params: any): Promise<unknown> {
         contextWindow?: number;
         maxOutputTokens?: number;
         temperature?: number;
+        /** Wire-dialect hints resolved by main; passed through verbatim. */
+        modelCompat?: ModelWireCompat;
       };
       const provider = {
         ...providerInput,
@@ -142,6 +143,10 @@ async function handle(method: string, params: any): Promise<unknown> {
           thinkingLevel,
           history,
           pluginTools,
+          scratchDir:
+            typeof params.scratchDir === "string" && params.scratchDir
+              ? params.scratchDir
+              : undefined,
           onEvent: (envelope: AgentEventEnvelope) => {
             notify("agent.event", envelope);
           },

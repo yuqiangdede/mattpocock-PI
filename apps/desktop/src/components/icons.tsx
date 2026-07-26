@@ -8,9 +8,11 @@ import {
   ArrowUpDown,
   ArrowUpRight,
   AtSign,
+  Bell,
   Bug,
   Camera,
   Check,
+  CheckCheck,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -27,6 +29,7 @@ import {
   FileText,
   Folder,
   Globe2,
+  GitFork,
   GitPullRequestArrow,
   Hammer,
   Image,
@@ -34,6 +37,7 @@ import {
   Keyboard,
   Link,
   Mic,
+  MessageSquare,
   MessageSquarePlus,
   MoreHorizontal,
   Palette,
@@ -52,6 +56,7 @@ import {
   Settings,
   Shield,
   SlidersHorizontal,
+  Slash,
   Smile,
   Sparkles,
   Square,
@@ -82,11 +87,13 @@ export const IconArchive = icon(Archive);
 export const IconArchiveRestore = icon(ArchiveRestore);
 export const IconArrowUpDown = icon(ArrowUpDown);
 export const IconSearch = icon(Search);
+export const IconChat = icon(MessageSquare);
 /** Session creation affordance. Keep it distinct from generic add actions. */
 export const IconNewSession = icon(MessageSquarePlus);
 export const IconFolder = icon(Folder);
 export const IconFileText = icon(FileText);
 export const IconGlobe = icon(Globe2);
+export const IconBranch = icon(GitFork);
 export const IconTerminal = icon(Terminal);
 export const IconPencil = icon(PencilLine);
 export const IconWrench = icon(Wrench);
@@ -102,6 +109,8 @@ export const IconArrowUp = icon(ArrowUp);
 export const IconArrowDown = icon(ArrowDown);
 export const IconCopy = icon(Copy);
 export const IconCheck = icon(Check);
+export const IconBell = icon(Bell);
+export const IconCheckCheck = icon(CheckCheck);
 export const IconShield = icon(Shield);
 export const IconChevronDown = icon(ChevronDown);
 export const IconClose = icon(X);
@@ -121,6 +130,7 @@ export const IconFix = icon(Bug);
 export const IconKeyboard = icon(Keyboard);
 export const IconMic = icon(Mic);
 export const IconPlug = icon(Plug);
+export const IconSlash = icon(Slash);
 export const IconUser = icon(UserRound);
 export const IconSparkles = icon(Sparkles);
 export const IconBrowser = icon(AppWindow);

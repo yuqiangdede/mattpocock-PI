@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useTranslation } from "react-i18next";
 import type { FsEntry, FsReadResult } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
@@ -142,8 +149,14 @@ export function FilesTab() {
   const [file, setFile] = useState<FsReadResult | null>(null);
   const [fileError, setFileError] = useState(false);
 
-  // Workspace switches reset all browsing state.
+  // Workspace switches reset all browsing state. Guarded so it only fires on
+  // an actual root change: an unconditional [root] effect also runs on the
+  // StrictMode remount, wiping the selection a chat file request just made
+  // (first click landed on the tree instead of the file).
+  const prevRoot = useRef(root);
   useEffect(() => {
+    if (prevRoot.current === root) return;
+    prevRoot.current = root;
     setDirs({});
     setExpanded(new Set());
     setSelected(null);

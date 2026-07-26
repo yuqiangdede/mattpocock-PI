@@ -57,7 +57,7 @@ Rules:
 | `AGENT_NOT_FOUND` | no | session missing |
 | `TURN_NOT_FOUND` | no | turn id invalid |
 | `TURN_ABORTED` | no | turn aborted by user/system |
-| `MODEL_NOT_CONFIGURED` | no | no usable model selected |
+| `MODEL_NOT_CONFIGURED` | no | no usable model selected, or provider rejects the selected model as unknown |
 | `PROVIDER_ERROR` | yes | upstream provider failure |
 | `PROVIDER_UNAUTHORIZED` | no | bad/missing provider credentials |
 | `PROVIDER_RATE_LIMITED` | yes | provider rate limited |
@@ -110,7 +110,7 @@ Until emitted, implementations use the canonical parent code shown.
 |---|---|---|
 | `PROVIDER_BASE_URL_INVALID` | `PROVIDER_ERROR` | endpoint invalid (400) |
 | `PROVIDER_PROTOCOL_MISMATCH` | `PROVIDER_ERROR` | wrong protocol profile |
-| `PROVIDER_MODEL_NOT_FOUND` | `PROVIDER_ERROR` | unknown model id (404) |
+| `PROVIDER_MODEL_NOT_FOUND` | `MODEL_NOT_CONFIGURED` | unknown model id (404) |
 | `PROVIDER_TIMEOUT` | `TIMEOUT` | network/server timeout (retriable) |
 | `PROVIDER_UNSUPPORTED_CAPABILITY` | `PROVIDER_ERROR` | tools/vision unsupported |
 | `PROVIDER_DISABLED` | `MODEL_NOT_CONFIGURED` | provider disabled |
@@ -135,7 +135,9 @@ Node sidecar maps provider SDK errors into:
 
 - `PROVIDER_UNAUTHORIZED`
 - `PROVIDER_RATE_LIMITED`
+- `MODEL_NOT_CONFIGURED` (provider rejects the selected model with 404)
 - `PROVIDER_ERROR`
+- `NETWORK_ERROR`
 - `STREAM_FAILED`
 
 ### Permission timeout
@@ -145,10 +147,17 @@ UI/host timeout emits `PERMISSION_TIMEOUT` internally, tool result presented as 
 
 | class | UI behavior |
 |---|---|
-| auth/config (`PROVIDER_SECRET_MISSING`, `MODEL_NOT_CONFIGURED`) | blocking CTA to settings |
+| auth/config (`PROVIDER_SECRET_MISSING`, `MODEL_NOT_CONFIGURED`) | assistant error message with settings CTA |
 | permission denials | inline tool card state |
-| retriable provider/network | show retry action |
+| retriable provider/network | assistant error message with retry action |
 | internal/host unavailable | degraded banner + recovery tip |
+
+Message-bound provider failures never use a toast or floating global banner.
+The assistant error message shows a localized summary and stable code, with an
+accessible details disclosure containing the redacted provider response,
+provider ID, and model ID. Provider detail is capped at 600 characters and
+common credential/header values are redacted before event emission or
+persistence.
 
 ## 6. i18n key convention
 
@@ -169,4 +178,3 @@ Examples:
 2. No raw untyped string-only failures on main paths
 3. Chat hard-denies use explicit mode codes
 4. Host numeric codes map to stable string codes
-

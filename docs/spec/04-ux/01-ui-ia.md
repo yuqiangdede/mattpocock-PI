@@ -20,10 +20,10 @@ destination, chat as the home surface, tools and permissions inline.
 |  New task        |  chat home / transcript        |  (optional,      |
 |  Projects        |  or Projects / Plugins page    |   resizable      |
 |  Plugins         |                                |   320–720px)     |
-|  Open projects   |                                |  Review          |
-|   Project A      |                                |  Terminal        |
-|   Project B      |                                |  Browser         |
-|  Temporary       |                                |  Files           |
+|  Open projects   |                                | App.tsx Review × |
+|   Project A      |                                | ───────────────  |
+|   Project B      |                                | Active artifact  |
+|  Temporary       |                                | surface          |
 |  Footer: local   |  Floating composer (chat)      |                  |
 +------------------+--------------------------------+------------------+
 ```
@@ -45,15 +45,25 @@ destination, chat as the home surface, tools and permissions inline.
   remains only an external import source or a design-reference term.
 - **Main pane**: exactly one destination at a time; destinations replace the
   pane (they are pages, not modals).
-- **Titlebar**: hiddenInset traffic lights; back/forward controls traverse
-  destination history; work-panel toggle on the right.
-- **Work panel**: docked right column (not an overlay) toggled from the
-  titlebar or Cmd/Ctrl+J. Opening lands on a welcome chooser; the right-edge
-  rail switches among Review (working-tree diff), Terminal (interactive PTY),
-  Browser (embedded preview), and Files (workspace browser). Width is
+- **Titlebar**: platform-native desktop chrome (D118). macOS uses
+  `hiddenInset` traffic lights and the system application menu.
+  Windows/Linux use a frameless 46px row with localized
+  File / Edit / View / Window / Help menus on the left and accessible
+  minimize / maximize-or-restore / close controls on the right. Back/forward
+  controls traverse destination history.
+- **Work panel**: docked right column (not an overlay) created only by file,
+  URL, browser-preview, successful-command, or successful workspace-edit
+  artifacts. Its top strip contains only currently opened, closeable tabs:
+  file paths get distinct tabs while Review, Terminal, and Browser deduplicate
+  by kind. A successful active-session workspace Write/Edit artifact opens
+  Review; scratch, failed, and background-session writes never steal focus.
+  Width is
   drag-resizable from 320px to
   `min(720px, 60vw, viewport − visible sidebar − 360px)`, preserving a
-  readable 360px Main pane. Open state and width persist across launches.
+  readable 360px Main pane. The sole panel-level control collapses the panel;
+  changing the visible session/workspace clears runtime tabs. Startup is closed
+  with no tabs and only panel width persists across launches; temporary OS
+  window expansion is excluded from restored launch bounds.
   Replaces the former context-panel overlay; workspace/model/status info lives
   in the composer chips and Settings instead.
 - **Composer**: workspace-agnostic floating pill anchored to the chat
@@ -133,6 +143,7 @@ independent Plugins destination described in §3.5.
 | Permission dialog | tool permission request | risk copy, args preview, allow-once / allow-session / deny, 120s countdown → deny |
 | Model menu | composer model chip | configured provider/model choices + settings entry (D091) |
 | Profile menu | sidebar footer | Settings / Logs / Theme cycle (D041) |
+| Notification inbox | titlebar bell | All/Unread views, task completion/failure rows, mark-all-read and clear actions (D117) |
 | Toasts | events (plugin toast, backend restored, copy) | top-center; 4s default, 8s for errors |
 
 ## 5. Navigation model
@@ -153,8 +164,11 @@ independent Plugins destination described in §3.5.
 |---|---|
 | Cmd/Ctrl+K, Cmd/Ctrl+Shift+P | command palette |
 | Cmd/Ctrl+B | toggle sidebar |
-| Cmd/Ctrl+J | toggle work panel |
+| Cmd/Ctrl+N | new task |
+| Cmd/Ctrl+O | open project |
+| Cmd/Ctrl+, | settings |
 | Cmd/Ctrl+. | abort current run |
+| F10 (Windows/Linux) | focus the application menu bar |
 | Enter / Shift+Enter | send / newline (configurable Enter-to-send) |
 | Esc | dismiss overlay/menu |
 
@@ -166,7 +180,16 @@ independent Plugins destination described in §3.5.
   workspace-required empty state. The composer never renders a workspace rail.
 - Background project session → the originating project row retains its
   running/error indicator. Selected shell state can move independently while
-  the session tool root remains bound to its durable project.
+  the session tool root remains bound to its durable project; its artifacts do
+  not open or activate tabs over the currently selected project.
+- Completed/failed turn not already visible → host-core appends one durable
+  inbox row. A result shown in the visible, focused current chat and every
+  `aborted` turn append none. Background sessions and any turn finishing while
+  the window is unfocused still append. The bell badge shows the unread count;
+  selecting a row marks it read and activates its bound project/session.
+  Electron additionally presents a native system notification only when the
+  app window is unfocused, and clicking it focuses the window before activating
+  the same session (D117).
 - Backend degraded → status capsule (restarting) or fatal banner with Open
   logs (D080); composer submits are rejected with readable errors while down.
 

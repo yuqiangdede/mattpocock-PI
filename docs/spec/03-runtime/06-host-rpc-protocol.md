@@ -78,7 +78,7 @@ Params:
 
 ```ts
 type HandshakeParams = {
-  protocolVersion: 3
+  protocolVersion: 4
   client: "electron-main"
   clientVersion: string
   locale: string // default "en"
@@ -89,7 +89,7 @@ Result:
 
 ```ts
 type HandshakeResult = {
-  protocolVersion: 3
+  protocolVersion: 4
   host: "rust-host-core"
   hostVersion: string
   features: string[]
@@ -101,8 +101,9 @@ Rules:
 1. If protocol major version mismatches → abort boot
 2. Electron should exit with actionable error if handshake fails
 3. All subsequent calls require successful handshake
-4. Version 3 is required for durable regenerate revisions; a version 2 host
-   must be rejected before chat becomes interactive
+4. Version 4 is required for the durable notification inbox and the
+   notification-bearing `session.endTurn` result; a version 3 host must be
+   rejected before chat becomes interactive
 
 ## 4. Method catalog (MVP)
 
@@ -142,14 +143,18 @@ Rules:
   `thinkingLevel` preserves the current value; invalid modes or levels return
   `INVALID_PARAMS`
 - `session.appendMessage`
-- `session.replaceMessages` — single-transaction transcript rewrite used by
-  regenerate/edit flows
+- `session.replaceMessages` — atomic transcript rewrite (temp-file rename +
+  one index transaction, D119) used by regenerate/edit flows
 - `session.saveRevision` — archive a regenerate branch under
   `(sessionId, rootUserId)`
 - `session.listRevisions` — list linear variants for a root user family
 - `session.activateRevision` — replace live transcript with `prefix + branch`
   and stamp root pager metadata
-- `session.updateTurn`
+- `session.beginTurn`
+- `session.endTurn` — atomically moves a running turn to its terminal state and
+  conditionally returns the newly created notification for `completed`/`error`;
+  returns no notification when `createNotification=false`, for `aborted`, or
+  for an already-terminal turn
 - `session.import` — atomically imports one converted session; a non-empty
   project path is normalized and upserted into `projects` before the session
   references it; returns `{ imported, skipped }`
@@ -187,6 +192,66 @@ than appending it to answer `content`.
 ### Audit
 - `audit.append`
 - `audit.query` (optional later)
+
+### Notification (D117)
+- `notification.list`
+- `notification.markRead`
+- `notification.markAllRead`
+- `notification.clear`
+
+## 4a. Notification contracts (protocol v4)
+
+```ts
+type AppNotification = {
+  id: string;
+  kind: "task.completed" | "task.failed";
+  sessionId: string;
+  sessionTitle: string;
+  turnId: string;
+  errorCode?: string;
+  createdAt: string; // ISO-8601 UTC
+  readAt?: string | null;
+};
+
+type SessionEndTurnParams = {
+  turnId: string;
+  status: "completed" | "error" | "aborted";
+  errorCode?: string;
+  usage?: unknown;
+  createNotification?: boolean; // default true; Electron supplies visibility decision
+};
+
+type SessionEndTurnResult = {
+  ok: boolean; // false when the turn was missing/already terminal
+  notification?: AppNotification; // omitted when no row was inserted
+};
+
+type NotificationListParams = {
+  unreadOnly?: boolean; // default false
+  limit?: number;       // default/max 200
+};
+
+type NotificationListResult = {
+  notifications: AppNotification[]; // newest first
+  unreadCount: number;               // global count, independent of filter
+};
+```
+
+- `notification.markRead({ id }) -> { ok }` is idempotent. `ok=false` means
+  the id does not exist; an already-read row remains successful.
+- `notification.markAllRead({}) -> { ok: true }` updates every unread row in
+  one transaction.
+- `notification.clear({}) -> { ok: true }` deletes inbox rows only.
+- No `notification.created` JSON-RPC server notification is emitted. Electron
+  receives the inserted record directly from `session.endTurn`, avoiding a
+  second ordering channel between terminal turn persistence and UI refresh.
+- `createNotification=false` suppresses only inbox insertion; the running turn
+  still reaches its requested terminal state in the same transaction. Missing
+  or non-boolean values default to true so unknown/stale UI state cannot lose a
+  notification.
+- `sessionTitle` is the stable session-name snapshot stored with the row.
+  Localized event title/body prose is derived by Electron/renderer and never
+  crosses host RPC.
 
 ## 5. Tool execute contract
 
@@ -304,3 +369,8 @@ Timeout behavior (**D005**): after 120s unresolved → deny.
 4. timeout path returns deny decision after 120s
 5. switching the selected workspace from A to B does not change the tool root
    of a call issued by session A
+6. Protocol v4 `session.endTurn` creates/returns exactly one notification for
+   unseen completed/failed turns and none for visible-current, aborted, or
+   repeated terminal updates
+7. Notification list/unread/read-all/clear round-trip through host-core and
+   remain bounded to the newest 200 durable rows

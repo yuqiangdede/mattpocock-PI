@@ -49,6 +49,13 @@ impl WorkspaceState {
     }
 }
 
+/// Which containment root a tool path resolved into.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolRoot {
+    Workspace,
+    Scratch,
+}
+
 /// Lexically resolve `.` / `..` components without touching the filesystem.
 /// `..` at the filesystem root clamps (stays at root); the caller's
 /// starts_with check then rejects anything that climbed out of the workspace.
@@ -114,6 +121,53 @@ pub fn resolve_in_workspace(workspace_root: &Path, input: &str) -> Result<PathBu
     Ok(resolved)
 }
 
+/// Resolve a tool path against the workspace root, falling back to the
+/// session scratch root (D114). Relative paths always resolve against the
+/// workspace; the scratch directory is addressed by absolute path only (the
+/// model learns it from the system prompt / `PI_SCRATCH_DIR`). Both roots get
+/// the same lexical + symlink containment defense.
+pub fn resolve_tool_path(
+    workspace_root: &Path,
+    scratch_root: Option<&Path>,
+    input: &str,
+) -> Result<(PathBuf, ToolRoot), String> {
+    let workspace_err = match resolve_in_workspace(workspace_root, input) {
+        Ok(path) => return Ok((path, ToolRoot::Workspace)),
+        Err(e) => e,
+    };
+    if Path::new(input).is_absolute() {
+        if let Some(scratch) = scratch_root {
+            if let Ok(path) = resolve_in_workspace(scratch, input) {
+                return Ok((path, ToolRoot::Scratch));
+            }
+            // The model addresses scratch with the exact spelling we
+            // advertised, which may differ from the canonical one (macOS
+            // /var vs /private/var, /tmp vs /private/tmp). Rewrite a literal
+            // scratch-root prefix to a relative path and resolve that — the
+            // full containment defense still runs.
+            let candidate = normalize_lexical(Path::new(input));
+            if let Ok(rel) = candidate.strip_prefix(normalize_lexical(scratch)) {
+                if let Ok(path) = resolve_in_workspace(scratch, &rel.to_string_lossy()) {
+                    return Ok((path, ToolRoot::Scratch));
+                }
+            }
+        }
+    }
+    Err(workspace_err)
+}
+
+/// Purely lexical containment check: does `input` (absolute) normalize to a
+/// path under `root`? Used only to decide whether a scratch write can skip
+/// the permission prompt — execution still runs the full symlink-aware
+/// resolver, so a false positive here cannot escape containment.
+pub fn lexically_inside(root: &Path, input: &str) -> bool {
+    let candidate = Path::new(input);
+    if !candidate.is_absolute() {
+        return false;
+    }
+    normalize_lexical(candidate).starts_with(normalize_lexical(root))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -166,6 +220,81 @@ mod tests {
         std::os::unix::fs::symlink(outside.path(), root.join("link")).unwrap();
         let err = resolve_in_workspace(root, "link/new.txt").unwrap_err();
         assert_eq!(err, "PATH_OUTSIDE_WORKSPACE");
+    }
+
+    #[test]
+    fn tool_path_relative_resolves_to_workspace() {
+        let ws = tempdir().unwrap();
+        let scratch = tempdir().unwrap();
+        let (p, root) =
+            resolve_tool_path(ws.path(), Some(scratch.path()), "notes.txt").unwrap();
+        assert_eq!(root, ToolRoot::Workspace);
+        assert!(p.starts_with(ws.path().canonicalize().unwrap()));
+    }
+
+    #[test]
+    fn tool_path_absolute_scratch_resolves_to_scratch() {
+        let ws = tempdir().unwrap();
+        let scratch = tempdir().unwrap();
+        let input = scratch.path().join("tmp.json");
+        let (p, root) = resolve_tool_path(
+            ws.path(),
+            Some(scratch.path()),
+            input.to_str().unwrap(),
+        )
+        .unwrap();
+        assert_eq!(root, ToolRoot::Scratch);
+        assert!(p.starts_with(scratch.path().canonicalize().unwrap()));
+    }
+
+    #[test]
+    fn tool_path_escape_from_scratch_blocked() {
+        let ws = tempdir().unwrap();
+        let scratch = tempdir().unwrap();
+        let input = scratch.path().join("a/../../evil.txt");
+        let err = resolve_tool_path(
+            ws.path(),
+            Some(scratch.path()),
+            input.to_str().unwrap(),
+        )
+        .unwrap_err();
+        assert_eq!(err, "PATH_OUTSIDE_WORKSPACE");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn tool_path_symlink_escape_from_scratch_blocked() {
+        let ws = tempdir().unwrap();
+        let scratch = tempdir().unwrap();
+        let outside = tempdir().unwrap();
+        std::os::unix::fs::symlink(outside.path(), scratch.path().join("link")).unwrap();
+        let input = scratch.path().join("link/new.txt");
+        let err = resolve_tool_path(
+            ws.path(),
+            Some(scratch.path()),
+            input.to_str().unwrap(),
+        )
+        .unwrap_err();
+        assert_eq!(err, "PATH_OUTSIDE_WORKSPACE");
+    }
+
+    #[test]
+    fn tool_path_absolute_outside_both_roots_blocked() {
+        let ws = tempdir().unwrap();
+        let scratch = tempdir().unwrap();
+        let err =
+            resolve_tool_path(ws.path(), Some(scratch.path()), "/etc/hosts").unwrap_err();
+        assert_eq!(err, "PATH_OUTSIDE_WORKSPACE");
+    }
+
+    #[test]
+    fn lexically_inside_checks() {
+        let root = Path::new("/data/scratch/s1");
+        assert!(lexically_inside(root, "/data/scratch/s1/a.txt"));
+        assert!(lexically_inside(root, "/data/scratch/s1/sub/./b.txt"));
+        assert!(!lexically_inside(root, "/data/scratch/s1/../s2/a.txt"));
+        assert!(!lexically_inside(root, "/data/other/a.txt"));
+        assert!(!lexically_inside(root, "relative/a.txt"));
     }
 
     #[test]

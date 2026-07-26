@@ -135,6 +135,7 @@ type ModelCatalogCacheRecord = {
 - `providers.delete`
 - `providers.testConnection`
 - `providers.listModels`
+- `providers.cacheModels` (internal Electron-main to host persistence bridge)
 - `providers.refreshModels`
 - `providers.upsertUserModel`
 - `providers.deleteUserModel`
@@ -191,10 +192,22 @@ The canonical DDL lives in [04-data-storage](04-data-storage.md) (D086). Summary
 - out: `{ ok: boolean, latencyMs?: number, error?: AppError, sampleModelId?: string }`
 
 ### `providers.listModels`
-- in: `{ id, query?: string, source?: "cache"|"live"|"all" }`
+- renderer IPC in: `{ providerId, source?: "cache"|"refresh" }`; `cache`
+  returns the durable catalog without provider network access, while `refresh`
+  runs discovery in Electron main
+- host RPC in: `{ providerId?: string }`; reads only the Rust-owned `models`
+  table
 - out: `{ models: ModelCatalogItem[] }`; each model carries effective
   `reasoning` capability and `supportedThinkingLevels`. Explicit provider
   `false` removes any stale catalog/cache reasoning tag.
+
+### `providers.cacheModels` (internal host RPC)
+- in: `{ providerId, models: DiscoveredModelInput[] }`
+- behavior: transactionally upsert successful live discovery into `models` as
+  `source='discovered'`; never overwrite `source='user'` rows and never delete
+  prior cache rows on a failed or partial refresh
+- out: `{ cached: number, models: ModelCatalogItem[] }`
+- raw secrets and authorization headers are never part of this call
 
 ### `providers.refreshModels`
 - in: `{ id }`

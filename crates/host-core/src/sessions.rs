@@ -5,6 +5,8 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::db::{ms_to_ts, now_ms, ts_to_ms, Database};
+use crate::notifications::{self, Notification};
+use crate::transcripts::{self, MessageRecord, RevisionRecord};
 
 /// Values accepted by the persisted per-session thinking selector.  Keep this
 /// list in the host boundary so old clients cannot write arbitrary provider
@@ -17,6 +19,29 @@ pub fn is_valid_thinking_level(level: &str) -> bool {
 
 fn default_thinking_level() -> String {
     "off".to_string()
+}
+
+/// Per-session permission mode (D115). `inherit` defers to the global
+/// default in settings; the rest override it for this session only.
+pub const PERMISSION_MODES: [&str; 4] = ["inherit", "ask", "accept-edits", "auto"];
+
+pub fn is_valid_permission_mode(mode: &str) -> bool {
+    PERMISSION_MODES.contains(&mode)
+}
+
+fn default_permission_mode() -> String {
+    "inherit".to_string()
+}
+
+fn validate_permission_mode(mode: &str) -> Result<()> {
+    if is_valid_permission_mode(mode) {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "permissionMode must be one of {}",
+            PERMISSION_MODES.join(", ")
+        ))
+    }
 }
 
 fn validate_thinking_level(level: &str) -> Result<()> {
@@ -32,8 +57,9 @@ fn validate_thinking_level(level: &str) -> Result<()> {
 
 /// Wire format is unchanged from v1: RFC3339 timestamps, `projectPath`
 /// resolved from the projects table, flat tool fields on messages. Storage is
-/// schema v3 (block-array transcripts, integer times, per-session `seq`, and
-/// persisted thinking level).
+/// schema v7 (D119): transcript content lives in per-session JSONL files and
+/// SQLite keeps session metadata plus per-message index rows (`seq`, `text`
+/// for FTS, promoted filter columns).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionSummary {
@@ -45,6 +71,8 @@ pub struct SessionSummary {
     pub mode: String,
     #[serde(default = "default_thinking_level")]
     pub thinking_level: String,
+    #[serde(default = "default_permission_mode")]
+    pub permission_mode: String,
     pub updated_at: String,
     pub created_at: String,
 }
@@ -80,6 +108,9 @@ pub struct UiMessage {
     pub provider_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub usage: Option<MessageUsage>,
+    /// Structured AppError for an assistant turn that failed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<Value>,
     /// Stable regenerate-family key shared across rewritten user prompts.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub revision_root_id: Option<String>,
@@ -133,10 +164,11 @@ fn is_default_title(title: &str) -> bool {
     )
 }
 
-// ---- UiMessage ⇄ storage row mapping ----------------------------------------
+// ---- UiMessage ⇄ transcript record mapping -----------------------------------
 
-/// (text, content_json, meta_json) for a wire message.
-fn ui_to_storage(message: &UiMessage) -> (Option<String>, String, Option<String>) {
+/// UiMessage → persisted transcript record, plus the extracted plain text for
+/// the search index row (None for tool rows, matching the FTS triggers).
+fn ui_to_record(message: &UiMessage) -> (MessageRecord, Option<String>) {
     let mut meta_obj = serde_json::Map::new();
     if let Some(status) = &message.status {
         meta_obj.insert("status".into(), json!(status));
@@ -160,6 +192,9 @@ fn ui_to_storage(message: &UiMessage) -> (Option<String>, String, Option<String>
             }),
         );
     }
+    if let Some(error) = &message.error {
+        meta_obj.insert("error".into(), error.clone());
+    }
     if let Some(root_id) = &message.revision_root_id {
         meta_obj.insert("revisionRootId".into(), json!(root_id));
     }
@@ -172,13 +207,14 @@ fn ui_to_storage(message: &UiMessage) -> (Option<String>, String, Option<String>
     let meta = if meta_obj.is_empty() {
         None
     } else {
-        Some(Value::Object(meta_obj).to_string())
+        Some(Value::Object(meta_obj))
     };
-    if message.role == "tool" {
-        let mut blocks = Vec::new();
-        if let Some(thinking) = &message.thinking {
-            blocks.push(json!({ "type": "thinking", "text": thinking }));
-        }
+
+    let mut blocks = Vec::with_capacity(2);
+    if let Some(thinking) = &message.thinking {
+        blocks.push(json!({ "type": "thinking", "text": thinking }));
+    }
+    let text = if message.role == "tool" {
         let mut block = serde_json::Map::new();
         block.insert("type".into(), json!("tool_call"));
         if let Some(v) = &message.tool_call_id {
@@ -209,39 +245,32 @@ fn ui_to_storage(message: &UiMessage) -> (Option<String>, String, Option<String>
             block.insert("text".into(), json!(message.content));
         }
         blocks.push(Value::Object(block));
-        (None, Value::Array(blocks).to_string(), meta)
+        None
     } else {
-        let mut blocks = Vec::with_capacity(2);
-        if let Some(thinking) = &message.thinking {
-            blocks.push(json!({ "type": "thinking", "text": thinking }));
-        }
         blocks.push(json!({ "type": "text", "text": message.content }));
-        (
-            Some(message.content.clone()),
-            Value::Array(blocks).to_string(),
+        Some(message.content.clone())
+    };
+
+    (
+        MessageRecord {
+            id: message.id.clone(),
+            role: message.role.clone(),
+            tool_name: message.tool_name.clone(),
+            is_error: message.is_error.unwrap_or(false),
+            blocks: Value::Array(blocks),
             meta,
-        )
-    }
+            created_at: message.created_at.clone(),
+        },
+        text,
+    )
 }
 
-struct MessageRow {
-    id: String,
-    role: String,
-    tool_name: Option<String>,
-    is_error: i64,
-    text: Option<String>,
-    content_json: String,
-    meta_json: Option<String>,
-    created_at: i64,
-}
-
-fn row_to_ui(row: MessageRow) -> UiMessage {
-    let blocks: Vec<Value> = serde_json::from_str(&row.content_json).unwrap_or_default();
-    let meta: Value = row
-        .meta_json
-        .as_deref()
-        .and_then(|raw| serde_json::from_str(raw).ok())
-        .unwrap_or(Value::Null);
+fn record_to_ui(record: MessageRecord) -> UiMessage {
+    let blocks = match record.blocks {
+        Value::Array(items) => items,
+        _ => Vec::new(),
+    };
+    let meta = record.meta.unwrap_or(Value::Null);
     let status = meta
         .get("status")
         .and_then(|v| v.as_str())
@@ -270,6 +299,7 @@ fn row_to_ui(row: MessageRow) -> UiMessage {
             total_tokens,
         })
     });
+    let error = meta.get("error").cloned();
     let revision_root_id = meta
         .get("revisionRootId")
         .and_then(|v| v.as_str())
@@ -285,8 +315,9 @@ fn row_to_ui(row: MessageRow) -> UiMessage {
         })
         .collect::<Vec<_>>();
     let thinking = (!thinking.is_empty()).then(|| thinking.concat());
+    let is_error = record.is_error.then_some(true);
 
-    if row.role == "tool" {
+    if record.role == "tool" {
         let block = blocks
             .iter()
             .find(|b| b.get("type").and_then(|t| t.as_str()) == Some("tool_call"))
@@ -298,19 +329,20 @@ fn row_to_ui(row: MessageRow) -> UiMessage {
             .map(|s| s.to_string())
             .unwrap_or_default();
         UiMessage {
-            id: row.id,
-            role: row.role,
+            id: record.id,
+            role: record.role,
             content: text,
-            created_at: ms_to_ts(row.created_at),
+            created_at: record.created_at,
             thinking,
             status,
             model_id,
             provider_id,
             usage,
-            revision_root_id: revision_root_id.clone(),
+            error,
+            revision_root_id,
             revision_count,
             active_revision,
-            tool_name: row.tool_name,
+            tool_name: record.tool_name,
             tool_call_id: block
                 .get("callId")
                 .and_then(|v| v.as_str())
@@ -326,30 +358,29 @@ fn row_to_ui(row: MessageRow) -> UiMessage {
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string()),
             tool_duration_ms: block.get("durationMs").and_then(|v| v.as_i64()),
-            is_error: if row.is_error != 0 { Some(true) } else { None },
+            is_error,
         }
     } else {
-        let content = row.text.unwrap_or_else(|| {
-            blocks
-                .iter()
-                .filter_map(|b| match b.get("type").and_then(|t| t.as_str()) {
-                    Some("text") => b.get("text").and_then(|v| v.as_str()),
-                    _ => None,
-                })
-                .collect::<Vec<_>>()
-                .join("")
-        });
+        let content = blocks
+            .iter()
+            .filter_map(|b| match b.get("type").and_then(|t| t.as_str()) {
+                Some("text") => b.get("text").and_then(|v| v.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("");
         UiMessage {
-            id: row.id,
-            role: row.role,
+            id: record.id,
+            role: record.role,
             content,
-            created_at: ms_to_ts(row.created_at),
+            created_at: record.created_at,
             thinking,
             status,
             model_id,
             provider_id,
             usage,
-            revision_root_id: revision_root_id.clone(),
+            error,
+            revision_root_id,
             revision_count,
             active_revision,
             tool_name: None,
@@ -359,48 +390,144 @@ fn row_to_ui(row: MessageRow) -> UiMessage {
             tool_result: None,
             tool_completed_at: None,
             tool_duration_ms: None,
-            is_error: if row.is_error != 0 { Some(true) } else { None },
+            is_error,
         }
     }
 }
 
-fn insert_message(
+fn dedupe_records(records: Vec<MessageRecord>) -> Vec<MessageRecord> {
+    let mut ordered: Vec<MessageRecord> = Vec::with_capacity(records.len());
+    let mut by_id: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::with_capacity(records.len());
+    for record in records {
+        match by_id.get(&record.id) {
+            Some(&pos) => ordered[pos] = record,
+            None => {
+                by_id.insert(record.id.clone(), ordered.len());
+                ordered.push(record);
+            }
+        }
+    }
+    ordered
+}
+
+fn record_index_text(record: &MessageRecord) -> Option<String> {
+    if record.role == "tool" {
+        return None;
+    }
+    let text = record
+        .blocks
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|block| {
+            (block.get("type").and_then(Value::as_str) == Some("text"))
+                .then(|| block.get("text").and_then(Value::as_str))
+                .flatten()
+        })
+        .collect::<String>();
+    (!text.is_empty()).then_some(text)
+}
+
+fn collect_tool_call_ids(records: &[MessageRecord]) -> std::collections::HashMap<String, String> {
+    let mut ids = std::collections::HashMap::new();
+    for record in records {
+        let Some(blocks) = record.blocks.as_array() else {
+            continue;
+        };
+        for block in blocks {
+            let Some(object) = block.as_object() else {
+                continue;
+            };
+            for key in ["callId", "toolCallId"] {
+                if let Some(id) = object.get(key).and_then(Value::as_str) {
+                    ids.entry(id.to_string())
+                        .or_insert_with(|| Uuid::new_v4().to_string());
+                }
+            }
+        }
+    }
+    ids
+}
+
+fn clone_records_for_fork(records: Vec<MessageRecord>) -> Vec<MessageRecord> {
+    let records = dedupe_records(records);
+    let tool_call_ids = collect_tool_call_ids(&records);
+    records
+        .into_iter()
+        .map(|mut record| {
+            record.id = Uuid::new_v4().to_string();
+            if let Some(meta) = record.meta.as_mut().and_then(Value::as_object_mut) {
+                meta.remove("revisionRootId");
+                meta.remove("revisionCount");
+                meta.remove("activeRevision");
+                if meta.is_empty() {
+                    record.meta = None;
+                }
+            }
+            if let Some(blocks) = record.blocks.as_array_mut() {
+                for block in blocks {
+                    let Some(object) = block.as_object_mut() else {
+                        continue;
+                    };
+                    for key in ["callId", "toolCallId"] {
+                        let Some(old_id) = object.get(key).and_then(Value::as_str) else {
+                            continue;
+                        };
+                        if let Some(new_id) = tool_call_ids.get(old_id) {
+                            object.insert(key.to_string(), json!(new_id));
+                        }
+                    }
+                }
+            }
+            record
+        })
+        .collect()
+}
+
+/// Insert one search/index row for a message whose content lives in the
+/// transcript file.
+fn insert_index_row(
     conn: &rusqlite::Connection,
     session_id: &str,
     seq: i64,
     turn_id: Option<&str>,
-    message: &UiMessage,
-    created_at: i64,
+    record: &MessageRecord,
+    text: Option<&str>,
 ) -> Result<()> {
-    let (text, content_json, meta_json) = ui_to_storage(message);
     let mut stmt = conn.prepare_cached(
         "INSERT INTO messages (
-            id, session_id, turn_id, seq, role, tool_name, is_error, text,
-            content_json, meta_json, created_at
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            id, session_id, turn_id, seq, role, tool_name, is_error, text, created_at
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
     )?;
     stmt.execute(params![
-        message.id,
+        record.id,
         session_id,
         turn_id,
         seq,
-        message.role,
-        message.tool_name,
-        if message.is_error.unwrap_or(false) {
-            1
-        } else {
-            0
-        },
+        record.role,
+        record.tool_name,
+        record.is_error,
         text,
-        content_json,
-        meta_json,
-        created_at,
+        ts_to_ms(&record.created_at),
     ])?;
     Ok(())
 }
 
+/// The session's created_at (RFC3339, used as the transcript header stamp) —
+/// doubles as the existence check before any transcript file is touched.
+fn session_created_at(db: &Database, session_id: &str) -> Result<String> {
+    let ms: Option<i64> = db
+        .conn()
+        .prepare_cached("SELECT created_at FROM sessions WHERE id = ?1")?
+        .query_row(params![session_id], |r| r.get(0))
+        .optional()?;
+    ms.map(ms_to_ts)
+        .ok_or_else(|| anyhow!("session not found: {session_id}"))
+}
+
 const SUMMARY_SELECT: &str = "SELECT s.id, s.title, p.path, s.model_id, s.provider_id, s.mode,
-            s.thinking_level, s.updated_at, s.created_at
+            s.thinking_level, s.permission_mode, s.updated_at, s.created_at
      FROM sessions s LEFT JOIN projects p ON p.id = s.project_id";
 
 fn summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SessionSummary> {
@@ -412,8 +539,9 @@ fn summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SessionSummary>
         provider_id: row.get(4)?,
         mode: row.get(5)?,
         thinking_level: row.get(6)?,
-        updated_at: ms_to_ts(row.get(7)?),
-        created_at: ms_to_ts(row.get(8)?),
+        permission_mode: row.get(7)?,
+        updated_at: ms_to_ts(row.get(8)?),
+        created_at: ms_to_ts(row.get(9)?),
     })
 }
 
@@ -526,9 +654,19 @@ pub fn create_session_with_thinking(
         provider_id,
         mode,
         thinking_level,
+        permission_mode: default_permission_mode(),
         updated_at: ms_to_ts(now),
         created_at: ms_to_ts(now),
     })
+}
+
+/// The persisted per-session permission mode, or None for unknown sessions.
+pub fn session_permission_mode(db: &Database, id: &str) -> Result<Option<String>> {
+    Ok(db
+        .conn()
+        .prepare_cached("SELECT permission_mode FROM sessions WHERE id = ?1")?
+        .query_row(params![id], |row| row.get(0))
+        .optional()?)
 }
 
 pub fn get_session(db: &Database, id: &str) -> Result<Option<SessionDetail>> {
@@ -542,28 +680,97 @@ pub fn get_session(db: &Database, id: &str) -> Result<Option<SessionDetail>> {
         return Ok(None);
     };
 
-    let mut stmt = db.conn().prepare_cached(
-        "SELECT id, role, tool_name, is_error, text, content_json, meta_json, created_at
-         FROM messages WHERE session_id = ?1 ORDER BY seq ASC",
-    )?;
-    let rows = stmt.query_map(params![id], |row| {
-        Ok(MessageRow {
-            id: row.get(0)?,
-            role: row.get(1)?,
-            tool_name: row.get(2)?,
-            is_error: row.get(3)?,
-            text: row.get(4)?,
-            content_json: row.get(5)?,
-            meta_json: row.get(6)?,
-            created_at: row.get(7)?,
-        })
-    })?;
-    let messages = rows
-        .collect::<rusqlite::Result<Vec<_>>>()?
-        .into_iter()
-        .map(row_to_ui)
-        .collect();
+    // Content comes from the transcript file; SQLite only indexes it.
+    // Keep-last dedupe by message id absorbs a retried append whose earlier
+    // file line lost its index transaction to a crash.
+    let records = dedupe_records(transcripts::read_transcript(db.data_dir(), id)?);
+    let messages = records.into_iter().map(record_to_ui).collect();
     Ok(Some(SessionDetail { summary, messages }))
+}
+
+/// Create an independent session from the source session's current canonical
+/// transcript. Regenerate revisions, turns, artifacts, notifications, scratch
+/// data, and live runtime state are intentionally not copied.
+pub enum ForkSessionResult {
+    Created(Box<SessionDetail>),
+    NotFound,
+    Busy,
+}
+
+pub fn fork_session(
+    db: &Database,
+    source_id: &str,
+    title: Option<&str>,
+) -> Result<ForkSessionResult> {
+    let Some(source) = get_session(db, source_id)? else {
+        return Ok(ForkSessionResult::NotFound);
+    };
+    let has_running_turn: bool = db.conn().query_row(
+        "SELECT EXISTS(
+            SELECT 1 FROM turns WHERE session_id = ?1 AND status = 'running'
+         )",
+        params![source_id],
+        |row| row.get(0),
+    )?;
+    if has_running_turn {
+        return Ok(ForkSessionResult::Busy);
+    }
+    let source_records = transcripts::read_transcript(db.data_dir(), source_id)?;
+    let records = clone_records_for_fork(source_records);
+    let texts = records.iter().map(record_index_text).collect::<Vec<_>>();
+    let id = Uuid::new_v4().to_string();
+    let now = now_ms();
+    let created_at = ms_to_ts(now);
+    let requested_title = title.map(str::trim).filter(|value| !value.is_empty());
+    let title = requested_title
+        .map(|value| value.chars().take(100).collect::<String>())
+        .unwrap_or_else(|| format!("{} (branch)", source.summary.title));
+
+    transcripts::write_transcript(db.data_dir(), &id, &created_at, &records)?;
+    let indexed = (|| -> Result<()> {
+        let tx = db.conn().unchecked_transaction()?;
+        let inserted = tx
+            .prepare_cached(
+                "INSERT INTO sessions (
+                    id, title, project_id, provider_id, model_id, mode, thinking_level,
+                    permission_mode, source, pinned, last_seq, created_at, updated_at
+                 )
+                 SELECT ?1, ?2, project_id, provider_id, model_id, mode, thinking_level,
+                        permission_mode, NULL, 0, ?3, ?4, ?4
+                 FROM sessions WHERE id = ?5",
+            )?
+            .execute(params![id, title, records.len() as i64, now, source_id])?;
+        if inserted == 0 {
+            return Err(anyhow!("session not found: {source_id}"));
+        }
+        for (seq, record) in records.iter().enumerate() {
+            insert_index_row(&tx, &id, seq as i64, None, record, texts[seq].as_deref())?;
+        }
+        tx.commit()?;
+        Ok(())
+    })();
+    if let Err(error) = indexed {
+        transcripts::remove_session_files(db.data_dir(), &id);
+        return Err(error);
+    }
+
+    let summary = SessionSummary {
+        id,
+        title,
+        project_path: source.summary.project_path,
+        model_id: source.summary.model_id,
+        provider_id: source.summary.provider_id,
+        mode: source.summary.mode,
+        thinking_level: source.summary.thinking_level,
+        permission_mode: source.summary.permission_mode,
+        updated_at: created_at.clone(),
+        created_at,
+    };
+    let messages = records.into_iter().map(record_to_ui).collect();
+    Ok(ForkSessionResult::Created(Box::new(SessionDetail {
+        summary,
+        messages,
+    })))
 }
 
 /// Backwards-compatible configurator.  Omitting the thinking level preserves
@@ -576,9 +783,10 @@ pub fn configure_session(
     provider_id: Option<&str>,
     model_id: Option<&str>,
 ) -> Result<Option<SessionSummary>> {
-    configure_session_with_thinking(db, id, mode, provider_id, model_id, None)
+    configure_session_with_thinking(db, id, mode, provider_id, model_id, None, None)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn configure_session_with_thinking(
     db: &Database,
     id: &str,
@@ -586,6 +794,7 @@ pub fn configure_session_with_thinking(
     provider_id: Option<&str>,
     model_id: Option<&str>,
     thinking_level: Option<&str>,
+    permission_mode: Option<&str>,
 ) -> Result<Option<SessionSummary>> {
     if !matches!(mode, "chat" | "agent") {
         return Err(anyhow!("mode must be chat or agent"));
@@ -593,12 +802,16 @@ pub fn configure_session_with_thinking(
     if let Some(level) = thinking_level {
         validate_thinking_level(level)?;
     }
+    if let Some(mode) = permission_mode {
+        validate_permission_mode(mode)?;
+    }
     let changed = db
         .conn()
         .prepare_cached(
             "UPDATE sessions
              SET mode = ?2, provider_id = ?3, model_id = ?4,
-                 thinking_level = COALESCE(?5, thinking_level), updated_at = ?6
+                 thinking_level = COALESCE(?5, thinking_level),
+                 permission_mode = COALESCE(?6, permission_mode), updated_at = ?7
              WHERE id = ?1",
         )?
         .execute(params![
@@ -607,6 +820,7 @@ pub fn configure_session_with_thinking(
             provider_id,
             model_id,
             thinking_level,
+            permission_mode,
             now_ms()
         ])?;
     if changed == 0 {
@@ -620,6 +834,11 @@ pub fn delete_session(db: &Database, id: &str) -> Result<bool> {
         .conn()
         .prepare_cached("DELETE FROM sessions WHERE id = ?1")?
         .execute(params![id])?;
+    if n > 0 {
+        // Here rather than in the RPC handler so every deletion path (UI,
+        // failed scheduled-run cleanup) also drops the transcript files.
+        transcripts::remove_session_files(db.data_dir(), id);
+    }
     Ok(n > 0)
 }
 
@@ -631,12 +850,30 @@ pub fn rename_session(db: &Database, id: &str, title: &str) -> Result<bool> {
     Ok(n > 0)
 }
 
+/// Per-message records plus their extracted index text, in input order.
+fn records_and_texts(messages: &[UiMessage]) -> (Vec<MessageRecord>, Vec<Option<String>>) {
+    let mut records = Vec::with_capacity(messages.len());
+    let mut texts = Vec::with_capacity(messages.len());
+    for message in messages {
+        let (record, text) = ui_to_record(message);
+        records.push(record);
+        texts.push(text);
+    }
+    (records, texts)
+}
+
 pub fn append_message(
     db: &Database,
     session_id: &str,
     message: &UiMessage,
     turn_id: Option<&str>,
 ) -> Result<()> {
+    let session_created = session_created_at(db, session_id)?;
+    let (record, text) = ui_to_record(message);
+    // File first: the transcript is the source of truth. A crash before the
+    // index commit costs one derived row (self-healed by the next rewrite),
+    // never message content.
+    transcripts::append_message(db.data_dir(), session_id, &session_created, &record)?;
     let conn = db.conn();
     let tx = conn.unchecked_transaction()?;
     let now = now_ms();
@@ -650,35 +887,24 @@ pub fn append_message(
     let Some(seq) = seq else {
         return Err(anyhow!("session not found: {session_id}"));
     };
-    insert_message(
-        &tx,
-        session_id,
-        seq - 1,
-        turn_id,
-        message,
-        ts_to_ms(&message.created_at),
-    )?;
+    insert_index_row(&tx, session_id, seq - 1, turn_id, &record, text.as_deref())?;
     tx.commit()?;
     Ok(())
 }
 
 pub fn replace_messages(db: &Database, session_id: &str, messages: &[UiMessage]) -> Result<()> {
+    let session_created = session_created_at(db, session_id)?;
+    let (records, texts) = records_and_texts(messages);
+    transcripts::write_transcript(db.data_dir(), session_id, &session_created, &records)?;
     let conn = db.conn();
     let tx = conn.unchecked_transaction()?;
     tx.prepare_cached("DELETE FROM messages WHERE session_id = ?1")?
         .execute(params![session_id])?;
-    for (seq, message) in messages.iter().enumerate() {
-        insert_message(
-            &tx,
-            session_id,
-            seq as i64,
-            None,
-            message,
-            ts_to_ms(&message.created_at),
-        )?;
+    for (seq, record) in records.iter().enumerate() {
+        insert_index_row(&tx, session_id, seq as i64, None, record, texts[seq].as_deref())?;
     }
     tx.prepare_cached("UPDATE sessions SET last_seq = ?1, updated_at = ?2 WHERE id = ?3")?
-        .execute(params![messages.len() as i64, now_ms(), session_id])?;
+        .execute(params![records.len() as i64, now_ms(), session_id])?;
     tx.commit()?;
     Ok(())
 }
@@ -694,6 +920,8 @@ pub struct MessageRevisionSummary {
 }
 
 /// Persist a discarded (or current) regenerate branch for a user root turn.
+/// The branch payload goes to the append-only revisions file; SQLite keeps
+/// the index row (identity, ordering, active flag, count).
 pub fn save_message_revision(
     db: &Database,
     session_id: &str,
@@ -708,8 +936,7 @@ pub fn save_message_revision(
         return Err(anyhow!("messages required"));
     }
     let conn = db.conn();
-    let tx = conn.unchecked_transaction()?;
-    let next_index: i64 = tx
+    let next_index: i64 = conn
         .query_row(
             "SELECT COALESCE(MAX(revision_index), 0) + 1
              FROM message_revisions
@@ -718,6 +945,19 @@ pub fn save_message_revision(
             |row| row.get(0),
         )
         .unwrap_or(1);
+    let created = now_ms();
+    let (records, _) = records_and_texts(messages);
+    transcripts::append_revision(
+        db.data_dir(),
+        session_id,
+        &RevisionRecord {
+            root_user_id: root_user_id.to_string(),
+            revision_index: next_index,
+            created_at: ms_to_ts(created),
+            messages: records,
+        },
+    )?;
+    let tx = conn.unchecked_transaction()?;
     if make_active {
         tx.prepare_cached(
             "UPDATE message_revisions
@@ -727,11 +967,9 @@ pub fn save_message_revision(
         .execute(params![session_id, root_user_id])?;
     }
     let id = Uuid::new_v4().to_string();
-    let created = now_ms();
-    let payload = serde_json::to_string(messages)?;
     tx.prepare_cached(
         "INSERT INTO message_revisions (
-            id, session_id, root_user_id, revision_index, is_active, messages_json, created_at
+            id, session_id, root_user_id, revision_index, is_active, message_count, created_at
          ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
     )?
     .execute(params![
@@ -740,7 +978,7 @@ pub fn save_message_revision(
         root_user_id,
         next_index,
         if make_active { 1 } else { 0 },
-        payload,
+        messages.len() as i64,
         created
     ])?;
     tx.commit()?;
@@ -758,21 +996,17 @@ pub fn list_message_revisions(
     root_user_id: &str,
 ) -> Result<Vec<MessageRevisionSummary>> {
     let mut stmt = db.conn().prepare_cached(
-        "SELECT revision_index, is_active, created_at, messages_json
+        "SELECT revision_index, is_active, created_at, message_count
          FROM message_revisions
          WHERE session_id = ?1 AND root_user_id = ?2
          ORDER BY revision_index ASC",
     )?;
     let rows = stmt.query_map(params![session_id, root_user_id], |row| {
-        let messages_json: String = row.get(3)?;
-        let count = serde_json::from_str::<Vec<Value>>(&messages_json)
-            .map(|v| v.len() as i64)
-            .unwrap_or(0);
         Ok(MessageRevisionSummary {
             revision_index: row.get(0)?,
             is_active: row.get::<_, i64>(1)? != 0,
             created_at: ms_to_ts(row.get(2)?),
-            message_count: count,
+            message_count: row.get(3)?,
         })
     })?;
     let mut out = Vec::new();
@@ -791,39 +1025,35 @@ pub fn activate_message_revision(
     revision_index: i64,
     prefix: &[UiMessage],
 ) -> Result<Vec<UiMessage>> {
+    let session_created = session_created_at(db, session_id)?;
     let conn = db.conn();
-    let tx = conn.unchecked_transaction()?;
-    let messages_json: String = tx
-        .query_row(
-            "SELECT messages_json FROM message_revisions
-             WHERE session_id = ?1 AND root_user_id = ?2 AND revision_index = ?3",
-            params![session_id, root_user_id, revision_index],
-            |row| row.get(0),
-        )
-        .map_err(|_| anyhow!("revision not found"))?;
-    let branch: Vec<UiMessage> = serde_json::from_str(&messages_json)
-        .map_err(|e| anyhow!("revision payload invalid: {e}"))?;
-    tx.prepare_cached(
-        "UPDATE message_revisions
-         SET is_active = CASE WHEN revision_index = ?3 THEN 1 ELSE 0 END
-         WHERE session_id = ?1 AND root_user_id = ?2",
-    )?
-    .execute(params![session_id, root_user_id, revision_index])?;
-    // rebuild live messages = prefix + branch
-    tx.prepare_cached("DELETE FROM messages WHERE session_id = ?1")?
-        .execute(params![session_id])?;
-    let mut combined = Vec::with_capacity(prefix.len() + branch.len());
-    combined.extend_from_slice(prefix);
-    combined.extend(branch.iter().cloned());
-    // Stamp revision meta on the branch's user root. After regenerate the live
-    // prompt id may differ from the stable family key, so prefer an exact id
-    // match and fall back to the first user message in the restored branch.
-    let total: i64 = tx.query_row(
+    let known: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM message_revisions
+         WHERE session_id = ?1 AND root_user_id = ?2 AND revision_index = ?3",
+        params![session_id, root_user_id, revision_index],
+        |row| row.get(0),
+    )?;
+    if known == 0 {
+        return Err(anyhow!("revision not found"));
+    }
+    let revision =
+        transcripts::read_revision(db.data_dir(), session_id, root_user_id, revision_index)?
+            .ok_or_else(|| anyhow!("revision payload missing from revisions file"))?;
+    let branch: Vec<UiMessage> = revision.messages.into_iter().map(record_to_ui).collect();
+
+    let total: i64 = conn.query_row(
         "SELECT COUNT(*) FROM message_revisions
          WHERE session_id = ?1 AND root_user_id = ?2",
         params![session_id, root_user_id],
         |row| row.get(0),
     )?;
+    // rebuild live messages = prefix + branch
+    let mut combined = Vec::with_capacity(prefix.len() + branch.len());
+    combined.extend_from_slice(prefix);
+    combined.extend(branch);
+    // Stamp revision meta on the branch's user root. After regenerate the live
+    // prompt id may differ from the stable family key, so prefer an exact id
+    // match and fall back to the first user message in the restored branch.
     let root_pos = combined
         .iter()
         .position(|m| m.id == root_user_id)
@@ -841,18 +1071,23 @@ pub fn activate_message_revision(
             root.active_revision = Some(revision_index);
         }
     }
-    for (seq, message) in combined.iter().enumerate() {
-        insert_message(
-            &tx,
-            session_id,
-            seq as i64,
-            None,
-            message,
-            ts_to_ms(&message.created_at),
-        )?;
+
+    let (records, texts) = records_and_texts(&combined);
+    transcripts::write_transcript(db.data_dir(), session_id, &session_created, &records)?;
+    let tx = conn.unchecked_transaction()?;
+    tx.prepare_cached(
+        "UPDATE message_revisions
+         SET is_active = CASE WHEN revision_index = ?3 THEN 1 ELSE 0 END
+         WHERE session_id = ?1 AND root_user_id = ?2",
+    )?
+    .execute(params![session_id, root_user_id, revision_index])?;
+    tx.prepare_cached("DELETE FROM messages WHERE session_id = ?1")?
+        .execute(params![session_id])?;
+    for (seq, record) in records.iter().enumerate() {
+        insert_index_row(&tx, session_id, seq as i64, None, record, texts[seq].as_deref())?;
     }
     tx.prepare_cached("UPDATE sessions SET last_seq = ?1, updated_at = ?2 WHERE id = ?3")?
-        .execute(params![combined.len() as i64, now_ms(), session_id])?;
+        .execute(params![records.len() as i64, now_ms(), session_id])?;
     tx.commit()?;
     Ok(combined)
 }
@@ -875,53 +1110,57 @@ pub fn import_session(
     if exists > 0 {
         return Ok(false);
     }
-    let tx = conn.unchecked_transaction()?;
-    let project_id = match summary
-        .project_path
-        .as_deref()
-        .filter(|path| !path.trim().is_empty())
-    {
-        Some(path) => Some(db.ensure_project(path, false)?),
-        None => None,
-    };
-    let source = summary.id.strip_prefix("import-").map(|rest| {
-        for known in ["claude-code", "opencode", "codex", "pi"] {
-            if rest.starts_with(&format!("{known}-")) {
-                return known.to_string();
+    let (records, texts) = records_and_texts(messages);
+    transcripts::write_transcript(db.data_dir(), &summary.id, &summary.created_at, &records)?;
+    let indexed = (|| -> Result<()> {
+        let tx = conn.unchecked_transaction()?;
+        let project_id = match summary
+            .project_path
+            .as_deref()
+            .filter(|path| !path.trim().is_empty())
+        {
+            Some(path) => Some(db.ensure_project(path, false)?),
+            None => None,
+        };
+        let source = summary.id.strip_prefix("import-").map(|rest| {
+            for known in ["claude-code", "opencode", "codex", "pi"] {
+                if rest.starts_with(&format!("{known}-")) {
+                    return known.to_string();
+                }
             }
+            "external".to_string()
+        });
+        tx.prepare_cached(
+            "INSERT INTO sessions (
+                id, title, project_id, provider_id, model_id, mode, thinking_level, source,
+                last_seq, created_at, updated_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        )?
+        .execute(params![
+            summary.id,
+            summary.title,
+            project_id,
+            summary.provider_id,
+            summary.model_id,
+            summary.mode,
+            summary.thinking_level,
+            source,
+            records.len() as i64,
+            ts_to_ms(&summary.created_at),
+            ts_to_ms(&summary.updated_at),
+        ])?;
+        for (seq, record) in records.iter().enumerate() {
+            insert_index_row(&tx, &summary.id, seq as i64, None, record, texts[seq].as_deref())?;
         }
-        "external".to_string()
-    });
-    tx.prepare_cached(
-        "INSERT INTO sessions (
-            id, title, project_id, provider_id, model_id, mode, thinking_level, source,
-            last_seq, created_at, updated_at
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-    )?
-    .execute(params![
-        summary.id,
-        summary.title,
-        project_id,
-        summary.provider_id,
-        summary.model_id,
-        summary.mode,
-        summary.thinking_level,
-        source,
-        messages.len() as i64,
-        ts_to_ms(&summary.created_at),
-        ts_to_ms(&summary.updated_at),
-    ])?;
-    for (seq, message) in messages.iter().enumerate() {
-        insert_message(
-            &tx,
-            &summary.id,
-            seq as i64,
-            None,
-            message,
-            ts_to_ms(&message.created_at),
-        )?;
+        tx.commit()?;
+        Ok(())
+    })();
+    if let Err(e) = indexed {
+        // Don't leave transcript files behind for a session row that never
+        // materialized.
+        transcripts::remove_session_files(db.data_dir(), &summary.id);
+        return Err(e);
     }
-    tx.commit()?;
     Ok(true)
 }
 
@@ -949,13 +1188,19 @@ pub fn begin_turn(
     Ok(id)
 }
 
+pub struct EndTurnResult {
+    pub updated: bool,
+    pub notification: Option<Notification>,
+}
+
 pub fn end_turn(
     db: &Database,
     turn_id: &str,
     status: &str,
     error_code: Option<&str>,
     usage: Option<&Value>,
-) -> Result<bool> {
+    create_notification: bool,
+) -> Result<EndTurnResult> {
     let status = match status {
         "completed" | "aborted" | "error" => status,
         _ => "completed",
@@ -966,8 +1211,8 @@ pub fn end_turn(
     let output_tokens = usage
         .and_then(|u| u.get("outputTokens"))
         .and_then(|v| v.as_i64());
-    let n = db
-        .conn()
+    let tx = db.conn().unchecked_transaction()?;
+    let n = tx
         .prepare_cached(
             "UPDATE turns SET status = ?1, error_code = ?2, ended_at = ?3,
                 input_tokens = COALESCE(?4, input_tokens),
@@ -984,7 +1229,16 @@ pub fn end_turn(
             usage.map(|u| u.to_string()),
             turn_id,
         ])?;
-    Ok(n > 0)
+    let notification = if n > 0 && create_notification {
+        notifications::insert_for_terminal_turn(&tx, turn_id, status, error_code)?
+    } else {
+        None
+    };
+    tx.commit()?;
+    Ok(EndTurnResult {
+        updated: n > 0,
+        notification,
+    })
 }
 
 // ---- search -----------------------------------------------------------------
@@ -1066,6 +1320,7 @@ mod tests {
             model_id: None,
             provider_id: None,
             usage: None,
+            error: None,
             revision_root_id: None,
             revision_count: None,
             active_revision: None,
@@ -1106,6 +1361,7 @@ mod tests {
             Some("provider-1"),
             Some("model-1"),
             Some("high"),
+            None,
         )
         .unwrap()
         .unwrap();
@@ -1127,7 +1383,8 @@ mod tests {
             "chat",
             None,
             None,
-            Some("turbo")
+            Some("turbo"),
+            None,
         )
         .is_err());
     }
@@ -1178,6 +1435,7 @@ mod tests {
             provider_id: None,
             mode: "agent".into(),
             thinking_level: "off".into(),
+            permission_mode: "inherit".into(),
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-02T00:00:00Z".into(),
         };
@@ -1226,6 +1484,7 @@ mod tests {
             provider_id: None,
             mode: "agent".into(),
             thinking_level: "off".into(),
+            permission_mode: "inherit".into(),
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-01T00:00:00Z".into(),
         };
@@ -1275,6 +1534,7 @@ mod tests {
             model_id: None,
             provider_id: None,
             usage: None,
+            error: None,
             revision_root_id: None,
             revision_count: None,
             active_revision: None,
@@ -1339,6 +1599,7 @@ mod tests {
                 reasoning_tokens: Some(5),
                 total_tokens: 48,
             }),
+            error: None,
             revision_root_id: None,
             revision_count: None,
             active_revision: None,
@@ -1353,15 +1614,9 @@ mod tests {
         };
         append_message(&db, &session.id, &assistant, None).unwrap();
 
-        let content_json: String = db
-            .conn()
-            .query_row(
-                "SELECT content_json FROM messages WHERE id = 'assistant-1'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        let blocks: Value = serde_json::from_str(&content_json).unwrap();
+        let records = transcripts::read_transcript(db.data_dir(), &session.id).unwrap();
+        assert_eq!(records.len(), 1);
+        let blocks = &records[0].blocks;
         assert_eq!(
             blocks[0],
             json!({
@@ -1394,6 +1649,29 @@ mod tests {
     }
 
     #[test]
+    fn assistant_error_roundtrips_in_message_metadata() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let mut assistant = user_msg("assistant-error", "", "2025-05-01T00:00:01Z");
+        assistant.role = "assistant".into();
+        assistant.status = Some("error".into());
+        assistant.is_error = Some(true);
+        assistant.error = Some(json!({
+            "code": "MODEL_NOT_CONFIGURED",
+            "message": "404: model not found",
+            "retriable": false
+        }));
+
+        append_message(&db, &session.id, &assistant, None).unwrap();
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        let restored = &detail.messages[0];
+
+        assert_eq!(restored.status.as_deref(), Some("error"));
+        assert_eq!(restored.is_error, Some(true));
+        assert_eq!(restored.error, assistant.error);
+    }
+
+    #[test]
     fn import_and_replace_preserve_thinking() {
         let db = test_db();
         let summary = SessionSummary {
@@ -1404,6 +1682,7 @@ mod tests {
             provider_id: None,
             mode: "agent".into(),
             thinking_level: "medium".into(),
+            permission_mode: "inherit".into(),
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-01T00:00:00Z".into(),
         };
@@ -1420,6 +1699,68 @@ mod tests {
         replace_messages(&db, &session.id, &[message]).unwrap();
         let detail = get_session(&db, &session.id).unwrap().unwrap();
         assert_eq!(detail.messages[0].thinking.as_deref(), Some("persist me"));
+    }
+
+    #[test]
+    fn transcript_survives_reopen_from_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        let db = Database::open(&path).unwrap();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("m1", "durable", "2025-05-01T00:00:00Z"),
+            None,
+        )
+        .unwrap();
+        let transcript = transcripts::transcript_path(db.data_dir(), &session.id).unwrap();
+        assert!(transcript.exists());
+
+        drop(db);
+        let db = Database::open(&path).unwrap();
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(detail.messages.len(), 1);
+        assert_eq!(detail.messages[0].content, "durable");
+    }
+
+    #[test]
+    fn delete_session_removes_transcript_files() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let root = user_msg("m1", "x", "2025-05-01T00:00:00Z");
+        append_message(&db, &session.id, &root, None).unwrap();
+        save_message_revision(&db, &session.id, "m1", &[root], true).unwrap();
+        let transcript = transcripts::transcript_path(db.data_dir(), &session.id).unwrap();
+        let revisions = transcripts::revisions_path(db.data_dir(), &session.id).unwrap();
+        assert!(transcript.exists());
+        assert!(revisions.exists());
+
+        assert!(delete_session(&db, &session.id).unwrap());
+        assert!(!transcript.exists());
+        assert!(!revisions.exists());
+    }
+
+    #[test]
+    fn get_session_dedupes_retried_file_lines_keep_last() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("m1", "old", "2025-05-01T00:00:00Z"),
+            None,
+        )
+        .unwrap();
+        // Simulate a retried append whose first file line lost its index
+        // transaction: the same id lands twice and the newest line wins.
+        let (record, _) = ui_to_record(&user_msg("m1", "new", "2025-05-01T00:00:01Z"));
+        transcripts::append_message(db.data_dir(), &session.id, "2025-05-01T00:00:00Z", &record)
+            .unwrap();
+
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(detail.messages.len(), 1);
+        assert_eq!(detail.messages[0].content, "new");
     }
 
     #[test]
@@ -1463,20 +1804,166 @@ mod tests {
     }
 
     #[test]
+    fn fork_session_clones_active_transcript_and_configuration() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        let db = Database::open(&path).unwrap();
+        let source = create_session_with_thinking(
+            &db,
+            Some("Source".into()),
+            Some("chat".into()),
+            Some("provider-1".into()),
+            Some("model-1".into()),
+            Some("/tmp/project".into()),
+            Some("high".into()),
+        )
+        .unwrap();
+        configure_session_with_thinking(
+            &db,
+            &source.id,
+            "chat",
+            Some("provider-1"),
+            Some("model-1"),
+            Some("high"),
+            Some("auto"),
+        )
+        .unwrap();
+
+        let mut user = user_msg("user-1", "fork this", "2025-05-01T00:00:00Z");
+        user.revision_root_id = Some("user-1".into());
+        user.revision_count = Some(2);
+        user.active_revision = Some(2);
+        let mut tool = user_msg("tool-1", "ok", "2025-05-01T00:00:01Z");
+        tool.role = "tool".into();
+        tool.tool_name = Some("Read".into());
+        tool.tool_call_id = Some("call-1".into());
+        tool.tool_status = Some("success".into());
+        append_message(&db, &source.id, &user, None).unwrap();
+        append_message(&db, &source.id, &tool, None).unwrap();
+        save_message_revision(&db, &source.id, "user-1", &[user.clone()], true).unwrap();
+
+        let ForkSessionResult::Created(fork) =
+            fork_session(&db, &source.id, Some("Source (branch)")).unwrap()
+        else {
+            panic!("expected forked session");
+        };
+        let source_after = get_session(&db, &source.id).unwrap().unwrap();
+
+        assert_ne!(fork.summary.id, source.id);
+        assert_eq!(fork.summary.title, "Source (branch)");
+        assert_eq!(fork.summary.project_path, source.project_path);
+        assert_eq!(fork.summary.provider_id.as_deref(), Some("provider-1"));
+        assert_eq!(fork.summary.model_id.as_deref(), Some("model-1"));
+        assert_eq!(fork.summary.mode, "chat");
+        assert_eq!(fork.summary.thinking_level, "high");
+        assert_eq!(fork.summary.permission_mode, "auto");
+        assert_eq!(fork.messages.len(), 2);
+        assert_eq!(source_after.messages[0].id, "user-1");
+        assert_eq!(
+            source_after.messages[1].tool_call_id.as_deref(),
+            Some("call-1")
+        );
+        assert_ne!(fork.messages[0].id, source_after.messages[0].id);
+        assert_ne!(fork.messages[1].id, source_after.messages[1].id);
+        assert_ne!(
+            fork.messages[1].tool_call_id,
+            source_after.messages[1].tool_call_id
+        );
+        assert_eq!(fork.messages[0].content, "fork this");
+        assert_eq!(fork.messages[0].revision_root_id, None);
+        assert_eq!(fork.messages[0].revision_count, None);
+        assert_eq!(fork.messages[0].active_revision, None);
+        assert!(list_message_revisions(&db, &fork.summary.id, "user-1")
+            .unwrap()
+            .is_empty());
+        assert!(
+            !transcripts::revisions_path(db.data_dir(), &fork.summary.id)
+                .unwrap()
+                .exists()
+        );
+        assert!(search_messages(&db, "fork", 10)
+            .unwrap()
+            .iter()
+            .any(|hit| hit.session_id == fork.summary.id));
+
+        append_message(
+            &db,
+            &fork.summary.id,
+            &user_msg("child-only", "continue here", "2025-05-01T00:00:02Z"),
+            None,
+        )
+        .unwrap();
+        configure_session_with_thinking(
+            &db,
+            &fork.summary.id,
+            "agent",
+            Some("provider-2"),
+            Some("model-2"),
+            Some("off"),
+            Some("ask"),
+        )
+        .unwrap();
+        let source_final = get_session(&db, &source.id).unwrap().unwrap();
+        let fork_final = get_session(&db, &fork.summary.id).unwrap().unwrap();
+        assert_eq!(source_final.messages.len(), 2);
+        assert_eq!(source_final.summary.mode, "chat");
+        assert_eq!(source_final.summary.model_id.as_deref(), Some("model-1"));
+        assert_eq!(fork_final.messages.len(), 3);
+        assert_eq!(fork_final.summary.mode, "agent");
+        assert_eq!(fork_final.summary.model_id.as_deref(), Some("model-2"));
+        assert_eq!(fork_final.summary.thinking_level, "off");
+        assert_eq!(fork_final.summary.permission_mode, "ask");
+
+        drop(db);
+        let db = Database::open(&path).unwrap();
+        let source_reopened = get_session(&db, &source.id).unwrap().unwrap();
+        let fork_reopened = get_session(&db, &fork.summary.id).unwrap().unwrap();
+        assert_eq!(source_reopened.messages.len(), 2);
+        assert_eq!(fork_reopened.messages.len(), 3);
+        assert_eq!(fork_reopened.messages[2].content, "continue here");
+
+        assert!(matches!(
+            fork_session(&db, "missing", None).unwrap(),
+            ForkSessionResult::NotFound
+        ));
+        let turn = begin_turn(&db, &source.id, None, None).unwrap();
+        assert!(matches!(
+            fork_session(&db, &source.id, None).unwrap(),
+            ForkSessionResult::Busy
+        ));
+        end_turn(&db, &turn, "aborted", None, None, false).unwrap();
+        delete_session(&db, &source.id).unwrap();
+        assert!(get_session(&db, &source.id).unwrap().is_none());
+        assert_eq!(
+            get_session(&db, &fork.summary.id)
+                .unwrap()
+                .unwrap()
+                .messages
+                .len(),
+            3
+        );
+    }
+
+    #[test]
     fn turns_lifecycle() {
         let db = test_db();
         let session = create_session(&db, None, None, None, None, None).unwrap();
         let turn = begin_turn(&db, &session.id, Some("p1"), Some("m1")).unwrap();
-        assert!(end_turn(
+        let ended = end_turn(
             &db,
             &turn,
             "completed",
             None,
-            Some(&json!({ "inputTokens": 10, "outputTokens": 20 }))
+            Some(&json!({ "inputTokens": 10, "outputTokens": 20 })),
+            true,
         )
-        .unwrap());
+        .unwrap();
+        assert!(ended.updated);
+        assert_eq!(ended.notification.unwrap().kind, "task.completed");
         // Ending twice is a no-op.
-        assert!(!end_turn(&db, &turn, "completed", None, None).unwrap());
+        let duplicate = end_turn(&db, &turn, "completed", None, None, true).unwrap();
+        assert!(!duplicate.updated);
+        assert!(duplicate.notification.is_none());
         let (status, input, output): (String, i64, i64) = db
             .conn()
             .query_row(
@@ -1487,6 +1974,49 @@ mod tests {
             .unwrap();
         assert_eq!(status, "completed");
         assert_eq!((input, output), (10, 20));
+    }
+
+    #[test]
+    fn aborted_turn_does_not_create_notification() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, None, None).unwrap();
+
+        let ended = end_turn(&db, &turn, "aborted", None, None, true).unwrap();
+
+        assert!(ended.updated);
+        assert!(ended.notification.is_none());
+        let notification_count: i64 = db
+            .conn()
+            .query_row("SELECT COUNT(*) FROM notifications", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(notification_count, 0);
+    }
+
+    #[test]
+    fn visible_turn_does_not_create_notification() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, None, None).unwrap();
+
+        let ended = end_turn(&db, &turn, "completed", None, None, false).unwrap();
+
+        assert!(ended.updated);
+        assert!(ended.notification.is_none());
+        let (status, notification_count): (String, i64) = db
+            .conn()
+            .query_row(
+                "SELECT t.status, COUNT(n.id)
+                 FROM turns t
+                 LEFT JOIN notifications n ON n.turn_id = t.id
+                 WHERE t.id = ?1
+                 GROUP BY t.status",
+                params![turn],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(status, "completed");
+        assert_eq!(notification_count, 0);
     }
 
     #[test]

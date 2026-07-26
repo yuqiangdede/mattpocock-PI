@@ -35,4 +35,7 @@ Each ADR includes:
 | 0017 | Remove composer workspace context rail | Accepted |
 | 0018 | Carry thinking mode through the complete session pipeline | Accepted |
 | 0019 | Work panel subsystems (PTY terminal, embedded browser, git review, file browsing) | Accepted |
-- [0020 Configuration provider studio](0020-configuration-provider-studio.md)
+| 0020 | Configuration provider studio | Accepted |
+| 0021 | Platform application chrome | Accepted |
+| 0023 | Independent conversation session fork | Accepted |
+| 0024 | Composer slash commands and @ file references | Accepted |

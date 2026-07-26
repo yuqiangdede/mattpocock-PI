@@ -2,11 +2,14 @@ import { create } from "zustand";
 import i18n from "i18next";
 import type {
   AgentEventEnvelope,
+  AppError,
+  AppNotification,
   AppSettings,
   AppVersionInfo,
   ModelInfo,
   OnboardingState,
   PluginSummary,
+  PermissionMode,
   ProjectWorkspace,
   ProviderPublic,
   SessionSummary,
@@ -35,6 +38,17 @@ import {
   type SessionSort,
 } from "../lib/sidebar-preferences";
 import { formatToolValue } from "../lib/tool-display";
+import {
+  activateWorkPanelTabState,
+  closeWorkPanelTabState,
+  fileWorkPanelTab,
+  openWorkPanelTabState,
+  shouldOpenReviewArtifact,
+  toolWorkPanelTab,
+  type WorkPanelTab,
+} from "../lib/work-panel-tabs";
+
+export type { WorkPanelTab } from "../lib/work-panel-tabs";
 
 // Sessions created before locale switches keep their old default title, so
 // match against every locale's defaults (case-insensitive), not just the
@@ -56,8 +70,6 @@ export type ToastOptions = {
   /** Override the variant default (4s, error 8s); 0 disables auto-dismiss. */
   duration?: number;
 };
-
-export type WorkPanelTab = "welcome" | "review" | "terminal" | "browser" | "files";
 
 const WORK_PANEL_STORAGE_KEY = "pi.desktop.workPanel";
 export const WORK_PANEL_MIN_WIDTH = 320;
@@ -88,47 +100,55 @@ function shrinkWindowForPanel(width: number) {
   if (growth !== 0) void api.windowResizeBy(-growth).catch(() => {});
 }
 
-function loadWorkPanelPreferences(): {
-  open: boolean;
-  tab: WorkPanelTab;
-  width: number;
-} {
-  const fallback = {
-    open: false,
-    // First ever open lands on the welcome page so the user picks a tool.
-    tab: "welcome" as WorkPanelTab,
-    width: WORK_PANEL_DEFAULT_WIDTH,
+function messageErrorFromUnknown(error: unknown): AppError {
+  const value = error as {
+    code?: string;
+    message?: string;
+    retriable?: boolean;
   };
+  return {
+    code: value?.code || "INTERNAL",
+    message:
+      error instanceof Error
+        ? error.message
+        : typeof value?.message === "string"
+          ? value.message
+          : String(error),
+    retriable: value?.retriable === true,
+  };
+}
+
+function assistantErrorMessage(error: AppError): UiMessage {
+  return {
+    id: crypto.randomUUID(),
+    role: "assistant",
+    content: "",
+    createdAt: new Date().toISOString(),
+    status: "error",
+    isError: true,
+    error,
+  };
+}
+
+function loadWorkPanelWidth(): number {
   try {
     const raw = localStorage.getItem(WORK_PANEL_STORAGE_KEY);
-    if (!raw) return fallback;
+    if (!raw) return WORK_PANEL_DEFAULT_WIDTH;
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     const width = Number(parsed.width);
-    return {
-      open: parsed.open === true,
-      // Every fresh app start lands on the tool list, not the last tool.
-      tab: fallback.tab,
-      width: Number.isFinite(width)
-        ? Math.max(WORK_PANEL_MIN_WIDTH, Math.min(720, width))
-        : fallback.width,
-    };
+    return Number.isFinite(width)
+      ? Math.max(WORK_PANEL_MIN_WIDTH, Math.min(720, width))
+      : WORK_PANEL_DEFAULT_WIDTH;
   } catch {
-    return fallback;
+    return WORK_PANEL_DEFAULT_WIDTH;
   }
 }
 
-function saveWorkPanelPreferences(state: Pick<
-  AppState,
-  "workPanelOpen" | "workPanelTab" | "workPanelWidth"
->) {
+function saveWorkPanelWidth(width: number) {
   try {
     localStorage.setItem(
       WORK_PANEL_STORAGE_KEY,
-      JSON.stringify({
-        open: state.workPanelOpen,
-        tab: state.workPanelTab,
-        width: state.workPanelWidth,
-      }),
+      JSON.stringify({ width }),
     );
   } catch {
     // best-effort persistence
@@ -196,8 +216,12 @@ export type AppState = {
   plugins: PluginSummary[];
   permission?: ToolPermissionRequest | null;
   toasts: ToastItem[];
+  notifications: AppNotification[];
+  unreadNotificationCount: number;
   page: "chat" | "projects" | "pulls" | "scheduled" | "plugins" | "settings";
   settingsTab: "general" | "agent" | "import" | "about";
+  /** Pending row anchor (i18n key) to flash after landing on a settings tab. */
+  settingsAnchor: string | null;
   navStack: Array<{ page: AppState["page"]; sessionId?: string }>;
   navIndex: number;
   error?: string | null;
@@ -208,11 +232,13 @@ export type AppState = {
   refreshSessions: () => Promise<void>;
   selectSession: (id: string, opts?: { record?: boolean }) => Promise<void>;
   newSession: (options?: { projectPath?: string | null }) => Promise<void>;
+  forkSession: (id: string) => Promise<void>;
   configureActiveSession: (config: {
     mode: "chat" | "agent";
     providerId?: string;
     modelId?: string;
     thinkingLevel: ThinkingLevel;
+    permissionMode?: PermissionMode;
   }) => Promise<void>;
   sendPrompt: (content: string) => Promise<void>;
   retryAssistantMessage: (messageId: string) => Promise<void>;
@@ -253,9 +279,16 @@ export type AppState = {
   /** Load a provider's model list into the cache (no-op when cached). */
   loadProviderModels: (providerId: string) => Promise<void>;
   refreshPlugins: () => Promise<void>;
+  refreshNotifications: () => Promise<void>;
+  receiveNotification: (notification: AppNotification) => void;
+  markNotificationRead: (id: string) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
+  clearNotifications: () => Promise<void>;
+  openNotification: (id: string) => Promise<void>;
   handleAgentEvent: (envelope: AgentEventEnvelope) => void;
   setPage: (page: AppState["page"], opts?: { record?: boolean }) => void;
   setSettingsTab: (tab: AppState["settingsTab"]) => void;
+  setSettingsAnchor: (key: string | null) => void;
   navBack: () => void;
   navForward: () => void;
   canNavBack: () => boolean;
@@ -269,30 +302,39 @@ export type AppState = {
   prefillComposer: (text: string) => void;
   clearComposerPrefill: () => void;
   workPanelOpen: boolean;
-  workPanelTab: WorkPanelTab;
+  workPanelTabs: WorkPanelTab[];
+  activeWorkPanelTabId: string | null;
   workPanelWidth: number;
   /** Bumped on agent Write/Edit/Bash completion; review tab refetches. */
   reviewRev: number;
   /** Chat-initiated "preview this file" request consumed by the files tab. */
   workPanelFileRequest: { path: string; seq: number } | null;
-  toggleWorkPanel: () => void;
-  setWorkPanelOpen: (open: boolean) => void;
-  setWorkPanelTab: (tab: WorkPanelTab) => void;
+  openWorkPanelTab: (tab: WorkPanelTab) => void;
+  activateWorkPanelTab: (tabId: string) => void;
+  closeWorkPanelTab: (tabId: string) => void;
+  collapseWorkPanel: () => void;
+  /** Drop tabs when the visible session or workspace context changes. */
+  resetWorkPanelContext: () => void;
   setWorkPanelWidth: (width: number) => void;
   /** Open a workspace-relative file in the work panel files viewer. */
   openFileInWorkPanel: (path: string) => void;
   /** Open a URL in the work panel browser tab. */
   openUrlInWorkPanel: (url: string) => void;
+  /** Open the interactive terminal from a completed command artifact. */
+  openTerminalInWorkPanel: () => void;
 };
 
 const initialSidebarPreferences = loadSidebarPreferences();
-const initialWorkPanelPreferences = loadWorkPanelPreferences();
+const initialWorkPanelWidth = loadWorkPanelWidth();
 
 // tool_end events carry no tool name, and cross-session tool calls never
 // enter `messages`, so remember names from tool_start envelopes here.
 const WORKSPACE_MUTATING_TOOLS = new Set(["Write", "Edit", "Bash"]);
 const toolNamesByCallId = new Map<string, string>();
 const TOOL_NAME_CACHE_LIMIT = 512;
+const providerModelLoads = new Map<string, Promise<void>>();
+const refreshedProviderModels = new Set<string>();
+let providerModelsGeneration = 0;
 
 function decorateSessions(
   sessions: SessionSummary[],
@@ -374,9 +416,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       .filter(([, meta]) => meta.collapsed === true)
       .map(([path]) => [path, true]),
   ),
-  workPanelOpen: initialWorkPanelPreferences.open,
-  workPanelTab: initialWorkPanelPreferences.tab,
-  workPanelWidth: initialWorkPanelPreferences.width,
+  workPanelOpen: false,
+  workPanelTabs: [],
+  activeWorkPanelTabId: null,
+  workPanelWidth: initialWorkPanelWidth,
   reviewRev: 0,
   workPanelFileRequest: null,
   projectSort: initialSidebarPreferences.projectSort,
@@ -389,9 +432,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   permission: null,
   page: "chat",
   settingsTab: "general",
+  settingsAnchor: null,
   navStack: [{ page: "chat" }],
   navIndex: 0,
   toasts: [],
+  notifications: [],
+  unreadNotificationCount: 0,
   composerPrefill: null,
   error: null,
   errorCode: null,
@@ -399,7 +445,17 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   bootstrap: async () => {
     try {
-      const [version, health, settingsRaw, sessions, providers, project, onboarding, plugins] =
+      const [
+        version,
+        health,
+        settingsRaw,
+        sessions,
+        providers,
+        project,
+        onboarding,
+        plugins,
+        notifications,
+      ] =
         await Promise.all([
           api.getVersion(),
           api.health(),
@@ -409,6 +465,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           api.getProject(),
           api.getOnboarding(),
           api.listPlugins(),
+          api.listNotifications({ limit: 200 }),
         ]);
       let settings = settingsRaw;
       // First-run default per D003: Agent. Never force-rewrite an existing
@@ -428,6 +485,25 @@ export const useAppStore = create<AppState>((set, get) => ({
           errorCode: "PROTOCOL_MISMATCH",
         });
       }
+      const cachedProviderModels = Object.fromEntries(
+        (
+          await Promise.all(
+            providers.providers.map(async (provider) => {
+              try {
+                const cached = await api.listProviderModels({
+                  providerId: provider.id,
+                  source: "cache",
+                });
+                return cached.models.length > 0
+                  ? ([provider.id, cached.models] as const)
+                  : null;
+              } catch {
+                return null;
+              }
+            }),
+          )
+        ).filter((entry): entry is readonly [string, ModelInfo[]] => entry !== null),
+      );
       const currentWorkspace = project.workspace;
       const persistedPaths = get().openProjectPaths;
       // Only explicitly retained tabs are restored. Historical sessions stay
@@ -448,12 +524,15 @@ export const useAppStore = create<AppState>((set, get) => ({
         settings,
         sessions: hydratedSessions,
         providers: providers.providers,
+        providerModels: cachedProviderModels,
         workspace: currentWorkspace,
         activeProjectPath: currentWorkspace?.path,
         openProjectPaths,
         openProjects: hydratedProjects,
         onboarding,
         plugins: plugins.plugins,
+        notifications: notifications.notifications,
+        unreadNotificationCount: notifications.unreadCount,
       });
       saveSidebarPreferences(preferencesFromState(get()));
       if (currentWorkspace?.path) {
@@ -482,6 +561,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   selectSession: async (id, opts) => {
     const detail = await api.getSession(id);
+    if (id !== get().activeSessionId) get().resetWorkPanelContext();
     const sessionProjectPath = detail.session?.projectPath;
     // Selecting a conversation also selects its project tab. This is what
     // makes several open projects behave like independent sidebar scopes.
@@ -596,6 +676,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
     await get().refreshSessions();
     const detail = await api.getSession(created.session.id);
+    get().resetWorkPanelContext();
     const entry = { page: "chat" as const, sessionId: created.session.id };
     set((s) => {
       const stack = s.navStack.slice(0, s.navIndex + 1);
@@ -604,6 +685,56 @@ export const useAppStore = create<AppState>((set, get) => ({
         activeSessionId: created.session.id,
         messages: detail.session?.messages ?? [],
         page: "chat" as const,
+        navStack: nextStack,
+        navIndex: nextStack.length - 1,
+      };
+    });
+  },
+
+  forkSession: async (id) => {
+    const state = get();
+    if (!id || state.runningSessions[id]) return;
+    const source = state.sessions.find((session) => session.id === id);
+    if (!source) throw new Error("Session not found");
+
+    if (source.projectPath) {
+      if (
+        !sessionMatchesProject(
+          { projectPath: state.activeProjectPath },
+          source.projectPath,
+        )
+      ) {
+        const workspace = await get().activateProject(source.projectPath);
+        if (!workspace) throw new Error("Unable to activate project workspace");
+      }
+    } else if (state.workspace) {
+      await get().clearProject();
+    }
+
+    const sourceTitle = source.title.trim() || i18n.t("chat.untitledTask");
+    const result = await api.forkSession(
+      id,
+      i18n.t("nav.branchTitle", { title: sourceTitle }),
+    );
+    const { messages, ...summary } = result.session;
+    get().resetWorkPanelContext();
+    set((current) => {
+      const sessions = decorateSessions(
+        [
+          summary,
+          ...current.sessions.filter((session) => session.id !== summary.id),
+        ],
+        current.sessionMeta,
+      );
+      const stack = current.navStack.slice(0, current.navIndex + 1);
+      const entry = { page: "chat" as const, sessionId: summary.id };
+      const nextStack = [...stack, entry].slice(-50);
+      return {
+        sessions,
+        activeSessionId: summary.id,
+        messages,
+        page: "chat" as const,
+        isRunning: false,
         navStack: nextStack,
         navIndex: nextStack.length - 1,
       };
@@ -656,13 +787,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       await api.prompt({ sessionId, content });
     } catch (e) {
+      const messageError = messageErrorFromUnknown(e);
       set((s) => ({
         // The user may have switched sessions while the request was in
         // flight; only reset the spinner if the failed session is visible.
         isRunning: s.activeSessionId === startedIn ? false : s.isRunning,
         runningSessions: { ...s.runningSessions, [startedIn]: false },
-        error: e instanceof Error ? e.message : String(e),
-        errorCode: (e as { code?: string })?.code ?? null,
+        ...(s.activeSessionId === startedIn
+          ? { messages: [...s.messages, assistantErrorMessage(messageError)] }
+          : {}),
       }));
     }
   },
@@ -927,6 +1060,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     const result = await api.setProject(requestedPath);
     const workspace = result.workspace;
     if (!workspace?.path) return null;
+    if (
+      normalizeProjectPath(get().activeProjectPath) !==
+      normalizeProjectPath(workspace.path)
+    ) {
+      get().resetWorkPanelContext();
+    }
 
     set((state) => {
       const switchesVisibleProject =
@@ -994,6 +1133,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     const result = await api.openProject();
     if (!result.canceled && result.workspace) {
       const workspace = result.workspace;
+      if (
+        normalizeProjectPath(get().activeProjectPath) !==
+        normalizeProjectPath(workspace.path)
+      ) {
+        get().resetWorkPanelContext();
+      }
       set((state) => {
         const switchesVisibleProject =
           normalizeProjectPath(state.activeProjectPath) !==
@@ -1032,6 +1177,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   clearProject: async () => {
     await api.clearProject();
+    get().resetWorkPanelContext();
     set({
       workspace: null,
       activeProjectPath: undefined,
@@ -1107,6 +1253,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   deleteSession: async (id) => {
     if (!id) return;
     await api.deleteSession(id);
+    if (get().activeSessionId === id) get().resetWorkPanelContext();
     set((state) => {
       const sessionMeta = { ...state.sessionMeta };
       delete sessionMeta[id];
@@ -1276,9 +1423,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       api.getSettings(),
       api.getOnboarding(),
     ]);
+    providerModelsGeneration += 1;
+    refreshedProviderModels.clear();
     set((state) => ({
       providers: providers.providers,
-      // Provider edits may change baseUrl/apiStyle — drop stale model lists.
+      // Provider edits may change discovery settings. The next load hydrates
+      // from SQLite first, then refreshes without presenting an empty menu.
       providerModels: {},
       sessions: decorateSessions(sessions.sessions, state.sessionMeta),
       settings,
@@ -1287,23 +1437,141 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   loadProviderModels: async (providerId) => {
-    if (get().providerModels[providerId]) return;
+    if (refreshedProviderModels.has(providerId)) return;
+    const generation = providerModelsGeneration;
+    const existing = providerModelLoads.get(providerId);
+    if (existing) {
+      await existing;
+      if (providerModelLoads.get(providerId) === existing) {
+        providerModelLoads.delete(providerId);
+      }
+      if (!refreshedProviderModels.has(providerId)) {
+        await get().loadProviderModels(providerId);
+      }
+      return;
+    }
+
+    const load = (async () => {
+      let hydrated = (get().providerModels[providerId]?.length ?? 0) > 0;
+      if (!hydrated) {
+        try {
+          const cached = await api.listProviderModels({ providerId, source: "cache" });
+          if (generation !== providerModelsGeneration) return;
+          hydrated = cached.models.length > 0;
+          set((state) => ({
+            providerModels: {
+              ...state.providerModels,
+              [providerId]: cached.models,
+            },
+          }));
+        } catch {
+          // Continue to live discovery when the local cache is unavailable.
+        }
+      }
+
+      try {
+        const refreshed = await api.listProviderModels({
+          providerId,
+          source: "refresh",
+        });
+        if (generation !== providerModelsGeneration) return;
+        if (refreshed.source === "remote" && refreshed.models.length > 0) {
+          set((state) => ({
+            providerModels: {
+              ...state.providerModels,
+              [providerId]: refreshed.models,
+            },
+          }));
+        } else if (!hydrated && refreshed.models.length > 0) {
+          set((state) => ({
+            providerModels: {
+              ...state.providerModels,
+              [providerId]: refreshed.models,
+            },
+          }));
+        }
+      } catch {
+        // Keep the cached catalog; the menu already has a usable fallback.
+      } finally {
+        if (generation === providerModelsGeneration) {
+          refreshedProviderModels.add(providerId);
+        }
+      }
+    })();
+    providerModelLoads.set(providerId, load);
     try {
-      const result = await api.listProviderModels({ providerId });
-      set((state) => ({
-        providerModels: {
-          ...state.providerModels,
-          [providerId]: result.models,
-        },
-      }));
-    } catch {
-      // Menu falls back to the provider's configured model.
+      await load;
+    } finally {
+      if (providerModelLoads.get(providerId) === load) {
+        providerModelLoads.delete(providerId);
+      }
     }
   },
 
   refreshPlugins: async () => {
     const plugins = await api.listPlugins();
     set({ plugins: plugins.plugins });
+  },
+
+  refreshNotifications: async () => {
+    const result = await api.listNotifications({ limit: 200 });
+    set({
+      notifications: result.notifications,
+      unreadNotificationCount: result.unreadCount,
+    });
+  },
+
+  receiveNotification: (notification) => {
+    set((state) => {
+      const withoutCurrent = state.notifications.filter(
+        (item) => item.id !== notification.id,
+      );
+      const notifications = [notification, ...withoutCurrent].slice(0, 200);
+      return {
+        notifications,
+        unreadNotificationCount: notifications.reduce(
+          (count, item) => count + (item.readAt ? 0 : 1),
+          0,
+        ),
+      };
+    });
+  },
+
+  markNotificationRead: async (id) => {
+    const item = get().notifications.find((notification) => notification.id === id);
+    if (!item || item.readAt) return;
+    await api.markNotificationRead(id);
+    const readAt = new Date().toISOString();
+    set((state) => ({
+      notifications: state.notifications.map((notification) =>
+        notification.id === id ? { ...notification, readAt } : notification,
+      ),
+      unreadNotificationCount: Math.max(0, state.unreadNotificationCount - 1),
+    }));
+  },
+
+  markAllNotificationsRead: async () => {
+    if (get().unreadNotificationCount === 0) return;
+    await api.markAllNotificationsRead();
+    const readAt = new Date().toISOString();
+    set((state) => ({
+      notifications: state.notifications.map((notification) =>
+        notification.readAt ? notification : { ...notification, readAt },
+      ),
+      unreadNotificationCount: 0,
+    }));
+  },
+
+  clearNotifications: async () => {
+    await api.clearNotifications();
+    set({ notifications: [], unreadNotificationCount: 0 });
+  },
+
+  openNotification: async (id) => {
+    const notification = get().notifications.find((item) => item.id === id);
+    if (!notification) return;
+    await get().markNotificationRead(id);
+    await get().selectSession(notification.sessionId);
   },
 
   handleAgentEvent: (envelope) => {
@@ -1334,8 +1602,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     } else if (event.type === "tool_end") {
       const toolName = toolNamesByCallId.get(event.toolCallId);
       toolNamesByCallId.delete(event.toolCallId);
-      if (toolName && WORKSPACE_MUTATING_TOOLS.has(toolName)) {
+      if (toolName && WORKSPACE_MUTATING_TOOLS.has(toolName) && !event.isError) {
         set((s) => ({ reviewRev: s.reviewRev + 1 }));
+      }
+      if (
+        shouldOpenReviewArtifact({
+          toolName,
+          isError: event.isError,
+          result: event.result,
+          sessionId: envelope.sessionId,
+          activeSessionId: get().activeSessionId,
+        })
+      ) {
+        get().openWorkPanelTab(toolWorkPanelTab("review"));
       }
     }
     if (envelope.sessionId !== get().activeSessionId) {
@@ -1384,15 +1663,16 @@ export const useAppStore = create<AppState>((set, get) => ({
         break;
       case "message_end":
         set((s) => {
-          // Failed turns with no output resolve to an empty error/aborted
-          // bubble; remove it instead of leaving a blank row (main skips
-          // persisting it for the same reason).
+          // Remove only legacy failures without structured detail and empty
+          // aborts. Provider failures with AppError metadata are real
+          // assistant transcript messages.
           if (
             event.message.role === "assistant" &&
             (event.message.status === "error" ||
               event.message.status === "aborted") &&
             !event.message.content.trim() &&
-            !(event.message.thinking || "").trim()
+            !(event.message.thinking || "").trim() &&
+            !event.message.error
           ) {
             return {
               messages: s.messages.filter((m) => m.id !== event.message.id),
@@ -1474,24 +1754,19 @@ export const useAppStore = create<AppState>((set, get) => ({
       case "error": {
         // A user-initiated stop is not an error; just settle the run state.
         const aborted = event.error.code === "TURN_ABORTED";
-        set((s) => ({
-          isRunning: false,
-          ...(aborted
-            ? {}
-            : {
-                error: `${event.error.code}: ${event.error.message}`,
-                errorCode: event.error.code,
-                errorRetriable: event.error.retriable === true,
-              }),
-          messages: s.messages
+        set((s) => {
+          const last = s.messages[s.messages.length - 1];
+          const hasErrorMessage =
+            last?.role === "assistant" &&
+            (last.status === "error" || last.isError === true);
+          const messages: UiMessage[] = s.messages
             // A turn that died before producing text leaves an empty
-            // error/aborted bubble — drop it (main skips persisting it too).
+            // aborted bubble. Provider failures stay as assistant messages.
             .filter(
               (message) =>
                 !(
                   message.role === "assistant" &&
-                  (message.status === "error" ||
-                    message.status === "aborted") &&
+                  message.status === "aborted" &&
                   !message.content.trim() &&
                   !(message.thinking || "").trim()
                 ),
@@ -1500,16 +1775,29 @@ export const useAppStore = create<AppState>((set, get) => ({
               message.role === "tool" && message.toolStatus === "running"
                 ? {
                     ...message,
-                    toolStatus: "error",
-                    status: "error",
+                    toolStatus: "error" as const,
+                    status: "error" as const,
                     isError: true,
                   }
                 : message.role === "assistant" &&
                     message.status === "streaming"
-                  ? { ...message, status: aborted ? "aborted" : "error" }
+                  ? {
+                      ...message,
+                      status: aborted ? ("aborted" as const) : ("error" as const),
+                    }
                   : message,
-            ),
-        }));
+            );
+          return {
+            isRunning: false,
+            error: null,
+            errorCode: null,
+            errorRetriable: null,
+            messages:
+              aborted || hasErrorMessage
+                ? messages
+                : [...messages, assistantErrorMessage(event.error)],
+          };
+        });
         break;
       }
       default:
@@ -1541,6 +1829,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().setPage("settings");
     set({ settingsTab });
   },
+  setSettingsAnchor: (settingsAnchor) => set({ settingsAnchor }),
   canNavBack: () => get().navIndex > 0,
   canNavForward: () => get().navIndex < get().navStack.length - 1,
   navBack: () => {
@@ -1596,33 +1885,105 @@ export const useAppStore = create<AppState>((set, get) => ({
   dismissToast: (id) =>
     set((state) => ({ toasts: state.toasts.filter((item) => item.id !== id) })),
 
-  toggleWorkPanel: () => {
-    const opening = !get().workPanelOpen;
-    // Opening always lands on the tool list; the user picks from there.
-    set(opening ? { workPanelOpen: true, workPanelTab: "welcome" } : { workPanelOpen: false });
-    saveWorkPanelPreferences(get());
-    if (opening) expandWindowForPanel(get().workPanelWidth);
-    else shrinkWindowForPanel(get().workPanelWidth);
-  },
-  setWorkPanelOpen: (open) => {
-    if (get().workPanelOpen === open) return;
-    set(open ? { workPanelOpen: true, workPanelTab: "welcome" } : { workPanelOpen: false });
-    saveWorkPanelPreferences(get());
-    if (open) expandWindowForPanel(get().workPanelWidth);
-    else shrinkWindowForPanel(get().workPanelWidth);
-  },
-  setWorkPanelTab: (tab) => {
+  openWorkPanelTab: (tab) => {
     const wasOpen = get().workPanelOpen;
-    set({ workPanelTab: tab, workPanelOpen: true });
-    saveWorkPanelPreferences(get());
+    set((state) => {
+      const next = openWorkPanelTabState(
+        {
+          tabs: state.workPanelTabs,
+          activeTabId: state.activeWorkPanelTabId,
+        },
+        tab,
+      );
+      return {
+        workPanelTabs: next.tabs,
+        activeWorkPanelTabId: next.activeTabId,
+        workPanelOpen: true,
+        ...(tab.kind === "file" && tab.resource
+          ? {
+              workPanelFileRequest: {
+                path: tab.resource,
+                seq: (state.workPanelFileRequest?.seq ?? 0) + 1,
+              },
+            }
+          : {}),
+      };
+    });
     if (!wasOpen) expandWindowForPanel(get().workPanelWidth);
+  },
+  activateWorkPanelTab: (tabId) => {
+    set((state) => {
+      const next = activateWorkPanelTabState(
+        {
+          tabs: state.workPanelTabs,
+          activeTabId: state.activeWorkPanelTabId,
+        },
+        tabId,
+      );
+      const activeTab = next.tabs.find((tab) => tab.id === next.activeTabId);
+      return {
+        activeWorkPanelTabId: next.activeTabId,
+        ...(activeTab?.kind === "file" && activeTab.resource
+          ? {
+              workPanelFileRequest: {
+                path: activeTab.resource,
+                seq: (state.workPanelFileRequest?.seq ?? 0) + 1,
+              },
+            }
+          : {}),
+      };
+    });
+  },
+  closeWorkPanelTab: (tabId) => {
+    const wasOpen = get().workPanelOpen;
+    let closePanel = false;
+    set((state) => {
+      const next = closeWorkPanelTabState(
+        {
+          tabs: state.workPanelTabs,
+          activeTabId: state.activeWorkPanelTabId,
+        },
+        tabId,
+      );
+      const activeTab = next.tabs.find((tab) => tab.id === next.activeTabId);
+      closePanel = next.activeTabId === null;
+      return {
+        workPanelTabs: next.tabs,
+        activeWorkPanelTabId: next.activeTabId,
+        workPanelOpen: closePanel ? false : state.workPanelOpen,
+        ...(activeTab?.kind === "file" && activeTab.resource
+          ? {
+              workPanelFileRequest: {
+                path: activeTab.resource,
+                seq: (state.workPanelFileRequest?.seq ?? 0) + 1,
+              },
+            }
+          : {}),
+      };
+    });
+    if (wasOpen && closePanel) shrinkWindowForPanel(get().workPanelWidth);
+  },
+  collapseWorkPanel: () => {
+    if (!get().workPanelOpen) return;
+    set({ workPanelOpen: false });
+    shrinkWindowForPanel(get().workPanelWidth);
+  },
+  resetWorkPanelContext: () => {
+    const wasOpen = get().workPanelOpen;
+    set({
+      workPanelOpen: false,
+      workPanelTabs: [],
+      activeWorkPanelTabId: null,
+      workPanelFileRequest: null,
+    });
+    if (wasOpen) shrinkWindowForPanel(get().workPanelWidth);
   },
   setWorkPanelWidth: (width) => {
     const prev = get().workPanelWidth;
     set({
       workPanelWidth: Math.max(WORK_PANEL_MIN_WIDTH, Math.min(720, width)),
     });
-    saveWorkPanelPreferences(get());
+    saveWorkPanelWidth(get().workPanelWidth);
     // Committed drag-resize also extends the window instead of the chat.
     const next = get().workPanelWidth;
     if (get().workPanelOpen && next !== prev) {
@@ -1636,19 +1997,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   openFileInWorkPanel: (path) => {
-    get().setWorkPanelTab("files");
-    set((s) => ({
-      workPanelFileRequest: {
-        path,
-        seq: (s.workPanelFileRequest?.seq ?? 0) + 1,
-      },
-    }));
+    get().openWorkPanelTab(fileWorkPanelTab(path));
   },
   openUrlInWorkPanel: (url) => {
-    get().setWorkPanelTab("browser");
+    get().openWorkPanelTab(toolWorkPanelTab("browser"));
     // The browser view lives in main; it pushes navigation state back to
     // whichever BrowserTab is (or becomes) mounted.
     void api.browserNavigate(url).catch(() => {});
+  },
+  openTerminalInWorkPanel: () => {
+    get().openWorkPanelTab(toolWorkPanelTab("terminal"));
   },
 
   prefillComposer: (text) => set({ composerPrefill: text }),
