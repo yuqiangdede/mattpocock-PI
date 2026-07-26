@@ -1,6 +1,6 @@
 export const PROTOCOL_VERSION = 4 as const;
 export const APP_NAME = "PI-Desktop";
-export const APP_VERSION = "0.1.0";
+export const APP_VERSION = "0.1.1-rc.1";
 
 export const APP_MENU_COMMANDS = [
   "newTask",
