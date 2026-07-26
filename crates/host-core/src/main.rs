@@ -12,6 +12,7 @@ mod secrets;
 mod sessions;
 mod state;
 mod tools;
+mod transcripts;
 mod workspace;
 
 use std::sync::Arc;

@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::db::{ms_to_ts, now_ms, ts_to_ms, Database};
 use crate::notifications::{self, Notification};
+use crate::transcripts::{self, MessageRecord, RevisionRecord};
 
 /// Values accepted by the persisted per-session thinking selector.  Keep this
 /// list in the host boundary so old clients cannot write arbitrary provider
@@ -56,8 +57,9 @@ fn validate_thinking_level(level: &str) -> Result<()> {
 
 /// Wire format is unchanged from v1: RFC3339 timestamps, `projectPath`
 /// resolved from the projects table, flat tool fields on messages. Storage is
-/// schema v3 (block-array transcripts, integer times, per-session `seq`, and
-/// persisted thinking level).
+/// schema v7 (D119): transcript content lives in per-session JSONL files and
+/// SQLite keeps session metadata plus per-message index rows (`seq`, `text`
+/// for FTS, promoted filter columns).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionSummary {
@@ -162,10 +164,11 @@ fn is_default_title(title: &str) -> bool {
     )
 }
 
-// ---- UiMessage ⇄ storage row mapping ----------------------------------------
+// ---- UiMessage ⇄ transcript record mapping -----------------------------------
 
-/// (text, content_json, meta_json) for a wire message.
-fn ui_to_storage(message: &UiMessage) -> (Option<String>, String, Option<String>) {
+/// UiMessage → persisted transcript record, plus the extracted plain text for
+/// the search index row (None for tool rows, matching the FTS triggers).
+fn ui_to_record(message: &UiMessage) -> (MessageRecord, Option<String>) {
     let mut meta_obj = serde_json::Map::new();
     if let Some(status) = &message.status {
         meta_obj.insert("status".into(), json!(status));
@@ -204,13 +207,14 @@ fn ui_to_storage(message: &UiMessage) -> (Option<String>, String, Option<String>
     let meta = if meta_obj.is_empty() {
         None
     } else {
-        Some(Value::Object(meta_obj).to_string())
+        Some(Value::Object(meta_obj))
     };
-    if message.role == "tool" {
-        let mut blocks = Vec::new();
-        if let Some(thinking) = &message.thinking {
-            blocks.push(json!({ "type": "thinking", "text": thinking }));
-        }
+
+    let mut blocks = Vec::with_capacity(2);
+    if let Some(thinking) = &message.thinking {
+        blocks.push(json!({ "type": "thinking", "text": thinking }));
+    }
+    let text = if message.role == "tool" {
         let mut block = serde_json::Map::new();
         block.insert("type".into(), json!("tool_call"));
         if let Some(v) = &message.tool_call_id {
@@ -241,39 +245,32 @@ fn ui_to_storage(message: &UiMessage) -> (Option<String>, String, Option<String>
             block.insert("text".into(), json!(message.content));
         }
         blocks.push(Value::Object(block));
-        (None, Value::Array(blocks).to_string(), meta)
+        None
     } else {
-        let mut blocks = Vec::with_capacity(2);
-        if let Some(thinking) = &message.thinking {
-            blocks.push(json!({ "type": "thinking", "text": thinking }));
-        }
         blocks.push(json!({ "type": "text", "text": message.content }));
-        (
-            Some(message.content.clone()),
-            Value::Array(blocks).to_string(),
+        Some(message.content.clone())
+    };
+
+    (
+        MessageRecord {
+            id: message.id.clone(),
+            role: message.role.clone(),
+            tool_name: message.tool_name.clone(),
+            is_error: message.is_error.unwrap_or(false),
+            blocks: Value::Array(blocks),
             meta,
-        )
-    }
+            created_at: message.created_at.clone(),
+        },
+        text,
+    )
 }
 
-struct MessageRow {
-    id: String,
-    role: String,
-    tool_name: Option<String>,
-    is_error: i64,
-    text: Option<String>,
-    content_json: String,
-    meta_json: Option<String>,
-    created_at: i64,
-}
-
-fn row_to_ui(row: MessageRow) -> UiMessage {
-    let blocks: Vec<Value> = serde_json::from_str(&row.content_json).unwrap_or_default();
-    let meta: Value = row
-        .meta_json
-        .as_deref()
-        .and_then(|raw| serde_json::from_str(raw).ok())
-        .unwrap_or(Value::Null);
+fn record_to_ui(record: MessageRecord) -> UiMessage {
+    let blocks = match record.blocks {
+        Value::Array(items) => items,
+        _ => Vec::new(),
+    };
+    let meta = record.meta.unwrap_or(Value::Null);
     let status = meta
         .get("status")
         .and_then(|v| v.as_str())
@@ -318,8 +315,9 @@ fn row_to_ui(row: MessageRow) -> UiMessage {
         })
         .collect::<Vec<_>>();
     let thinking = (!thinking.is_empty()).then(|| thinking.concat());
+    let is_error = record.is_error.then_some(true);
 
-    if row.role == "tool" {
+    if record.role == "tool" {
         let block = blocks
             .iter()
             .find(|b| b.get("type").and_then(|t| t.as_str()) == Some("tool_call"))
@@ -331,20 +329,20 @@ fn row_to_ui(row: MessageRow) -> UiMessage {
             .map(|s| s.to_string())
             .unwrap_or_default();
         UiMessage {
-            id: row.id,
-            role: row.role,
+            id: record.id,
+            role: record.role,
             content: text,
-            created_at: ms_to_ts(row.created_at),
+            created_at: record.created_at,
             thinking,
             status,
             model_id,
             provider_id,
             usage,
-            error: error.clone(),
-            revision_root_id: revision_root_id.clone(),
+            error,
+            revision_root_id,
             revision_count,
             active_revision,
-            tool_name: row.tool_name,
+            tool_name: record.tool_name,
             tool_call_id: block
                 .get("callId")
                 .and_then(|v| v.as_str())
@@ -360,31 +358,29 @@ fn row_to_ui(row: MessageRow) -> UiMessage {
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string()),
             tool_duration_ms: block.get("durationMs").and_then(|v| v.as_i64()),
-            is_error: if row.is_error != 0 { Some(true) } else { None },
+            is_error,
         }
     } else {
-        let content = row.text.unwrap_or_else(|| {
-            blocks
-                .iter()
-                .filter_map(|b| match b.get("type").and_then(|t| t.as_str()) {
-                    Some("text") => b.get("text").and_then(|v| v.as_str()),
-                    _ => None,
-                })
-                .collect::<Vec<_>>()
-                .join("")
-        });
+        let content = blocks
+            .iter()
+            .filter_map(|b| match b.get("type").and_then(|t| t.as_str()) {
+                Some("text") => b.get("text").and_then(|v| v.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("");
         UiMessage {
-            id: row.id,
-            role: row.role,
+            id: record.id,
+            role: record.role,
             content,
-            created_at: ms_to_ts(row.created_at),
+            created_at: record.created_at,
             thinking,
             status,
             model_id,
             provider_id,
             usage,
             error,
-            revision_root_id: revision_root_id.clone(),
+            revision_root_id,
             revision_count,
             active_revision,
             tool_name: None,
@@ -394,44 +390,50 @@ fn row_to_ui(row: MessageRow) -> UiMessage {
             tool_result: None,
             tool_completed_at: None,
             tool_duration_ms: None,
-            is_error: if row.is_error != 0 { Some(true) } else { None },
+            is_error,
         }
     }
 }
 
-fn insert_message(
+/// Insert one search/index row for a message whose content lives in the
+/// transcript file.
+fn insert_index_row(
     conn: &rusqlite::Connection,
     session_id: &str,
     seq: i64,
     turn_id: Option<&str>,
-    message: &UiMessage,
-    created_at: i64,
+    record: &MessageRecord,
+    text: Option<&str>,
 ) -> Result<()> {
-    let (text, content_json, meta_json) = ui_to_storage(message);
     let mut stmt = conn.prepare_cached(
         "INSERT INTO messages (
-            id, session_id, turn_id, seq, role, tool_name, is_error, text,
-            content_json, meta_json, created_at
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            id, session_id, turn_id, seq, role, tool_name, is_error, text, created_at
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
     )?;
     stmt.execute(params![
-        message.id,
+        record.id,
         session_id,
         turn_id,
         seq,
-        message.role,
-        message.tool_name,
-        if message.is_error.unwrap_or(false) {
-            1
-        } else {
-            0
-        },
+        record.role,
+        record.tool_name,
+        record.is_error,
         text,
-        content_json,
-        meta_json,
-        created_at,
+        ts_to_ms(&record.created_at),
     ])?;
     Ok(())
+}
+
+/// The session's created_at (RFC3339, used as the transcript header stamp) —
+/// doubles as the existence check before any transcript file is touched.
+fn session_created_at(db: &Database, session_id: &str) -> Result<String> {
+    let ms: Option<i64> = db
+        .conn()
+        .prepare_cached("SELECT created_at FROM sessions WHERE id = ?1")?
+        .query_row(params![session_id], |r| r.get(0))
+        .optional()?;
+    ms.map(ms_to_ts)
+        .ok_or_else(|| anyhow!("session not found: {session_id}"))
 }
 
 const SUMMARY_SELECT: &str = "SELECT s.id, s.title, p.path, s.model_id, s.provider_id, s.mode,
@@ -588,27 +590,23 @@ pub fn get_session(db: &Database, id: &str) -> Result<Option<SessionDetail>> {
         return Ok(None);
     };
 
-    let mut stmt = db.conn().prepare_cached(
-        "SELECT id, role, tool_name, is_error, text, content_json, meta_json, created_at
-         FROM messages WHERE session_id = ?1 ORDER BY seq ASC",
-    )?;
-    let rows = stmt.query_map(params![id], |row| {
-        Ok(MessageRow {
-            id: row.get(0)?,
-            role: row.get(1)?,
-            tool_name: row.get(2)?,
-            is_error: row.get(3)?,
-            text: row.get(4)?,
-            content_json: row.get(5)?,
-            meta_json: row.get(6)?,
-            created_at: row.get(7)?,
-        })
-    })?;
-    let messages = rows
-        .collect::<rusqlite::Result<Vec<_>>>()?
-        .into_iter()
-        .map(row_to_ui)
-        .collect();
+    // Content comes from the transcript file; SQLite only indexes it.
+    // Keep-last dedupe by message id absorbs a retried append whose earlier
+    // file line lost its index transaction to a crash.
+    let records = transcripts::read_transcript(db.data_dir(), id)?;
+    let mut ordered: Vec<MessageRecord> = Vec::with_capacity(records.len());
+    let mut by_id: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::with_capacity(records.len());
+    for record in records {
+        match by_id.get(&record.id) {
+            Some(&pos) => ordered[pos] = record,
+            None => {
+                by_id.insert(record.id.clone(), ordered.len());
+                ordered.push(record);
+            }
+        }
+    }
+    let messages = ordered.into_iter().map(record_to_ui).collect();
     Ok(Some(SessionDetail { summary, messages }))
 }
 
@@ -673,6 +671,11 @@ pub fn delete_session(db: &Database, id: &str) -> Result<bool> {
         .conn()
         .prepare_cached("DELETE FROM sessions WHERE id = ?1")?
         .execute(params![id])?;
+    if n > 0 {
+        // Here rather than in the RPC handler so every deletion path (UI,
+        // failed scheduled-run cleanup) also drops the transcript files.
+        transcripts::remove_session_files(db.data_dir(), id);
+    }
     Ok(n > 0)
 }
 
@@ -684,12 +687,30 @@ pub fn rename_session(db: &Database, id: &str, title: &str) -> Result<bool> {
     Ok(n > 0)
 }
 
+/// Per-message records plus their extracted index text, in input order.
+fn records_and_texts(messages: &[UiMessage]) -> (Vec<MessageRecord>, Vec<Option<String>>) {
+    let mut records = Vec::with_capacity(messages.len());
+    let mut texts = Vec::with_capacity(messages.len());
+    for message in messages {
+        let (record, text) = ui_to_record(message);
+        records.push(record);
+        texts.push(text);
+    }
+    (records, texts)
+}
+
 pub fn append_message(
     db: &Database,
     session_id: &str,
     message: &UiMessage,
     turn_id: Option<&str>,
 ) -> Result<()> {
+    let session_created = session_created_at(db, session_id)?;
+    let (record, text) = ui_to_record(message);
+    // File first: the transcript is the source of truth. A crash before the
+    // index commit costs one derived row (self-healed by the next rewrite),
+    // never message content.
+    transcripts::append_message(db.data_dir(), session_id, &session_created, &record)?;
     let conn = db.conn();
     let tx = conn.unchecked_transaction()?;
     let now = now_ms();
@@ -703,35 +724,24 @@ pub fn append_message(
     let Some(seq) = seq else {
         return Err(anyhow!("session not found: {session_id}"));
     };
-    insert_message(
-        &tx,
-        session_id,
-        seq - 1,
-        turn_id,
-        message,
-        ts_to_ms(&message.created_at),
-    )?;
+    insert_index_row(&tx, session_id, seq - 1, turn_id, &record, text.as_deref())?;
     tx.commit()?;
     Ok(())
 }
 
 pub fn replace_messages(db: &Database, session_id: &str, messages: &[UiMessage]) -> Result<()> {
+    let session_created = session_created_at(db, session_id)?;
+    let (records, texts) = records_and_texts(messages);
+    transcripts::write_transcript(db.data_dir(), session_id, &session_created, &records)?;
     let conn = db.conn();
     let tx = conn.unchecked_transaction()?;
     tx.prepare_cached("DELETE FROM messages WHERE session_id = ?1")?
         .execute(params![session_id])?;
-    for (seq, message) in messages.iter().enumerate() {
-        insert_message(
-            &tx,
-            session_id,
-            seq as i64,
-            None,
-            message,
-            ts_to_ms(&message.created_at),
-        )?;
+    for (seq, record) in records.iter().enumerate() {
+        insert_index_row(&tx, session_id, seq as i64, None, record, texts[seq].as_deref())?;
     }
     tx.prepare_cached("UPDATE sessions SET last_seq = ?1, updated_at = ?2 WHERE id = ?3")?
-        .execute(params![messages.len() as i64, now_ms(), session_id])?;
+        .execute(params![records.len() as i64, now_ms(), session_id])?;
     tx.commit()?;
     Ok(())
 }
@@ -747,6 +757,8 @@ pub struct MessageRevisionSummary {
 }
 
 /// Persist a discarded (or current) regenerate branch for a user root turn.
+/// The branch payload goes to the append-only revisions file; SQLite keeps
+/// the index row (identity, ordering, active flag, count).
 pub fn save_message_revision(
     db: &Database,
     session_id: &str,
@@ -761,8 +773,7 @@ pub fn save_message_revision(
         return Err(anyhow!("messages required"));
     }
     let conn = db.conn();
-    let tx = conn.unchecked_transaction()?;
-    let next_index: i64 = tx
+    let next_index: i64 = conn
         .query_row(
             "SELECT COALESCE(MAX(revision_index), 0) + 1
              FROM message_revisions
@@ -771,6 +782,19 @@ pub fn save_message_revision(
             |row| row.get(0),
         )
         .unwrap_or(1);
+    let created = now_ms();
+    let (records, _) = records_and_texts(messages);
+    transcripts::append_revision(
+        db.data_dir(),
+        session_id,
+        &RevisionRecord {
+            root_user_id: root_user_id.to_string(),
+            revision_index: next_index,
+            created_at: ms_to_ts(created),
+            messages: records,
+        },
+    )?;
+    let tx = conn.unchecked_transaction()?;
     if make_active {
         tx.prepare_cached(
             "UPDATE message_revisions
@@ -780,11 +804,9 @@ pub fn save_message_revision(
         .execute(params![session_id, root_user_id])?;
     }
     let id = Uuid::new_v4().to_string();
-    let created = now_ms();
-    let payload = serde_json::to_string(messages)?;
     tx.prepare_cached(
         "INSERT INTO message_revisions (
-            id, session_id, root_user_id, revision_index, is_active, messages_json, created_at
+            id, session_id, root_user_id, revision_index, is_active, message_count, created_at
          ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
     )?
     .execute(params![
@@ -793,7 +815,7 @@ pub fn save_message_revision(
         root_user_id,
         next_index,
         if make_active { 1 } else { 0 },
-        payload,
+        messages.len() as i64,
         created
     ])?;
     tx.commit()?;
@@ -811,21 +833,17 @@ pub fn list_message_revisions(
     root_user_id: &str,
 ) -> Result<Vec<MessageRevisionSummary>> {
     let mut stmt = db.conn().prepare_cached(
-        "SELECT revision_index, is_active, created_at, messages_json
+        "SELECT revision_index, is_active, created_at, message_count
          FROM message_revisions
          WHERE session_id = ?1 AND root_user_id = ?2
          ORDER BY revision_index ASC",
     )?;
     let rows = stmt.query_map(params![session_id, root_user_id], |row| {
-        let messages_json: String = row.get(3)?;
-        let count = serde_json::from_str::<Vec<Value>>(&messages_json)
-            .map(|v| v.len() as i64)
-            .unwrap_or(0);
         Ok(MessageRevisionSummary {
             revision_index: row.get(0)?,
             is_active: row.get::<_, i64>(1)? != 0,
             created_at: ms_to_ts(row.get(2)?),
-            message_count: count,
+            message_count: row.get(3)?,
         })
     })?;
     let mut out = Vec::new();
@@ -844,39 +862,35 @@ pub fn activate_message_revision(
     revision_index: i64,
     prefix: &[UiMessage],
 ) -> Result<Vec<UiMessage>> {
+    let session_created = session_created_at(db, session_id)?;
     let conn = db.conn();
-    let tx = conn.unchecked_transaction()?;
-    let messages_json: String = tx
-        .query_row(
-            "SELECT messages_json FROM message_revisions
-             WHERE session_id = ?1 AND root_user_id = ?2 AND revision_index = ?3",
-            params![session_id, root_user_id, revision_index],
-            |row| row.get(0),
-        )
-        .map_err(|_| anyhow!("revision not found"))?;
-    let branch: Vec<UiMessage> = serde_json::from_str(&messages_json)
-        .map_err(|e| anyhow!("revision payload invalid: {e}"))?;
-    tx.prepare_cached(
-        "UPDATE message_revisions
-         SET is_active = CASE WHEN revision_index = ?3 THEN 1 ELSE 0 END
-         WHERE session_id = ?1 AND root_user_id = ?2",
-    )?
-    .execute(params![session_id, root_user_id, revision_index])?;
-    // rebuild live messages = prefix + branch
-    tx.prepare_cached("DELETE FROM messages WHERE session_id = ?1")?
-        .execute(params![session_id])?;
-    let mut combined = Vec::with_capacity(prefix.len() + branch.len());
-    combined.extend_from_slice(prefix);
-    combined.extend(branch.iter().cloned());
-    // Stamp revision meta on the branch's user root. After regenerate the live
-    // prompt id may differ from the stable family key, so prefer an exact id
-    // match and fall back to the first user message in the restored branch.
-    let total: i64 = tx.query_row(
+    let known: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM message_revisions
+         WHERE session_id = ?1 AND root_user_id = ?2 AND revision_index = ?3",
+        params![session_id, root_user_id, revision_index],
+        |row| row.get(0),
+    )?;
+    if known == 0 {
+        return Err(anyhow!("revision not found"));
+    }
+    let revision =
+        transcripts::read_revision(db.data_dir(), session_id, root_user_id, revision_index)?
+            .ok_or_else(|| anyhow!("revision payload missing from revisions file"))?;
+    let branch: Vec<UiMessage> = revision.messages.into_iter().map(record_to_ui).collect();
+
+    let total: i64 = conn.query_row(
         "SELECT COUNT(*) FROM message_revisions
          WHERE session_id = ?1 AND root_user_id = ?2",
         params![session_id, root_user_id],
         |row| row.get(0),
     )?;
+    // rebuild live messages = prefix + branch
+    let mut combined = Vec::with_capacity(prefix.len() + branch.len());
+    combined.extend_from_slice(prefix);
+    combined.extend(branch);
+    // Stamp revision meta on the branch's user root. After regenerate the live
+    // prompt id may differ from the stable family key, so prefer an exact id
+    // match and fall back to the first user message in the restored branch.
     let root_pos = combined
         .iter()
         .position(|m| m.id == root_user_id)
@@ -894,18 +908,23 @@ pub fn activate_message_revision(
             root.active_revision = Some(revision_index);
         }
     }
-    for (seq, message) in combined.iter().enumerate() {
-        insert_message(
-            &tx,
-            session_id,
-            seq as i64,
-            None,
-            message,
-            ts_to_ms(&message.created_at),
-        )?;
+
+    let (records, texts) = records_and_texts(&combined);
+    transcripts::write_transcript(db.data_dir(), session_id, &session_created, &records)?;
+    let tx = conn.unchecked_transaction()?;
+    tx.prepare_cached(
+        "UPDATE message_revisions
+         SET is_active = CASE WHEN revision_index = ?3 THEN 1 ELSE 0 END
+         WHERE session_id = ?1 AND root_user_id = ?2",
+    )?
+    .execute(params![session_id, root_user_id, revision_index])?;
+    tx.prepare_cached("DELETE FROM messages WHERE session_id = ?1")?
+        .execute(params![session_id])?;
+    for (seq, record) in records.iter().enumerate() {
+        insert_index_row(&tx, session_id, seq as i64, None, record, texts[seq].as_deref())?;
     }
     tx.prepare_cached("UPDATE sessions SET last_seq = ?1, updated_at = ?2 WHERE id = ?3")?
-        .execute(params![combined.len() as i64, now_ms(), session_id])?;
+        .execute(params![records.len() as i64, now_ms(), session_id])?;
     tx.commit()?;
     Ok(combined)
 }
@@ -928,53 +947,57 @@ pub fn import_session(
     if exists > 0 {
         return Ok(false);
     }
-    let tx = conn.unchecked_transaction()?;
-    let project_id = match summary
-        .project_path
-        .as_deref()
-        .filter(|path| !path.trim().is_empty())
-    {
-        Some(path) => Some(db.ensure_project(path, false)?),
-        None => None,
-    };
-    let source = summary.id.strip_prefix("import-").map(|rest| {
-        for known in ["claude-code", "opencode", "codex", "pi"] {
-            if rest.starts_with(&format!("{known}-")) {
-                return known.to_string();
+    let (records, texts) = records_and_texts(messages);
+    transcripts::write_transcript(db.data_dir(), &summary.id, &summary.created_at, &records)?;
+    let indexed = (|| -> Result<()> {
+        let tx = conn.unchecked_transaction()?;
+        let project_id = match summary
+            .project_path
+            .as_deref()
+            .filter(|path| !path.trim().is_empty())
+        {
+            Some(path) => Some(db.ensure_project(path, false)?),
+            None => None,
+        };
+        let source = summary.id.strip_prefix("import-").map(|rest| {
+            for known in ["claude-code", "opencode", "codex", "pi"] {
+                if rest.starts_with(&format!("{known}-")) {
+                    return known.to_string();
+                }
             }
+            "external".to_string()
+        });
+        tx.prepare_cached(
+            "INSERT INTO sessions (
+                id, title, project_id, provider_id, model_id, mode, thinking_level, source,
+                last_seq, created_at, updated_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        )?
+        .execute(params![
+            summary.id,
+            summary.title,
+            project_id,
+            summary.provider_id,
+            summary.model_id,
+            summary.mode,
+            summary.thinking_level,
+            source,
+            records.len() as i64,
+            ts_to_ms(&summary.created_at),
+            ts_to_ms(&summary.updated_at),
+        ])?;
+        for (seq, record) in records.iter().enumerate() {
+            insert_index_row(&tx, &summary.id, seq as i64, None, record, texts[seq].as_deref())?;
         }
-        "external".to_string()
-    });
-    tx.prepare_cached(
-        "INSERT INTO sessions (
-            id, title, project_id, provider_id, model_id, mode, thinking_level, source,
-            last_seq, created_at, updated_at
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-    )?
-    .execute(params![
-        summary.id,
-        summary.title,
-        project_id,
-        summary.provider_id,
-        summary.model_id,
-        summary.mode,
-        summary.thinking_level,
-        source,
-        messages.len() as i64,
-        ts_to_ms(&summary.created_at),
-        ts_to_ms(&summary.updated_at),
-    ])?;
-    for (seq, message) in messages.iter().enumerate() {
-        insert_message(
-            &tx,
-            &summary.id,
-            seq as i64,
-            None,
-            message,
-            ts_to_ms(&message.created_at),
-        )?;
+        tx.commit()?;
+        Ok(())
+    })();
+    if let Err(e) = indexed {
+        // Don't leave transcript files behind for a session row that never
+        // materialized.
+        transcripts::remove_session_files(db.data_dir(), &summary.id);
+        return Err(e);
     }
-    tx.commit()?;
     Ok(true)
 }
 
@@ -1428,15 +1451,9 @@ mod tests {
         };
         append_message(&db, &session.id, &assistant, None).unwrap();
 
-        let content_json: String = db
-            .conn()
-            .query_row(
-                "SELECT content_json FROM messages WHERE id = 'assistant-1'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        let blocks: Value = serde_json::from_str(&content_json).unwrap();
+        let records = transcripts::read_transcript(db.data_dir(), &session.id).unwrap();
+        assert_eq!(records.len(), 1);
+        let blocks = &records[0].blocks;
         assert_eq!(
             blocks[0],
             json!({
@@ -1519,6 +1536,68 @@ mod tests {
         replace_messages(&db, &session.id, &[message]).unwrap();
         let detail = get_session(&db, &session.id).unwrap().unwrap();
         assert_eq!(detail.messages[0].thinking.as_deref(), Some("persist me"));
+    }
+
+    #[test]
+    fn transcript_survives_reopen_from_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        let db = Database::open(&path).unwrap();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("m1", "durable", "2025-05-01T00:00:00Z"),
+            None,
+        )
+        .unwrap();
+        let transcript = transcripts::transcript_path(db.data_dir(), &session.id).unwrap();
+        assert!(transcript.exists());
+
+        drop(db);
+        let db = Database::open(&path).unwrap();
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(detail.messages.len(), 1);
+        assert_eq!(detail.messages[0].content, "durable");
+    }
+
+    #[test]
+    fn delete_session_removes_transcript_files() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let root = user_msg("m1", "x", "2025-05-01T00:00:00Z");
+        append_message(&db, &session.id, &root, None).unwrap();
+        save_message_revision(&db, &session.id, "m1", &[root], true).unwrap();
+        let transcript = transcripts::transcript_path(db.data_dir(), &session.id).unwrap();
+        let revisions = transcripts::revisions_path(db.data_dir(), &session.id).unwrap();
+        assert!(transcript.exists());
+        assert!(revisions.exists());
+
+        assert!(delete_session(&db, &session.id).unwrap());
+        assert!(!transcript.exists());
+        assert!(!revisions.exists());
+    }
+
+    #[test]
+    fn get_session_dedupes_retried_file_lines_keep_last() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("m1", "old", "2025-05-01T00:00:00Z"),
+            None,
+        )
+        .unwrap();
+        // Simulate a retried append whose first file line lost its index
+        // transaction: the same id lands twice and the newest line wins.
+        let (record, _) = ui_to_record(&user_msg("m1", "new", "2025-05-01T00:00:01Z"));
+        transcripts::append_message(db.data_dir(), &session.id, "2025-05-01T00:00:00Z", &record)
+            .unwrap();
+
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(detail.messages.len(), 1);
+        assert_eq!(detail.messages[0].content, "new");
     }
 
     #[test]
