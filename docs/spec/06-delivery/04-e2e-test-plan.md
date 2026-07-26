@@ -17,7 +17,8 @@
 
 - Full automated test suite in MVP phase (document scenarios first; automate later).
 - Performance / stress testing (post-MVP).
-- Cross-platform testing (macOS arm64 only for first release — D010).
+- Windows/Linux release qualification (macOS arm64 remains the first-release
+  acceptance platform per D010; readiness scenarios may be documented).
 - Plugin marketplace scenarios (post-MVP).
 - Remote gateway / control-plane scenarios (post-MVP — ADR 0004 / baseline #20).
 
@@ -35,7 +36,7 @@
 |---|---|---|---|
 | **Unit** | Single module, no IPC | Many | Vitest / Rust #[test] |
 | **Integration** | IPC contract, host↔renderer, host↔sidecar | Moderate | Vitest + IPC mocks or live Electron |
-| **E2E** | Full user journey through the desktop app | ~55 functional + US-UI visual catalog | protocol smoke + Electron probes now; Playwright later |
+| **E2E** | Full user journey through the desktop app | ~65 functional + US-UI visual catalog | protocol smoke + Electron probes now; Playwright later |
 
 **Strategy**: document all E2E scenarios now; write unit/integration tests alongside code; automate E2E after M5.
 
@@ -59,7 +60,7 @@
 
 | Requirement | Detail |
 |---|---|
-| Platform | macOS arm64 (D010) |
+| Platform | macOS arm64 for release acceptance (D010); native Windows/Linux runners for shell-readiness scenarios |
 | Profile | Clean `~/.pi-desktop` profile (no prior config) |
 | Fixtures | Sample project directory (`examples/fixtures/sample-project/`) |
 | Sample plugin | `examples/plugins/hello` loaded from local path |
@@ -1152,6 +1153,50 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`providers::tests`, `model-cache.test.mjs`); full
   restart/offline UI scenario Draft
 
+#### E2E-067: Platform application menus and window chrome
+
+- **Preconditions**: Native macOS, Windows, and Linux runners; built desktop
+  app; English and zh-CN locales available. The Windows/Linux harness can set
+  `PI_DESKTOP_START_MAXIMIZED=1` before launch so Main maximizes the hidden
+  native window before renderer mount.
+- **Steps**: 1) On macOS, open every system menu and invoke New Task, Open
+  Project, Settings, Command Palette, sidebar toggle, editing,
+  zoom/fullscreen, Window, Help, Logs, and Check for Updates actions. Verify
+  the update status reports that the current fixture version is up to date.
+  2) Repeat through the visible Windows/Linux menubar using pointer and
+  F10/arrow/Home/End/Enter/Space/Escape/Tab navigation; verify Shift+F10 is not
+  consumed or redirected to File, invoke Edit actions after focusing an
+  editor, and invoke Check for Updates from Help with the same status result.
+  3) Close the macOS window, immediately invoke two native menu
+  commands, and acknowledge renderer readiness after the replacement loads.
+  Verify one window and one delivery per command. 4) Minimize, maximize,
+  restore, and close on Windows/Linux. 5) Start
+  the renderer while its native window is already maximized and inspect the
+  initial queried glyph/state. 6) Attempt unknown menu/window IPC actions
+  while a window exists and after it closes. 7) Build each target on its
+  native runner from a clean release-host directory.
+- **Expected**: macOS follows native menu conventions and accelerators.
+  Windows/Linux show localized File/Edit/View/Window/Help menus without
+  colliding with drag regions or right-side controls; keyboard focus and
+  checked sidebar state remains accurate, and no work-panel launcher is
+  present. Check for Updates invokes the allowlisted update command from both
+  menu surfaces and shows the resulting up-to-date state. Replacement-window
+  commands wait for renderer readiness without
+  creating duplicate windows or losing events. Window controls match native state and
+  have accessible names. Unknown actions fail closed. Each package contains
+  the target-native host binary (`.exe` only on Windows). Passing this scenario
+  on Windows/Linux proves shell readiness, not first-release qualification.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`,
+  `04-ux/01-ui-ia.md`, `04-ux/02-i18n-english-first.md`,
+  `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`,
+  `04-ux/09-interaction-patterns.md`, `06-delivery/06-release-runbook.md`,
+  `08-meta/decisions-log.md` (D118)
+- **Acceptance**: A (app startup), Quality
+- **Milestone**: M5 on macOS; post-MVP release qualification on Windows/Linux
+- **Status**: Unit-covered (`window-menu.test.mjs`); Electron boot probe covers
+  platform bridge, native menu installation, and the pre-render maximize
+  fixture on Windows/Linux; native visual scenario Draft
+
 ## 8. Traceability Matrix
 
 
@@ -1160,7 +1205,7 @@ Each scenario is documented in this format:
 
 | Acceptance | Scenarios |
 |---|---|
-| A — App startup | E2E-001, E2E-002, E2E-003, E2E-004 |
+| A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066 |
 | C — Chat & stream | E2E-008, E2E-009, E2E-010, E2E-011, E2E-031, E2E-040, E2E-047, E2E-048, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-060, E2E-061, E2E-062, E2E-064, E2E-065 |
 | D — Workspace | E2E-012, E2E-013, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060 |
@@ -1169,7 +1214,7 @@ Each scenario is documented in this format:
 | G — Plugins | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026 |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-049 |
-| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066 |
+| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 |
 
 | Milestone | Scenarios |
 |---|---|
@@ -1177,7 +1222,7 @@ Each scenario is documented in this format:
 | M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-020, E2E-021, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042 |
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
-| M5 | E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066 (+ packaging scenarios in release runbook) |
+| M5 | E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS) (+ packaging scenarios in release runbook) |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)

@@ -395,6 +395,143 @@ textarea:disabled {
 }
 
 
+/* Windows/Linux window chrome: no traffic lights on the left; our own
+ * Codex-style controls pinned top-right (see WindowControls.tsx). */
+:root[data-platform="win32"] .sidebar-drag,
+:root[data-platform="linux"] .sidebar-drag {
+  padding-left: 214px;
+}
+
+.desktop-menu-bar {
+  position: fixed;
+  top: 0;
+  left: 8px;
+  z-index: 210;
+  display: flex;
+  height: 46px;
+  align-items: center;
+  gap: 1px;
+  -webkit-app-region: no-drag;
+}
+
+.desktop-menu-root {
+  position: relative;
+}
+
+.desktop-menu-trigger {
+  display: inline-flex;
+  height: 26px;
+  align-items: center;
+  padding: 0 7px;
+  border-radius: var(--radius-2xs);
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+  letter-spacing: 0;
+}
+
+.desktop-menu-trigger:hover,
+.desktop-menu-trigger.active {
+  color: var(--ds-text-primary);
+  background: var(--ds-bg-hover);
+}
+
+.desktop-menu-popover {
+  position: absolute;
+  top: 30px;
+  left: 0;
+  z-index: 220;
+  min-width: 238px;
+  padding: 4px;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--ds-bg-elevated-opaque);
+  box-shadow: var(--ds-shadow-dialog);
+}
+
+.desktop-menu-popover button {
+  display: grid;
+  width: 100%;
+  min-height: 30px;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 4px;
+  border-radius: var(--radius-2xs);
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm);
+  letter-spacing: 0;
+  text-align: left;
+}
+
+.desktop-menu-popover button:hover,
+.desktop-menu-popover button:focus-visible {
+  background: var(--ds-bg-hover);
+  outline-offset: -1px;
+}
+
+.desktop-menu-check {
+  display: inline-flex;
+  width: 16px;
+  align-items: center;
+  justify-content: center;
+}
+
+.desktop-menu-popover kbd {
+  color: var(--ds-text-muted);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  letter-spacing: 0;
+}
+
+.desktop-menu-separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--ds-border-default);
+}
+
+.window-controls {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 200; /* above titlebar (10) and work panel chrome */
+  display: flex;
+  align-items: center;
+  height: 46px; /* matches .main-titlebar band */
+  padding-right: 6px;
+  gap: 2px;
+}
+
+.window-control-btn {
+  display: inline-flex;
+  height: 26px;
+  width: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-2xs);
+  color: color-mix(in oklab, var(--ds-text-primary) 55%, transparent);
+  background: transparent;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.window-control-btn:hover {
+  color: var(--ds-text-primary);
+  background: var(--ds-bg-hover);
+}
+
+.window-control-btn.window-control-close:hover {
+  color: var(--gray-0);
+  background: var(--ds-error);
+}
+
+/* Keep titlebar action buttons clear of the control cluster. */
+:root[data-platform="win32"] .main-titlebar,
+:root[data-platform="linux"] .main-titlebar,
+:root[data-platform="win32"] .work-panel-header,
+:root[data-platform="linux"] .work-panel-header {
+  padding-right: 112px;
+}
+
+
 .sidebar-header {
   display: flex;
   align-items: center;

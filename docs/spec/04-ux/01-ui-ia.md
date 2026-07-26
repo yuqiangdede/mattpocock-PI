@@ -45,8 +45,12 @@ destination, chat as the home surface, tools and permissions inline.
   remains only an external import source or a design-reference term.
 - **Main pane**: exactly one destination at a time; destinations replace the
   pane (they are pages, not modals).
-- **Titlebar**: hiddenInset traffic lights; back/forward controls traverse
-  destination history.
+- **Titlebar**: platform-native desktop chrome (D118). macOS uses
+  `hiddenInset` traffic lights and the system application menu.
+  Windows/Linux use a frameless 46px row with localized
+  File / Edit / View / Window / Help menus on the left and accessible
+  minimize / maximize-or-restore / close controls on the right. Back/forward
+  controls traverse destination history.
 - **Work panel**: docked right column (not an overlay) created only by file,
   URL, browser-preview, successful-command, or successful workspace-edit
   artifacts. Its top strip contains only currently opened, closeable tabs:
@@ -160,7 +164,11 @@ independent Plugins destination described in §3.5.
 |---|---|
 | Cmd/Ctrl+K, Cmd/Ctrl+Shift+P | command palette |
 | Cmd/Ctrl+B | toggle sidebar |
+| Cmd/Ctrl+N | new task |
+| Cmd/Ctrl+O | open project |
+| Cmd/Ctrl+, | settings |
 | Cmd/Ctrl+. | abort current run |
+| F10 (Windows/Linux) | focus the application menu bar |
 | Enter / Shift+Enter | send / newline (configurable Enter-to-send) |
 | Esc | dismiss overlay/menu |
 

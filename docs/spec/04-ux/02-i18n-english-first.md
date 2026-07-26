@@ -21,6 +21,8 @@ Rules:
 4. Every shipped locale has the same flattened key set as English
 5. Interpolation variable names and sets match across every locale
 6. Dates and times use the active application locale rather than the host default
+7. Electron application-menu custom labels and renderer menubars consume the
+   same catalog keys; native role labels may use Electron/OS localization
 
 ## 3. Catalog structure
 
@@ -68,3 +70,5 @@ Plugins may include localized display fields later, but English fields are requi
 5. Catalog tests reject missing keys or mismatched interpolation variables
 6. Import, Projects, and Temporary sessions expose localized visible and
    accessible labels in English and Simplified Chinese
+7. macOS system-menu custom commands and Windows/Linux renderer menus expose
+   the same English and Simplified Chinese labels

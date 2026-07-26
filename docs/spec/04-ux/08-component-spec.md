@@ -63,6 +63,33 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   the sidebar may retain several project tabs/groups
 - No status bar (deferred)
 
+### 1.7 Platform application chrome
+
+| Platform | Top-level chrome | Application menu |
+|---|---|---|
+| macOS | Native inset traffic lights at `{x:16,y:16}` | System menu: PI-Desktop, File, Edit, View, Window, Help |
+| Windows | Frameless 46px titlebar; minimize/maximize/close at right | Localized File, Edit, View, Window, Help menubar |
+| Linux | Frameless 46px titlebar; minimize/maximize/close at right | Localized File, Edit, View, Window, Help menubar |
+
+- Both menu surfaces expose New Task, Open Project, Settings, Command Palette,
+  Sidebar, standard editing, zoom/fullscreen, window, Help, and
+  Logs actions where the platform convention permits. Check for Updates is
+  available from the macOS App menu and the Windows/Linux Help menu.
+- The Windows/Linux menubar uses `role=menubar`; popovers use `role=menu`,
+  separators, menu items, and checked menu-item semantics for visible panels.
+- Window buttons have localized tooltips and accessible names. The maximize
+  glyph reflects the initial native state plus later maximize/unmaximize
+  events.
+- F10 focuses the Windows/Linux File trigger. Arrow keys move between menus
+  and items; Home/End move to boundaries; Tab exits; Escape closes the
+  popover and restores trigger focus. Shift+F10 is not consumed by the
+  menubar and remains available to the focused content.
+- The menubar uses roving tab focus. Editing actions restore the previously
+  focused editor before invoking the native web-contents operation.
+- Native commands that create or reload a window wait for the renderer's menu
+  subscription acknowledgement instead of relying on a timing delay.
+
+
 ---
 
 ## 2. Topbar

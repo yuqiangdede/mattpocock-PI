@@ -30,6 +30,7 @@ const child = spawn(electronBin, ["."], {
     ...process.env,
     PI_DESKTOP_DATA_DIR: dataDir,
     PI_DESKTOP_BOOT_PROBE: "1",
+    PI_DESKTOP_START_MAXIMIZED: process.platform === "darwin" ? "0" : "1",
     // never inherit a dev-server URL: probe the packaged renderer path
     ELECTRON_RENDERER_URL: "",
   },
@@ -68,9 +69,16 @@ for (const stream of [child.stdout, child.stderr]) {
 }
 
 child.on("exit", () => {
-  if (probe?.ok) {
+  if (
+    probe?.ok &&
+    probe.appName === "PI-Desktop" &&
+    probe.platform === process.platform &&
+    (process.platform === "darwin" || probe.maximized === true) &&
+    probe.menuCount >= (process.platform === "darwin" ? 6 : 5)
+  ) {
     console.log(
-      `PASS boot-probe — app v${probe.version}, host protocol ${probe.hostProtocol}`,
+      `PASS boot-probe — app v${probe.version}, host protocol ${probe.hostProtocol}, ` +
+        `${probe.menuCount} native menu groups on ${probe.platform}`,
     );
     cleanup(0);
   } else {

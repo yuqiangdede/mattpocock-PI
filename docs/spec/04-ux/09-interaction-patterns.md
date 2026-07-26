@@ -13,12 +13,13 @@
 |---|---|---|
 | `Cmd/Ctrl + Shift + P` | Open command palette | Global (D014) |
 | `Cmd/Ctrl + N` | New chat/session | Global |
-| `Cmd/Ctrl + W` | Close/delete current session | Global (with confirm) |
+| `Cmd/Ctrl + O` | Open project | Global |
+| `Cmd/Ctrl + W` | Close window | Global |
 | `Cmd/Ctrl + ,` | Open settings | Global |
 | `Cmd/Ctrl + B` | Toggle sidebar | Global |
-| `Cmd/Ctrl + E` | Toggle context panel | Global |
 | `Cmd/Ctrl + .` | Abort active turn | Global (same as abort button) |
-| `Cmd/Ctrl + K` | Focus model selector | Topbar context |
+| `Cmd/Ctrl + K` | Open command palette | Global |
+| `F10` | Focus application menubar | Windows/Linux |
 
 ### 1.2 Chat context shortcuts
 
@@ -40,13 +41,40 @@
 
 ### 1.4 Shortcut rules
 
-- All shortcuts are discoverable via command palette search (keyword "shortcut" or "keybinding")
+- Application-menu shortcuts are discoverable through visible menu
+  accelerators. Command-only shortcuts remain discoverable via command palette
+  search (keyword "shortcut" or "keybinding").
 - Shortcuts must not conflict with macOS system shortcuts or common browser shortcuts
 - Never override `Cmd/Ctrl + C`, `Cmd/Ctrl + V`, `Cmd/Ctrl + A`, `Cmd/Ctrl + S`
 - Shortcuts are consistent across macOS (Cmd) and Windows/Linux (Ctrl)
-- Shortcut changes require updating the command palette metadata
+- Command-only shortcut changes require updating the command palette metadata;
+  native roles and visible application-menu accelerators remain menu-owned
 
-### 1.5 Sidebar project and conversation organization
+### 1.5 Platform application menus
+
+- macOS application-menu accelerators dispatch the same allowlisted shell
+  commands as renderer controls. Native Edit/View/Window roles retain
+  platform text-editing, zoom, fullscreen, hide, and quit behavior.
+- Windows/Linux F10 focuses File while Shift+F10 is not consumed by the
+  menubar and remains available to focused content. Enter, Space, or ArrowDown
+  opens the focused menu at its first item; ArrowUp opens it at its last item.
+  Left/Right moves between top-level menus; Up/Down wraps through menu items;
+  Home/End move to boundaries; Tab exits; Escape closes and restores trigger
+  focus.
+- Top-level items use roving tab focus. Keyboard-invoked editing actions
+  restore the previously focused editor before dispatch.
+- Opening one Windows/Linux menu and hovering another transfers the open
+  popover and focus without changing titlebar geometry. Outside pointer press
+  dismisses it.
+- Main queues native commands until the renderer acknowledges that its menu
+  event subscription is active. Closing and recreating a window resets this
+  handshake.
+- Frameless minimize, maximize/restore, and close controls remain outside the
+  drag region. Maximize state is queried on mount and updated from native
+  window events, so the restore affordance never depends only on optimistic
+  renderer state.
+
+### 1.6 Sidebar project and conversation organization
 
 The sidebar is a path-keyed presentation of host-owned projects and sessions.
 Several project groups may be retained while exactly one workspace supplies
@@ -128,7 +156,7 @@ the visible shell context.
 - Collapsing the sidebar closes the menu and restores the collapsed rail's
   normal navigation state.
 
-### 1.6 Notification inbox (D117)
+### 1.7 Notification inbox (D117)
 
 #### Event-to-surface flow
 
@@ -490,6 +518,6 @@ This does not prevent state changes — it makes them instant.
 16. Completed and failed turns appear exactly once in the durable inbox;
     aborted turns never appear
 17. All/Unread, mark-all-read, clear, row activation, Escape/focus restore, and
-    arrow/Home/End keyboard navigation behave as documented in §1.6
+    arrow/Home/End keyboard navigation behave as documented in §1.7
 18. Native notifications appear only while the main window is unfocused and
     their activation focuses the window and opens the corresponding session

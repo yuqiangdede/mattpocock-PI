@@ -29,6 +29,8 @@ Principles:
 | `terminal` | Work panel PTY create/write/resize/dispose + data/exit events |
 | `browser` | Work panel embedded preview navigation/bounds/visibility + state events |
 | `fs` | Work panel workspace file listing/reading/reveal (read-only) |
+| `window` | Frameless window state and minimize/maximize/close controls |
+| `menu` | Allowlisted application-menu commands and native editing/window actions |
 | `notification` | Durable inbox list/read/clear and new/activated events |
 
 ## 3. Channel Conventions
@@ -456,6 +458,59 @@ without one.
 - `fs/reveal({path})` → reveal in Finder
 - Every path resolves inside the workspace root; traversal outside is
   rejected (`INVALID_ARGUMENT`).
+
+## 13b. Desktop Menu and Window APIs
+
+The preload exposes a synchronous, read-only `platform: NodeJS.Platform`
+value so the renderer chooses native macOS chrome or Windows/Linux frameless
+chrome before first paint.
+
+Main-to-renderer application commands use one allowlisted event:
+
+```ts
+type AppMenuCommand =
+  | "newTask" | "openProject" | "openSettings"
+  | "openCommandPalette" | "toggleSidebar"
+  | "openHelp" | "openLogs" | "checkForUpdates";
+
+event: menu/event/command { command: AppMenuCommand }
+
+menu/rendererReady() -> { ready: true }
+```
+
+The renderer subscribes to `menu/event/command` before invoking
+`menu/rendererReady`. Main waits for that acknowledgement when a native menu
+command creates or reloads a window, so startup timing cannot drop the first
+command.
+
+Renderer-owned Windows/Linux menus execute editing and window operations
+through `menu/nativeAction`. Its request is restricted to the exported
+`NATIVE_MENU_ACTIONS` tuple; unknown values fail rather than becoming a
+generic main-process command surface:
+
+```ts
+type NativeMenuAction =
+  | "undo" | "redo" | "cut" | "copy" | "paste" | "selectAll"
+  | "reload" | "zoomIn" | "zoomOut" | "resetZoom"
+  | "toggleFullScreen" | "minimize" | "toggleMaximize" | "close";
+
+menu/nativeAction({ action: NativeMenuAction })
+  -> { maximized: boolean; fullScreen: boolean }
+```
+
+`window/control` accepts the exported `WINDOW_CONTROL_ACTIONS` tuple:
+
+```ts
+type WindowControlAction =
+  | "getState" | "minimize" | "toggleMaximize" | "close";
+
+window/control({ action: WindowControlAction })
+  -> { maximized: boolean }
+```
+
+Maximize/unmaximize changes also emit
+`window/event/maximized`. Unknown actions fail. These Electron-only channels
+do not cross into host-core and do not change the host RPC protocol version.
 
 ## 14. Error Codes — Initial registry (extensible)
 

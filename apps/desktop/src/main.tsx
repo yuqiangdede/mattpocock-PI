@@ -8,6 +8,10 @@ import { initLanguageSync } from "./lib/app-language";
 import "./styles/globals.css";
 
 document.documentElement.dataset.theme = "dark";
+// Window-chrome layout differs per OS (traffic lights left on macOS,
+// controls overlay right on Windows/Linux); set before first paint.
+document.documentElement.dataset.platform =
+  window.piDesktop?.platform ?? "darwin";
 
 const locale = resolveLocale(navigator.language || (navigator as any).userLanguage);
 
