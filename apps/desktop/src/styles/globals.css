@@ -6059,7 +6059,7 @@ textarea:disabled {
   color: var(--ds-text-muted);
   font-size: var(--text-sm);
   font-weight: var(--font-weight-medium);
-  letter-spacing: 0.02em;
+  letter-spacing: var(--tracking-wide);
   user-select: none;
 }
 
