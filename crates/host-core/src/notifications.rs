@@ -186,10 +186,17 @@ mod tests {
         let (all, unread) = list(&db, false, 50).unwrap();
         assert_eq!(all.len(), 2);
         assert_eq!(unread, 2);
-        assert_eq!(all[0].session_title, "Build release");
-        assert_eq!(all[0].error_code.as_deref(), Some("MODEL_ERROR"));
+        let failed_notification = all
+            .iter()
+            .find(|notification| notification.kind == "task.failed")
+            .unwrap();
+        assert_eq!(failed_notification.session_title, "Build release");
+        assert_eq!(
+            failed_notification.error_code.as_deref(),
+            Some("MODEL_ERROR")
+        );
 
-        assert!(mark_read(&db, &all[0].id).unwrap());
+        assert!(mark_read(&db, &failed_notification.id).unwrap());
         assert!(!mark_read(&db, "missing").unwrap());
         let (unread_items, unread) = list(&db, true, 50).unwrap();
         assert_eq!(unread_items.len(), 1);
