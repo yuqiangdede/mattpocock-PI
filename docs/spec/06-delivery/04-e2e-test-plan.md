@@ -446,25 +446,28 @@ Each scenario is documented in this format:
 - **Milestone**: M3
 - **Status**: Draft
 
-#### E2E-042: Storage v1 migrates atomically to host-owned schema v2
+#### E2E-042: Pre-v7 storage archives via breaking reset; transcripts live in session files
 
-- **Preconditions**: A fixture data directory contains a valid v1
-  `pi.sqlite`, representative settings, project-bound and temporary sessions,
-  transcript messages, audit events, and a legacy scheduled-task JSON file.
-- **Steps**: 1) Start host-core against the fixture. 2) Query projects,
-  sessions, transcripts, settings, audit events, and scheduled tasks through
-  host RPC. 3) Stop and restart host-core. 4) Run the same queries again.
-- **Expected**: Host-core creates exactly one `pi.sqlite.v1.bak`, advances
-  `PRAGMA user_version` to 2, preserves recoverable data, imports scheduled
-  tasks without duplicate rows, exposes canonical project paths and transcript
-  blocks through RPC, and returns identical logical results after restart. No
-  Electron-owned persistence file remains authoritative.
+- **Preconditions**: A fixture data directory contains a `pi.sqlite` whose
+  `PRAGMA user_version` is between 1 and 6 (pre-D119 content-in-DB schema)
+  with representative rows.
+- **Steps**: 1) Start host-core against the fixture. 2) Create a session and
+  append messages through host RPC. 3) Stop and restart host-core. 4) Reload
+  the session through RPC and inspect the data directory.
+- **Expected**: Host-core renames the legacy file to exactly one
+  `pi.sqlite.v6.bak`, bootstraps a fresh schema-v7 database (index-only
+  `messages`), writes `sessions/<id>.jsonl` with a session-header line plus
+  one line per message, reloads the transcript from the file after restart
+  with identical logical results, and deleting the session removes both the
+  index rows and the session files. No Electron-owned persistence file is
+  authoritative.
 - **Specs linked**: `03-runtime/04-data-storage.md`,
   `03-runtime/06-host-rpc-protocol.md`, ADR 0014
-- **Acceptance**: F (persistence), H (migration failures are diagnosable)
+- **Acceptance**: F (persistence), H (reset failures are diagnosable)
 - **Milestone**: M2
-- **Status**: Unit-covered (`db::tests::migrates_v1_file_and_leaves_backup`,
-  `scheduled::tests::import_is_idempotent_and_preserves_fields`); full fixture
+- **Status**: Unit-covered (`db::tests::archives_pre_v7_database_and_starts_fresh`,
+  `sessions::tests::transcript_survives_reopen_from_file`,
+  `sessions::tests::delete_session_removes_transcript_files`); full fixture
   scenario Draft
 
 ### Plugin Load / Command / Disable

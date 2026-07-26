@@ -1,11 +1,12 @@
-# 04. Data Storage (Schema v6)
+# 04. Data Storage (Schema v7)
 
 ## 0. Ownership decision
 
-**Rust host-core owns SQLite exclusively (D002).**
+**Rust host-core owns SQLite exclusively (D002), and the transcript file
+store with it (D119).**
 
-- Node pi sidecar does not open the DB directly
-- Electron main does not write DB files directly
+- Node pi sidecar does not open the DB or transcript files directly
+- Electron main does not write DB or transcript files directly
 - All persistent app data — sessions, settings, providers, scheduled tasks,
   artifacts, notifications, audit — goes through host RPC. (v1 violation
   fixed: scheduled tasks previously lived in an Electron-owned
@@ -13,25 +14,29 @@
 
 ## 1. Goals
 
-Local-first, recoverable after restart, sensitive data isolated — plus, for v6:
+Local-first, recoverable after restart, sensitive data isolated — plus, for v7:
 
 1. **Lossless transcripts** — store the runtime message shape (content blocks),
    not the UI projection; UI shapes are derived at the RPC boundary.
-2. **High performance** — O(1) appends, covering indexes for every hot query,
-   integer times, single-writer WAL, no JSON scans on hot paths.
-3. **Minimal** — one database file, 14 ordinary tables plus one FTS virtual
-   table, no dead relations, every relation has a current or explicitly
-   spec'd consumer.
-4. **Extensible without migrations** where cheap (block vocabulary, kv
-   namespaces, `config_json` columns), **with migrations** where structural
-   (new entities), versioned by `PRAGMA user_version`.
+2. **SQLite is an index, not a payload store (D119)** — message content lives
+   in one JSONL file per session (codex/claude-code style): human-readable,
+   greppable, copyable, and the database stays small no matter how much is
+   chatted.
+3. **High performance** — O(1) file appends, covering indexes for every hot
+   query, integer times, single-writer WAL, no JSON scans on hot paths.
+4. **Extensible without migrations** where cheap (block vocabulary, JSONL line
+   types, kv namespaces, `config_json` columns), **with migrations** where
+   structural (new entities), versioned by `PRAGMA user_version`.
 
 ## 2. File layout
 
 ```text
 ~/.pi-desktop/
- ├── pi.sqlite            # THE database (WAL: + -wal/-shm) — host-core only
- ├── pi.sqlite.v1.bak     # one-shot backup created by the v1→v2 migration
+ ├── pi.sqlite            # index database (WAL: + -wal/-shm) — host-core only
+ ├── pi.sqlite.v6.bak     # archived pre-v7 database (D119 breaking reset)
+ ├── sessions/            # transcript file store (D119) — host-core only
+ │    ├── <sessionId>.jsonl           # live transcript (header + messages)
+ │    └── <sessionId>.revisions.jsonl # regenerate branches, append-only
  ├── secrets/             # encrypted secret blobs + .machine-key (unchanged)
  ├── attachments/         # content-addressed blobs (sha256 name), refs from messages
  ├── plugins/             # code + data + registry.json (unchanged, spec 07-11)
@@ -41,12 +46,50 @@ Local-first, recoverable after restart, sensitive data isolated — plus, for v6
                           # the session; startup sweep removes orphans/stale
 ```
 
-Supersedes the v1 sketch of split `settings.sqlite` / `sessions.sqlite`: a
-single file keeps cross-entity writes transactional (e.g. session + turn +
-artifact in one commit) and halves fsync/fd overhead. The DB stores **no large
-blobs**: attachments and tool outputs beyond the limits of
-[16-tool-result-limits](16-tool-result-limits.md) live on disk, referenced by
-path/hash.
+One database file keeps cross-entity writes transactional (e.g. session +
+turn + artifact in one commit). The DB stores **no large payloads**: message
+content lives in `sessions/`, attachments and tool outputs beyond the limits
+of [16-tool-result-limits](16-tool-result-limits.md) live on disk, referenced
+by path/hash.
+
+### 2.1 Transcript files (D119)
+
+`sessions/<sessionId>.jsonl` — first line is a session header, then one line
+per message; `seq` is implied by line order:
+
+```jsonl
+{"type":"session","schema":1,"sessionId":"0b0e…","createdAt":"2026-07-26T09:00:00.000Z"}
+{"type":"message","id":"m1","role":"user","createdAt":"…","blocks":[{"type":"text","text":"…"}]}
+{"type":"message","id":"m2","role":"tool","toolName":"Write","blocks":[{"type":"tool_call","callId":"c1","args":{},"result":{},"status":"success"}]}
+{"type":"message","id":"m3","role":"assistant","createdAt":"…","blocks":[{"type":"thinking","text":"…"},{"type":"text","text":"…"}],"meta":{"usage":{},"modelId":"…"}}
+```
+
+`sessions/<sessionId>.revisions.jsonl` — append-only, one line per archived
+regenerate branch; the *active* flag lives only in the DB index so switching
+revisions never rewrites this file:
+
+```jsonl
+{"type":"revision","rootUserId":"u1","revisionIndex":1,"createdAt":"…","messages":[…message records…]}
+```
+
+Rules:
+
+- `blocks` is the canonical block vocabulary (§4.7) — not the UiMessage
+  projection. `meta` is the parsed metadata object (usage / modelId /
+  providerId / status / error / revision fields).
+- Timestamps in files are RFC3339 wire spellings (readability); the DB index
+  keeps integer ms.
+- Readers skip unknown `type` lines and a torn trailing line: new line kinds
+  need no migration, and a crash mid-append cannot poison the file.
+- Writers append with flush + fsync (message durability ≈ WAL
+  `synchronous=NORMAL`); full rewrites (compaction, revision switch, import)
+  go through a sibling temp file + atomic rename.
+- Ordering: the file is written **before** the DB index transaction. A crash
+  between the two costs one derived index row — never content — and the next
+  full rewrite self-heals; transcript reads dedupe repeated message ids
+  keep-last.
+- Transcript files are user data: removed only when their session is deleted,
+  never by an age or orphan sweep (unlike `scratch/`).
 
 ## 3. Connection bootstrap
 
@@ -63,7 +106,7 @@ PRAGMA trusted_schema = ON;       -- required by the FTS triggers (§4.8); the D
 PRAGMA auto_vacuum = INCREMENTAL; -- set at creation, before any table
 ```
 
-- Schema version lives in `PRAGMA user_version` (v6 = `6`). The v1 `meta`
+- Schema version lives in `PRAGMA user_version` (v7 = `7`). The v1 `meta`
   table is gone.
 - host-core is the **single writer**; statements use `prepare_cached`; every
   multi-row write runs in one transaction.
@@ -292,10 +335,12 @@ Serves: mid-session model switches ("next turn only", spec 13 §4), the
 per-message cost chip's session rollup (benchmark §3.2), failed/aborted badges
 (§3.8), and retry lineage.
 
-### 4.7 messages — canonical transcript
+### 4.7 messages — transcript index
 
-One ordered stream per session. Tool calls are rows in the stream (as today),
-but content is the **canonical block array**, not a UI projection.
+The transcript itself is the per-session JSONL file (§2.1); this table is its
+derived index: one row per message carrying ordering, promoted filter columns,
+and the extracted plain text that feeds FTS. Tool calls are rows in the
+stream (as today) with `text = NULL`.
 
 ```sql
 CREATE TABLE messages (
@@ -308,14 +353,13 @@ CREATE TABLE messages (
   tool_name    TEXT,                            -- promoted for tool rows (filters, audit joins)
   is_error     INTEGER NOT NULL DEFAULT 0,
   text         TEXT,                            -- extracted plain text (search/preview); NULL for tool rows
-  content_json TEXT NOT NULL,                   -- block array, see below
-  meta_json    TEXT,                            -- usage / model / stopReason / durationMs
   created_at   INTEGER NOT NULL,
   UNIQUE (session_id, seq)
 );
 ```
 
-**Block vocabulary** (open set — new types need no migration):
+**Block vocabulary** (open set — new types need no migration; stored in the
+transcript file's `blocks` array):
 
 ```ts
 type Block =
@@ -329,17 +373,20 @@ type Block =
 ```
 
 - Tool results are stored **post-truncation** (16-tool-result-limits); full
-  raw output is not a DB concern.
-- Assistant thinking is stored only in `thinking` blocks. The derived `text`
-  column contains final answer text, so transcript search and answer previews
-  do not expose or mix reasoning.
-- `meta_json` on assistant rows carries per-response usage/model for the cost
-  chip; `turns` holds the summable rollup — no `json_each` at query time.
-- Ordering: `seq` is allocated O(1) inside the insert transaction via
-  `UPDATE sessions SET last_seq = last_seq + 1 … RETURNING last_seq`
-  (replaces v1's racy `MAX(sort_index)+1` scan). `UNIQUE(session_id, seq)`
-  doubles as the covering index for transcript load
-  (`WHERE session_id = ? ORDER BY seq`).
+  raw output is not a storage concern.
+- Assistant thinking is stored only in `thinking` blocks inside the file. The
+  derived `text` column contains final answer text, so transcript search and
+  answer previews do not expose or mix reasoning.
+- Per-response usage/model metadata rides in the file line's `meta` object;
+  `turns` holds the summable rollup — no `json_each` at query time.
+- Ordering: `seq` is allocated O(1) inside the index transaction via
+  `UPDATE sessions SET last_seq = last_seq + 1 … RETURNING last_seq`; the
+  file's line order is the same ordering. `UNIQUE(session_id, seq)` doubles
+  as the covering index for index scans; transcript *content* loads from the
+  file, not this table.
+- The index is derived state: losing a row (crash between file append and
+  index commit) degrades search for that message until the next full rewrite,
+  but never loses content.
 - `mid` (explicit INTEGER PRIMARY KEY) pins rowids across `VACUUM`, which the
   FTS external-content mapping depends on; `id` stays the wire-format uuid.
 
@@ -376,11 +423,13 @@ index too; this is why `trusted_schema = ON` is part of the bootstrap. DDL
 validated end-to-end (insert/update/delete/cascade + CJK trigram match) with
 `sqlite3` 3.43+.
 
-### 4.9 message_revisions — regenerate history
+### 4.9 message_revisions — regenerate history index
 
 Archives discarded regenerate branches so users can page previous variants
 without stacking them in the live transcript (D105/D109). One row is one
-linear branch rooted at a user turn.
+linear branch rooted at a user turn; the branch **payload** lives in the
+append-only `sessions/<id>.revisions.jsonl` (§2.1), keyed by
+`(rootUserId, revisionIndex)`.
 
 ```sql
 CREATE TABLE message_revisions (
@@ -389,7 +438,7 @@ CREATE TABLE message_revisions (
   root_user_id    TEXT NOT NULL,            -- wire id of the root user message
   revision_index  INTEGER NOT NULL,         -- 1-based per (session, root)
   is_active       INTEGER NOT NULL DEFAULT 0,
-  messages_json   TEXT NOT NULL,            -- UiMessage[] for this branch
+  message_count   INTEGER NOT NULL DEFAULT 0, -- pager label, no payload parse
   created_at      INTEGER NOT NULL,
   UNIQUE (session_id, root_user_id, revision_index)
 );
@@ -397,14 +446,16 @@ CREATE INDEX idx_message_revisions_root
   ON message_revisions(session_id, root_user_id, revision_index);
 ```
 
-- Live transcript remains the active branch only (`messages`).
-- Switching a pager entry replaces the active tail and flips `is_active`.
-- `messages_json` is opaque to SQL queries; host code owns encode/decode.
-- Cascade on `session_id` keeps history from outliving its session.
+- Live transcript remains the active branch only (transcript file + index).
+- Switching a pager entry reads the branch from the revisions file, rewrites
+  the live transcript file, rebuilds index rows, and flips `is_active` —
+  the revisions file itself is never rewritten.
+- Cascade on `session_id` clears index rows; file deletion rides on session
+  deletion.
 - `root_user_id` is the stable regenerate-family key. Live rewritten user
-  prompts may carry a new message `id`, but `meta_json.revisionRootId` keeps
+  prompts may carry a new message `id`, but `meta.revisionRootId` keeps
   pointing at the original family so later regenerates append to one set.
-- Root user `meta_json` also stores `revisionCount` / `activeRevision` for the
+- Root user `meta` also stores `revisionCount` / `activeRevision` for the
   transcript pager; those fields are presentation metadata, not a second source
   of truth for branch payloads.
 
@@ -561,27 +612,35 @@ CREATE INDEX idx_notifications_unread
 ## 5. Write paths (consistency)
 
 Persistence points follow [10-session-state-machine](10-session-state-machine.md) §4;
-streaming deltas never touch the DB.
+streaming deltas never touch storage. Message writes are two steps in a fixed
+order — **transcript file first, index transaction second** (§2.1): the file
+is the source of truth, the index is derived and self-healing.
 
-| event | transaction |
-|---|---|
-| prompt accepted | insert user message (seq via `last_seq` RETURNING) + insert `turns(running)` + touch `sessions.updated_at` |
-| assistant/tool message end | insert message row (+ meta) + touch session |
-| tool succeeded (Write/Edit) | upsert `artifacts` + `audit_log` row, same tx as result persistence |
-| turn terminal via `session.endTurn` | update `turns` status/usage/ended_at; for completed/error insert one notification and prune to 200 in the same tx; aborted inserts none |
-| compaction / edit (`session.replaceMessages`) | single tx: delete stream, bulk insert, reset `last_seq` |
-| import | one tx per session; `seq` = enumeration order; `source` set; projects upserted |
+| event | file step | index/DB transaction |
+|---|---|---|
+| prompt accepted | append user message line | `last_seq` alloc (RETURNING) + index row + touch `sessions.updated_at`; then insert `turns(running)` |
+| assistant/tool message end | append message line | index row + touch session |
+| tool succeeded (Write/Edit) | — | upsert `artifacts` + `audit_log` row, same tx as result persistence |
+| turn terminal via `session.endTurn` | — | update `turns`; for completed/error insert one notification and prune to 200 in the same tx; aborted inserts none |
+| compaction / edit (`session.replaceMessages`) | atomic transcript rewrite (temp + rename) | single tx: delete index rows, bulk reinsert, reset `last_seq` |
+| regenerate branch save | append revision line | index row with `message_count` (+ `is_active` flip) |
+| revision switch | read branch, atomic transcript rewrite | flip `is_active`, rebuild index rows, reset `last_seq` |
+| import | write transcript file | one tx per session: session row + index rows; on failure the file is removed |
+| session delete | remove both session files after row delete | `DELETE FROM sessions` (cascades) |
 
-Rules: user message durable before the turn starts; assistant/tool rows
-durable at their end events; a crash mid-turn loses at most the in-flight
-turn's tail and the boot sweep marks that turn `aborted`.
+Rules: user message durable (fsync'd file line) before the turn starts;
+assistant/tool lines durable at their end events; a crash mid-turn loses at
+most the in-flight turn's tail, and the boot sweep marks that turn `aborted`.
+A crash between file append and index commit leaves the message readable
+(transcript loads from the file) with only its search row missing until the
+next rewrite; transcript reads dedupe repeated ids keep-last.
 
 ## 6. Performance notes
 
 - Single writer + WAL: readers never block; no lock contention by design.
 - All timestamps INTEGER Unix ms — smaller rows, integer compares, index-friendly.
 - Hot queries and their indexes:
-  - transcript load → `UNIQUE(session_id, seq)` range scan
+  - transcript load → one sequential read of `sessions/<id>.jsonl` (no DB)
   - session list → `idx_sessions_updated`
   - group-by-project → `idx_sessions_project`
   - badges/cost rollup → `idx_turns_session` (latest turn per session)
@@ -596,42 +655,21 @@ turn's tail and the boot sweep marks that turn `aborted`.
 - JSON columns are read blind on hot paths (shipped to the renderer as-is);
   anything filtered or summed is a promoted column by rule.
 
-## 7. Migration
+## 7. Versioning & the v7 breaking reset
 
-- `PRAGMA user_version` + an ordered list of Rust migration fns; each runs in
-  one transaction; destructive steps copy `pi.sqlite` → `pi.sqlite.v<n>.bak`
-  first (wal-checkpointed).
-- **v1 → v2** (one-shot, detected by `user_version < 2` on a legacy file named
-  `settings.sqlite`):
-  1. checkpoint + backup copy
-  2. create v2 schema; carry data: providers (merge `headers_json` +
-     `compatibility_json` → `config_json`), `provider_models` → `models
-     (source='user')`, sessions (RFC3339 → ms; `project_path` → upserted
-     `projects.id`; `source` derived from `import-<src>-` id prefix),
-     messages (v1 columns → block array + extracted `text`; `sort_index` →
-     `seq`; set `last_seq`), secrets_meta (+`owner_kind='provider'`),
-     audit_log (ts → ms), workspace row → `projects` + `kv currentProjectId`,
-     settings `app` → `kv(app, settings)`
-  3. drop v1 tables, `user_version = 2`, `VACUUM` (activates
-     `auto_vacuum=INCREMENTAL`), rename file to `pi.sqlite`
-  4. Electron side: once host exposes `scheduled.*`, main imports
-     `scheduled-tasks.json` via RPC and renames it `.imported.bak`
-- **v2 → v3** (additive, one transaction): add
-  `sessions.thinking_level TEXT NOT NULL DEFAULT 'off'` with the canonical
-  seven-value check constraint, then set `user_version = 3`. Existing
-  transcripts and session bindings are unchanged.
-- **v3 → v4** (additive, one transaction): create `message_revisions` plus
-  `idx_message_revisions_root`, then set `user_version = 4`. Existing
-  transcripts are unchanged; regenerate history starts empty.
-- **v4 → v5** (additive, one transaction): add `sessions.permission_mode
-  TEXT NOT NULL DEFAULT 'inherit'` with the four-value check constraint
-  (D115), then set `user_version = 5`. Existing sessions inherit the global
-  default, matching prior behavior (`ask`).
-- **v5 → v6** (additive, one transaction): create `notifications`,
-  `idx_notifications_created`, and `idx_notifications_unread`, then set
-  `user_version = 6`. Existing notification history starts empty; sessions,
-  turns, and transcripts are unchanged.
-- Fresh installs run the full v6 DDL directly.
+- `PRAGMA user_version` stays the schema authority; future structural changes
+  add ordered Rust migration fns again, each in one transaction, with a
+  `pi.sqlite.v<n>.bak` copy before destructive steps.
+- **v7 is a breaking reset (D119), not a migration.** Opening a database with
+  `user_version` 1–6 WAL-checkpoints it, renames it to `pi.sqlite.v6.bak`
+  (removing stale `-wal`/`-shm` siblings), and bootstraps a fresh v7 file.
+  Sessions, providers, and settings from the old file are not carried over;
+  the archive remains for manual recovery. All pre-v7 migration code
+  (v1 `settings.sqlite` import, v2→v6 chain) is deleted.
+- Fresh installs run the full v7 DDL directly.
+- The transcript file format carries its own `schema` field in the session
+  header line; unknown line types are skipped, so additive file-format growth
+  needs no reset.
 
 ## 8. Retention & maintenance
 
@@ -641,24 +679,29 @@ turn's tail and the boot sweep marks that turn `aborted`.
 - notifications: enforce the newest-200 global cap after every insert and at
   boot as a defensive repair; rows otherwise survive restart until cleared,
   pruned, or cascade-deleted with their session.
+- transcript files: user data, never pruned or swept — removed only with
+  their session (delete or scheduled-run cleanup). Orphan files (session row
+  gone, file present) are preserved, not garbage-collected: the file is the
+  source of truth and a future re-index can recover it.
 - logs rotate at the file layer (D082); sessions are never auto-deleted.
 - Attachment GC (later): sweep `attachments/` for hashes unreferenced by any
-  `content_json`.
+  transcript file.
 
 ## 9. Extensibility playbook
 
 | need | mechanism | migration? |
 |---|---|---|
-| new message content kind (citations, diffs, voice) | new block `type` in `content_json` | no |
-| new per-response metadata | `meta_json` key | no |
+| new message content kind (citations, diffs, voice) | new block `type` in the transcript file | no |
+| new per-response metadata | `meta` key in the message line | no |
+| new transcript line kind | new JSONL `type` (readers skip unknown) | no |
 | new config domain (MCP servers, memories) | `kv` namespace | no |
 | new provider/task knob | `config_json` key | no |
 | new model capability | value in `capabilities_json` | no |
 | new queryable/filterable field | promoted column | yes (additive) |
 | new entity with relations (knowledge base, connectors) | new table | yes |
 
-Rule of thumb: JSON for payloads the host merely stores and ships; columns for
-anything the host filters, joins, sums, or indexes.
+Rule of thumb: files/JSON for payloads the host merely stores and ships;
+columns for anything the host filters, joins, sums, or indexes.
 
 ## 10. Secrets rules (unchanged)
 
@@ -670,34 +713,36 @@ anything the host filters, joins, sums, or indexes.
 ## 11. Acceptance
 
 1. Sessions and transcripts survive restart byte-identically (blocks, usage,
-   tool results) — no UI-projection loss
-2. Transcript load for a 5k-message session is a single index range scan
+   tool results) — content reloads from `sessions/<id>.jsonl` with no
+   UI-projection loss
+2. Transcript load for a 5k-message session is one sequential file read; no
+   message-content SQL on the hot path
 3. Kill -9 during a running turn: boot marks the turn `aborted`, transcript
-   intact up to the last completed message
-4. v1 file migrates losslessly with a `.bak` left behind; re-running is a no-op
-5. Scheduled tasks CRUD + run history round-trip through host RPC only
-6. FTS finds CJK and ASCII substrings across sessions; deleting a session
-   removes its index entries
-7. Plugin uninstall clears `kv(plugin:<id>)` in one statement
-8. Resetting sidebar preferences changes no `projects`, `sessions`, or
-   transcript row; retained paths and organization choices survive a normal
+   intact up to the last fsync'd message line; a torn trailing line is
+   skipped on read
+4. Kill -9 between file append and index commit: the message still renders
+   after restart; search misses it only until the next transcript rewrite
+5. Opening a pre-v7 database archives it as `pi.sqlite.v6.bak` and starts a
+   fresh v7 file; reopening the fresh file is a plain open
+6. Scheduled tasks CRUD + run history round-trip through host RPC only
+7. FTS finds CJK and ASCII substrings across sessions; deleting a session
+   removes its index entries and both session files
+8. Plugin uninstall clears `kv(plugin:<id>)` in one statement
+9. Resetting sidebar preferences changes no `projects`, `sessions`, or
+   transcript data; retained paths and organization choices survive a normal
    renderer restart when preferences are available
-9. A tool call for session A resolves A's persisted project root even after
-   the visible workspace switches to project B
-10. A session's thinking level survives restart; a v2 database opens at v3
-    with every existing session set to `off`
-11. Assistant thinking blocks round-trip independently from final answer text;
+10. A tool call for session A resolves A's persisted project root even after
+    the visible workspace switches to project B
+11. A session's thinking level survives restart
+12. Assistant thinking blocks round-trip independently from final answer text;
     the derived search text excludes thinking content
-12. Regenerated assistant variants survive restart under `message_revisions`;
-    the live root user turn reloads with `revisionCount` / `activeRevision` and
-    the pager can restore any archived branch
-13. A v3 database opens at v4 with an empty `message_revisions` table and no
-    transcript loss
-14. A v5 database opens at v6 with an empty notification inbox and no session,
-    turn, or transcript loss
-15. Completed and failed turns atomically create one durable notification;
+13. Regenerated assistant variants survive restart in
+    `sessions/<id>.revisions.jsonl`; the live root user turn reloads with
+    `revisionCount` / `activeRevision`, the pager can restore any archived
+    branch, and switching branches never rewrites the revisions file
+14. Completed and failed turns atomically create one durable notification;
     repeated terminal updates do not duplicate it, aborted turns create none,
     and the newest-200 cap survives restart
-16. Notification list/unread, mark-read, mark-all-read, clear, and session
+15. Notification list/unread, mark-read, mark-all-read, clear, and session
     cascade deletion use the documented indexes/transactions without changing
     turn or transcript data

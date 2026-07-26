@@ -143,8 +143,8 @@ Rules:
   `thinkingLevel` preserves the current value; invalid modes or levels return
   `INVALID_PARAMS`
 - `session.appendMessage`
-- `session.replaceMessages` — single-transaction transcript rewrite used by
-  regenerate/edit flows
+- `session.replaceMessages` — atomic transcript rewrite (temp-file rename +
+  one index transaction, D119) used by regenerate/edit flows
 - `session.saveRevision` — archive a regenerate branch under
   `(sessionId, rootUserId)`
 - `session.listRevisions` — list linear variants for a root user family

@@ -47,6 +47,9 @@ accept_prompt
 
 ## 4. Persistence points
 
+Message persistence is two-step per 04-data-storage §5 (D119): fsync'd
+transcript-file line first, index transaction second.
+
 - user message: on accept
 - turn run row: on start + terminal `session.endTurn` update
 - notification row: same transaction as an unseen completed/error terminal
