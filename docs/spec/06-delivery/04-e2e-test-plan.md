@@ -1072,15 +1072,17 @@ Each scenario is documented in this format:
 - **Preconditions**: Two durable sessions exist; a deterministic provider can
   complete one turn, fail one turn with a stable error code, and abort one
   turn; notification inbox starts empty.
-- **Steps**: 1) Complete a turn in session A. 2) Fail a turn in session B. 3)
-  Abort a third turn. 4) Repeat the terminal RPC for each turn id. 5) Open the
-  bell and switch between All and Unread. 6) Mark one row read, close/reopen
-  the popover, and restart the app. 7) Select the other row. 8) Generate a host
-  fixture with 205 terminal turns. 9) Use Mark all read, then Clear.
-- **Expected**: Exactly two rows exist, newest first: localized completed and
-  failed labels with snapshotted session titles, and the failure's stable
-  code;
-  abort/repeated terminal calls create no row. Badge and Unread show the exact
+- **Steps**: 1) Focus and view session A, then complete a turn in A. 2) While
+  still focused on A, fail a turn in background session B. 3) Unfocus the
+  window and complete another turn in A. 4) Abort a fourth turn. 5) Repeat each
+  terminal RPC. 6) Open the bell and switch between All and Unread. 7) Mark one
+  row read, close/reopen the popover, and restart the app. 8) Select the other
+  row. 9) Generate a host fixture with 205 eligible terminal turns. 10) Use
+  Mark all read, then Clear.
+- **Expected**: A's visible-current completion creates no row. Exactly two rows
+  exist, newest first: the unfocused A completion and background B failure,
+  with localized labels, snapshotted session titles, and B's stable code.
+  Abort/repeated terminal calls create no row. Badge and Unread show the exact
   unread count without opening implicitly reading rows. Read state and both
   records survive restart. Row selection marks it read and activates its bound
   project/session. The fixture retains exactly the newest 200 rows. Mark all
@@ -1097,17 +1099,19 @@ Each scenario is documented in this format:
 
 - **Preconditions**: Native notifications are supported; sessions A and B
   exist; the main window can be focused, unfocused, hidden, and minimized.
-- **Steps**: 1) Keep the app focused and complete a turn in A. 2) Unfocus the
-  app and complete a turn in B. 3) Click B's native notification. 4) Minimize
-  the app, fail another turn, and click its native notification. 5) Unfocus the
-  app and abort a turn. 6) Repeat with native delivery suppressed by the OS.
-- **Expected**: Every completed/failed turn still enters the durable inbox.
-  Focused completion shows no duplicate native banner. Unfocused completion
-  and failure each show one localized native notification. Clicking restores,
-  shows, and focuses the main window before activating the matching session;
-  no event opens the wrong currently selected session. Abort shows neither an
-  inbox row nor a native banner. OS suppression does not lose the durable row
-  or surface a misleading app error.
+- **Steps**: 1) Keep the app focused on A and complete a turn in A. 2) While
+  still focused on A, complete a turn in B. 3) Unfocus the app while A remains
+  current and complete another turn in A. 4) Click A's native notification. 5)
+  Minimize the app, fail another turn, and click its native notification. 6)
+  Unfocus the app and abort a turn. 7) Repeat with native delivery suppressed
+  by the OS.
+- **Expected**: Focused-current A creates neither inbox row nor native banner.
+  Focused-background B creates an inbox row without a native banner. Unfocused
+  current A and the minimized failure each create one durable row and one
+  localized native notification. Clicking restores, shows, and focuses the
+  main window before activating the matching session; no event opens the wrong
+  currently selected session. Abort shows neither surface. OS suppression does
+  not lose the durable row or surface a misleading app error.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
   `04-ux/09-interaction-patterns.md`, `08-meta/decisions-log.md` (D117)
 - **Acceptance**: C (turn completion), Quality
@@ -1637,9 +1641,10 @@ This test plan spec is accepted when:
 
 
 ### US-UI-65 Durable notification inbox (D117)
-- Populate the inbox with unread/read completed and failed task rows, including
-  one long session title, then inspect the titlebar and popover in light/dark
-  themes at default and narrow supported widths.
+- Verify a focused-current completion leaves the inbox unchanged, then
+  populate it through background/unfocused completed and failed task rows,
+  including one long session title. Inspect the titlebar and popover in
+  light/dark themes at default and narrow supported widths.
 - Expect a stable 32px bell control, non-overlapping `1`–`99` / `99+` badge,
   dense 360px-or-narrower list, localized kind/session/time/error content, and
   distinct text/icon/unread-dot semantics without nested cards or clipped text.

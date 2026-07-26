@@ -99,5 +99,6 @@ notification.list
 2. healthcheck RPC succeeds
 3. at least one tool path executes through Rust
 4. permission deny path works
-5. completed/failed turns create exactly one durable notification through the
-   `session.endTurn` transaction; aborted turns create none
+5. unseen completed/failed turns create exactly one durable notification
+   through the `session.endTurn` transaction; results already visible in the
+   focused current chat and aborted turns create none

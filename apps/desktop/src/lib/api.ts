@@ -102,6 +102,10 @@ export const api = {
     title: string;
     body: string;
   }) => invoke<{ shown: boolean }>(IPC.invoke.notificationShowNative, input),
+  setNotificationViewingSession: (sessionId: string | null) =>
+    invoke<{ ok: boolean }>(IPC.invoke.notificationSetViewingSession, {
+      sessionId,
+    }),
   listSessions: () =>
     invoke<{ sessions: SessionSummary[] }>(IPC.invoke.sessionList),
   createSession: (input?: Partial<SessionSummary>) =>

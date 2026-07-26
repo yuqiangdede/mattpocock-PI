@@ -1221,8 +1221,9 @@ Modern model-configuration surface for adding OpenAI-compatible providers, revie
 ### 20.1 Purpose
 
 Expose the bounded, host-owned history of task completion and failure events
-without turning transient toasts into history. The inbox is local-only and
-durable across app restarts.
+the user did not already see in the focused current chat, without turning
+transient toasts into history. The inbox is local-only and durable across app
+restarts.
 
 ### 20.2 Anatomy
 
@@ -1275,13 +1276,14 @@ Titlebar                                               Popover (360px max)
   popover also refreshes the bounded list from host-core. A
   `notification.activated` event from Electron follows the same session
   activation path as a row click.
-- Completion/failure always enters the durable inbox. Electron shows an
-  additional native system notification only while the app window is
-  unfocused. Clicking it restores/shows and focuses the main window before
+- Completion/failure enters the durable inbox unless the main window is
+  visible/focused and the exact finishing session is the current chat. A
+  focused background session still enters the inbox without a native banner;
+  an unfocused current session enters the inbox and receives a native banner.
+  Clicking the banner restores/shows and focuses the main window before
   emitting `notification.activated` for the matching session.
-- A focused window never receives the duplicate native surface. Aborted turns,
-  permission requests, scheduled reminders, and plugin notifications do not
-  enter this inbox.
+- Aborted turns, permission requests, scheduled reminders, and plugin
+  notifications do not enter this inbox.
 
 ### 20.5 Accessibility
 
@@ -1302,7 +1304,8 @@ Titlebar                                               Popover (360px max)
 ### 20.6 Constraints
 
 - The list contains only `task.completed` and `task.failed` records produced
-  from terminal agent turns. `aborted` is intentionally silent.
+  from unseen terminal agent turns. Visible-current results and `aborted` turns
+  are intentionally silent.
 - At most 200 newest rows are retained globally. There is no pagination,
   scheduled notification source, permission-notification source, preferences
   page, notification permission prompt, or cloud sync.
@@ -1332,4 +1335,4 @@ Titlebar                                               Popover (360px max)
 16. ProviderStudio shows hero summary + add dialog + provider cards; secrets never render raw; test/default/delete remain keyboard reachable
 17. NotificationInbox exposes All/Unread views, exact unread badge semantics,
     row activation, mark-all-read and clear actions; it is keyboard-operable
-    and never treats an aborted turn as a notification
+    and never treats a visible-current or aborted turn as a notification

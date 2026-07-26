@@ -252,6 +252,8 @@ async function importLegacyScheduled() {
 const activeTurns = new Map<string, string>();
 /** sessionId → scheduled task_run id awaiting completion. */
 const scheduledRunsBySession = new Map<string, string>();
+/** Session currently rendered on the chat page; focus remains Main-owned. */
+let notificationViewingSessionId: string | null = null;
 /** Preserve tool metadata until the result is persisted at tool_end. */
 const activeToolCalls = new Map<
   string,
@@ -260,6 +262,16 @@ const activeToolCalls = new Map<
 
 function activeToolCallKey(sessionId: string, toolCallId: string) {
   return `${sessionId}:${toolCallId}`;
+}
+
+function shouldCreateTaskNotification(sessionId: string) {
+  const userIsViewingResult =
+    mainWindow !== null &&
+    !mainWindow.isDestroyed() &&
+    mainWindow.isVisible() &&
+    mainWindow.isFocused() &&
+    notificationViewingSessionId === sessionId;
+  return !userIsViewingResult;
 }
 
 async function withGitBranch<T extends { path?: string; name?: string } | null | undefined>(
@@ -317,6 +329,7 @@ function writeWindowState(state: WindowState) {
 }
 
 async function createWindow() {
+  notificationViewingSessionId = null;
   const savedState = await readWindowState();
   mainWindow = new BrowserWindow({
     ...(savedState ?? { width: 1200, height: 800 }),
@@ -338,6 +351,12 @@ async function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url);
     return { action: "deny" };
+  });
+  mainWindow.webContents.on("did-start-loading", () => {
+    notificationViewingSessionId = null;
+  });
+  mainWindow.webContents.on("render-process-gone", () => {
+    notificationViewingSessionId = null;
   });
 
   browserPane.setWindow(mainWindow);
@@ -1117,11 +1136,13 @@ function finishTurn(
   const turnId = activeTurns.get(sessionId);
   activeTurns.delete(sessionId);
   if (host && turnId) {
+    const createNotification = shouldCreateTaskNotification(sessionId);
     void host
       .call<{ ok: boolean; notification?: AppNotification }>("session.endTurn", {
         turnId,
         status,
         errorCode,
+        createNotification,
       })
       .then((result) => {
         if (result.notification) {
@@ -1455,6 +1476,16 @@ function registerIpc() {
     if (!host) throw new Error("host unavailable");
     return host.call("notification.clear");
   });
+
+  handle(
+    IPC.invoke.notificationSetViewingSession,
+    async (input: { sessionId?: unknown } = {}) => {
+      const sessionId =
+        typeof input.sessionId === "string" ? input.sessionId.trim() : "";
+      notificationViewingSessionId = sessionId || null;
+      return { ok: true };
+    },
+  );
 
   handle(IPC.invoke.notificationShowNative, async (input: {
     id?: string;

@@ -152,8 +152,9 @@ Rules:
   and stamp root pager metadata
 - `session.beginTurn`
 - `session.endTurn` — atomically moves a running turn to its terminal state and
-  returns the newly created notification for `completed`/`error`; returns no
-  notification for `aborted` or an already-terminal turn
+  conditionally returns the newly created notification for `completed`/`error`;
+  returns no notification when `createNotification=false`, for `aborted`, or
+  for an already-terminal turn
 - `session.import` — atomically imports one converted session; a non-empty
   project path is normalized and upserted into `projects` before the session
   references it; returns `{ imported, skipped }`
@@ -217,6 +218,7 @@ type SessionEndTurnParams = {
   status: "completed" | "error" | "aborted";
   errorCode?: string;
   usage?: unknown;
+  createNotification?: boolean; // default true; Electron supplies visibility decision
 };
 
 type SessionEndTurnResult = {
@@ -243,6 +245,10 @@ type NotificationListResult = {
 - No `notification.created` JSON-RPC server notification is emitted. Electron
   receives the inserted record directly from `session.endTurn`, avoiding a
   second ordering channel between terminal turn persistence and UI refresh.
+- `createNotification=false` suppresses only inbox insertion; the running turn
+  still reaches its requested terminal state in the same transaction. Missing
+  or non-boolean values default to true so unknown/stale UI state cannot lose a
+  notification.
 - `sessionTitle` is the stable session-name snapshot stored with the row.
   Localized event title/body prose is derived by Electron/renderer and never
   crosses host RPC.
@@ -364,6 +370,7 @@ Timeout behavior (**D005**): after 120s unresolved → deny.
 5. switching the selected workspace from A to B does not change the tool root
    of a call issued by session A
 6. Protocol v4 `session.endTurn` creates/returns exactly one notification for
-   completed/failed turns and none for aborted/repeated terminal updates
+   unseen completed/failed turns and none for visible-current, aborted, or
+   repeated terminal updates
 7. Notification list/unread/read-all/clear round-trip through host-core and
    remain bounded to the newest 200 durable rows

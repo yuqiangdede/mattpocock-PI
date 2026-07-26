@@ -172,14 +172,14 @@ mod tests {
                 .unwrap();
         let completed = sessions::begin_turn(&db, &session.id, None, None).unwrap();
         let completed_result =
-            sessions::end_turn(&db, &completed, "completed", None, None).unwrap();
+            sessions::end_turn(&db, &completed, "completed", None, None, true).unwrap();
         assert_eq!(
             completed_result.notification.unwrap().kind,
             "task.completed"
         );
         let failed = sessions::begin_turn(&db, &session.id, None, None).unwrap();
         let failed_result =
-            sessions::end_turn(&db, &failed, "error", Some("MODEL_ERROR"), None).unwrap();
+            sessions::end_turn(&db, &failed, "error", Some("MODEL_ERROR"), None, true).unwrap();
         assert_eq!(failed_result.notification.unwrap().kind, "task.failed");
         assert!(sessions::rename_session(&db, &session.id, "Renamed session").unwrap());
 
@@ -212,7 +212,7 @@ mod tests {
 
         for _ in 0..201 {
             let turn = sessions::begin_turn(&db, &session.id, None, None).unwrap();
-            let result = sessions::end_turn(&db, &turn, "completed", None, None).unwrap();
+            let result = sessions::end_turn(&db, &turn, "completed", None, None, true).unwrap();
             assert!(result.notification.is_some());
         }
 

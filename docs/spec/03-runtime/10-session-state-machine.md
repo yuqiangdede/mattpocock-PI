@@ -40,16 +40,17 @@ accept_prompt
 7. A tool transition retains the originating session's persisted project root;
    it never adopts the newly active project's root
 8. `session.endTurn` moves only a `running` turn to terminal. In that same
-   transaction, `completed` inserts `task.completed`, `error` inserts
-   `task.failed`, and `aborted` inserts no notification (D117). Repeated
-   terminal calls are no-ops.
+   transaction, unseen `completed` inserts `task.completed`, unseen `error`
+   inserts `task.failed`, and a result already visible in the focused current
+   chat or any `aborted` turn inserts no notification (D117). Repeated terminal
+   calls are no-ops.
 
 ## 4. Persistence points
 
 - user message: on accept
 - turn run row: on start + terminal `session.endTurn` update
-- notification row: same transaction as a completed/error terminal update;
-  never for abort
+- notification row: same transaction as an unseen completed/error terminal
+  update; never for a visible-current result or abort
 - assistant/tool messages: on message_end/tool_end
 - mode/project fields: on change
 
@@ -60,5 +61,5 @@ accept_prompt
 3. waiting_permission is visible in UI status
 4. sessions in two retained project tabs may run independently without
    transcript-event or workspace-root crossover
-5. each completed/failed turn produces exactly one notification record while
-   an aborted turn produces none
+5. each unseen completed/failed turn produces exactly one notification record
+   while a visible-current result or aborted turn produces none

@@ -1013,6 +1013,7 @@ pub fn end_turn(
     status: &str,
     error_code: Option<&str>,
     usage: Option<&Value>,
+    create_notification: bool,
 ) -> Result<EndTurnResult> {
     let status = match status {
         "completed" | "aborted" | "error" => status,
@@ -1042,7 +1043,7 @@ pub fn end_turn(
             usage.map(|u| u.to_string()),
             turn_id,
         ])?;
-    let notification = if n > 0 {
+    let notification = if n > 0 && create_notification {
         notifications::insert_for_terminal_turn(&tx, turn_id, status, error_code)?
     } else {
         None
@@ -1571,12 +1572,13 @@ mod tests {
             "completed",
             None,
             Some(&json!({ "inputTokens": 10, "outputTokens": 20 })),
+            true,
         )
         .unwrap();
         assert!(ended.updated);
         assert_eq!(ended.notification.unwrap().kind, "task.completed");
         // Ending twice is a no-op.
-        let duplicate = end_turn(&db, &turn, "completed", None, None).unwrap();
+        let duplicate = end_turn(&db, &turn, "completed", None, None, true).unwrap();
         assert!(!duplicate.updated);
         assert!(duplicate.notification.is_none());
         let (status, input, output): (String, i64, i64) = db
@@ -1597,7 +1599,7 @@ mod tests {
         let session = create_session(&db, None, None, None, None, None).unwrap();
         let turn = begin_turn(&db, &session.id, None, None).unwrap();
 
-        let ended = end_turn(&db, &turn, "aborted", None, None).unwrap();
+        let ended = end_turn(&db, &turn, "aborted", None, None, true).unwrap();
 
         assert!(ended.updated);
         assert!(ended.notification.is_none());
@@ -1605,6 +1607,32 @@ mod tests {
             .conn()
             .query_row("SELECT COUNT(*) FROM notifications", [], |row| row.get(0))
             .unwrap();
+        assert_eq!(notification_count, 0);
+    }
+
+    #[test]
+    fn visible_turn_does_not_create_notification() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, None, None).unwrap();
+
+        let ended = end_turn(&db, &turn, "completed", None, None, false).unwrap();
+
+        assert!(ended.updated);
+        assert!(ended.notification.is_none());
+        let (status, notification_count): (String, i64) = db
+            .conn()
+            .query_row(
+                "SELECT t.status, COUNT(n.id)
+                 FROM turns t
+                 LEFT JOIN notifications n ON n.turn_id = t.id
+                 WHERE t.id = ?1
+                 GROUP BY t.status",
+                params![turn],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(status, "completed");
         assert_eq!(notification_count, 0);
     }
 

@@ -13,6 +13,7 @@ export const IPC = {
     notificationMarkAllRead: "pi-desktop/notification/markAllRead",
     notificationClear: "pi-desktop/notification/clear",
     notificationShowNative: "pi-desktop/notification/showNative",
+    notificationSetViewingSession: "pi-desktop/notification/setViewingSession",
     agentPrompt: "pi-desktop/agent/prompt",
     agentAbort: "pi-desktop/agent/abort",
     agentGetStatus: "pi-desktop/agent/getStatus",

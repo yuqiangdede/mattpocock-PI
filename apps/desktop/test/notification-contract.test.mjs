@@ -21,12 +21,14 @@ test("notification IPC stays behind the shared preload allowlist", () => {
     "notificationMarkAllRead",
     "notificationClear",
     "notificationShowNative",
+    "notificationSetViewingSession",
     "notificationChanged",
     "notificationActivated",
   ]) {
     assert.match(protocolSource, new RegExp(`${channel}:`), channel);
   }
   assert.match(apiSource, /listNotifications:/);
+  assert.match(apiSource, /setNotificationViewingSession:/);
   assert.match(apiSource, /onNotificationChanged:/);
   assert.match(apiSource, /onNotificationActivated:/);
 });
@@ -39,6 +41,17 @@ test("terminal notifications flow from host completion to the renderer", () => {
   assert.match(storeSource, /unreadNotificationCount/);
   assert.match(appSource, /api\.onNotificationChanged/);
   assert.match(appSource, /<NotificationCenter \/>/);
+});
+
+test("the visible chat session suppresses durable task notifications", () => {
+  assert.match(mainSource, /notificationViewingSessionId === sessionId/);
+  assert.match(mainSource, /mainWindow\.isVisible\(\)/);
+  assert.match(mainSource, /mainWindow\.isFocused\(\)/);
+  assert.match(mainSource, /createNotification,/);
+  assert.match(mainSource, /"did-start-loading"[\s\S]*notificationViewingSessionId = null/);
+  assert.match(mainSource, /"render-process-gone"[\s\S]*notificationViewingSessionId = null/);
+  assert.match(appSource, /page === "chat" \? activeSessionId \?\? null : null/);
+  assert.match(appSource, /setNotificationViewingSession\(viewingSessionId\)/);
 });
 
 test("native notifications only show for an unfocused window and navigate back", () => {

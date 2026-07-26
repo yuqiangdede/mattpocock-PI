@@ -176,7 +176,11 @@ to the singular host RPC domain without renderer access to SQLite:
 - `pi-desktop/notification/markAllRead()`
 - `pi-desktop/notification/clear()`
 
-The renderer also invokes
+The renderer invokes
+`pi-desktop/notification/setViewingSession({ sessionId })` whenever the chat
+page's active session changes; `sessionId: null` clears the viewing context on
+non-chat pages. Electron combines this hint with Main-owned window
+visibility/focus at the terminal event boundary. It also invokes
 `pi-desktop/notification/showNative({ id, sessionId, title, body })` after
 localizing a new record. This Electron-only request never crosses into the host
 RPC domain.
@@ -212,8 +216,9 @@ Main sends two events:
 
 - `pi-desktop/notification/event/changed` after `session.endTurn` returns a
   newly inserted record. Renderer merges the record into its bounded local list
-  and recalculates the exact unread count; repeated/aborted terminal updates
-  emit nothing.
+  and recalculates the exact unread count. A terminal result already visible in
+  the focused current chat, repeated terminal updates, and aborted turns emit
+  nothing.
 - `pi-desktop/notification/event/activated` after the user clicks Electron's
   native system notification. Renderer follows its existing session-selection
   path, including project activation for a project-bound session.
@@ -226,6 +231,12 @@ restores/shows and focuses the window before emitting `activated`. There is no
 native notification while focused and no permission, scheduled-reminder, or
 plugin source in this contract. Native delivery is best-effort; the durable
 inbox remains authoritative when the OS suppresses a banner.
+
+The viewing-session hint is advisory and fail-safe: missing, stale, hidden, or
+unfocused renderer state creates the durable notification. Suppression occurs
+only when the main window is visible and focused and the reported chat session
+matches the finishing session. Window creation, renderer reload, and renderer
+process loss clear the hint before any later terminal event is evaluated.
 
 ## 7. Session API
 
@@ -364,6 +375,9 @@ type ToolPermissionResolution = {
 - Protocol v4 adds notification records, channels, and the
   notification-bearing `session.endTurn` result. A v3 peer is rejected rather
   than silently losing durable completion/failure events.
+- The optional viewing-session invoke and `createNotification` end-turn field
+  are additive v4 behavior. Older callers omit the field and retain the
+  fail-safe default of creating notifications.
 
 ## 12. Plugin API (host UI side)
 

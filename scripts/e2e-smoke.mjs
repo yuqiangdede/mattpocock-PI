@@ -172,6 +172,24 @@ async function main() {
         notificationList.unreadCount === 1,
       notification?.id,
     );
+    const visibleTurn = await host.call("session.beginTurn", {
+      sessionId: session.session.id,
+      providerId: created.provider.id,
+      modelId: MODEL,
+    });
+    const visibleEnded = await host.call("session.endTurn", {
+      turnId: visibleTurn.turnId,
+      status: "completed",
+      createNotification: false,
+    });
+    const afterVisible = await host.call("notification.list", { limit: 20 });
+    record(
+      "E2E-064-visible-notification-suppressed",
+      visibleEnded.ok === true &&
+        visibleEnded.notification === undefined &&
+        afterVisible.notifications?.length === 1 &&
+        afterVisible.unreadCount === 1,
+    );
     await host.call("notification.markRead", { id: notification?.id });
     const readList = await host.call("notification.list", { unreadOnly: true });
     record(

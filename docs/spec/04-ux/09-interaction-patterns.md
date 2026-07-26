@@ -132,17 +132,21 @@ the visible shell context.
 
 #### Event-to-surface flow
 
-1. A turn reaches `completed` or `error`; the `session.endTurn` host
-   transaction returns the newly inserted durable notification. An `aborted`
-   turn returns no notification.
-2. Electron emits `notification.changed` to every live renderer so the bell
+1. Renderer reports the current chat's session id to Electron Main; navigating
+   away clears it. Main combines this hint with its own window visibility and
+   focus state when a turn reaches `completed` or `error`.
+2. If the exact finishing session is already visible in the focused window,
+   `session.endTurn` closes the turn without inserting a notification. Any
+   background session or unfocused/hidden window creates the durable record.
+   An `aborted` turn never creates one.
+3. Electron emits `notification.changed` to every live renderer so the bell
    badge and currently open inbox refresh.
-3. If the main window is focused, no other surface appears. If it is
+4. If the main window is focused, no other surface appears. If it is
    unfocused and native notifications are supported, Electron shows one
    platform notification derived from the event kind and session title.
-4. Clicking the native notification shows/restores and focuses the main
+5. Clicking the native notification shows/restores and focuses the main
    window, then emits `notification.activated { sessionId }`.
-5. Renderer activation selects the bound project when present, loads the
+6. Renderer activation selects the bound project when present, loads the
    session, and focuses the transcript/composer using the same path as an inbox
    row click. Native and in-app activation must not diverge.
 

@@ -506,9 +506,9 @@ CREATE INDEX idx_audit_session ON audit_log(session_id, ts)
 
 ### 4.14 notifications — durable local inbox (D117)
 
-One row records one terminal agent-turn outcome. It stores structured source
-data only; renderer and Electron derive localized title/body strings at the
-presentation boundary.
+One row records one terminal agent-turn outcome that was not already visible in
+the focused current chat. It stores structured source data only; renderer and
+Electron derive localized title/body strings at the presentation boundary.
 
 ```sql
 CREATE TABLE notifications (
@@ -528,8 +528,10 @@ CREATE INDEX idx_notifications_unread
   ON notifications(created_at DESC) WHERE read_at IS NULL;
 ```
 
-- `session.endTurn` updates the turn and, in the **same transaction**, inserts
-  `task.completed` for `completed` or `task.failed` for `error`. `aborted`
+- `session.endTurn` always updates the turn and, when `createNotification` is
+  true, inserts `task.completed` for `completed` or `task.failed` for `error`
+  in the **same transaction**. Electron passes false only when the main window
+  is visible/focused and that exact session is the current chat. `aborted`
   never inserts a row.
 - Repeating a terminal update cannot duplicate a notification because
   `turn_id` is unique. The RPC result includes the record only when this call

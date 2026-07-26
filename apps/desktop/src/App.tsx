@@ -66,6 +66,7 @@ function AppShell() {
   const bootstrap = useAppStore((s) => s.bootstrap);
   const ready = useAppStore((s) => s.ready);
   const page = useAppStore((s) => s.page);
+  const activeSessionId = useAppStore((s) => s.activeSessionId);
   const messages = useAppStore((s) => s.messages);
   const error = useAppStore((s) => s.error);
   const errorCode = useAppStore((s) => s.errorCode);
@@ -107,6 +108,13 @@ function AppShell() {
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, [settings?.theme]);
+
+  useEffect(() => {
+    const viewingSessionId = page === "chat" ? activeSessionId ?? null : null;
+    void api
+      .setNotificationViewingSession(viewingSessionId)
+      .catch(() => undefined);
+  }, [activeSessionId, page]);
 
   useEffect(() => {
     void bootstrap();

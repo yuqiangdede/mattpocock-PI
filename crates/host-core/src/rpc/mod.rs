@@ -803,6 +803,10 @@ async fn handle_request(
                 status,
                 params.get("errorCode").and_then(|v| v.as_str()),
                 params.get("usage"),
+                params
+                    .get("createNotification")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true),
             )
             .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             let mut response = json!({ "ok": result.updated });
@@ -1547,9 +1551,24 @@ mod tests {
         )
         .unwrap();
         let turn = sessions::begin_turn(&app_state.db, &session.id, None, None).unwrap();
-        sessions::end_turn(&app_state.db, &turn, "completed", None, None).unwrap();
+        sessions::end_turn(&app_state.db, &turn, "completed", None, None, true).unwrap();
+        let visible_turn = sessions::begin_turn(&app_state.db, &session.id, None, None).unwrap();
         let state = Arc::new(Mutex::new(app_state));
         let (tx, _rx) = mpsc::unbounded_channel();
+
+        let ended_visible = handle_request(
+            state.clone(),
+            "session.endTurn",
+            json!({
+                "turnId": visible_turn,
+                "status": "completed",
+                "createNotification": false
+            }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(ended_visible, json!({ "ok": true }));
 
         let listed = handle_request(
             state.clone(),
