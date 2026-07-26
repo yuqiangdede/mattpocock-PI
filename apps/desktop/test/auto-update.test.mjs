@@ -125,6 +125,9 @@ test("packaging publishes an electron-updater feed for GitHub Releases", () => {
     assert.match(pkg.scripts[script], /--publish never/, script);
   }
   assert.equal(pkg.build.linux.executableName, "pi-desktop");
+  // Scoped package name is not a valid deb package/file name.
+  assert.equal(pkg.build.deb.packageName, "pi-desktop");
+  assert.ok(!pkg.build.deb.artifactName.includes("${name}"), "deb artifactName");
   assert.match(releaseWorkflowSource, /release\/\*\.zip/);
   assert.match(releaseWorkflowSource, /latest-mac\.yml/);
 });

@@ -139,6 +139,10 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     },
+    "deb": {
+      "packageName": "pi-desktop",
+      "artifactName": "pi-desktop_${version}_${arch}.${ext}"
+    },
     "linux": {
       "executableName": "pi-desktop",
       "target": [
