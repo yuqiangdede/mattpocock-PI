@@ -74,9 +74,10 @@ sidecar/host shutdown sequence runs before the updater replaces the app.
 - Electron via electron-vite
 - Rust via `cargo run` binary path
 - Node via system Node (`>= 22.19`)
-- `desktop` `predev` rebuilds `packages/agent-runtime/dist` before host-core
-  and Electron startup; Electron must never spawn a stale ignored sidecar
-  artifact from an earlier source revision
+- `desktop` `predev` rebuilds every workspace dependency in topological order
+  (`shared`, `i18n`, `plugin-sdk`, and `agent-runtime`) before host-core and
+  Electron startup; Electron must never compile against or load stale ignored
+  package artifacts from an earlier source revision
 
 ### Release
 - package Electron app

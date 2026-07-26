@@ -11,7 +11,7 @@
   "main": "./out/main/index.js",
   "type": "module",
   "scripts": {
-    "predev": "pnpm -C ../../packages/agent-runtime build && cargo build --manifest-path ../../Cargo.toml -p host-core",
+    "predev": "pnpm --filter '@pi-desktop/desktop^...' build && cargo build --manifest-path ../../Cargo.toml -p host-core",
     "dev": "node ../../scripts/dev-electron.mjs",
     "build": "electron-vite build",
     "preview": "electron-vite preview",

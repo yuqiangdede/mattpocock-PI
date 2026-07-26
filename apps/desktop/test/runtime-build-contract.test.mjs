@@ -4,19 +4,19 @@ import test from "node:test";
 
 const desktopPackageUrl = new URL("../package.json", import.meta.url);
 
-test("desktop dev builds the agent runtime before Electron starts", async () => {
+test("desktop dev builds all workspace dependencies before Electron starts", async () => {
   const pkg = JSON.parse(await readFile(desktopPackageUrl, "utf8"));
   const predev = pkg.scripts?.predev ?? "";
-  const runtimeBuild = "pnpm -C ../../packages/agent-runtime build";
+  const dependencyBuild = "pnpm --filter '@pi-desktop/desktop^...' build";
   const hostBuild = "cargo build --manifest-path ../../Cargo.toml -p host-core";
 
   assert.ok(
-    predev.includes(runtimeBuild),
-    "predev must rebuild the sidecar artifact consumed by Electron",
+    predev.includes(dependencyBuild),
+    "predev must rebuild every workspace dependency consumed by Electron",
   );
   assert.ok(predev.includes(hostBuild), "predev must continue building host-core");
   assert.ok(
-    predev.indexOf(runtimeBuild) < predev.indexOf(hostBuild),
-    "the sidecar build must complete before the desktop boot sequence continues",
+    predev.indexOf(dependencyBuild) < predev.indexOf(hostBuild),
+    "workspace dependency builds must complete before the desktop boot sequence continues",
   );
 });

@@ -93,13 +93,20 @@ Each scenario is documented in this format:
 
 #### E2E-001: App launches and shows main window
 
-- **Preconditions**: macOS arm64; no prior `~/.pi-desktop` profile.
-- **Steps**: 1) Launch PI-Desktop. 2) Observe main window appears.
-- **Expected**: Window renders in English; no crash; version info visible.
+- **Preconditions**: macOS arm64; no prior `~/.pi-desktop` profile. For the
+  development lane, workspace package build outputs are absent or older than
+  their TypeScript sources.
+- **Steps**: 1) Launch PI-Desktop. In the development lane, use `pnpm dev`.
+  2) Observe main window appears.
+- **Expected**: Development launch rebuilds all workspace dependencies before
+  host-core and Electron startup. Window renders in English with the current
+  locale catalog; no compile error, missing-menu runtime error, or crash;
+  version info visible.
 - **Specs linked**: `03-runtime/07-process-model.md`, `04-ux/01-ui-ia.md`
 - **Acceptance**: A (app startup)
 - **Milestone**: M1
-- **Status**: Draft
+- **Status**: Partially automated (`runtime-build-contract.test.mjs` covers the
+  dependency build contract; Electron window launch remains Draft)
 
 #### E2E-002: IPC bridge is functional
 
