@@ -51,17 +51,12 @@ test("project title toggles its conversation group without forcing it open", () 
   assert.doesNotMatch(sidebarSource, /className="project-collapse-toggle"/);
 });
 
-test("expanded sidebar search filters sessions without opening a second surface", () => {
+test("expanded sidebar search opens the global search surface", () => {
   const searchButtonBlock = sidebarSource.match(
-    /aria-controls="sidebar-session-search"[\s\S]*?<\/button>/,
+    /aria-label=\{t\("nav\.search"\)\}[\s\S]*?<\/button>/,
   )?.[0] ?? "";
-  assert.match(searchButtonBlock, /toggleSearch/);
-  assert.doesNotMatch(searchButtonBlock, /onOpenPalette/);
-  assert.match(sidebarSource, /id="sidebar-session-search"/);
-  assert.match(
-    sidebarSource,
-    /const toggleSearch[\s\S]*?if \(searchOpen\) setQuery\(""\)/,
-  );
+  assert.match(searchButtonBlock, /onOpenSearch/);
+  assert.doesNotMatch(sidebarSource, /sidebar-session-search|toggleSearch/);
 });
 
 test("manual ordering stays a persistence-only compatibility value", () => {
