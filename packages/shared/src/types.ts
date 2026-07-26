@@ -52,6 +52,12 @@ export type UiMessage = {
   revisionCount?: number;
   /** 1-based active variant index for this user root turn. */
   activeRevision?: number;
+  /**
+   * Typed slash invocation ("/name args") when this user message was
+   * produced by a prompt-template command; `content` holds the expanded
+   * text the model sees (D123). Transcript renders this as a chip.
+   */
+  command?: string;
   toolName?: string;
   toolCallId?: string;
   toolStatus?: "running" | "success" | "error" | "denied";
@@ -311,6 +317,22 @@ export type CommandItem = {
   pluginId?: string;
 };
 
+/** One entry of the composer "/" menu, merged from three sources (D123). */
+export type ComposerCommand = {
+  /** Slash name typed after "/"; unique across the merged list. */
+  name: string;
+  kind: "template" | "builtin" | "plugin";
+  /** Display title (templates use their name). */
+  title: string;
+  description?: string;
+  /** Template frontmatter `argument-hint`, shown as ghost text. */
+  argumentHint?: string;
+  /** Template provenance; project templates override user-global ones. */
+  source?: "project" | "user";
+  /** Palette command id for builtin/plugin execution. */
+  id?: string;
+};
+
 export type AppVersionInfo = {
   name: string;
   version: string;
@@ -477,4 +499,16 @@ export type FsReadResult = {
   /** Base64 data URL when kind is "image". */
   dataUrl?: string;
   size: number;
+};
+
+/** Workspace-relative entry of the `fs/index` snapshot for the "@" menu (D124). */
+export type FsIndexEntry = {
+  path: string;
+  kind: "dir" | "file";
+};
+
+export type FsIndexResult = {
+  entries: FsIndexEntry[];
+  /** True when the index hit its entry cap and results were dropped. */
+  truncated: boolean;
 };
