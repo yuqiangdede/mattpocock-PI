@@ -2,12 +2,58 @@ export const PROTOCOL_VERSION = 4 as const;
 export const APP_NAME = "PI-Desktop";
 export const APP_VERSION = "0.1.0";
 
+export const APP_MENU_COMMANDS = [
+  "newTask",
+  "openProject",
+  "openSettings",
+  "openCommandPalette",
+  "toggleSidebar",
+  "openHelp",
+  "openLogs",
+  "checkForUpdates",
+] as const;
+
+export type AppMenuCommand = (typeof APP_MENU_COMMANDS)[number];
+
+export const NATIVE_MENU_ACTIONS = [
+  "undo",
+  "redo",
+  "cut",
+  "copy",
+  "paste",
+  "selectAll",
+  "reload",
+  "zoomIn",
+  "zoomOut",
+  "resetZoom",
+  "toggleFullScreen",
+  "minimize",
+  "toggleMaximize",
+  "close",
+] as const;
+
+export type NativeMenuAction = (typeof NATIVE_MENU_ACTIONS)[number];
+
+export const WINDOW_CONTROL_ACTIONS = [
+  "getState",
+  "minimize",
+  "toggleMaximize",
+  "close",
+] as const;
+
+export type WindowControlAction = (typeof WINDOW_CONTROL_ACTIONS)[number];
+
 export const IPC = {
   invoke: {
     appGetVersion: "pi-desktop/app/getVersion",
     appHealth: "pi-desktop/app/health",
     appGetOnboarding: "pi-desktop/app/getOnboarding",
     appDismissOnboarding: "pi-desktop/app/dismissOnboarding",
+    updatesGetState: "pi-desktop/updates/getState",
+    updatesCheck: "pi-desktop/updates/check",
+    updatesDownload: "pi-desktop/updates/download",
+    updatesInstall: "pi-desktop/updates/install",
+    updatesOpenReleases: "pi-desktop/updates/openReleases",
     notificationList: "pi-desktop/notification/list",
     notificationMarkRead: "pi-desktop/notification/markRead",
     notificationMarkAllRead: "pi-desktop/notification/markAllRead",
@@ -77,6 +123,9 @@ export const IPC = {
     fsRead: "pi-desktop/fs/read",
     fsReveal: "pi-desktop/fs/reveal",
     windowResizeBy: "pi-desktop/window/resizeBy",
+    windowControl: "pi-desktop/window/control",
+    menuRendererReady: "pi-desktop/menu/rendererReady",
+    nativeMenuAction: "pi-desktop/menu/nativeAction",
   },
   event: {
     agentMessage: "pi-desktop/agent/event/message",
@@ -86,8 +135,11 @@ export const IPC = {
     terminalExit: "pi-desktop/terminal/event/exit",
     browserState: "pi-desktop/browser/event/state",
     browserPreview: "pi-desktop/browser/event/preview",
+    windowMaximized: "pi-desktop/window/event/maximized",
+    menuCommand: "pi-desktop/menu/event/command",
     notificationChanged: "pi-desktop/notification/event/changed",
     notificationActivated: "pi-desktop/notification/event/activated",
+    updatesState: "pi-desktop/updates/event/state",
   },
 } as const;
 

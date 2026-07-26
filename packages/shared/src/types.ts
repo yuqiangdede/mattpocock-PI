@@ -338,6 +338,38 @@ export type HostStatusEvent = {
   message?: string;
 };
 
+/**
+ * How app updates are delivered on this install:
+ *  - in-app: electron-updater downloads and installs (Windows NSIS, Linux AppImage)
+ *  - manual: we only detect new versions and link to the releases page
+ *    (unsigned macOS builds, Linux deb)
+ *  - disabled: development / unpackaged build
+ */
+export type UpdateMode = "in-app" | "manual" | "disabled";
+
+export type UpdateStatus =
+  | "idle"
+  | "checking"
+  | "available"
+  | "up-to-date"
+  | "downloading"
+  | "downloaded"
+  | "error";
+
+/** Snapshot pushed on the `updatesState` event and returned by updates IPC. */
+export type UpdateState = {
+  mode: UpdateMode;
+  status: UpdateStatus;
+  currentVersion: string;
+  availableVersion?: string;
+  /** 0-100 while status is "downloading". */
+  progressPercent?: number;
+  error?: string;
+  /** True when the transition came from a user-initiated check. */
+  manual?: boolean;
+  releasesUrl: string;
+};
+
 export type OnboardingState = {
   showChecklist: boolean;
   steps: Array<{

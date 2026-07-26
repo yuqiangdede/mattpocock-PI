@@ -102,6 +102,11 @@ GitHub Actions:
   for macOS (dmg, arm64), Windows (NSIS, x64), and Linux (AppImage + deb,
   x64). Tag builds publish only the D010 macOS artifact; Windows/Linux remain
   downloadable Actions artifacts for shell-readiness testing.
+- **Auto-update** — packaged builds poll the latest GitHub Release
+  (electron-updater; feed = `latest*.yml` attached by the Release workflow).
+  Windows NSIS / Linux AppImage install in-app; unsigned macOS builds notify
+  and link to the releases page (in-app once signing lands). Requires the
+  repository to be public (or a reachable update feed).
 
 Cut a release:
 

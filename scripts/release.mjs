@@ -44,10 +44,12 @@ for (const group of ["apps", "packages"]) {
   }
 }
 
-// Cargo workspace version ([workspace.package] in root Cargo.toml) + lockfile entry.
+// Cargo workspace version ([workspace.package] in root Cargo.toml), lockfile
+// entry, and the APP_VERSION constant surfaced in the About panel.
 for (const [relPath, pattern] of [
   ["Cargo.toml", /(\[workspace\.package\][\s\S]*?\bversion = ")[^"]+(")/],
   ["Cargo.lock", /(name = "host-core"\nversion = ")[^"]+(")/],
+  ["packages/shared/src/protocol.ts", /(export const APP_VERSION = ")[^"]+(")/],
 ]) {
   const file = path.join(root, relPath);
   const source = readFileSync(file, "utf8");

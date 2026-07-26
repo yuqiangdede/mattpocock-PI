@@ -30,6 +30,7 @@
     "@pi-desktop/shared": "workspace:*",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
+    "electron-updater": "^6.8.9",
     "i18next": "^25.3.2",
     "katex": "^0.16.47",
     "lucide-react": "^1.26.0",
@@ -63,6 +64,13 @@
     "directories": {
       "output": "release"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "vastsa",
+        "repo": "PI-Desktop"
+      }
+    ],
     "files": [
       "out/**/*",
       "package.json"
@@ -80,6 +88,12 @@
       "target": [
         {
           "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
           "arch": [
             "arm64"
           ]
