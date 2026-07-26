@@ -10,8 +10,10 @@ import {
   createProvider,
   Type,
   type Api,
+  type AssistantMessage,
   type Model,
   type ProviderStreams,
+  type ToolResultMessage,
   type Usage,
 } from "@earendil-works/pi-ai";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
@@ -201,6 +203,77 @@ function assistantContent(content: unknown): AssistantContent {
   return { text, thinking, hasText, hasThinking };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function safeJson(value: unknown): string {
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
+}
+
+/** Rebuild a pi-ai tool result from a persisted tool row. Rows that never
+ * finished (app quit / abort mid-tool) restore as errored results so the
+ * model knows the call produced nothing. */
+function toolResultFromUi(
+  m: UiMessage,
+  timestamp: number,
+): ToolResultMessage {
+  const raw = m.toolResult as
+    | { content?: unknown; details?: unknown }
+    | string
+    | null
+    | undefined;
+  const blocks: ToolResultMessage["content"] = [];
+  const rawBlocks =
+    isRecord(raw) && Array.isArray(raw.content) ? raw.content : undefined;
+  if (rawBlocks) {
+    for (const b of rawBlocks) {
+      if (!isRecord(b)) continue;
+      if (b.type === "text" && typeof b.text === "string") {
+        blocks.push({ type: "text", text: b.text });
+      } else if (
+        b.type === "image" &&
+        typeof b.data === "string" &&
+        typeof b.mimeType === "string"
+      ) {
+        blocks.push({ type: "image", data: b.data, mimeType: b.mimeType });
+      }
+    }
+  } else if (typeof raw === "string" && raw.trim()) {
+    blocks.push({ type: "text", text: raw });
+  } else if (raw !== undefined && raw !== null) {
+    blocks.push({ type: "text", text: safeJson(raw) });
+  }
+  const interrupted = m.toolStatus === "running";
+  if (blocks.length === 0) {
+    blocks.push({
+      type: "text",
+      text: interrupted
+        ? "[tool call was interrupted before a result was recorded]"
+        : "[no tool result recorded]",
+    });
+  }
+  return {
+    role: "toolResult",
+    toolCallId: m.toolCallId ?? "",
+    toolName: m.toolName ?? "",
+    content: blocks,
+    ...(isRecord(raw) && raw.details !== undefined
+      ? { details: raw.details }
+      : {}),
+    isError:
+      interrupted ||
+      m.toolStatus === "error" ||
+      m.toolStatus === "denied" ||
+      m.isError === true,
+    timestamp,
+  };
+}
+
 export class DesktopAgentRuntime {
   private agent: Agent;
   private turnId?: string;
@@ -253,6 +326,12 @@ export class DesktopAgentRuntime {
       streamFn: (m, context, options) =>
         models.streamSimple(m, context, {
           ...options,
+          // Transient provider failures (request timeouts, dropped
+          // connections, 429/5xx) retry with interruptible backoff instead
+          // of failing the turn. A failed turn pushes the user into
+          // regenerate, which forks the transcript and reseeds the agent —
+          // far more expensive than a retry.
+          maxRetries: 2,
           ...(temperature !== undefined ? { temperature } : {}),
         }),
       getApiKey: async () => runtimeApiKey,
@@ -339,9 +418,13 @@ export class DesktopAgentRuntime {
     );
   }
 
-  /* Rebuild pi-ai messages from the persisted transcript. Tool rows are
-   * transcript-only (call/result pairs can't be reconstructed reliably), so
-   * only user/assistant text is restored. */
+  /* Rebuild pi-ai messages from the persisted transcript, including tool
+   * call/result pairs — tool rows persist toolCallId/toolName/toolArgs and
+   * the result, which is everything the model context needs. Losing them
+   * (the pre-D120 behavior) collapsed a reseeded session to bare chat text:
+   * the model forgot every file it had read and, seeing its own history
+   * "answer" without visible tool use, stopped calling tools altogether.
+   * Failed assistant turns stay transcript-only. */
   private historyToAgentMessages(history: UiMessage[]): AgentMessage[] {
     const zeroUsage: Usage = {
       input: 0,
@@ -351,37 +434,77 @@ export class DesktopAgentRuntime {
       totalTokens: 0,
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
     };
+    const api = apiBindingForStyle(this.provider.apiStyle).api;
     const messages: AgentMessage[] = [];
+    // Tool rows attach their calls to the assistant message that made them
+    // (the nearest one above), keeping each call adjacent to its result as
+    // the provider APIs require.
+    let toolCarrier: AssistantMessage | undefined;
     for (const m of history) {
       const timestamp = Date.parse(m.createdAt) || Date.now();
       if (m.role === "user") {
+        toolCarrier = undefined;
         if (!(m.content || "").trim()) continue;
         messages.push({ role: "user", content: m.content, timestamp });
       } else if (m.role === "assistant") {
+        toolCarrier = undefined;
         // Failed provider responses belong in the transcript for diagnosis,
         // but must never become model context on the next turn.
         if (m.status === "error" || m.isError || m.error) continue;
-        const content = [];
+        const content: AssistantMessage["content"] = [];
         if (m.thinking?.trim()) {
           content.push({ type: "thinking" as const, thinking: m.thinking });
         }
         if (m.content?.trim()) {
           content.push({ type: "text" as const, text: m.content });
         }
-        if (content.length === 0) continue;
-        messages.push({
+        // Kept even when empty: a call-only turn has no text of its own and
+        // becomes the carrier for the tool rows that follow. Assistants that
+        // end up with no content and no calls are dropped at the end.
+        const assistant: AssistantMessage = {
           role: "assistant",
           content,
-          api: apiBindingForStyle(this.provider.apiStyle).api,
+          api,
           provider: this.provider.id,
           model: this.provider.modelId,
           usage: zeroUsage,
           stopReason: "stop",
           timestamp,
+        };
+        messages.push(assistant);
+        toolCarrier = assistant;
+      } else if (m.role === "tool") {
+        if (!m.toolCallId || !m.toolName) continue;
+        if (!toolCarrier) {
+          // Tool row whose assistant row was lost (truncated branch):
+          // synthesize a carrier so the call/result pair stays well-formed.
+          toolCarrier = {
+            role: "assistant",
+            content: [],
+            api,
+            provider: this.provider.id,
+            model: this.provider.modelId,
+            usage: zeroUsage,
+            stopReason: "toolUse",
+            timestamp,
+          };
+          messages.push(toolCarrier);
+        }
+        toolCarrier.content.push({
+          type: "toolCall",
+          id: m.toolCallId,
+          name: m.toolName,
+          arguments: isRecord(m.toolArgs)
+            ? (m.toolArgs as Record<string, unknown>)
+            : {},
         });
+        toolCarrier.stopReason = "toolUse";
+        messages.push(toolResultFromUi(m, timestamp));
       }
     }
-    return messages;
+    return messages.filter(
+      (message) => message.role !== "assistant" || message.content.length > 0,
+    );
   }
 
   private buildModel(): Model<Api> {

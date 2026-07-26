@@ -112,6 +112,206 @@ describe("DesktopAgentRuntime thinking configuration", () => {
   });
 });
 
+describe("DesktopAgentRuntime tool history restore (D120)", () => {
+  const toolRow = (overrides: Partial<UiMessage> = {}): UiMessage => ({
+    id: "tool-1",
+    role: "tool",
+    content: "",
+    createdAt: new Date().toISOString(),
+    status: "complete",
+    toolName: "Grep",
+    toolCallId: "call-1",
+    toolStatus: "success",
+    toolArgs: { pattern: "renderFormContent" },
+    toolResult: {
+      content: [{ type: "text", text: "index.html:2924 match" }],
+      details: { count: 1 },
+    },
+    ...overrides,
+  });
+
+  it("restores tool call/result pairs adjacent to their assistant turn", async () => {
+    const runtime = createRuntime({
+      history: [
+        {
+          id: "user-1",
+          role: "user",
+          content: "optimize the form",
+          createdAt: new Date().toISOString(),
+          status: "complete",
+        },
+        {
+          id: "assistant-1",
+          role: "assistant",
+          content: "Let me find the render code.",
+          createdAt: new Date().toISOString(),
+          status: "complete",
+        },
+        toolRow(),
+        {
+          id: "assistant-2",
+          role: "assistant",
+          content: "Found it.",
+          createdAt: new Date().toISOString(),
+          status: "complete",
+        },
+      ],
+    });
+    const messages = (runtime as any).agent.state.messages;
+
+    expect(messages.map((m: any) => m.role)).toEqual([
+      "user",
+      "assistant",
+      "toolResult",
+      "assistant",
+    ]);
+    expect(messages[1].stopReason).toBe("toolUse");
+    expect(messages[1].content).toEqual([
+      { type: "text", text: "Let me find the render code." },
+      {
+        type: "toolCall",
+        id: "call-1",
+        name: "Grep",
+        arguments: { pattern: "renderFormContent" },
+      },
+    ]);
+    expect(messages[2]).toMatchObject({
+      role: "toolResult",
+      toolCallId: "call-1",
+      toolName: "Grep",
+      content: [{ type: "text", text: "index.html:2924 match" }],
+      details: { count: 1 },
+      isError: false,
+    });
+    expect(messages[3].stopReason).toBe("stop");
+
+    await runtime.dispose();
+  });
+
+  it("keeps call-only assistant turns as carriers and drops truly empty ones", async () => {
+    const runtime = createRuntime({
+      history: [
+        {
+          id: "assistant-empty-with-tools",
+          role: "assistant",
+          content: "",
+          createdAt: new Date().toISOString(),
+          status: "complete",
+        },
+        toolRow({ id: "tool-a", toolCallId: "call-a" }),
+        toolRow({ id: "tool-b", toolCallId: "call-b" }),
+        {
+          id: "assistant-empty",
+          role: "assistant",
+          content: "",
+          createdAt: new Date().toISOString(),
+          status: "complete",
+        },
+      ],
+    });
+    const messages = (runtime as any).agent.state.messages;
+
+    expect(messages.map((m: any) => m.role)).toEqual([
+      "assistant",
+      "toolResult",
+      "toolResult",
+    ]);
+    expect(messages[0].content.map((b: any) => b.id)).toEqual([
+      "call-a",
+      "call-b",
+    ]);
+
+    await runtime.dispose();
+  });
+
+  it("synthesizes a carrier for tool rows whose assistant row was lost", async () => {
+    const runtime = createRuntime({
+      history: [
+        {
+          id: "user-1",
+          role: "user",
+          content: "hello",
+          createdAt: new Date().toISOString(),
+          status: "complete",
+        },
+        toolRow(),
+      ],
+    });
+    const messages = (runtime as any).agent.state.messages;
+
+    expect(messages.map((m: any) => m.role)).toEqual([
+      "user",
+      "assistant",
+      "toolResult",
+    ]);
+    expect(messages[1].content).toEqual([
+      {
+        type: "toolCall",
+        id: "call-1",
+        name: "Grep",
+        arguments: { pattern: "renderFormContent" },
+      },
+    ]);
+    expect(messages[1].stopReason).toBe("toolUse");
+
+    await runtime.dispose();
+  });
+
+  it("restores interrupted tool rows as errored results", async () => {
+    const runtime = createRuntime({
+      history: [
+        {
+          id: "assistant-1",
+          role: "assistant",
+          content: "Running it now.",
+          createdAt: new Date().toISOString(),
+          status: "complete",
+        },
+        toolRow({
+          toolStatus: "running",
+          toolResult: undefined,
+        }),
+      ],
+    });
+    const messages = (runtime as any).agent.state.messages;
+
+    expect(messages[1]).toMatchObject({
+      role: "toolResult",
+      isError: true,
+      content: [
+        {
+          type: "text",
+          text: "[tool call was interrupted before a result was recorded]",
+        },
+      ],
+    });
+
+    await runtime.dispose();
+  });
+
+  it("skips tool rows without a call id and keeps plain restores unchanged", async () => {
+    const runtime = createRuntime({
+      history: [
+        {
+          id: "assistant-1",
+          role: "assistant",
+          content: "answer",
+          createdAt: new Date().toISOString(),
+          status: "complete",
+        },
+        toolRow({ toolCallId: undefined }),
+      ],
+    });
+    const messages = (runtime as any).agent.state.messages;
+
+    expect(messages.map((m: any) => m.role)).toEqual(["assistant"]);
+    expect(messages[0].content).toEqual([{ type: "text", text: "answer" }]);
+    expect(messages[0].stopReason).toBe("stop");
+
+    await runtime.dispose();
+  });
+});
+
 describe("DesktopAgentRuntime assistant thinking events", () => {
   it("normalizes thinking blocks and emits independent thinking deltas", async () => {
     const onEvent = vi.fn();
