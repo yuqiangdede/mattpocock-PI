@@ -39,6 +39,9 @@ import {
   clampThinkingLevel,
   resolveModelWireCompat,
   resolveThinkingCapabilities,
+  expandSlashInvocation,
+  loadComposerTemplates,
+  type ComposerTemplate,
   type ThinkingCapabilities,
 } from "@pi-desktop/agent-runtime";
 import { HostProcess } from "./host-process";
@@ -50,6 +53,8 @@ import { PtyManager } from "./terminal";
 import { BrowserPane, resolveLocalFile } from "./browser-view";
 import { discoverProviderModels } from "./model-discovery";
 import { listDir, readWorkspaceFile, resolveWithinRoot } from "./fs-panel";
+import { getWorkspaceFileIndex } from "./fs-index";
+import { builtinComposerCommands, builtinPaletteItems } from "./builtin-commands";
 import {
   convertSession,
   scanAllSources,
@@ -2476,6 +2481,81 @@ function registerIpc() {
     return { ok: true };
   });
 
+  // Composer input APIs (D123/D124, ADR 0024). Both fail soft: the menus
+  // simply have less to show when the workspace or host is unavailable.
+  const optionalWorkspaceRoot = async (): Promise<string | null> => {
+    try {
+      return await requireWorkspaceRoot();
+    } catch {
+      return null;
+    }
+  };
+
+  let composerTemplateCache: {
+    key: string;
+    at: number;
+    templates: ComposerTemplate[];
+  } | null = null;
+  const loadComposerTemplatesCached = async (
+    root: string | null,
+  ): Promise<ComposerTemplate[]> => {
+    const key = root ?? "";
+    const now = Date.now();
+    if (
+      composerTemplateCache &&
+      composerTemplateCache.key === key &&
+      now - composerTemplateCache.at < 5000
+    ) {
+      return composerTemplateCache.templates;
+    }
+    const { templates, diagnostics } = await loadComposerTemplates(root);
+    for (const diagnostic of diagnostics) {
+      logger.app("warn", "composer template diagnostic", { data: diagnostic });
+    }
+    composerTemplateCache = { key, at: now, templates };
+    return templates;
+  };
+
+  handle(IPC.invoke.fsIndex, async () => {
+    const root = await optionalWorkspaceRoot();
+    if (!root) return { entries: [], truncated: false };
+    return getWorkspaceFileIndex(root);
+  });
+
+  handle(IPC.invoke.composerCommands, async () => {
+    const root = await optionalWorkspaceRoot();
+    const templates = await loadComposerTemplatesCached(root).catch(() => []);
+    const templateCommands = templates.map((template) => ({
+      name: template.name,
+      kind: "template" as const,
+      title: template.name,
+      ...(template.description ? { description: template.description } : {}),
+      ...(template.argumentHint ? { argumentHint: template.argumentHint } : {}),
+      source: template.source,
+    }));
+    const pluginCommands = plugins.getCommands().map((command) => ({
+      name: command.id,
+      kind: "plugin" as const,
+      title: command.title,
+      ...(command.category ? { description: command.category } : {}),
+      id: command.id,
+    }));
+    // One namespace: builtin aliases win, then project templates, then user
+    // templates, then plugin commands (spec 04 §7).
+    const merged = new Map<
+      string,
+      ReturnType<typeof builtinComposerCommands>[number]
+    >();
+    for (const command of [
+      ...builtinComposerCommands(),
+      ...templateCommands,
+      ...pluginCommands,
+    ]) {
+      if (!merged.has(command.name)) merged.set(command.name, command);
+    }
+    return { commands: [...merged.values()] };
+  });
+
   // Grow/shrink the window horizontally, keeping the left edge anchored so
   // the chat column keeps its width when the work panel opens. Returns the
   // delta actually applied (0 when maximized/fullscreen or out of room).
@@ -2864,6 +2944,30 @@ function registerIpc() {
       .catch(() => null);
     if (turn) activeTurns.set(req.sessionId, turn.turnId);
 
+    // Slash template expansion (D123, ADR 0024): templates expand before
+    // persistence so reseed replays exactly what the model saw; the typed
+    // form rides along as `command` for transcript display. Builtin/plugin
+    // slash aliases never reach this channel, and unknown /names stay
+    // literal text.
+    let promptContent = req.content;
+    let slashCommand: string | undefined;
+    if (req.content.startsWith("/")) {
+      try {
+        const root = await optionalWorkspaceRoot();
+        const templates = await loadComposerTemplatesCached(root);
+        const expansion = expandSlashInvocation(req.content, templates);
+        if (expansion) {
+          promptContent = expansion.expanded;
+          slashCommand = expansion.command;
+        }
+      } catch (error) {
+        logger.app("warn", "slash expansion failed; sending literal text", {
+          sessionId: req.sessionId,
+          data: String(error),
+        });
+      }
+    }
+
     // Persist user message
     const revisionMeta = (req as any).__revisionMeta as
       | {
@@ -2875,9 +2979,10 @@ function registerIpc() {
     const userMessage = {
       id: crypto.randomUUID(),
       role: "user" as const,
-      content: req.content,
+      content: promptContent,
       createdAt: new Date().toISOString(),
       status: "complete" as const,
+      ...(slashCommand ? { command: slashCommand } : {}),
       ...(revisionMeta?.revisionCount
         ? {
             revisionRootId: revisionMeta.rootUserId,
@@ -2908,7 +3013,7 @@ function registerIpc() {
         "agent.prompt",
         {
           sessionId: req.sessionId,
-          content: req.content,
+          content: promptContent,
           mode: session.mode || settings.defaultMode || "agent",
           thinkingLevel,
           // Per-session scratch dir for temp files (D114). Same layout as
@@ -3023,21 +3128,7 @@ function registerIpc() {
 
   handle(IPC.invoke.commandPaletteSearch, async (query: string) => {
     const q = (query || "").toLowerCase();
-    const builtin = [
-      { id: "builtin.session.new", title: "New task", category: "Session", keywords: ["new", "chat", "task"], source: "builtin" as const },
-      { id: "builtin.session.delete", title: "Delete current task", category: "Session", keywords: ["delete", "remove", "session"], source: "builtin" as const },
-      { id: "builtin.agent.abort", title: "Abort current run", category: "Session", keywords: ["stop", "abort", "cancel"], source: "builtin" as const },
-      { id: "builtin.mode.agent", title: "Switch to Agent mode", category: "Session", keywords: ["mode", "agent"], source: "builtin" as const },
-      { id: "builtin.mode.chat", title: "Switch to Chat mode (read-only)", category: "Session", keywords: ["mode", "chat", "read-only"], source: "builtin" as const },
-      { id: "builtin.project.open", title: "Open project", category: "Project", keywords: ["open", "folder", "workspace"], source: "builtin" as const },
-      { id: "builtin.project.clear", title: "Clear project", category: "Project", keywords: ["clear", "close", "workspace"], source: "builtin" as const },
-      { id: "builtin.settings.open", title: "Open settings", category: "App", keywords: ["settings", "preferences"], source: "builtin" as const },
-      { id: "builtin.settings.providers", title: "Open provider settings", category: "Settings", keywords: ["provider", "model", "key"], source: "builtin" as const },
-      { id: "builtin.settings.import", title: "Import from other tools", category: "Settings", keywords: ["import", "claude", "codex", "opencode", "pi", "migrate"], source: "builtin" as const },
-      { id: "builtin.plugins.open", title: "Open plugins", category: "Plugins", keywords: ["plugins", "extensions"], source: "builtin" as const },
-      { id: "builtin.plugins.loadDev", title: "Load development plugin", category: "Plugins", keywords: ["load", "dev", "plugin"], source: "builtin" as const },
-      { id: "builtin.logs.open", title: "Open logs folder", category: "Diagnostics", keywords: ["logs", "diagnostics"], source: "builtin" as const },
-    ];
+    const builtin = builtinPaletteItems();
     const pluginCmds = plugins.getCommands().map((c) => ({
       id: c.id,
       title: c.title,
