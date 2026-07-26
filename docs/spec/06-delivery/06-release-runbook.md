@@ -1,6 +1,7 @@
-# 06. Release Runbook — macOS arm64
+# 06. Desktop Release Runbook
 
-> Scope: first distributable release channel (D010: macOS arm64 only)
+> Scope: D126 tag artifacts for macOS arm64, Windows x64, and Linux x64;
+> macOS signing/notarization remains the detailed qualification lane below.
 > Cross-references: [milestones](01-mvp-milestones.md) · [process model](../03-runtime/07-process-model.md) · [security](../05-security/01-security.md)
 
 ## 1. Build lanes
@@ -16,10 +17,17 @@ The static electron-builder config stays unsigned-friendly (`identity: null`)
 so contributors without certificates can always package. The release script
 injects the real identity via `-c.mac.identity` at build time.
 
-On macOS, the unpackaged `pnpm dev` process explicitly applies
-`build/icon_1024.png` to the Dock after Electron becomes ready. The packaged
-lanes continue to use `build/icon.icns` through electron-builder, and the
-renderer imports the same PNG through `BrandLogo`. The PNG is canonical;
+On macOS, `pnpm dev` creates and reuses a fingerprinted branded Electron host
+bundle under `.cache/electron-dev/`. Its bundle name, executable, identifier,
+and ICNS resource are development-only PI-Desktop values, so AppKit shows
+PI-Desktop in the application menu and uses the canonical icon in the native
+About panel. The runtime also applies `build/icon_1024.png` to the Dock. Stock
+files under `node_modules` are never modified. Windows/Linux development keeps
+the normal electron-vite executable. The launcher sets `PI_DESKTOP_DEV=1` so
+runtime packaging checks keep update delivery disabled and preserve developer
+workspace defaults despite the branded executable name. Packaged lanes use
+`build/icon.icns` through electron-builder, and the renderer imports the same
+PNG through `BrandLogo`. The PNG is canonical;
 `scripts/make-icon.py` derives the 512px Windows/Linux package PNG on every
 platform and the iconset/ICNS when macOS `iconutil` is available, without
 overwriting the canonical source.
@@ -71,9 +79,11 @@ xcrun stapler validate "$APP"            # notarization staple (if notarized)
 
 Manual smoke on a clean profile (`PI_DESKTOP_DATA_DIR=$(mktemp -d)`):
 
-1. `pnpm dev` launches with the PI-Desktop icon rather than Electron's default
-   icon in the Dock.
-2. App launches from DMG install, window appears, icon correct in Dock.
+1. `pnpm dev` launches with `PI-Desktop` in the macOS application menu and the
+   canonical icon in both the Dock and native About panel; no Electron brand is
+   visible.
+2. App launches from DMG install, window appears, and the application-menu,
+   About-panel, and Dock branding match the development lane.
 3. Empty home, expanded/collapsed sidebar, and docked composer show the
    canonical PI-Desktop logo; New task and project/Temporary create controls
    use the message-plus session icon.
@@ -82,11 +92,12 @@ Manual smoke on a clean profile (`PI_DESKTOP_DATA_DIR=$(mktemp -d)`):
 6. Quit/relaunch → session history restored, window bounds restored.
 7. `~/.pi-desktop/logs/` contains `app.log` / `host.log` / `agent.log`.
 
-## 6. Windows/Linux shell-readiness packages
+## 6. Windows/Linux release packages
 
-The repository exposes `dist:win` and `dist:linux` for native-runner smoke
-builds. Each packaging command first runs `build:host-release`, then bundles
-the agent runtime and Electron app. Run a target command on that target OS:
+The repository exposes `dist:win` and `dist:linux` for native-runner builds.
+Each packaging command first runs `build:host-release`, then bundles the agent
+runtime and Electron app. D126 tag workflows publish these outputs and their
+electron-updater manifests. Run a target command on that target OS:
 
 ```text
 Windows: pnpm --filter @pi-desktop/desktop dist:win
@@ -95,9 +106,9 @@ Linux:   pnpm --filter @pi-desktop/desktop dist:linux
 
 The Windows package includes `bin/pi-desktop-host-core.exe`; Linux includes
 `bin/pi-desktop-host-core`. `node-pty` must also be rebuilt by
-electron-builder on the native runner. These lanes validate D118 shell and
-sidecar packaging readiness only. Signing, installer upgrade testing, release
-publishing, and release qualification remain post-MVP and do not alter D010.
+electron-builder on the native runner. Signing, rollback, and installer
+upgrade qualification remain release hardening work; publication itself is
+active under D126.
 
 Native-runner output matrix:
 
@@ -116,5 +127,6 @@ Shell smoke on each native runner:
 
 ## 7. Known limitations
 
-- Auto-update channel: post-MVP (open question), DMG-only distribution for now.
-- Windows/Linux release qualification and publishing: post-MVP (D010).
+- macOS and Linux deb remain notify-and-link update modes.
+- Signed in-app macOS delivery, rollback, staged rollout, and prerelease
+  channel policy remain open release work.

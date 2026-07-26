@@ -1,7 +1,7 @@
 # PI-Desktop Spec
 
-> Baseline: `0.4.3`
-> Updated: `2026-07-26`
+> Baseline: `0.4.7`
+> Updated: `2026-07-27`
 > Language: **English-first**
 > Stack: Electron + **Rust host core** + pi Agent Harness + user-installable plugins
 
@@ -72,5 +72,5 @@ docs/spec/
 7. Default mode = Agent; Chat read-only
 8. Permission timeout 120s deny
 9. Local user-installable plugins (market later)
-10. First release = macOS arm64 only
+10. Tag releases = macOS arm64, Windows x64, and Linux x64 (D126)
 11. Universal provider/model coverage (native + OpenAI-compatible + custom)

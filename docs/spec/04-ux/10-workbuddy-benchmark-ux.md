@@ -126,7 +126,7 @@ writes results to workspace memory/config — a form disguised as a chat.
 
 ### 3.7 Artifacts view (from 我的文件)
 Sessions produce files the user later can't find without scrolling the
-transcript. **Adopted first step in D119**: clicking a file artifact creates a
+transcript. **Adopted first step in D128**: clicking a file artifact creates a
 path-keyed, closeable work-panel tab, and successful workspace Write/Edit
 artifacts open Review. These renderer tabs are transient views, not a second
 persistence model; the host-owned `artifacts` table remains authoritative.

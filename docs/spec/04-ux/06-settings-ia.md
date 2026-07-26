@@ -47,6 +47,8 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 
 ### Info
 - app/host/protocol versions + open logs
+- Updates row with the current delivery state and one applicable action:
+  Check for updates, View release, or Restart to update
 
 ## 3. Navigation rules
 
@@ -77,6 +79,8 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 10. Resizing the window expands or contracts the content cards with the
     available content pane; the fixed rail and pane gutters remain intact and
     the page does not gain horizontal overflow
+11. Info renders disabled, checking, up-to-date, available, downloading,
+    downloaded, and error update states without adding a fifth destination
 
 ## 5. Basics chrome metrics
 

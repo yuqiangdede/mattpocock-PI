@@ -78,7 +78,7 @@ Params:
 
 ```ts
 type HandshakeParams = {
-  protocolVersion: 4
+  protocolVersion: 5
   client: "electron-main"
   clientVersion: string
   locale: string // default "en"
@@ -89,7 +89,7 @@ Result:
 
 ```ts
 type HandshakeResult = {
-  protocolVersion: 4
+  protocolVersion: 5
   host: "rust-host-core"
   hostVersion: string
   features: string[]
@@ -101,9 +101,10 @@ Rules:
 1. If protocol major version mismatches → abort boot
 2. Electron should exit with actionable error if handshake fails
 3. All subsequent calls require successful handshake
-4. Version 4 is required for the durable notification inbox and the
-   notification-bearing `session.endTurn` result; a version 3 host must be
-   rejected before chat becomes interactive
+4. Version 4 introduced the durable notification inbox and the
+   notification-bearing `session.endTurn` result.
+5. Version 5 requires the host-owned `session.fork` snapshot operation; a
+   version 4 host must be rejected before chat becomes interactive (ADR 0023).
 
 ## 4. Method catalog (MVP)
 
@@ -135,6 +136,15 @@ Rules:
 - `session.list`
 - `session.create` — accepts optional `thinkingLevel`; missing/null defaults
   to `off`
+- `session.fork` — accepts `sessionId` and an optional caller-provided display
+  `title`; creates
+  one independent session from the source's current active canonical
+  transcript. The child inherits project/provider/model/mode/thinking and
+  permission configuration, receives new message/tool-call ids, and starts
+  without turns, revisions, notifications, artifacts, grants, or scratch data.
+  Missing sources return `NOT_FOUND`; Electron rejects active sources with
+  `AGENT_BUSY` before forwarding and normalizes the host's persisted
+  running-turn `CONFLICT` fallback to `AGENT_BUSY`
 - `session.get`
 - `session.delete`
 - `session.rename`
@@ -354,6 +364,10 @@ Timeout behavior (**D005**): after 120s unresolved → deny.
    each resolves its own project root and grants
 3. Notifications may arrive anytime after handshake
 4. Abort should be best-effort and idempotent
+5. A session fork is one host-owned snapshot operation. The source transcript
+   is never rewritten, and a handled child write/index failure leaves no
+   visible session or orphan transcript file. A process crash follows D119's
+   existing orphan-transcript recovery policy.
 
 ## 9. Logging rules
 
@@ -374,3 +388,6 @@ Timeout behavior (**D005**): after 120s unresolved → deny.
    repeated terminal updates
 7. Notification list/unread/read-all/clear round-trip through host-core and
    remain bounded to the newest 200 durable rows
+8. Forking an idle session produces an independently mutable child with the
+   same active transcript and durable execution configuration while leaving
+   the source and its regenerate revisions unchanged

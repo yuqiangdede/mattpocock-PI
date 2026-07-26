@@ -14,7 +14,7 @@ destination, chat as the home surface, tools and permissions inline.
 
 ```text
 +----------------------------------------------------------------------+
-| Titlebar row (46px): traffic lights · back/forward · actions         |
+| Titlebar row (46px): traffic lights · back/forward · bell · actions  |
 +------------------+--------------------------------+------------------+
 | Sidebar (~275px) | Main pane (active destination) | Work panel       |
 |  New task        |  chat home / transcript        |  (optional,      |
@@ -36,8 +36,9 @@ destination, chat as the home surface, tools and permissions inline.
   intentionally omitted from the home sidebar. Each retained project is a
   path-keyed tab/group that can be
   collapsed independently. Project and conversation rows expose
-  non-destructive pin/archive actions and sortable views. Projects not
-  retained in the sidebar remain discoverable through the Projects index.
+  non-destructive pin/archive actions, an independent conversation-branch
+  command, and sortable views. Projects not retained in the sidebar remain
+  discoverable through the Projects index.
   Collapsible to an icon rail (Cmd/Ctrl+B).
 - **Product identity**: runtime shell copy uses `PI-Desktop`; the home hero,
   sidebar, and docked composer reuse the canonical `build/icon_1024.png` logo,
@@ -50,14 +51,16 @@ destination, chat as the home surface, tools and permissions inline.
   Windows/Linux use a frameless 46px row with localized
   File / Edit / View / Window / Help menus on the left and accessible
   minimize / maximize-or-restore / close controls on the right. Back/forward
-  controls traverse destination history.
+  controls traverse destination history; the right side also contains the
+  notification bell/unread badge. The bell opens a
+  durable local inbox rather than a separate destination (D117).
 - **Work panel**: docked right column (not an overlay) created only by file,
   URL, browser-preview, successful-command, or successful workspace-edit
-  artifacts. Its top strip contains only currently opened, closeable tabs:
-  file paths get distinct tabs while Review, Terminal, and Browser deduplicate
-  by kind. A successful active-session workspace Write/Edit artifact opens
-  Review; scratch, failed, and background-session writes never steal focus.
-  Width is
+  artifacts. Its
+  top strip contains only currently opened, closeable tabs: file paths get
+  distinct tabs while Review, Terminal, and Browser deduplicate by kind. A
+  successful active-session workspace Write/Edit artifact opens Review;
+  scratch, failed, and background-session writes never steal focus. Width is
   drag-resizable from 320px to
   `min(720px, 60vw, viewport − visible sidebar − 360px)`, preserving a
   readable 360px Main pane. The sole panel-level control collapses the panel;

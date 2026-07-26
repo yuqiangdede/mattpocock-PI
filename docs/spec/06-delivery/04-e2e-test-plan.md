@@ -18,7 +18,7 @@
 - Full automated test suite in MVP phase (document scenarios first; automate later).
 - Performance / stress testing (post-MVP).
 - Windows/Linux release qualification (macOS arm64 remains the first-release
-  acceptance platform per D010; readiness scenarios may be documented).
+  acceptance platforms per D126; native qualification gaps remain documented).
 - Plugin marketplace scenarios (post-MVP).
 - Remote gateway / control-plane scenarios (post-MVP — ADR 0004 / baseline #20).
 
@@ -60,7 +60,7 @@
 
 | Requirement | Detail |
 |---|---|
-| Platform | macOS arm64 for release acceptance (D010); native Windows/Linux runners for shell-readiness scenarios |
+| Platform | macOS arm64, Windows x64, and Linux x64 release targets (D126) |
 | Profile | Clean `~/.pi-desktop` profile (no prior config) |
 | Fixtures | Sample project directory (`examples/fixtures/sample-project/`) |
 | Sample plugin | `examples/plugins/hello` loaded from local path |
@@ -114,11 +114,12 @@ Each scenario is documented in this format:
 #### E2E-003: Rust host healthcheck responds
 
 - **Preconditions**: App is running; Rust host-core sidecar started.
-- **Steps**: 1) Electron handshakes with protocol version 4. 2) Call the host
-  healthcheck RPC. 3) Repeat boot with a version 3 host fixture.
-- **Expected**: The version 4 host returns `ok` and the handshake is logged.
-  The stale version 3 host is rejected before chat becomes interactive, so
-  notification records cannot be silently lost at turn completion.
+- **Steps**: 1) Electron handshakes with protocol version 5. 2) Call the host
+  healthcheck RPC. 3) Repeat boot with version 4 and version 3 host fixtures.
+- **Expected**: The version 5 host returns `ok` and the handshake is logged.
+  The stale version 4 and version 3 hosts are rejected before chat becomes
+  interactive, so notification records cannot be silently lost at turn
+  completion.
 - **Specs linked**: `03-runtime/05-host-core-rust.md`, `03-runtime/06-host-rpc-protocol.md`
 - **Acceptance**: A (bridge normal)
 - **Milestone**: M1
@@ -1162,7 +1163,9 @@ Each scenario is documented in this format:
   app; English and zh-CN locales available. The Windows/Linux harness can set
   `PI_DESKTOP_START_MAXIMIZED=1` before launch so Main maximizes the hidden
   native window before renderer mount.
-- **Steps**: 1) On macOS, open every system menu and invoke New Task, Open
+- **Steps**: 1) On macOS, launch both `pnpm dev` and a packaged build. Confirm
+  the application-menu title is PI-Desktop, open About PI-Desktop, and inspect
+  its name, version, and icon. Then open every system menu and invoke New Task, Open
   Project, Settings, Command Palette, sidebar toggle, editing,
   zoom/fullscreen, Window, Help, Logs, and Check for Updates actions. Verify
   the update status reports that the current fixture version is up to date.
@@ -1178,7 +1181,10 @@ Each scenario is documented in this format:
   initial queried glyph/state. 6) Attempt unknown menu/window IPC actions
   while a window exists and after it closes. 7) Build each target on its
   native runner from a clean release-host directory.
-- **Expected**: macOS follows native menu conventions and accelerators.
+- **Expected**: macOS development and packaged launches show PI-Desktop as the
+  native application identity, and the About panel uses the canonical
+  PI-Desktop icon; neither surface exposes the stock Electron name or icon.
+  macOS follows native menu conventions and accelerators.
   Windows/Linux show localized File/Edit/View/Window/Help menus without
   colliding with drag regions or right-side controls; keyboard focus and
   checked sidebar state remains accurate, and no work-panel launcher is
@@ -1193,12 +1199,45 @@ Each scenario is documented in this format:
   `04-ux/01-ui-ia.md`, `04-ux/02-i18n-english-first.md`,
   `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`,
   `04-ux/09-interaction-patterns.md`, `06-delivery/06-release-runbook.md`,
-  `08-meta/decisions-log.md` (D118)
+  `08-meta/decisions-log.md` (D118, D121)
 - **Acceptance**: A (app startup), Quality
 - **Milestone**: M5 on macOS; post-MVP release qualification on Windows/Linux
-- **Status**: Unit-covered (`window-menu.test.mjs`); Electron boot probe covers
+- **Status**: Unit-covered (`window-menu.test.mjs`,
+  `development-branding.test.mjs`); Electron boot probe covers
   platform bridge, native menu installation, and the pre-render maximize
   fixture on Windows/Linux; native visual scenario Draft
+
+#### E2E-068: Fork a conversation into an independent session
+
+- **Preconditions**: An idle project conversation has user, assistant,
+  thinking, and tool history plus at least one regenerate variant. A second
+  source conversation is running. A Temporary conversation and two retained
+  project workspaces contain distinct same-named marker files. The idle source
+  has a session-scoped tool grant.
+- **Steps**: 1) Open the idle conversation overflow menu with keyboard. 2)
+  Choose Create branch. 3) Append a prompt and change model/mode on the child.
+  4) Switch the visible workspace, return to the child, and read the marker.
+  5) Trigger the previously granted tool and verify confirmation is requested.
+  6) Reopen the source. 7) Restart the app and inspect both sessions. 8) Open
+  the running conversation overflow menu. 9) Fork the Temporary conversation
+  and invoke a workspace-required tool.
+- **Expected**: A localized branch title appears in the same project group and
+  is activated with composer focus. Its visible active transcript and durable
+  project/provider/model/mode/thinking/permission configuration match the
+  source snapshot, but regenerate pager history is absent. Child messages and
+  later configuration changes do not affect the source; both survive restart.
+  The running source action is disabled. No turns, notifications, artifacts,
+  permission grants, revisions, or scratch files are copied.
+  The marker resolves under the child's inherited project; the Temporary child
+  remains path-less and returns `WORKSPACE_REQUIRED`.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`,
+  `03-runtime/04-data-storage.md`, `03-runtime/06-host-rpc-protocol.md`,
+  `04-ux/01-ui-ia.md`, `04-ux/08-component-spec.md`,
+  `04-ux/09-interaction-patterns.md`
+- **Acceptance**: C (sessions), D (workspace), F (persistence), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`sessions::tests::fork_session_clones_active_transcript_and_configuration`,
+  `session-fork.test.mjs`); full restart UI scenario Draft
 
 ## 8. Traceability Matrix
 
@@ -1210,14 +1249,14 @@ Each scenario is documented in this format:
 |---|---|
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066 |
-| C — Chat & stream | E2E-008, E2E-009, E2E-010, E2E-011, E2E-031, E2E-040, E2E-047, E2E-048, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-060, E2E-061, E2E-062, E2E-064, E2E-065 |
-| D — Workspace | E2E-012, E2E-013, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060 |
+| C — Chat & stream | E2E-008, E2E-009, E2E-010, E2E-011, E2E-031, E2E-040, E2E-047, E2E-048, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-060, E2E-061, E2E-062, E2E-064, E2E-065, E2E-068 |
+| D — Workspace | E2E-012, E2E-013, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068 |
 | E — Tools & permissions | E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040, E2E-049 |
-| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066 |
+| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068 |
 | G — Plugins | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026 |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042 |
-| Security | E2E-028, E2E-029, E2E-030, E2E-049 |
-| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 |
+| Security | E2E-028, E2E-029, E2E-030, E2E-049, E2E-068 |
+| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068 |
 
 | Milestone | Scenarios |
 |---|---|
@@ -1225,7 +1264,7 @@ Each scenario is documented in this format:
 | M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-020, E2E-021, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042 |
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
-| M5 | E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS) (+ packaging scenarios in release runbook) |
+| M5 | E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068 (+ packaging scenarios in release runbook) |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
