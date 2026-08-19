@@ -1,4 +1,14 @@
 #!/usr/bin/env node
+/**
+ * Vendored copy of PI-Desktop `scripts/check-marketplace-catalog.mjs`.
+ *
+ * The point of running the client's own preflight here is that a catalog which
+ * passes in this repository cannot then fail the client's rules on a user's
+ * machine. Keep it byte-identical below this header; when PI-Desktop changes
+ * its preflight, re-copy the file rather than editing this one.
+ *
+ * Source: https://github.com/vastsa/PI-Desktop/blob/main/scripts/check-marketplace-catalog.mjs
+ */
 
 import { readFile } from "node:fs/promises";
 import { realpathSync } from "node:fs";
