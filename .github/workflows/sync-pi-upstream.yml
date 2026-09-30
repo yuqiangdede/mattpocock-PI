@@ -1,0 +1,157 @@
+name: Sync PI upstream
+
+on:
+  schedule:
+    # Every day at 00:30 UTC (08:30 Asia/Shanghai)
+    - cron: "30 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-pi-upstream
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REPOSITORY: vastsa/PI-Desktop
+  UPSTREAM_BRANCH: main
+  TARGET_BRANCH: main
+  SYNC_BRANCH: sync/pi-upstream
+
+jobs:
+  sync:
+    name: Check upstream and maintain sync PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch PI upstream
+        run: |
+          git remote remove upstream 2>/dev/null || true
+          git remote add upstream "https://github.com/${UPSTREAM_REPOSITORY}.git"
+          git fetch --no-tags upstream "${UPSTREAM_BRANCH}"
+          git fetch --no-tags origin "${TARGET_BRANCH}"
+          git fetch --no-tags origin "${SYNC_BRANCH}:refs/remotes/origin/${SYNC_BRANCH}" 2>/dev/null || true
+
+      - name: Detect upstream changes
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          LOCAL_REF="origin/${TARGET_BRANCH}"
+          UPSTREAM_REF="upstream/${UPSTREAM_BRANCH}"
+
+          if ! git merge-base "${LOCAL_REF}" "${UPSTREAM_REF}" >/dev/null 2>&1; then
+            echo "::error::Local and upstream branches do not share Git history. Automatic sync is disabled for safety."
+            exit 1
+          fi
+
+          LOCAL_SHA="$(git rev-parse "${LOCAL_REF}")"
+          UPSTREAM_SHA="$(git rev-parse "${UPSTREAM_REF}")"
+          NEW_COMMITS="$(git rev-list --count "${LOCAL_REF}..${UPSTREAM_REF}")"
+
+          echo "local_sha=${LOCAL_SHA}" >> "$GITHUB_OUTPUT"
+          echo "upstream_sha=${UPSTREAM_SHA}" >> "$GITHUB_OUTPUT"
+          echo "upstream_short_sha=${UPSTREAM_SHA:0:12}" >> "$GITHUB_OUTPUT"
+          echo "new_commits=${NEW_COMMITS}" >> "$GITHUB_OUTPUT"
+
+          if [[ "${NEW_COMMITS}" -gt 0 ]]; then
+            echo "has_updates=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_updates=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "Local:    ${LOCAL_SHA}"
+          echo "Upstream: ${UPSTREAM_SHA}"
+          echo "New upstream commits: ${NEW_COMMITS}"
+
+      - name: Refresh sync branch
+        if: steps.detect.outputs.has_updates == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # The sync branch intentionally mirrors upstream/main exactly.
+          # GitHub performs the actual merge only after a human reviews the PR.
+          git push --force-with-lease origin \
+            "upstream/${UPSTREAM_BRANCH}:refs/heads/${SYNC_BRANCH}"
+
+      - name: Create or update sync pull request
+        if: steps.detect.outputs.has_updates == 'true'
+        env:
+          # Optional: define PI_UPSTREAM_SYNC_TOKEN as a fine-grained PAT if
+          # you want PR-created events to trigger other GitHub Actions.
+          # Without it, the built-in GITHUB_TOKEN is used.
+          GH_TOKEN: ${{ secrets.PI_UPSTREAM_SYNC_TOKEN || github.token }}
+          NEW_COMMITS: ${{ steps.detect.outputs.new_commits }}
+          UPSTREAM_SHA: ${{ steps.detect.outputs.upstream_sha }}
+          UPSTREAM_SHORT_SHA: ${{ steps.detect.outputs.upstream_short_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cat > /tmp/pi-upstream-sync-pr.md <<EOF
+          ## PI upstream update detected
+
+          Source: https://github.com/${UPSTREAM_REPOSITORY}/tree/${UPSTREAM_BRANCH}
+
+          - Target branch: \`${TARGET_BRANCH}\`
+          - Upstream branch: \`${UPSTREAM_REPOSITORY}:${UPSTREAM_BRANCH}\`
+          - New upstream commits not yet in target: **${NEW_COMMITS}**
+          - Upstream HEAD: \`${UPSTREAM_SHA}\`
+
+          ### Safety policy
+
+          This PR is created and refreshed automatically, but it is **never auto-merged**.
+
+          Before merging:
+
+          1. Review upstream changes and conflicts.
+          2. Confirm custom workflow / Skills / UI changes are preserved.
+          3. Run the project's validation and tests.
+          4. Merge manually only after review passes.
+
+          The branch \`${SYNC_BRANCH}\` mirrors upstream HEAD. Future upstream updates refresh this same PR instead of creating duplicate PRs.
+          EOF
+
+          PR_NUMBER="$(gh pr list \
+            --repo "${GITHUB_REPOSITORY}" \
+            --base "${TARGET_BRANCH}" \
+            --head "${SYNC_BRANCH}" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          TITLE="chore: sync PI upstream @ ${UPSTREAM_SHORT_SHA}"
+
+          if [[ -n "${PR_NUMBER}" ]]; then
+            gh pr edit "${PR_NUMBER}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "${TITLE}" \
+              --body-file /tmp/pi-upstream-sync-pr.md
+            echo "Updated existing sync PR #${PR_NUMBER}."
+          else
+            gh pr create \
+              --repo "${GITHUB_REPOSITORY}" \
+              --base "${TARGET_BRANCH}" \
+              --head "${SYNC_BRANCH}" \
+              --title "${TITLE}" \
+              --body-file /tmp/pi-upstream-sync-pr.md
+          fi
+
+      - name: No upstream changes
+        if: steps.detect.outputs.has_updates == 'false'
+        run: echo "PI upstream is already fully contained in ${TARGET_BRANCH}; nothing to do."
