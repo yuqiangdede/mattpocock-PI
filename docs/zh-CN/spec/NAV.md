@@ -14,6 +14,7 @@
 - [00-overview.md](/zh-CN/spec/01-product/00-overview)
 - [01-product-scope.md](/zh-CN/spec/01-product/01-product-scope)
 - [02-non-goals.md](/zh-CN/spec/01-product/02-non-goals)
+- [engineering-workflow-v0.md](/zh-CN/spec/01-product/engineering-workflow-v0)
 
 ## 2. 架构
 - [README.md](/zh-CN/spec/02-architecture/README)

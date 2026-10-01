@@ -1,5 +1,7 @@
 # Project Tracking
 
+- Engineering Workflow V0: [published tickets and acceptance coverage](engineering-workflow-v0-tickets.md)
+
 - Pending release highlights: [Unreleased changes](unreleased.md)
 
 - Historical project board (archived; last refreshed 2026-08-11 for the 0.5.x line): [`BOARD.md`](BOARD.md)

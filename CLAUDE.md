@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Policy-Sync: 2026-09-26.1
+Policy-Sync: 2026-10-01.1
 
 Instructions for Claude Code CLI and Claude Cowork on PI-Desktop.
 
@@ -338,3 +338,20 @@ Security reports are private via `SECURITY.md` — never open a public issue for
 | Cross-cutting protocol types | `packages/shared/` |
 
 When unsure which layer owns a concern, follow the frozen process model and existing domain modules — do not invent a new boundary without an ADR.
+
+## Agent skills
+
+### Issue tracker
+
+Use GitHub Issues in `yuqiangdede/mattpocock-PI` for specs and tickets.
+Read [issue tracker configuration](docs/agents/issue-tracker.md) before tracker operations.
+
+### Triage labels
+
+Use the five canonical triage roles mapped in
+[triage label configuration](docs/agents/triage-labels.md) before triage or labeling.
+
+### Domain docs
+
+Use the root glossary and shared ADR directory as a single context.
+Read [domain documentation rules](docs/agents/domain.md) before domain exploration.
