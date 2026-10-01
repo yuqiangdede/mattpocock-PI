@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Policy-Sync: 2026-09-26.1
+Policy-Sync: 2026-10-01.1
 
 Mandatory rules for AI coding agents working in PI-Desktop.
 
@@ -969,3 +969,20 @@ not actually executed.
   otherwise the critical constraints get diluted.
 * Every change here bumps `Policy-Sync` in both this file and
   `CLAUDE.md`, and passes `pnpm check:agent-policy`.
+
+## Agent skills
+
+### Issue tracker
+
+Use GitHub Issues in `yuqiangdede/mattpocock-PI` for specs and tickets.
+Read [issue tracker configuration](docs/agents/issue-tracker.md) before tracker operations.
+
+### Triage labels
+
+Use the five canonical triage roles mapped in
+[triage label configuration](docs/agents/triage-labels.md) before triage or labeling.
+
+### Domain docs
+
+Use the root glossary and shared ADR directory as a single context.
+Read [domain documentation rules](docs/agents/domain.md) before domain exploration.
