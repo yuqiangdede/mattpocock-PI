@@ -1,7 +1,7 @@
 # Engineering Workflow V0 Tickets
 
 - Date: 2026-10-01
-- Status: Published; implementation not started
+- Status: Implemented in [PR #12](https://github.com/yuqiangdede/mattpocock-PI/pull/12); #5-#10 closed as completed after delivery acceptance review on 2026-10-02
 - Tracker: GitHub Issues in yuqiangdede/mattpocock-PI
 - Source: Accepted Engineering Workflow V0 implementation specification from the discovery conversation
 - Approval: The user authorized automatic acceptance of subsequent recommendations
@@ -20,14 +20,16 @@
 | T5 | [#9](https://github.com/yuqiangdede/mattpocock-PI/issues/9) | Reopen earlier work and return Review to Implement | #8 |
 | T6 | [#10](https://github.com/yuqiangdede/mattpocock-PI/issues/10) | Register, inspect, and safely open artifact references | #5 |
 
-All six issues carry ready-for-agent. That label means fully specified, not
-unblocked. The initial frontier is #5. Once #5 is complete, #6 and #10 become
-eligible; the execution progression then follows #6 -> #7 -> #8 -> #9.
+The original implementation order was #5 -> #6 -> #7 -> #8 -> #9, with #10
+eligible after #5. All six slices are now included in remote main. See the
+[delivery acceptance record](engineering-workflow-v0-closeout.md) for the
+reviewed implementation, test evidence, and remaining release qualification.
 
 ## Acceptance coverage
 
 Each issue contains concrete acceptance checklists and representative user-path
-tests. The mapping below is traceability, not a claim that tests were run.
+tests. The mapping below is traceability; actual execution evidence and its
+limits are recorded in the delivery acceptance record.
 
 | Spec criterion | Tickets |
 | --- | --- |
