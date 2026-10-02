@@ -5,6 +5,9 @@ export const trEntries: ChangelogEntry[] = [
     "version": "0.16.0",
     "date": "2026-10-01",
     "highlights": [
+      "Matt Pocock mühendislik becerilerinin tümü, altı varsayılan giriş ve yerel değişiklikleri koruyan elle güncellemelerle birlikte gelir.",
+      "Revizyonlarla ilişkili mühendislik çıktısı başvurularını kaydedip açın; geçmiş ve kullanılamayan dosyaları koruyun.",
+      "Proje bazlı mühendislik iş akışları: altı beceri aşaması, açık kabul ve güvenli yürütme kurtarma.",
       "Canlı Ses artık herkesin kullanımına açık ve görüşmeler geçerli oturumda başlıyor.",
       "Yerel hizmet yeniden başlatılsa bile bağlayıcı durumunu koruyan oturum bazlı kontrol listesi eklendi.",
       "Tek seferlik bildirimler artık engelleyici iletişim kutuları yerine ortak toast yığınında gösteriliyor.",

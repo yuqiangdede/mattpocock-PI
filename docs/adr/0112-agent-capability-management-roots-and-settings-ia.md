@@ -19,7 +19,9 @@ It also left several documents referring to `.pi/` capability directories.
 
 ### 1. `.agents` is the only capability file root
 
-The host scans and writes only these directories:
+For user-owned capability files the host scans and writes only these directories.
+First-party engineering fallback packages use the profile-managed source in
+[ADR 0315](0315-bundled-engineering-skill-fallback.md), with user files taking precedence:
 
 ```text
 ~/.agents/skills                 global skills

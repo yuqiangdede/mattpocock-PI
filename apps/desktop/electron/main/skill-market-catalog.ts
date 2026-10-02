@@ -9,6 +9,7 @@
 import { net, session } from "electron";
 import type { SkillCatalogEntry, SkillMarketSource } from "@pi-desktop/shared";
 import { createPublicHttpsClient } from "./public-https-fetch";
+import { fetchEngineeringSkillBundle } from "./engineering-skill-update";
 import {
   allowInsecureUserEndpointsEnabled,
   noteInsecureUserEndpoint,
@@ -55,4 +56,8 @@ export function searchSkillMarket(
 
 export function fetchSkillMarketDocument(entry: SkillCatalogEntry): Promise<SkillMarketDocument> {
   return aggregator.fetchEntryDocument(entry);
+}
+
+export function fetchEngineeringSkills() {
+  return fetchEngineeringSkillBundle(client.request);
 }

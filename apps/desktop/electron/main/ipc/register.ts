@@ -8,6 +8,9 @@ import { ROUTE_LOCAL, type BackendRouter } from "../remote/backend-router";
 import { registerAgentExtensionIpc } from "../agent-extensions-ipc";
 import { readNpmPath, writeNpmPath } from "../npm-preferences";
 import { registerAgentIpc } from "./agent-ipc";
+import { registerWorkflowIpc } from "./workflow-ipc";
+import { registerWorkflowArtifactsIpc } from "./workflow-artifacts-ipc";
+import { createWorkflowExecutionService } from "../services/workflow-execution";
 import { registerAppIpc } from "./app-ipc";
 import { registerDiagnosticsIpc } from "./diagnostics-ipc";
 import { registerMarketIpc } from "./market-ipc";
@@ -399,6 +402,32 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     composerCommandService,
     loadComposerTemplatesCached,
   });
+
+  registerWorkflowIpc({
+    registrar,
+    getHost,
+    execution: createWorkflowExecutionService({
+      getHost,
+      catalog: (path) => composerCommandService.buildComposerCommands(path),
+      onIdle: (sessionId) => getAgentHostBridge()?.kickQueue(sessionId),
+      cancel: async (request) => {
+        const handler = ipcHandlers.get(IPC.invoke.agentAbort);
+        if (!handler) throw new Error("workflow cancellation handler unavailable");
+        return handler(request);
+      },
+      submit: async (request) => {
+        const handler = ipcHandlers.get(IPC.invoke.agentPrompt);
+        if (!handler) throw new Error("workflow prompt handler unavailable");
+        return handler(request);
+      },
+      logger,
+    }),
+  });
+  registerWorkflowArtifactsIpc({ registrar, getHost, readFile: async (path) => {
+    const handler = ipcHandlers.get(IPC.invoke.fsRead);
+    if (!handler) throw new Error("file preview handler unavailable");
+    return handler({ path });
+  } });
 
   registerPluginIpc({
     registrar,

@@ -30,13 +30,27 @@ import {
 } from "./index.js";
 
 describe("Plan protocol contracts", () => {
-  it("uses protocol v11/schema v16 and exposes the plan, schedule, and shell channels", () => {
+  it("uses protocol v11/schema v16 and exposes the plan, schedule, shell, and workflow channels", () => {
     expect(PROTOCOL_VERSION).toBe(11);
     expect(SCHEMA_VERSION).toBe(16);
     expect(IPC_WHITELIST.has(IPC.invoke.plansPending)).toBe(true);
     expect(IPC_WHITELIST.has(IPC.invoke.plansResolve)).toBe(true);
     expect(IPC_WHITELIST.has(IPC.event.plansChanged)).toBe(true);
     expect(IPC.invoke.commandShellList).toBe("pi-desktop/commandShell/list");
+    expect(IPC_WHITELIST.has(IPC.invoke.workflowHistoryList)).toBe(true);
+    expect(IPC_WHITELIST.has(IPC.invoke.workflowHistoryRead)).toBe(true);
+    expect(IPC_WHITELIST.has(IPC.invoke.workflowRunCreate)).toBe(true);
+    expect(IPC_WHITELIST.has(IPC.invoke.workflowRunArchive)).toBe(true);
+    expect(IPC_WHITELIST.has(IPC.invoke.workflowDiscoveryCheck)).toBe(true);
+    expect(IPC_WHITELIST.has(IPC.invoke.workflowDiscoveryStart)).toBe(true);
+    expect(IPC_WHITELIST.has(IPC.invoke.workflowExecutionStop)).toBe(true);
+    expect(IPC_WHITELIST.has(IPC.invoke.workflowStageCheck)).toBe(true);
+    expect(IPC_WHITELIST.has(IPC.invoke.workflowStageStart)).toBe(true);
+    expect(IPC_WHITELIST.has(IPC.invoke.workflowStageAccept)).toBe(true);
+    expect(IPC_WHITELIST.has(IPC.invoke.workflowStageReopen)).toBe(true);
+    expect(IPC_WHITELIST.has(IPC.invoke.workflowArtifactList)).toBe(true);
+    expect(IPC_WHITELIST.has(IPC.invoke.workflowArtifactRegister)).toBe(true);
+    expect(IPC_WHITELIST.has(IPC.invoke.workflowArtifactOpen)).toBe(true);
     expect(IPC_WHITELIST.has(IPC.invoke.commandShellList)).toBe(true);
     expect(IPC_WHITELIST.has(IPC.invoke.scheduledList)).toBe(true);
     expect(IPC_WHITELIST.has(IPC.invoke.scheduledCreate)).toBe(true);

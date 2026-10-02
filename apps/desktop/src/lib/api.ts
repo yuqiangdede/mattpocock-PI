@@ -121,6 +121,10 @@ import type {
   TrustedExtensionUiPrompt,
   TrustedExtensionUiPromptResponse,
   SessionTodoSnapshot,
+  WorkflowProjectHistory,
+  WorkflowAdmission,
+  WorkflowDiscoveryRequest,
+  WorkflowDiscoveryStatus,
 } from "@pi-desktop/shared";
 import {
   defaultCommandShellForPlatform,
@@ -792,6 +796,46 @@ export const api = {
     invoke<{ projects: ProjectRecord[] }>(IPC.invoke.projectList),
   listProjectGroups: () =>
     invoke<{ groups: ProjectGroupRecord[] }>(IPC.invoke.projectGroupList),
+  listWorkflowHistories: () =>
+    invoke<{ histories: WorkflowProjectHistory[] }>(IPC.invoke.workflowHistoryList),
+  checkWorkflowDiscovery: (input: Pick<WorkflowDiscoveryRequest, "projectGroupId" | "runId" | "sessionId">) =>
+    invoke<WorkflowDiscoveryStatus>(IPC.invoke.workflowDiscoveryCheck, input),
+  startWorkflowDiscovery: (input: WorkflowDiscoveryRequest) =>
+    invoke<WorkflowAdmission>(IPC.invoke.workflowDiscoveryStart, input),
+  stopWorkflowExecution: (executionId: string) =>
+    invoke<{ history: WorkflowProjectHistory }>(IPC.invoke.workflowExecutionStop, { executionId }),
+  checkWorkflowStage: (input: Pick<import("@pi-desktop/shared").WorkflowStageRequest, "projectGroupId" | "runId" | "sessionId" | "stageId">) =>
+    invoke<WorkflowDiscoveryStatus>(IPC.invoke.workflowStageCheck, input),
+  startWorkflowStage: (input: import("@pi-desktop/shared").WorkflowStageRequest) =>
+    invoke<WorkflowAdmission>(IPC.invoke.workflowStageStart, input),
+  acceptWorkflowStage: (input: { projectGroupId: string; runId: string; stageId: import("@pi-desktop/shared").WorkflowStageId; expectedRevision: number }) =>
+    invoke<{ history: WorkflowProjectHistory }>(IPC.invoke.workflowStageAccept, input),
+  reopenWorkflowStage: (input: { projectGroupId: string; runId: string; stageId: import("@pi-desktop/shared").WorkflowStageId; expectedRevision: number; confirmed: true }) =>
+    invoke<{ history: WorkflowProjectHistory }>(IPC.invoke.workflowStageReopen, input),
+  registerWorkflowArtifact: (input: import("@pi-desktop/shared").WorkflowArtifactRegistration) =>
+    invoke<{ history: WorkflowProjectHistory }>(IPC.invoke.workflowArtifactRegister, input),
+  listWorkflowArtifacts: (projectGroupId: string, runId: string) =>
+    invoke<import("@pi-desktop/shared").WorkflowArtifactList>(IPC.invoke.workflowArtifactList, { projectGroupId, runId }),
+  openWorkflowArtifact: (projectGroupId: string, runId: string, referenceId: string) =>
+    invoke<import("@pi-desktop/shared").WorkflowArtifactOpen>(IPC.invoke.workflowArtifactOpen, { projectGroupId, runId, referenceId }),
+  readWorkflowHistory: (projectGroupId: string) =>
+    invoke<{ history: WorkflowProjectHistory }>(IPC.invoke.workflowHistoryRead, { projectGroupId }),
+  createWorkflowRun: (projectGroupId: string, title: string, expectedRevision: number) =>
+    invoke<{ history: WorkflowProjectHistory }>(IPC.invoke.workflowRunCreate, {
+      projectGroupId,
+      title,
+      expectedRevision,
+    }),
+  archiveWorkflowRun: (
+    projectGroupId: string,
+    runId: string,
+    expectedRevision: number,
+  ) =>
+    invoke<{ history: WorkflowProjectHistory }>(IPC.invoke.workflowRunArchive, {
+      projectGroupId,
+      runId,
+      expectedRevision,
+    }),
   createProjectGroup: (name: string, folders: string[]) =>
     invoke<{ group: ProjectGroupRecord }>(IPC.invoke.projectGroupCreate, { name, folders }),
   renameProjectGroup: (groupId: string, name: string) =>
@@ -1112,6 +1156,7 @@ export const api = {
     ),
 
   // --- Skills the user owns -------------------------------------------------
+  updateEngineeringSkills: () => invoke<{ revision: string; updated: string[]; preserved: string[] }>(IPC.invoke.skillBundleUpdate),
   listUserSkills: (query?: AgentCapabilityQuery) =>
     invoke<{ skills: UserSkillRecord[] }>(IPC.invoke.skillList, query),
   createUserSkill: (skill: UserSkillInput) =>

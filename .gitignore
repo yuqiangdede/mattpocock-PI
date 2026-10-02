@@ -51,6 +51,7 @@ coverage/
 # Local runtime data
 .pi-desktop/
 .pi-desktop-test/
+/cache/electron-builder/
 .pi/
 .cc-connect/
 

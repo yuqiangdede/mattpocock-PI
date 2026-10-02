@@ -5,6 +5,9 @@ export const deEntries: ChangelogEntry[] = [
     "version": "0.16.0",
     "date": "2026-10-01",
     "highlights": [
+      "Alle Matt-Pocock-Engineering-Skills mit sechs Standardeinträgen und manuellen Updates unter Beibehaltung lokaler Änderungen mitliefern.",
+      "Technische Artefaktverweise mit Phasenrevision registrieren und öffnen; historische und nicht verfügbare Dateien bleiben sichtbar.",
+      "Projektbezogene Engineering-Workflow-Läufe mit sechs Skill-Phasen, expliziter Bestätigung und sicherer Wiederaufnahme.",
       "Live Voice steht jetzt allen zur Verfügung, und Anrufe starten im aktuellen Verlauf.",
       "Neue Checkliste pro Verlauf, die ihren verbindlichen Stand auch nach einem Neustart des lokalen Dienstes behält.",
       "Einmalige Hinweise erscheinen jetzt im gemeinsamen Toast-Stapel statt in blockierenden Dialogen.",

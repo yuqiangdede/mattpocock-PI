@@ -1,6 +1,6 @@
 # Engineering Workflow V0
 
-- Status: Accepted implementation specification; not implemented
+- Status: Project-owned runs, six-stage execution, recovery, explicit acceptance, reopening and artifact references implemented (#5-#10)
 - Date: 2026-10-01
 - Scope: First productization phase of mattpocock-PI
 - Decision authority: Discovery decisions Q1-Q9 accepted explicitly; subsequent recommendations accepted automatically by the user
@@ -31,6 +31,22 @@ Pi session. Pi continues to execute the work. The workflow enforces prerequisite
 records execution outcomes, and waits for explicit user acceptance before
 unlocking the next stage. Users may continue a stage, retry failed work, return
 from Review to Implement, or reopen earlier work while preserving history.
+
+### Bundled engineering skills
+
+The installer supplies all Matt Pocock skills and companion files offline.
+First startup installs an enabled profile-managed fallback; existing global and
+project definitions take precedence. Later startup retains user disablement,
+edits and removal. Main/Host ownership is described in ADR 0315.
+
+The default Settings > Agent > Skills list and empty slash suggestions expose the six stage
+skills. Show all skills, search and explicit slash names expose the remaining
+catalog. Visibility never restricts the Skill tool or execution lookup.
+Update engineering skills explicitly fetches one complete immutable upstream
+revision through existing public-HTTPS policy. Host validates the bundle before
+activation, retains changed/removed packages, preserves activation state and
+keeps old versions. A failed download does not activate partial content.
+Stage start still reports disabled/missing skills rather than installing them.
 
 ### Stage definitions
 
@@ -66,6 +82,92 @@ outcome rather than a seventh stage.
 Running includes a visibly pending start while admission is unresolved; it does
 not falsely claim that Pi has already begun executing. The execution record
 separates admission from actual execution.
+
+### Discovery execution persistence (#6)
+
+Host-owned version 4 workflow documents retain version 1/2/3 histories without a
+read-time rewrite. Each admission persists a request/execution identity and the
+initiating group, run, stage revision and existing session before dispatch. The
+actual host turn is attached atomically with turn creation. Installed
+`grill-with-docs` is dispatched through the normal Agent IPC and Pi Skill tool;
+workflow admission never uses the ordinary chat queue. Terminal settlement and
+the turn outcome commit together. Normal completion only enables confirmation;
+it does not accept Discovery or unlock Spec. Pending/Running reservations block
+archival and duplicate execution. Reload reads the live reservation; host boot
+marks unsettled attempts Interrupted without replay. Unknown or malformed
+documents remain preserved. Continue, Retry, Stop and acceptance belong to the
+subsequent implementation slices.
+
+An explicit runtime refusal settles rejection. Missing or mismatched admission
+acknowledgements cannot prove refusal: the existing host turn remains reserved
+and uncertain until its durable outcome or restart reconciliation settles it.
+Neither a transport deadline nor an unrelated acknowledgement enables replay.
+
+### Explicit execution recovery (#7)
+
+Stop resolves the durable execution's own session and turn and revalidates them
+under the existing Main session-operation lock before Pi cancellation. An idle
+or already terminal execution cannot cancel a subsequent chat turn. A pending
+reservation with no turn is retired atomically, preventing later admission.
+Cancellation transport failures remain visible and retain unresolved ownership.
+Normal attempts offer Continue; unsuccessful attempts offer Retry. Each explicit
+attempt creates a new identity, rechecks the selected existing session and skill,
+and retains earlier bindings. Starting another attempt removes prior confirmation
+eligibility. Restart retains Interrupted history and offers manual Retry; it does
+not replay. Ordinary input arriving after a winning workflow reservation remains
+queued until the bound turn releases the existing queue.
+
+### Six-stage acceptance (#8)
+
+The six stage/skill pairs above share one admission path. Host transitions reject
+unaccepted prerequisites, stale document revisions, immutable runs and accepted
+stages. Each acceptance records the current revision, latest Normal execution
+identity and user decision timestamp. Untracked chat turns cannot qualify. A
+later unsuccessful attempt replaces confirmation eligibility. Acceptance checks
+the bound session exists and has no active or queued work, and the run has no
+unsettled workflow attempt. It completes only the selected stage and unlocks
+only its successor without dispatching Pi. Implement may execute repeatedly and
+reserves optional `activeTicketId` metadata without counters. Review has explicit
+review-passed wording. Retro acceptance marks the run done; its history is
+immutable and a new run can be created. Stored stage projections and acceptance
+identities are validated against recorded execution history on read.
+
+### Confirmed reopening (#9)
+
+Only accepted stages in active, idle runs can be reopened. The confirmation
+dialog lists the selected stage and every affected successor; Cancel performs no
+mutation. Confirmation carries the document revision shown when the dialog was
+opened. Host atomically increments affected stage revisions, moves their current
+acceptance records into historical decisions, clears confirmation eligibility,
+sets the selected stage Ready and successors Locked. Predecessors are unchanged.
+Review's Return to Implement uses the same transition starting at Implement.
+Unsettled executions, busy/queued bound sessions, stale writes and immutable runs
+are rejected. Missing old sessions do not delete retained history.
+
+Earlier executions and typed root-relative artifact reference metadata remain
+unchanged and are displayed as historical when their revision differs. Old normal
+outcomes cannot satisfy a new revision; delayed old-turn settlement cannot mutate
+current state. Historical acceptance identities and artifact metadata are
+validated on read. Reference registration and permission-checked opening remain
+independent of execution and acceptance; reopening does not verify artifact contents.
+
+### Artifact references
+
+The native panel registers glossary, ADR, spec, ticket, review and retro metadata
+against a run's current stage revision and a registered root. Registration uses
+the expected history revision and rejects unknown types, stale identities,
+foreign roots, malformed relative paths and escaping links. Active runs can
+register references before executing a stage; archived/done runs are read-only.
+No reference creates work, accepts a stage or claims content verification.
+
+List/open resolve against the retained project/run/reference identity. Missing
+files, unavailable roots, non-files, access failures and denied paths stay
+visible without rewriting metadata. Historical references remain identifiable
+after reopening and restart. Opening reuses Host path containment and Main's
+existing current-workspace/registered-root file reader and preview restrictions,
+then opens the existing Files panel. A delayed result after session/project/run
+navigation cannot open a file in the new view. Availability is filesystem status,
+not engineering acceptance or proof that file content is correct.
 
 ### Acceptance criteria
 
@@ -229,7 +331,7 @@ no runtime acceptance is claimed until implementation and checks pass.
 
 ## Further Notes
 
-- Canonical terminology is in the [domain glossary](../../../CONTEXT.md); durable ownership and acceptance rationale are in [ADR 0314](../../adr/0314-engineering-workflow-ownership-and-acceptance.md).
+- Canonical terminology is in the repository-root `CONTEXT.md` domain glossary; durable ownership and acceptance rationale are in [ADR 0314](../../adr/0314-engineering-workflow-ownership-and-acceptance.md).
 - The factual discovery baseline was remote main at revision 51c839596. Implementation must refresh its own task branch against current remote main rather than assume that snapshot remains current.
 - At that baseline, the native built-in skill catalog contained plugin-development and imagegen, not the six engineering skills. Registry metadata alone cannot make the workflow executable; verify installed project/user/plugin skills through existing discovery.
 - The live code used database schema version 21 while older baseline prose referenced earlier versions. Verify executable contracts and migrations before changing persistence.

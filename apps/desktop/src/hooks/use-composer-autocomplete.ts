@@ -9,6 +9,7 @@ import {
   fuzzyMatchCommand,
   fuzzyMatchPath,
   selectBestMatches,
+  showEngineeringSkillEntry,
   type ComposerCommand,
   type ComposerTrigger,
   type FsIndexEntry,
@@ -60,6 +61,7 @@ function filterCommands(
     sortText: string;
   }> = [];
   for (const command of commands) {
+    if (command.kind === "skill" && !showEngineeringSkillEntry(command.skillId ?? command.name, query)) continue;
     if (skillsOnly && command.kind !== "skill") continue;
     const byName = fuzzyMatchCommand(query, command.name);
     if (byName) {

@@ -135,8 +135,8 @@ export type UserSkillRecord = {
   description?: string;
   enabled: boolean;
   scope?: ActivationScope;
-  /** `created` writes a template; `imported` copies an existing document. */
-  source: "created" | "imported";
+  /** `bundled` is a first-party profile fallback; user definitions take precedence. */
+  source: "created" | "imported" | "bundled";
   /** Absolute path of the document, for opening it in the editor. */
   path: string;
   /** Bytes of the document, so the list can flag one that grew past the cap. */

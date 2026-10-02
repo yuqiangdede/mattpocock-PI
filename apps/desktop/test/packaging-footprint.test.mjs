@@ -191,6 +191,10 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
   // in agent-runtime-bundle-package.test.mjs.
   assert.deepEqual(packageJson.build.extraResources, [
     {
+      from: "../../crates/host-core/resources/workflow-skills-LICENSE",
+      to: "licenses/matt-pocock-skills-LICENSE",
+    },
+    {
       from: "build/icon.png",
       to: "tray-icon.png",
     },

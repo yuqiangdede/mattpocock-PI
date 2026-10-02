@@ -988,6 +988,14 @@ export class AgentHost {
           void this.deliverPromotedBlock(state, started.turnId);
           return;
         } catch (error) {
+          const failure = error as { code?: string; errorCode?: string };
+          if ((failure.errorCode ?? failure.code) === "AGENT_BUSY") {
+            await this.queue.restoreHead(record);
+            turn.status = "queued";
+            this.renumberQueue(state);
+            this.notifyQueue(sessionId);
+            return;
+          }
           turn.status = "failed";
           turn.endedAt = new Date(this.clock.now()).toISOString();
           turn.error = {

@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   GLOBAL_SCOPE,
+  showEngineeringSkillEntry,
   type AgentCapabilityLevel,
   type UserSkillRecord,
 } from "@pi-desktop/shared";
@@ -95,6 +96,17 @@ export function AgentSkillsPage() {
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [editor, setEditor] = useState<SkillEditorState | null>(null);
   const [view, setView] = useState<"skills" | "market">("skills");
+  const [showAllSkills, setShowAllSkills] = useState(false);
+  const updateEngineeringSkills = async () => {
+    setBusyId("engineering-update");
+    try {
+      const result = await api.updateEngineeringSkills();
+      await load();
+      showToast(t("settings.engineeringSkillsUpdated", { count: result.updated.length, preserved: result.preserved.length }));
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+    } finally { setBusyId(null); }
+  };
   const [saving, setSaving] = useState(false);
   const { armed, setArmed } = useArmedDelete();
 
@@ -282,12 +294,12 @@ export function AgentSkillsPage() {
 
   const visible = useMemo(() => {
     const match = (skill: UserSkillRecord) =>
-      matchesCapabilitySearch(search, skill.name, skill.id, skill.description);
+      showEngineeringSkillEntry(skill.id, search, showAllSkills) && matchesCapabilitySearch(search, skill.name, skill.id, skill.description);
     return {
       global: globalSkills.filter(match),
       project: projectSkills.filter(match),
     };
-  }, [globalSkills, projectSkills, search]);
+  }, [globalSkills, projectSkills, search, showAllSkills]);
 
   const counts = {
     all: visible.global.length + visible.project.length,
@@ -546,6 +558,8 @@ export function AgentSkillsPage() {
                 {t("settings.newSkill")}
               </CapabilityButton>
               {marketButton}
+              <CapabilityButton onClick={() => setShowAllSkills((value) => !value)}>{t(showAllSkills ? "settings.showWorkflowSkills" : "settings.showAllSkills")}</CapabilityButton>
+              <CapabilityButton busy={busyId === "engineering-update"} onClick={() => void updateEngineeringSkills()}>{t("settings.updateEngineeringSkills")}</CapabilityButton>
             </>
           }
         />
@@ -567,7 +581,7 @@ export function AgentSkillsPage() {
               <>
                 <CapabilityGroupHeader
                   label={t("settings.globalLevel")}
-                  path={GLOBAL_SKILLS_PATH}
+                  path={visible.global.some((skill) => skill.source === "bundled") ? undefined : GLOBAL_SKILLS_PATH}
                   count={visible.global.length}
                   action={importButton("global")}
                 />

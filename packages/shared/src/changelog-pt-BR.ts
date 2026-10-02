@@ -5,6 +5,9 @@ export const ptBREntries: ChangelogEntry[] = [
     "version": "0.16.0",
     "date": "2026-10-01",
     "highlights": [
+      "Inclui todas as habilidades de engenharia de Matt Pocock, com seis entradas padrão e atualizações manuais que preservam alterações locais.",
+      "Registre e abra referências de artefatos vinculadas a revisões, mantendo o histórico e os arquivos indisponíveis.",
+      "Fluxos de engenharia por projeto com seis etapas de skills, aceitação explícita e recuperação segura.",
       "O Live Voice agora está disponível para todos e as chamadas começam na sessão atual.",
       "Nova lista de tarefas por sessão, que mantém o estado oficial mesmo após reiniciar o serviço local.",
       "Avisos pontuais agora aparecem na pilha de toasts compartilhada em vez de diálogos bloqueantes.",

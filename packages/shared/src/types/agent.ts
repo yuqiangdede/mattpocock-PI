@@ -13,6 +13,8 @@ export type AgentPromptRequest = {
   content: string;
   /** Host-owned collaboration delivery; its durable record supplies the input. */
   sessionMessageId?: string;
+  /** Host-owned Workflow reservation; validated and bound at beginTurn. */
+  workflowExecutionId?: string;
   /** Attachments are resolved by Electron main and never trusted by the sidecar. */
   attachments?: AgentPromptAttachment[];
   /**

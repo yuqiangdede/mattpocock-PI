@@ -140,6 +140,14 @@ export class TurnQueue {
     return this.remove(sessionId, head.id);
   }
 
+  /** Restore an input refused before admission without changing its identity/order. */
+  async restoreHead(record: QueuedTurnRecord): Promise<void> {
+    await this.store.push(record);
+    const queue = this.bySession.get(record.sessionId) ?? [];
+    queue.unshift(record);
+    this.bySession.set(record.sessionId, orderQueue(queue));
+  }
+
   /**
    * Promote one entry to the end of its session's priority block ("send now").
    * `false` when the entry is not queued or already promoted: promotion is

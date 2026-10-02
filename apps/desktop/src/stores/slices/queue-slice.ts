@@ -485,6 +485,17 @@ export function createQueueSlice({
           runtime.submittedComposerDrafts.delete(startedIn);
           runtime.retractOptimisticUserMessage(startedIn, optimisticMessage);
           const messageError = messageErrorFromUnknown(error);
+          if (messageError.code === "AGENT_BUSY" && get().sessions.find((session) => session.id === startedIn)?.source !== "pi-native") {
+            // Admission can become busy after the renderer's initial check.
+            // Preserve ordinary composer input through the existing queue.
+            set((state) => ({
+              isRunning: state.activeSessionId === startedIn ? false : state.isRunning,
+              runningSessions: { ...state.runningSessions, [startedIn]: false },
+            }));
+            const accepted = await get().enqueuePrompt(content, draft, startedIn);
+            if (accepted) onAccepted?.(startedIn);
+            return accepted;
+          }
           const errorRow = assistantErrorMessage(messageError);
           set((state) => {
             return {

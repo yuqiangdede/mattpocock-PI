@@ -20,7 +20,8 @@ Each ADR includes:
 
 | ID | Title | Status |
 |---|---|---|
-| 0314 | [Engineering Workflow ownership and acceptance](0314-engineering-workflow-ownership-and-acceptance.md) | Accepted design; not implemented |
+| 0314 | [Engineering Workflow ownership and acceptance](0314-engineering-workflow-ownership-and-acceptance.md) | Accepted; implemented V0 candidate |
+| 0315 | [Profile-managed engineering skill fallback](0315-bundled-engineering-skill-fallback.md) | Implemented candidate |
 | pi-ai-core-0991-authority | [Pi 0.99.1 account model authority](pi-ai-core-0991-authority.md) | Accepted for current migration candidate |
 | plan-tool-declarations-and-execution-denials | [Keep known tool declarations while denying contract-mode execution](plan-tool-declarations-and-execution-denials.md) | Accepted for implementation |
 | trusted-extension-operation-ownership | [Trusted extension operation ownership](trusted-extension-operation-ownership.md) | Implemented candidate |

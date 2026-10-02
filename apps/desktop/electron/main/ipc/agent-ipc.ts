@@ -316,6 +316,10 @@ export function registerAgentIpc({
 
   handle(IPC.invoke.agentPrompt, async (req: AgentPromptRequest) => {
     if (!sidecar) throw new Error("sidecar unavailable");
+    const workflowExecutionId = typeof req.workflowExecutionId === "string" ? req.workflowExecutionId.trim() : undefined;
+    if (req.workflowExecutionId !== undefined && (!workflowExecutionId || req.sessionId.startsWith("native-pi:") || req.sessionMessageId || req.truncateFromMessageId || req.truncateBefore !== undefined || req.attachments?.length || req.voiceOrigin || req.permissionMode)) {
+      throw Object.assign(new Error("Workflow submissions require their existing Desktop session and canonical input"), { errorCode: "WORKFLOW_INVALID_REQUEST" });
+    }
     const voiceOrigin = parseVoiceOrigin(req.voiceOrigin);
     if (req.sessionId.startsWith("native-pi:")) {
       if (voiceOrigin) {
@@ -446,12 +450,27 @@ export function registerAgentIpc({
     );
     sidecar.setProjectInstructionRoot(req.sessionId, launch.projectPath);
 
+    let submittedContent = req.content;
+    let workflowSkillId: string | undefined;
+    if (workflowExecutionId) {
+      const context = await host.call<{ projectPath: string; skillId: string; prompt: string }>("workflow.execution.context", {
+        executionId: workflowExecutionId, sessionId: req.sessionId,
+      });
+      const commands = await composerCommandService.buildComposerCommands(context.projectPath);
+      if (!commands.some((command) => command.kind === "skill" && command.name === context.skillId && command.skillId === context.skillId)) {
+        throw Object.assign(new Error("Installed workflow skill is unavailable"), { errorCode: "WORKFLOW_SKILL_UNAVAILABLE" });
+      }
+      submittedContent = context.prompt;
+      workflowSkillId = context.skillId;
+    }
+
     // Open a durable turn row, then persist the user message under it.
     const turn = await host.call<{ turnId?: string }>("session.beginTurn", {
       sessionId: req.sessionId,
       providerId: launch.providerId,
       modelId: launch.modelId,
       ...(sessionMessage ? { sessionMessageId: sessionMessage.origin.messageId } : {}),
+      ...(workflowExecutionId ? { workflowExecutionId } : {}),
     });
     const durableTurnId = String(turn?.turnId ?? "").trim();
     if (!durableTurnId) {
@@ -467,15 +486,15 @@ export function registerAgentIpc({
     // explicit, while the typed form remains the visible transcript chip.
     // Builtin/plugin slash aliases never reach this channel, and unknown
     // /names stay literal text.
-    let promptContent = sessionMessage?.content ?? req.content;
+    let promptContent = sessionMessage?.content ?? submittedContent;
     let slashCommand: string | undefined;
     let skillMentions: UiMessage["skillMentions"];
-    if (!sessionMessage && /(^|\s)\/\S/.test(req.content)) {
+    if (!sessionMessage && /(^|\s)\/\S/.test(submittedContent)) {
       try {
         const root = await optionalWorkspaceRoot();
-        const commandEnd = req.content.search(/\s/);
-        const commandName = req.content.startsWith("/")
-          ? req.content.slice(1, commandEnd === -1 ? undefined : commandEnd)
+        const commandEnd = submittedContent.search(/\s/);
+        const commandName = submittedContent.startsWith("/")
+          ? submittedContent.slice(1, commandEnd === -1 ? undefined : commandEnd)
           : "";
         const commands = await composerCommandService.buildComposerCommands(
           launch.projectPath ?? root,
@@ -486,15 +505,22 @@ export function registerAgentIpc({
             ? [[item.name, item.skillId] as const]
             : []),
         );
-        const mentions = findSkillMentions(req.content, activeSkills);
+        if (workflowExecutionId && (!workflowSkillId || activeSkills.get(workflowSkillId) !== workflowSkillId)) {
+          throw Object.assign(new Error("Workflow skill disappeared before dispatch"), { errorCode: "WORKFLOW_SKILL_UNAVAILABLE" });
+        }
+        // The reserved stage's leading alias owns workflow skill selection;
+        // slash text inside the run title remains metadata in the prompt body.
+        const mentions = findSkillMentions(submittedContent, activeSkills).filter((mention) =>
+          !workflowExecutionId || (mention.start === 0 && mention.id === workflowSkillId),
+        );
         if (mentions.length > 0 && (!command || command.kind === "skill")) {
           let body = "";
           let end = 0;
           for (const mention of mentions) {
-            body += req.content.slice(end, mention.start);
+            body += submittedContent.slice(end, mention.start);
             end = mention.end;
           }
-          body = (body + req.content.slice(end)).trim();
+          body = (body + submittedContent.slice(end)).trim();
           const ids = [...new Set(mentions.map((mention) => mention.id))];
           promptContent = [
             `Call the \`Skill\` tool with each of these ids before answering this request, in order: ${ids.map((id) => JSON.stringify(id)).join(", ")}. Follow the loaded skill instructions.`,
@@ -502,17 +528,21 @@ export function registerAgentIpc({
           ]
             .filter(Boolean)
             .join("\n\n");
-          slashCommand = req.content;
+          slashCommand = submittedContent;
           skillMentions = mentions;
-        } else if (req.content.startsWith("/")) {
+        } else if (submittedContent.startsWith("/")) {
           const templates = await loadComposerTemplatesCached(root);
-          const expansion = expandSlashInvocation(req.content, templates);
+          const expansion = expandSlashInvocation(submittedContent, templates);
           if (expansion) {
             promptContent = expansion.expanded;
             slashCommand = expansion.command;
           }
         }
       } catch (error) {
+        if (workflowExecutionId) {
+          await finishTurn(req.sessionId, "error", "WORKFLOW_SKILL_UNAVAILABLE", { turnId: durableTurnId });
+          throw error;
+        }
         logger.app("session", "warn", "slash expansion failed; sending literal text", {
           sessionId: req.sessionId,
           data: String(error),
@@ -642,10 +672,28 @@ export function registerAgentIpc({
         },
       );
     } catch (e) {
+      if (workflowExecutionId && isRpcTimeoutError(e)) {
+        await host.call("workflow.execution.reconcile", { executionId: workflowExecutionId });
+        throw e;
+      }
       await finishTurn(req.sessionId, "error", (e as any)?.errorCode, {
         turnId: durableTurnId,
       });
       throw e;
+    }
+    if (workflowExecutionId) {
+      if (result?.accepted !== true || result.turnId !== durableTurnId) {
+        const explicitRejection = result?.accepted === false;
+        if (explicitRejection) {
+          await finishTurn(req.sessionId, "error", "WORKFLOW_ADMISSION_REJECTED", { turnId: durableTurnId });
+        } else {
+          // A mismatched acknowledgement cannot prove that Pi rejected work.
+          // Keep the admitted turn reserved until its durable outcome settles.
+          await host.call("workflow.execution.reconcile", { executionId: workflowExecutionId });
+        }
+        throw Object.assign(new Error("Workflow runtime did not acknowledge the bound turn"), { errorCode: explicitRejection ? "WORKFLOW_ADMISSION_REJECTED" : "WORKFLOW_ADMISSION_UNCERTAIN" });
+      }
+      await host.call("workflow.execution.running", { executionId: workflowExecutionId, turnId: durableTurnId });
     }
     logger.app("session", "info", "prompt accepted", {
       sessionId: req.sessionId,
@@ -708,12 +756,17 @@ export function registerAgentIpc({
     return result;
   });
 
-  handle(IPC.invoke.agentAbort, async (req: { sessionId: string; turnId?: string }) => {
+  handle(IPC.invoke.agentAbort, async (req: { sessionId: string; turnId?: string; workflowExecutionId?: string }) => {
     if (!sidecar) throw new Error("sidecar unavailable");
     const releaseSessionOperation = req.turnId ? await acquireSessionOperation(req.sessionId) : undefined;
     try {
     const abortedTurnId = activeTurns.get(req.sessionId);
     if (req.turnId && abortedTurnId !== req.turnId) return { ok: false, aborted: false };
+    if (req.workflowExecutionId) {
+      if (!host || !req.turnId) throw new Error("workflow cancellation requires the bound turn");
+      const target = await host.call<{ turnId?: string | null; sessionId: string }>("workflow.execution.stop", { executionId: req.workflowExecutionId });
+      if (target.turnId !== req.turnId || target.sessionId !== req.sessionId) return { ok: false, aborted: false };
+    }
     logger.app("session", "info", "prompt aborted", { sessionId: req.sessionId });
     agentHostBridge?.markAborting(req.sessionId);
     // Lock the abort reason before the first await: the cancel RPC can take a
@@ -726,15 +779,21 @@ export function registerAgentIpc({
         ([, sessionId]) => sessionId === req.sessionId,
       )?.[0];
     let result: unknown;
+    let canceled = false;
     try {
       // An open extension prompt resolves with its abort value (spec 16 §9).
       agentExtensions.cancelPrompts(req.sessionId);
       cancelSessionTools(req.sessionId, "Session turn was aborted");
       result = await sidecar.call("agent.abort", req);
+      if (req.workflowExecutionId && result && typeof result === "object" &&
+          ((result as { aborted?: boolean }).aborted === false || (result as { ok?: boolean }).ok === false)) {
+        throw Object.assign(new Error("Workflow cancellation was not acknowledged"), { errorCode: "WORKFLOW_CANCELLATION_FAILED" });
+      }
+      canceled = true;
     } finally {
       // A turn that already stopped owning the session is refused inside the
       // finalizer, so the identity captured above is the only one used here.
-      if (abortedTurnId) {
+      if (abortedTurnId && (!req.workflowExecutionId || canceled)) {
         await finishTurn(req.sessionId, "aborted", "TURN_ABORTED", {
           turnId: abortedTurnId,
         });
