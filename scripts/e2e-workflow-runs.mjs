@@ -152,5 +152,5 @@ try {
   ]);
   }
 } finally {
-  await rm(temp, { recursive: true, force: true });
+  await rm(temp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 }
