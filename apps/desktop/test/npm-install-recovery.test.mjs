@@ -14,7 +14,7 @@ const { readNpmPath, writeNpmPath } = await import("../electron/main/npm-prefere
 
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), "npm-picker-"));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  t.after(() => rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
   const source = join(root, "source");
   mkdirSync(source);
   writeFileSync(join(source, "index.ts"), "export default function (pi) {}\n");

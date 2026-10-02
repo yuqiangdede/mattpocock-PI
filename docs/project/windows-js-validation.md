@@ -1,4 +1,4 @@
-## Windows JavaScript validation
+# Windows JavaScript validation
 
 JavaScript tests use native path separators. Unix executable and macOS
 release shell fixtures are explicitly skipped on Windows; SSH key transport
