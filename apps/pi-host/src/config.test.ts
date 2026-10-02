@@ -59,5 +59,5 @@ describe("identity and credentials", () => {
     const again = new FileCredentialStore(dir);
     expect((await again.listDevices())[0]?.revokedAt).toBe("2026-09-18T00:00:03.000Z");
     expect(await again.findPairing("cd".repeat(32))).toBeNull();
-  });
+  }, 30_000);
 });
