@@ -1,6 +1,7 @@
 # Project Tracking
 
 - Engineering Workflow V0: [published tickets and acceptance coverage](engineering-workflow-v0-tickets.md)
+- Engineering Workflow V0: [delivery acceptance and remaining release gates](engineering-workflow-v0-closeout.md)
 
 - Pending release highlights: [Unreleased changes](unreleased.md)
 
