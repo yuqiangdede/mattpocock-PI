@@ -148,7 +148,7 @@ test("a silent signing stage produces a stall dump without failing the run", asy
   assert.ok(elapsedMs < 20_000, `watchdog took ${elapsedMs}ms`);
 });
 
-test("a hard timeout kills the process group, dumps diagnostics and exits 124", async () => {
+test("a hard timeout kills the process group, dumps diagnostics and exits 124", { skip: process.platform === "win32" ? "POSIX subprocess fixture" : false }, async () => {
   const { status, stdout, elapsedMs } = await runWatchdog([
     "--label",
     "timeout",

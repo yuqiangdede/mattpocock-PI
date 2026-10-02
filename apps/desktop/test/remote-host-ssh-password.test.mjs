@@ -17,6 +17,7 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
+import { spawn } from "node:child_process";
 import { chmod, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { register } from "node:module";
 import { tmpdir } from "node:os";
@@ -32,9 +33,13 @@ const {
   assertSshPassword,
   createSshAskpass,
 } = await import("../electron/main/remote/ssh-askpass.ts");
-const { createSystemSshTransport, sshCommonArgs } = await import(
+const { createSystemSshTransport: nativeTransport, sshCommonArgs } = await import(
   "../electron/main/remote/ssh-transport.ts"
 );
+const portableFixtures = new Set();
+function createSystemSshTransport(target, options={}) {
+  return nativeTransport(target, {...options,...(portableFixtures.has(options.binary) ? {spawnProcess:(_binary,args,settings)=>spawn(process.execPath,[options.binary,...args],settings)} : {})});
+}
 const { sshTargetOf } = await import("../electron/main/remote/ssh-tunnel.ts");
 const { createRemoteHostRegistry } = await import(
   "../electron/main/remote/remote-host-registry.ts"
@@ -74,6 +79,10 @@ async function tmpDir(t, prefix = "ssh-password-") {
 async function writeFixture(t, body, name) {
   const dir = await tmpDir(t, "ssh-fixture-");
   const path = join(dir, name);
+  if (process.platform === "win32" && body === FIXTURES.argvAndEnv) {
+    body = 'for(const arg of process.argv.slice(2)) console.log("ARGV "+arg); console.log("HAS_ASKPASS "+(process.env.SSH_ASKPASS?"set":"")); console.log("SECRET_FILE "+(process.env.PI_SSH_ASKPASS_SECRET||"unset")); console.log("HELPER_PATH "+(process.env.SSH_ASKPASS||"unset"));';
+    portableFixtures.add(path);
+  }
   await writeFile(path, body, { mode: 0o700 });
   await chmod(path, 0o700);
   t.after(() => rm(path, { force: true }));
@@ -139,7 +148,7 @@ test("sshCommonArgs relaxes BatchMode only for a password target", () => {
   assert.equal(args.at(-1), "deploy@remote.example");
 });
 
-test("a password target reaches ssh through the askpass helper and nowhere else", { timeout: TEST_TIMEOUT_MS }, async (t) => {
+test("a password target reaches ssh through the askpass helper and nowhere else", { skip: process.platform === "win32" ? "POSIX subprocess fixture" : false, timeout: TEST_TIMEOUT_MS }, async (t) => {
   const binary = await writeFixture(t, FIXTURES.argvAndEnv, "ssh-askpass-probe");
   const transport = createSystemSshTransport(
     { host: "remote.example", user: "deploy", password: PASSWORD },
@@ -196,7 +205,7 @@ test("a key-authenticated transport is handed no askpass material", { timeout: T
   assert.equal(read("HELPER_READS"), undefined);
 });
 
-test("each command gets its own credential, and none outlives it", { timeout: TEST_TIMEOUT_MS }, async (t) => {
+test("each command gets its own credential, and none outlives it", { skip: process.platform === "win32" ? "POSIX subprocess fixture" : false, timeout: TEST_TIMEOUT_MS }, async (t) => {
   const binary = await writeFixture(t, FIXTURES.argvAndEnv, "ssh-per-command-secret");
   const transport = createSystemSshTransport(
     { host: "remote.example", password: PASSWORD },
@@ -216,7 +225,7 @@ test("each command gets its own credential, and none outlives it", { timeout: TE
   await assert.rejects(stat(secondSecret));
 });
 
-test("dispose removes credential material that no child has reclaimed", { timeout: TEST_TIMEOUT_MS }, async (t) => {
+test("dispose removes credential material that no child has reclaimed", { skip: process.platform === "win32" ? "POSIX subprocess fixture" : false, timeout: TEST_TIMEOUT_MS }, async (t) => {
   const binary = await writeFixture(t, FIXTURES.argvAndEnv, "ssh-dispose-secret");
   const transport = createSystemSshTransport(
     { host: "remote.example", password: PASSWORD },
@@ -261,7 +270,7 @@ test("createSshAskpass refuses Windows instead of writing a helper that cannot r
   assert.deepEqual(await readdir(dir), []);
 });
 
-test("createSshAskpass writes a 0600 secret in a 0700 directory and cleans up", async (t) => {
+test("createSshAskpass writes a 0600 secret in a 0700 directory and cleans up", { skip: process.platform === "win32" ? "POSIX subprocess fixture" : false }, async (t) => {
   const parent = await tmpDir(t);
   const material = await createSshAskpass(PASSWORD, { dir: parent });
   const secretPath = material.env[ASKPASS_SECRET_ENV];

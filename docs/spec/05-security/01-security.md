@@ -366,3 +366,12 @@ the parent's session directory (fsync, then a no-clobber hardlink to the final
 name); cleanup removes only files whose device/inode and content still match
 what this operation created, and unexpected filesystem failures cross the
 preload boundary only as a path-free classified error.
+
+### Remote host credential files on Windows
+
+`pi-host` protects its credential directory with a non-inherited Windows
+ACL before reading or writing identity, device and pairing records. Only
+the current user, SYSTEM and Administrators receive access. Credential
+files retain mode `0600` on Unix. Existing records and host identity are
+preserved when directory protection is reapplied; symbolic-link credential
+directories are rejected.

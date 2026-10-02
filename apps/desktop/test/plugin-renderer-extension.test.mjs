@@ -4,6 +4,8 @@ import { register, registerHooks } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
+const escapeModule = process.platform === "win32" ? "renderer/escape/secret.js" : "renderer/escape.js";
+const aliasModule = process.platform === "win32" ? "renderer/alias/chart.js" : "renderer/alias.js";
 
 // Electron is the boundary: the protocol module hands its request handler to
 // `protocol.handle`, and this stand-in keeps it for the tests to drive.
@@ -83,8 +85,13 @@ function pluginPackage(t) {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), content);
   }
-  symlinkSync(join(root, "secret.js"), join(dir, "renderer", "escape.js"));
-  symlinkSync(join(dir, "renderer", "lib", "chart.js"), join(dir, "renderer", "alias.js"));
+  if (process.platform === "win32") {
+    symlinkSync(root, join(dir,"renderer","escape"),"junction");
+    symlinkSync(join(dir,"renderer","lib"), join(dir,"renderer","alias"),"junction");
+  } else {
+    symlinkSync(join(root, "secret.js"), join(dir, "renderer", "escape.js"));
+    symlinkSync(join(dir, "renderer", "lib", "chart.js"), join(dir, "renderer", "alias.js"));
+  }
   return { root, dir };
 }
 
@@ -143,7 +150,7 @@ test("the source resolver serves the current load's regular files from inside th
   assert.equal(resolveRendererSourcePath(plugin, generation, "renderer/index.js"), real("renderer/index.js"));
   assert.equal(resolveRendererSourcePath(plugin, generation, "renderer/lib/chart.js"), real("renderer/lib/chart.js"));
   assert.equal(
-    resolveRendererSourcePath(plugin, generation, "renderer/alias.js"),
+    resolveRendererSourcePath(plugin, generation, aliasModule),
     real("renderer/lib/chart.js"),
     "a link inside the package serves its target",
   );
@@ -152,7 +159,7 @@ test("the source resolver serves the current load's regular files from inside th
     ["a parent escape through the entry folder", "renderer/../../secret.js"],
     ["a sibling folder sharing the name prefix", "../pkg-evil/x.js"],
     ["an absolute path", join(root, "secret.js")],
-    ["a link out of the package", "renderer/escape.js"],
+    ["a link out of the package", escapeModule],
     ["a folder", "renderer"],
     ["the package itself", ""],
     ["a missing file", "renderer/missing.js"],
@@ -451,7 +458,7 @@ test("plugin-renderer:// answers GET for module files the resolver allows, and 4
     ["another plugin", `plugin-renderer://demo.other/g${generation}/renderer/index.js`],
     ["an escape hidden in one segment", `${base}/..%2Fsecret.js`],
     ["an escape hidden after the entry folder", `${base}/renderer%2F..%2F..%2Fsecret.js`],
-    ["a link out of the package", `${base}/renderer/escape.js`],
+    ["a link out of the package", `${base}/${escapeModule}`],
     ["a missing file", `${base}/renderer/missing.js`],
   ];
   for (const [label, url] of refusedByResolver) {

@@ -240,7 +240,7 @@ test("a hostile version stays one literal value when the assignments run", async
   }
 });
 
-test("the generated script installs, starts, and prints the ready/pairing lines", async () => {
+test("the generated script installs, starts, and prints the ready/pairing lines", { skip: process.platform === "win32" ? "POSIX subprocess fixture" : false }, async () => {
   const { dir, cleanup } = await tempDir("pi-host-script-run-");
   try {
     const sandbox = await prepareSandbox(dir);
@@ -267,7 +267,7 @@ test("the generated script installs, starts, and prints the ready/pairing lines"
   }
 });
 
-test("a checksum mismatch fails the script before anything is installed", async () => {
+test("a checksum mismatch fails the script before anything is installed", { skip: process.platform === "win32" ? "POSIX subprocess fixture" : false }, async () => {
   const { dir, cleanup } = await tempDir("pi-host-script-digest-");
   try {
     const sandbox = await prepareSandbox(dir);

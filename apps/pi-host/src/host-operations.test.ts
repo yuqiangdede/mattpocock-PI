@@ -1,15 +1,19 @@
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { join, basename } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { RacpError } from "@pi-desktop/agent-host";
 
 import { createHostOperations } from "./host-operations.js";
 
 const dirs: string[] = [];
+const previousGitCeiling = process.env.GIT_CEILING_DIRECTORIES;
+beforeEach(() => { process.env.GIT_CEILING_DIRECTORIES = tmpdir(); });
 afterEach(async () => {
   for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true });
+  if (previousGitCeiling === undefined) delete process.env.GIT_CEILING_DIRECTORIES;
+  else process.env.GIT_CEILING_DIRECTORIES = previousGitCeiling;
 });
 
 function fakeHost(calls: Array<{ method: string; params: unknown }>, projectPath: string) {
@@ -60,7 +64,7 @@ describe("pi-host operations over host-core", () => {
       browseRoot: root,
     });
     const listed = await operations.sessions.list();
-    expect(listed[0]).toMatchObject({ id: "s1", workspaceLabel: root.split("/").pop() });
+    expect(listed[0]).toMatchObject({ id: "s1", workspaceLabel: basename(root) });
     const created = await operations.sessions.create({ title: "T", projectId: "7", permissionMode: "auto" }, { subject: "d", roles: ["owner"] });
     expect(created.permissionMode).toBe("auto");
     expect(calls.find((call) => call.method === "session.create")?.params).toMatchObject({ projectPath: root });

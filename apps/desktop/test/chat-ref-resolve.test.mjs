@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { before, after } from "node:test";
 import { mkdirSync, mkdtempSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -29,6 +30,12 @@ function roots(options) {
 }
 
 const resolve = (ref, options) => resolveChatFileRef(ref, roots(options));
+const previousGitCeiling = process.env.GIT_CEILING_DIRECTORIES;
+before(() => { process.env.GIT_CEILING_DIRECTORIES = tmpdir(); });
+after(() => {
+  if (previousGitCeiling === undefined) delete process.env.GIT_CEILING_DIRECTORIES;
+  else process.env.GIT_CEILING_DIRECTORIES = previousGitCeiling;
+});
 
 /**
  * Partial-path completion for chat file references.

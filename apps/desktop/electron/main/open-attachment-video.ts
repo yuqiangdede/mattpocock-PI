@@ -1,4 +1,4 @@
-import { lstat, mkdir, realpath, symlink } from "node:fs/promises";
+import { lstat, mkdir, realpath, symlink, link, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
 const ATTACHMENT_HASH = /^[0-9a-f]{64}$/i;
@@ -28,10 +28,15 @@ export async function openableMp4Path(
   }
   const alias = join(directory, `${hash.toLowerCase()}.mp4`);
   try {
-    await symlink(target, alias, "file");
+    if (process.platform === "win32") await link(target, alias);
+    else await symlink(target, alias, "file");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-    if (!(await lstat(alias)).isSymbolicLink() || (await realpath(alias)) !== target) {
+    const info = await lstat(alias);
+    const symbolicMatch = info.isSymbolicLink() && (await realpath(alias)) === target;
+    const [original, existing] = await Promise.all([stat(target, {bigint:true}),stat(alias, {bigint:true})]);
+    const hardMatch = process.platform === "win32" && info.isFile() && original.ino !== 0n && existing.ino === original.ino && existing.dev === original.dev;
+    if (!symbolicMatch && !hardMatch) {
       throw new Error("attachment open path is already occupied");
     }
   }

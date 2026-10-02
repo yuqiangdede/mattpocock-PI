@@ -10,6 +10,7 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
+import { spawn } from "node:child_process";
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { register } from "node:module";
 import { connect, createServer } from "node:net";
@@ -20,9 +21,16 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers/ts-import-hooks.mjs")));
 
-const { assertSshArgument, createSystemSshTransport, reserveLocalPort } = await import(
+const { assertSshArgument, createSystemSshTransport: nativeTransport, reserveLocalPort } = await import(
   "../electron/main/remote/ssh-transport.ts"
 );
+const nodeFixtures = new Set();
+function createSystemSshTransport(target, options = {}) {
+  const spawnProcess = process.platform === "win32" && nodeFixtures.has(options.binary)
+    ? (_binary, args, settings) => spawn(process.execPath, [options.binary, ...args], settings)
+    : undefined;
+  return nativeTransport(target, { ...options, ...(spawnProcess ? {spawnProcess} : {}) });
+}
 
 /** Every test is bounded well below the module's own 30 s / 120 s defaults. */
 const TEST_TIMEOUT_MS = 20_000;
@@ -101,6 +109,18 @@ async function writeFixture(t, body, name) {
   const dir = await mkdtemp(join(tmpdir(), "pi-desktop-ssh-fixture-"));
   t.after(() => rm(dir, { recursive: true, force: true }));
   const file = join(dir, name);
+  if (process.platform === "win32") {
+    const portable = new Map([
+      [FIXTURES.argvEcho, 'process.stdout.write(process.argv.slice(2).join("\\n")+"\\n");'],
+      [FIXTURES.argvAndStdin, 'process.stdout.write("ARGV-BEGIN\\n"+process.argv.slice(2).join("\\n")+"\\nARGV-END\\n");process.stdin.pipe(process.stdout);'],
+      [FIXTURES.failing, 'process.stdout.write("STDOUT-MARKER-the remote step failed\\n");process.stderr.write("STDERR-MARKER-connection reset by peer\\n");process.exitCode=3;'],
+      [FIXTURES.tokenLeak, 'process.stdout.write(\'PI_HOST_PAIRING_TOKEN {"token":"ppt1.secret","expiresAt":1}\\nbootstrap step 3 failed on the remote host\\n\');process.exitCode=7;'],
+      [FIXTURES.sleeper, 'setTimeout(()=>{},30000);'],
+      [FIXTURES.deadSsh, 'process.stderr.write("Permission denied (publickey).\\n");process.exitCode=255;'],
+    ]);
+    body = portable.get(body) ?? body;
+    nodeFixtures.add(file);
+  }
   await writeFile(file, body, "utf8");
   await chmod(file, 0o755);
   return file;
