@@ -12,7 +12,7 @@
   "main": "./out/main/index.js",
   "type": "module",
   "scripts": {
-    "build:deps": "pnpm --filter '@pi-desktop/desktop^...' build",
+    "build:deps": "pnpm --filter \"@pi-desktop/desktop^...\" build",
     "predev": "pnpm run build:deps && cargo build --manifest-path ../../Cargo.toml -p host-core",
     "dev": "node ../../scripts/dev-electron.mjs",
     "build": "electron-vite build",
@@ -120,6 +120,10 @@
       "pt_BR"
     ],
     "extraResources": [
+      {
+        "from": "../../crates/host-core/resources/workflow-skills-LICENSE",
+        "to": "licenses/matt-pocock-skills-LICENSE"
+      },
       {
         "from": "build/icon.png",
         "to": "tray-icon.png"

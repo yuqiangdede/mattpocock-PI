@@ -367,6 +367,7 @@ export function createHostRuntime({
   runtimeState.host = h;
   try {
     await h.handshake();
+    await h.call("skills.ensureBundled");
     logger.app("runtime", "info", "host-core handshake ok", {
       data: { generation: h.generation },
     });

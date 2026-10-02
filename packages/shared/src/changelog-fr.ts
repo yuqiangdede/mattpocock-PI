@@ -5,6 +5,9 @@ export const frEntries: ChangelogEntry[] = [
     "version": "0.16.0",
     "date": "2026-10-01",
     "highlights": [
+      "Intégrez tous les skills d’ingénierie de Matt Pocock, avec six entrées par défaut et des mises à jour manuelles préservant les modifications locales.",
+      "Enregistrez et ouvrez les références aux artefacts liées aux révisions, en conservant les fichiers historiques et indisponibles.",
+      "Workflows d’ingénierie par projet avec six étapes de skills, acceptation explicite et reprise sûre.",
       "Live Voice est désormais accessible à tous et les appels démarrent dans la conversation en cours.",
       "Nouvelle liste de tâches par conversation, qui conserve son état de référence même après un redémarrage du service local.",
       "Les notifications ponctuelles s’affichent maintenant dans la pile de toasts commune plutôt que dans des boîtes de dialogue bloquantes.",

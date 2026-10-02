@@ -1,6 +1,6 @@
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, basename } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentSession, ModelRuntime, SessionManager } from "@earendil-works/pi-coding-agent";
 import { createAssistantMessageEventStream, type AssistantMessage } from "@earendil-works/pi-ai";
@@ -543,8 +543,9 @@ describe("native fork children", () => {
       await expect.poll(() => service.status(child.id).status.isRunning).toBe(false);
       const after = readFileSync(childPath, "utf8");
       expect(after.startsWith(childBytes)).toBe(true);
-      expect(after.match(/follow-up/g)).toHaveLength(1);
-      expect(after.match(/fixture reply/g)).toHaveLength(1);
+      const appended = after.split("\n").filter(Boolean).map((line) => JSON.parse(line));
+      expect(appended.filter((entry) => entry.type === "message" && entry.message.role === "user" && JSON.stringify(entry.message.content).includes("follow-up"))).toHaveLength(1);
+      expect(appended.filter((entry) => entry.type === "message" && entry.message.role === "assistant" && JSON.stringify(entry.message.content).includes("fixture reply"))).toHaveLength(1);
       const reopened = SessionManager.open(childPath);
       const branch = reopened.getBranch().filter((entry) => entry.type === "message");
       const visibleBranch = branch.filter((entry) => entry.message.role !== "system");
@@ -781,7 +782,7 @@ describe("native fork children", () => {
         expect(failure?.message).not.toContain(f.group);
         expect(existsSync(foreignPath)).toBe(true);
         expect(readFileSync(foreignPath, "utf8")).toContain("collision");
-        expect(groupEntries(f.group).sort()).toEqual(before.concat([foreignPath.split("/").at(-1)!]).sort());
+        expect(groupEntries(f.group).sort()).toEqual(before.concat([basename(foreignPath)]).sort());
         expect(readFileSync(f.file, "utf8")).toBe(parentBytes);
       } finally { service.disposeAll(); }
     } finally {

@@ -109,7 +109,10 @@ impl ImportShape {
 
 pub struct UserSkillRegistry {
     state: CapabilityState,
+    bundled_root: PathBuf,
 }
+
+pub mod bundled;
 
 /// Place a single skill file at `target`, either as a copy or a symlink.
 ///
@@ -595,11 +598,13 @@ fn ensure_no_symlink_path(root: &Path, target: &Path) -> Result<()> {
             bail!("SKILL_INVALID: package path contains traversal");
         };
         current.push(value);
-        if current.exists() {
-            let metadata = fs::symlink_metadata(&current)?;
-            if metadata.file_type().is_symlink() {
+        match fs::symlink_metadata(&current) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
                 bail!("SKILL_INVALID: skill package path cannot traverse a symbolic link");
             }
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
         }
     }
     Ok(())
@@ -629,17 +634,31 @@ impl UserSkillRegistry {
             return Ok(source);
         }
         let source_path = PathBuf::from(&source.path);
-        let raw = fs::read_to_string(&source_path)
-            .with_context(|| format!("read {}", source_path.display()))?;
+        let raw = if source.source == "bundled" {
+            self.read_bundled_document(&source_path)?
+        } else {
+            fs::read_to_string(&source_path)
+                .with_context(|| format!("read {}", source_path.display()))?
+        };
         if raw.len() > MAX_SKILL_BYTES {
             bail!("SKILL_INVALID: document exceeds {MAX_SKILL_BYTES} bytes");
         }
-        let existing = self.list(to.level, to.project_path.as_deref())?;
+        let existing = self.owned_skills(to.level, to.project_path.as_deref())?;
         if existing.len() >= MAX_SKILLS {
             bail!("SKILL_INVALID: at most {MAX_SKILLS} skills");
         }
 
-        let source_dir = capability_dir(from.level, from.project_path.as_deref(), "skills")?;
+        let source_dir = if source.source == "bundled" {
+            source_path
+                .parent()
+                .and_then(Path::parent)
+                .ok_or_else(|| {
+                    anyhow::anyhow!("SKILL_INVALID: bundle package directory is missing")
+                })?
+                .to_path_buf()
+        } else {
+            capability_dir(from.level, from.project_path.as_deref(), "skills")?
+        };
         let directory = capability_dir(to.level, to.project_path.as_deref(), "skills")?;
         let owned_dir = directory_skill_root(&source_path, &source_dir);
         let shared_directory = owned_dir.is_some();
@@ -657,7 +676,13 @@ impl UserSkillRegistry {
         };
         let rewritten = placement.name != source.name;
 
-        if !rewritten {
+        if source.source == "bundled" {
+            if !shared_directory {
+                bail!("SKILL_INVALID: bundled skill is not a complete package");
+            }
+            let document = rewritten.then(|| rewrite_document_name(&raw, &placement.name));
+            self.move_bundled_package(&source_unit, &target_unit, document.as_deref())?;
+        } else if !rewritten {
             move_capability_file(&source_unit, &target_unit)?;
         } else {
             let document = rewrite_document_name(&raw, &placement.name);
@@ -738,6 +763,7 @@ impl UserSkillRegistry {
     pub fn new(data_dir: &Path) -> Self {
         Self {
             state: CapabilityState::new(data_dir, SKILL_KIND),
+            bundled_root: data_dir.join("engineering-skills"),
         }
     }
 
@@ -764,6 +790,10 @@ impl UserSkillRegistry {
             }
         }
         paths.sort();
+        if level == CapabilityLevel::Global {
+            // User-owned global definitions win over the shipped fallback.
+            paths.extend(self.bundled_paths()?);
+        }
 
         let owner_project_path = if level == CapabilityLevel::Project {
             project_path.map(normalize_project_path)
@@ -773,7 +803,12 @@ impl UserSkillRegistry {
         let mut records = Vec::new();
         let mut seen = HashSet::new();
         for path in paths {
-            let raw = match fs::read_to_string(&path) {
+            let content = if path.starts_with(&self.bundled_root) {
+                self.read_bundled_document(&path)
+            } else {
+                fs::read_to_string(&path).map_err(anyhow::Error::from)
+            };
+            let raw = match content {
                 Ok(raw) if raw.len() <= MAX_SKILL_BYTES => raw,
                 _ => continue,
             };
@@ -810,7 +845,12 @@ impl UserSkillRegistry {
                 description,
                 enabled,
                 scope,
-                source: "imported".into(),
+                source: if path.starts_with(&self.bundled_root) {
+                    "bundled"
+                } else {
+                    "imported"
+                }
+                .into(),
                 path: path.to_string_lossy().to_string(),
                 size_bytes: raw.len() as u64,
                 created_at: updated_at.clone(),
@@ -835,6 +875,18 @@ impl UserSkillRegistry {
     ) -> Result<Vec<UserSkillRecord>> {
         let selected = project_path.map(normalize_project_path);
         self.scan_level(level, project_path, selected.as_deref())
+    }
+
+    fn owned_skills(
+        &mut self,
+        level: CapabilityLevel,
+        project_path: Option<&str>,
+    ) -> Result<Vec<UserSkillRecord>> {
+        Ok(self
+            .list(level, project_path)?
+            .into_iter()
+            .filter(|record| record.source != "bundled")
+            .collect())
     }
 
     /// Return the effective user skill catalog. A project document shadows a
@@ -894,13 +946,13 @@ impl UserSkillRegistry {
             bail!("SKILL_INVALID: invalid id");
         }
         if self
-            .list(level, project_path.as_deref())?
+            .owned_skills(level, project_path.as_deref())?
             .iter()
             .any(|record| record.id == id || record.name.eq_ignore_ascii_case(&name))
         {
             bail!("SKILL_INVALID: a skill with this name already exists at this level");
         }
-        if self.list(level, project_path.as_deref())?.len() >= MAX_SKILLS {
+        if self.owned_skills(level, project_path.as_deref())?.len() >= MAX_SKILLS {
             bail!("SKILL_INVALID: at most {MAX_SKILLS} skills");
         }
         let body = input
@@ -963,7 +1015,7 @@ impl UserSkillRegistry {
             }
         };
         let (level, project_path) = level_and_project(&input)?;
-        let existing = self.list(level, project_path.as_deref())?;
+        let existing = self.owned_skills(level, project_path.as_deref())?;
         if existing.len() >= MAX_SKILLS {
             bail!("SKILL_INVALID: at most {MAX_SKILLS} skills");
         }
@@ -1138,7 +1190,11 @@ impl UserSkillRegistry {
         let Some(record) = record else {
             return Ok(None);
         };
-        let raw = fs::read_to_string(&record.path)?;
+        let raw = if record.source == "bundled" {
+            self.read_bundled_document(Path::new(&record.path))?
+        } else {
+            fs::read_to_string(&record.path)?
+        };
         let (front, old_body) = parse_front_matter(&raw);
         let name = input
             .name
@@ -1160,7 +1216,11 @@ impl UserSkillRegistry {
         if document.len() > MAX_SKILL_BYTES {
             bail!("SKILL_INVALID: document exceeds {MAX_SKILL_BYTES} bytes");
         }
-        fs::write(&record.path, document)?;
+        if record.source == "bundled" {
+            self.write_bundled_document(Path::new(&record.path), document.as_bytes())?;
+        } else {
+            fs::write(&record.path, document)?;
+        }
         if let Some(enabled) = input.enabled {
             self.state.set_enabled(
                 SKILL_KIND,
@@ -1186,7 +1246,11 @@ impl UserSkillRegistry {
         let Some(record) = self.find(id, level, project_path)? else {
             return Ok(None);
         };
-        let raw = fs::read_to_string(&record.path)?;
+        let raw = if record.source == "bundled" {
+            self.read_bundled_document(Path::new(&record.path))?
+        } else {
+            fs::read_to_string(&record.path)?
+        };
         if raw.len() > MAX_SKILL_BYTES {
             bail!("SKILL_INVALID: document exceeds {MAX_SKILL_BYTES} bytes");
         }
@@ -1206,6 +1270,9 @@ impl UserSkillRegistry {
         let Some(record) = self.find(id, Some(level), project_path)? else {
             return Ok(Vec::new());
         };
+        if record.source == "bundled" {
+            return self.bundled_package_files(Path::new(&record.path));
+        }
         let Some(root) = package_root(&record, level, project_path)? else {
             return Ok(Vec::new());
         };
@@ -1298,7 +1365,11 @@ impl UserSkillRegistry {
         let Some(record) = self.find(id, level, project_path)? else {
             return Ok(false);
         };
-        fs::remove_file(&record.path).ok();
+        if record.source == "bundled" {
+            self.remove_bundled_document(Path::new(&record.path))?;
+        } else {
+            fs::remove_file(&record.path).ok();
+        }
         let level = record
             .level
             .as_deref()

@@ -9023,11 +9023,194 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   desktop and host. Host-core and targeted renderer tests are companion checks,
   not substitutes for the Electron journey.
 
+### E2E-WORKFLOW-project-owned-runs: Project-owned Workflow Runs
+- **Preconditions**: Isolated Electron fixture profile, two temporary logical
+  projects, production `WorkPanel`, `WorkflowTab`, the app's Work Panel store
+  projection, and the real Rust HostProcess/SQLite boundary. No provider, user
+  profile, or paid service is used.
+- **Steps**: Open/close the Work Panel without creating a run. Open Workflow
+  from the native launcher. Create a titled run in project A and verify
+  Discovery alone is ready. Switch to another chat in A, switch to B, then
+  return to A. Close/reopen Workflow, archive the idle run, create a second
+  run, and read the archived history. Hold an A history response after the
+  real host returns, switch to B, release the response, and verify B stays
+  bound to its own history. Archive A in renderer project metadata, inspect
+  the read-only unavailable view, and restore it. Remove A's host project
+  binding and inspect the retained history from the unavailable section.
+  Inspect A and B records through the host list operation.
+- **Expected**: Opening and closing the panel creates no data. A's history is
+  retained across chats and panel reopening; B has no A runs. Only Discovery is
+  ready on a new run, the other five stages explain their prerequisite, and no
+  execution/acceptance action is exposed. Archival and unavailable project
+  bindings remain read-only, selectable history; removing A does not delete or
+  move its Workflow Runs. A delayed response for A cannot replace B's current
+  projection. Renderer-archived and host-missing bindings both remain
+  inspectable without mutation controls.
+- **Specs linked**: [Engineering Workflow V0](../01-product/engineering-workflow-v0.md),
+  [ADR 0314](../../adr/0314-engineering-workflow-ownership-and-acceptance.md).
+- **Acceptance criterion**: AC-01, AC-06, AC-10, AC-16, AC-18, AC-19, AC-20.
+  `pnpm test:e2e:workflow-runs` exercises the production
+  WorkPanel and WorkflowTab through renderer IPC and the real host process. Host tests cover
+  simultaneous create requests, stale revisions, malformed/future document
+  preservation, identity stability, and restart with unrelated data. The
+  full AppShell startup remains outside this focused fixture; the native
+  panel/session context and host/database lifecycle are exercised directly.
+- **Milestone**: M6+ (Engineering Workflow V0).
+- **Status**: Passed on the uncommitted task worktree candidate based on
+  `c1e3da0f4c9cb223781f63760621097ab3e056c4` (`origin/main`):
+  `pnpm test:e2e:workflow-runs`. The focused fixture used a temporary
+  Electron profile and real Rust host process; the full AppShell path remains
+  outside this fixture.
+
+### E2E-WORKFLOW-discovery: Bound Discovery execution
+
+- **Preconditions**: Isolated Electron profile, real HostProcess/SQLite,
+  production WorkPanel, WorkflowTab, Agent IPC, and DesktopAgentRuntime. Only
+  provider transport is deterministic; no account or paid service is contacted.
+- **Steps**: Create a run; inspect missing-session, mismatched-project and
+  disabled-skill blockers. Start twice while admission waits; release admission
+  and observe the actual Pi Skill load. Switch project/chat and close/reopen the
+  panel. Reload the renderer, finish normally, and inspect awaiting confirmation
+  with Spec locked. Archive and execute a failed attempt in another run. Start
+  an admission with a lost acknowledgement, reload, kill/restart the host, and
+  inspect the retained Interrupted execution without replay.
+- **Expected**: Three workflow prompts plus one queued ordinary prompt, four real
+  skill loads; ordinary input racing a winning reservation persists and drains
+  after Discovery settles. Durable
+  execution/turn identities survive navigation and reload. Normal, failure and
+  uncertain admission never unlock Spec. Full restart preserves the attempt and
+  marks it Interrupted. Busy/queued races reject admission without chat queuing;
+  simultaneous and duplicate reservations admit only one execution.
+- **Specs linked**: [Engineering Workflow V0](../01-product/engineering-workflow-v0.md),
+  [ADR 0314](../../adr/0314-engineering-workflow-ownership-and-acceptance.md).
+- **Acceptance criterion**: AC-03, AC-05, AC-07 through AC-10, AC-14, AC-16,
+  AC-18. Host tests cover races, durable settlement and corruption preservation.
+- **Milestone**: M6+ (Engineering Workflow V0).
+- **Status**: `pnpm test:e2e:workflow-discovery` passed in the uncommitted task
+  candidate based on `c1e3da0f4c9cb223781f63760621097ab3e056c4`. Full AppShell,
+  installed release packaging and live providers are outside this fixture.
+
+### E2E-WORKFLOW-recovery: Stop, Retry and Continue
+
+- **Preconditions**: Discovery fixture with real Pi runtime/Skill, Main admission
+  and cancellation, and durable Host/SQLite; deterministic provider/process I/O.
+- **Steps**: Restart an uncertain execution, Retry explicitly, Stop its bound
+  turn, Retry to normal completion, then Continue to a provider failure. Fail
+  cancellation transport and inspect retained ownership and a visible error.
+  Finish that attempt, start an ordinary subsequent chat, and Stop an old
+  workflow execution. Inspect all prior attempts and bindings.
+  Return a mismatched runtime acknowledgement for an already admitted turn;
+  verify it remains reserved with Retry unavailable until its own Normal outcome.
+- **Expected**: New identities for explicit attempts; no replay, no automatic
+  acceptance or Spec unlock. Failed cancellation retains the reservation.
+  Stale Stop does not affect ordinary chat. Missing/mismatched/busy/queued
+  session gates remain authoritative; a next attempt may bind another existing
+  same-project session without changing prior history.
+- **Specs linked**: [Engineering Workflow V0](../01-product/engineering-workflow-v0.md).
+- **Acceptance criterion**: AC-05, AC-07, AC-10, AC-14 through AC-16, AC-20.
+- **Milestone**: M6+.
+- **Status**: `pnpm test:e2e:workflow-recovery` and focused Host recovery tests
+  validate the uncommitted request candidate based on
+  `c1e3da0f4c9cb223781f63760621097ab3e056c4`. Full AppShell and live providers
+  remain outside this fixture.
+
+### E2E-WORKFLOW-six-stages: Explicit engineering acceptance
+
+- **Preconditions**: Production Workflow panel, Main Agent IPC, real Pi Skill
+  execution, real Host/SQLite and installed fixture skills; provider I/O local.
+- **Steps**: Try every locked successor through Host RPC. Execute Discovery,
+  reject acceptance based only on ordinary chat, while bound chat is busy/queued,
+  and with stale revision. Explicitly accept Discovery. Continue Spec to failure,
+  reject acceptance, Retry successfully and accept. Execute/accept Tickets,
+  execute Implement twice and confirm all tasks, explicitly confirm Review
+  passed, then execute/accept Retro. Inspect done history and create a new run.
+- **Expected**: Nine prompts load the exact assigned skills. Normal endings and
+  acceptance never dispatch the next stage. Done history is immutable. Every
+  accepted record points to the latest Normal current-revision execution.
+- **Specs linked**: [Engineering Workflow V0](../01-product/engineering-workflow-v0.md).
+- **Acceptance criterion**: AC-02 through AC-05, AC-09, AC-10, AC-12, AC-13, AC-19.
+- **Milestone**: M6+.
+- **Status**: `pnpm test:e2e:workflow-stages` passed on the uncommitted candidate
+  based on `c1e3da0f4c9cb223781f63760621097ab3e056c4`. The focused fixture does
+  not qualify full AppShell, release packaging or live providers.
+
+### E2E-WORKFLOW-reopen: Confirmed revision invalidation
+
+- **Preconditions**: Real production panel and modal, installed stage skills,
+  Pi runtime and Host/SQLite; isolated profile and deterministic provider I/O.
+- **Steps**: Accept through Implement. Open Reopen Spec, inspect all affected
+  stages and Cancel; compare unchanged history. During Review, confirm Return to
+  Implement. Reject old-Normal acceptance and stale reopen, replay an old terminal
+  event, execute/accept the new Implement revision, and reject reopening during
+  Review admission. Stop/Retry Review, reopen Spec, inspect retained historical
+  attempts and predecessor acceptance, archive, reject archived mutation, create
+  another run, restart the Host/renderer, and inspect restored history.
+- **Expected**: Only selected/successor revisions advance; old decisions move
+  into historical records. Existing executions/references remain intact. No
+  acceptance or execution is inferred from reopening. Native modal Cancel is a
+  no-op; busy and stale operations conflict. Restart retains exact identities.
+- **Specs linked**: [Engineering Workflow V0](../01-product/engineering-workflow-v0.md).
+- **Acceptance criterion**: AC-07, AC-10, AC-11, AC-12, AC-19, AC-20. Host tests
+  cover atomic reference/attempt retention; the pure history component covers
+  revision-based historical labels without pretending to verify file content.
+- **Milestone**: M6+.
+- **Status**: Passed. `pnpm test:e2e:workflow-reopen` validated the uncommitted request
+  candidate based on `c1e3da0f4c9cb223781f63760621097ab3e056c4`. Full AppShell,
+  live providers and artifact attachment/opening are outside this fixture.
+
+### E2E-WORKFLOW-artifacts: Registered revision-associated references
+
+- **Preconditions**: Production Workflow panel, existing Files panel, Main file
+  reader and real Host/SQLite; isolated roots/profile and deterministic Pi I/O.
+- **Steps**: Create a run; register Discovery glossary before any execution;
+  open the real Markdown preview. Switch project while opening is held and
+  release the late result; return to the original project. Reject traversal,
+  absolute paths, foreign roots, escaping links, unknown kinds and stale writes.
+  Execute/accept/reopen Discovery; inspect the historical reference. Remove its
+  file, make the registered root unavailable, refresh, restart Host/renderer,
+  inspect retained identity/revision, archive and reject registration.
+- **Expected**: Registration/opening do not execute or accept stages. References
+  remain retained and explicitly historical/unavailable. Opening uses existing
+  permissions and cannot redirect a new project's panel. No generated content,
+  automatic completion, content verification or root reassociation occurs.
+- **Specs linked**: [Engineering Workflow V0](../01-product/engineering-workflow-v0.md).
+- **Acceptance criterion**: AC-07, AC-11, AC-16, AC-17, AC-20. Host boundary tests
+  additionally cover link replacement; Main tests retain file-reader permissions
+  and reject a changed Host or path during an open operation.
+- **Milestone**: M6+.
+- **Status**: Automated in `pnpm test:e2e:workflow-artifacts` against an isolated
+  uncommitted candidate based on `c1e3da0f4c9cb223781f63760621097ab3e056c4`.
+  Full AppShell, live accounts and macOS/Linux qualification are not covered.
+
+### E2E-ENGINEERING-skills: Installer supplies callable skills
+
+- **Preconditions**: Actual Windows packaged application, fresh isolated profile
+  and empty agents directory; local deterministic model endpoint and fixture key.
+- **Steps**: Launch offline and inspect 37 enabled skills. Open native Skills:
+  assert six default entries, then Show all. Configure the model and Agent chat,
+  create a Workflow Run, start Discovery and observe real Skill loads. Invoke
+  /tdd from the composer. Disable Retro, edit Grilling and restart. Explicitly
+  update from a pinned upstream revision; inspect retained edits and activation.
+- **Expected**: Complete skill packages need no external installer or Codex home.
+  Auxiliary skills remain callable; normal execution awaits explicit acceptance.
+  Startup and manual update retain local choices and resources. Failure does not
+  activate partial content; a changed Host generation refuses stale downloads.
+- **Specs linked**: Engineering Workflow V0; ADR 0315; engineering skills distribution.
+- **Acceptance criterion**: Installer-first skill availability, six default
+  entries, full callable catalog, safe explicit updates and restart persistence.
+- **Milestone**: Engineering Workflow V0 delivery.
+- **Status**: Automated by pnpm test:e2e:engineering-skills against the packaged
+  executable. PI_SKILLS_VERIFY_UPSTREAM=1 adds the explicit public upstream check.
+  OS installer-wizard execution and real paid models are separate qualification.
+
 ## 8. Traceability Matrix
 
 | Acceptance | Scenarios |
 |---|---|
 | C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
+| AC-01–AC-16 / AC-18–AC-20 — Engineering Workflow Runs | E2E-WORKFLOW-project-owned-runs, E2E-WORKFLOW-discovery, E2E-WORKFLOW-recovery, E2E-WORKFLOW-six-stages, E2E-WORKFLOW-reopen |
+| AC-17 — Engineering artifact references | E2E-WORKFLOW-artifacts |
+| Installer-first engineering skills | E2E-ENGINEERING-skills |
 | C / E / Security / Quality — Live Voice four-stage interaction | E2E-LIVE-VOICE-four-stage-ui |
 | C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
 | C / F / Quality — Saved project isolation | E2E-SCHEDULED-manual-workspace-binding |

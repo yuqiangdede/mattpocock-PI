@@ -5,18 +5,18 @@
  * virtual modules.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { externalBundleFixture } from "../test-support/external-fixture.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 let work: string;
 
 beforeEach(() => {
-  work = mkdtempSync(join(tmpdir(), "pi-ext-bundle-"));
+  work = externalBundleFixture("pi-ext-bundle-");
 });
 
 afterEach(() => {

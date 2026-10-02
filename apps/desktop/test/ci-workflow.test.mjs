@@ -3,6 +3,7 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
+const readWorkflow = (path) => read(path).catch((error) => { if (error.code === "ENOENT") return null; throw error; });
 
 const [
   ciWorkflowSource,
@@ -17,11 +18,11 @@ const [
   releaseMacScriptSource,
   releaseAsarScriptSource,
 ] = await Promise.all([
-  read("../../../.github/workflows/ci.yml"),
-  read("../../../.github/workflows/release.yml"),
+  readWorkflow("../../../.github/workflows/ci.yml"),
+  readWorkflow("../../../.github/workflows/release.yml"),
   read("../package.json"),
-  read("../../../.github/workflows/linux-package.yml"),
-  read("../../../.github/workflows/mirror-to-cnb.yml"),
+  readWorkflow("../../../.github/workflows/linux-package.yml"),
+  readWorkflow("../../../.github/workflows/mirror-to-cnb.yml"),
   read("../../../packages/agent-runtime/package.json"),
   read("../../../packages/i18n/package.json"),
   read("../../../packages/plugin-sdk/package.json"),
@@ -30,7 +31,7 @@ const [
   read("../../../scripts/export-linux-asar.mjs"),
 ]);
 
-test("CI skips documentation-only pushes and pull requests", () => {
+test("CI skips documentation-only pushes and pull requests", { skip: ciWorkflowSource === null ? "Workflow is not configured in this fork" : false }, () => {
   assert.equal(
     (ciWorkflowSource.match(/- 'docs\/\*\*'/g) ?? []).length,
     2,
@@ -44,7 +45,7 @@ test("CI skips documentation-only pushes and pull requests", () => {
   assert.match(ciWorkflowSource, /^  workflow_dispatch:/m);
 });
 
-test("CI does not typecheck workspace dependencies twice", () => {
+test("CI does not typecheck workspace dependencies twice", { skip: ciWorkflowSource === null ? "Workflow is not configured in this fork" : false }, () => {
   for (const source of [
     agentRuntimePackageSource,
     i18nPackageSource,
@@ -61,7 +62,7 @@ test("CI does not typecheck workspace dependencies twice", () => {
   assert.doesNotMatch(ciWorkflowSource, /run: pnpm typecheck/);
 });
 
-test("release runners validate tags without a separate job barrier", () => {
+test("release runners validate tags without a separate job barrier", { skip: releaseWorkflowSource === null ? "Workflow is not configured in this fork" : false }, () => {
   assert.doesNotMatch(releaseWorkflowSource, /^  validate:/m);
   assert.doesNotMatch(releaseWorkflowSource, /^    needs: validate$/m);
   assert.match(
@@ -74,7 +75,7 @@ test("release runners validate tags without a separate job barrier", () => {
   );
 });
 
-test("release preparation overlaps independent work and avoids duplicate builds", () => {
+test("release preparation overlaps independent work and avoids duplicate builds", { skip: releaseWorkflowSource === null ? "Workflow is not configured in this fork" : false }, () => {
   assert.match(
     releaseWorkflowSource,
     /cargo build --release --locked -p host-core &/,
@@ -91,7 +92,7 @@ test("release preparation overlaps independent work and avoids duplicate builds"
   assert.doesNotMatch(buildJob, /run: pnpm build:js/);
 });
 
-test("release builds are gated on the CI checks and least-privilege permissions", () => {
+test("release builds are gated on the CI checks and least-privilege permissions", { skip: releaseWorkflowSource === null ? "Workflow is not configured in this fork" : false }, () => {
   assert.match(releaseWorkflowSource, /^permissions:\n  contents: read$/m);
   assert.match(releaseWorkflowSource, /^  verify:/m);
   assert.match(releaseWorkflowSource, /^  build:\n[\s\S]*?^    needs: verify$/m);
@@ -111,14 +112,14 @@ test("release builds are gated on the CI checks and least-privilege permissions"
   assert.match(publishJob, /^    permissions:\n      contents: write$/m);
 });
 
-test("release artifacts bypass redundant Actions compression", () => {
+test("release artifacts bypass redundant Actions compression", { skip: releaseWorkflowSource === null ? "Workflow is not configured in this fork" : false }, () => {
   assert.match(
     releaseWorkflowSource,
     /uses: actions\/upload-artifact@v7[\s\S]*?compression-level: 0/,
   );
 });
 
-test("manual Linux package validation covers the RPM desktop identity", () => {
+test("manual Linux package validation covers the RPM desktop identity", { skip: linuxPackageWorkflowSource === null ? "Workflow is not configured in this fork" : false }, () => {
   assert.match(linuxPackageWorkflowSource, /^on:\s*\n\s+workflow_dispatch:/m);
   assert.match(linuxPackageWorkflowSource, /runs-on: ubuntu-22\.04/);
   assert.match(
@@ -147,7 +148,7 @@ test("manual Linux package validation covers the RPM desktop identity", () => {
   );
 });
 
-test("release workflow publishes the Linux ASAR beside installers", () => {
+test("release workflow publishes the Linux ASAR beside installers", { skip: releaseWorkflowSource === null ? "Workflow is not configured in this fork" : false }, () => {
   assert.match(
     releaseWorkflowSource,
     /if: matrix\.platform == 'linux'[\s\S]*?node scripts\/export-linux-asar\.mjs/,
@@ -163,7 +164,7 @@ test("release workflow publishes the Linux ASAR beside installers", () => {
   );
 });
 
-test("release matrix packages both native macOS architectures", () => {
+test("release matrix packages both native macOS architectures", { skip: releaseWorkflowSource === null ? "Workflow is not configured in this fork" : false }, () => {
   assert.match(
     releaseWorkflowSource,
     /name: macOS arm64[\s\S]*?os: macos-15[\s\S]*?arch: arm64[\s\S]*?runner_arch: arm64/,
@@ -208,7 +209,7 @@ test("release matrix packages both native macOS architectures", () => {
   assert.match(releaseWorkflowSource, /Merge macOS updater metadata[\s\S]*?ruby/);
 });
 
-test("macOS release signing is required on tag pushes", () => {
+test("macOS release signing is required on tag pushes", { skip: releaseWorkflowSource === null ? "Workflow is not configured in this fork" : false }, () => {
   assert.match(
     releaseWorkflowSource,
     /workflow_dispatch:\s+inputs:\s+sign_macos:[\s\S]*?default:\s*true[\s\S]*?type:\s*boolean/,
@@ -363,7 +364,7 @@ test("the signed local macOS lane selects the native runner architecture", () =>
  * one command became a positional argument while the other still pointed at a
  * deleted script. Every script path either lane references must exist.
  */
-test("both macOS lanes only reference scripts that exist", async () => {
+test("both macOS lanes only reference scripts that exist", { skip: releaseWorkflowSource === null ? "Workflow is not configured in this fork" : false }, async () => {
   const referenced = new Set();
   for (const source of [releaseMacScriptSource, releaseWorkflowSource]) {
     for (const match of source.matchAll(/(?<![\w./-])scripts\/[A-Za-z0-9._-]+\.(?:sh|mjs)/g)) {
@@ -382,7 +383,7 @@ test("both macOS lanes only reference scripts that exist", async () => {
   assert.deepEqual(missing, []);
 });
 
-test("macOS signing instrumentation stays out of the Windows and Linux lanes", () => {
+test("macOS signing instrumentation stays out of the Windows and Linux lanes", { skip: releaseWorkflowSource === null ? "Workflow is not configured in this fork" : false }, () => {
   const instrumentation =
     /macos-signing-watchdog|macos-signing-diagnostics|macos-bundle-inventory/;
   const stepBlock = (name) =>
@@ -398,7 +399,7 @@ test("macOS signing instrumentation stays out of the Windows and Linux lanes", (
   assert.doesNotMatch(unsignedBlock, instrumentation);
 });
 
-test("GitHub releases trigger the CNB mirror pipeline with a JSON payload", () => {
+test("GitHub releases trigger the CNB mirror pipeline with a JSON payload", { skip: mirrorToCnbWorkflowSource === null ? "Workflow is not configured in this fork" : false }, () => {
   assert.match(
     mirrorToCnbWorkflowSource,
     /release:\s+types:\s+\[published, edited\]/,

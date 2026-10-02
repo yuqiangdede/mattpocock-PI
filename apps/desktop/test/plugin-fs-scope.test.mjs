@@ -340,8 +340,10 @@ test("a symlink inside the workspace cannot carry a read out of it", async (t) =
   const outside = mkdtempSync(join(tmpdir(), "pi-fs-scope-outside-"));
   writeFileSync(join(outside, "id_rsa"), "PRIVATE KEY", "utf8");
   const ws = makeWorkspace();
-  symlinkSync(join(outside, "id_rsa"), join(ws, "innocent.txt"));
-  symlinkSync(outside, join(ws, "elsewhere"));
+  const leaf = process.platform === "win32" ? "innocent/id_rsa" : "innocent.txt";
+  if (process.platform === "win32") symlinkSync(outside, join(ws, "innocent"), "junction");
+  else symlinkSync(join(outside, "id_rsa"), join(ws, "innocent.txt"));
+  symlinkSync(outside, join(ws, "elsewhere"), process.platform === "win32" ? "junction" : "dir");
 
   const { runtime } = await harness(t, {
     id: "fs.read.symlink",
@@ -352,7 +354,7 @@ test("a symlink inside the workspace cannot carry a read out of it", async (t) =
 
   // The old lexical containment check accepted both of these: the string stayed
   // under the workspace even though the file never was.
-  for (const path of ["innocent.txt", "elsewhere/id_rsa"]) {
+  for (const path of [leaf, "elsewhere/id_rsa"]) {
     await refused(
       t,
       runtime.invokePanelBridge("fs.read.symlink", "fs.readText", { path }),
@@ -600,8 +602,8 @@ test("the project's other folders are not an escape hatch", async (t) => {
     runtime.invokePanelBridge("fs.folders.guards", "fs.openDefault", {
       path: join(stranger, "notes.txt"),
     }),
-    "NOT_FOUND",
-    /path not found/,
+    process.platform === "win32" ? "INVALID_ARGUMENT" : "NOT_FOUND",
+    process.platform === "win32" ? /path escapes/ : /path not found/,
   );
   assert.ok(
     audits.some((entry) => entry.api === "fs.read" && entry.ok === false),

@@ -3401,6 +3401,19 @@ pub fn begin_turn(
     provider_id: Option<&str>,
     model_id: Option<&str>,
 ) -> Result<String> {
+    begin_turn_inner(db, session_id, provider_id, model_id, None)
+}
+
+pub(crate) fn begin_turn_inner(
+    db: &Database,
+    session_id: &str,
+    provider_id: Option<&str>,
+    model_id: Option<&str>,
+    workflow_execution_id: Option<&str>,
+) -> Result<String> {
+    if db.workflow_session_reserved(session_id, workflow_execution_id)? {
+        return Err(anyhow!("AGENT_BUSY"));
+    }
     let id = Uuid::new_v4().to_string();
     let inserted = db
         .conn()
@@ -3543,6 +3556,9 @@ pub fn end_turn_settling(
     } else {
         None
     };
+    if n > 0 {
+        db.finish_workflow_turn(turn_id, status, error_code)?;
+    }
     tx.commit()?;
     // Settle the in-flight checkpoint (D299, D327). A caller that knows the
     // reply can never finish (sidecar gone) asks for recovery. A completed or

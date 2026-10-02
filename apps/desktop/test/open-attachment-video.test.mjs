@@ -17,8 +17,13 @@ test("an extensionless stored MP4 gets an OS-openable name without copying bytes
 
   const alias = await openableMp4Path(dataDir, storedReal, "video/mp4");
   assert.equal(alias, join(dataDir, "openable-attachments", `${hash}.mp4`));
-  assert.equal(await realpath(alias), storedReal);
-  assert.equal(await readlink(alias), storedReal);
+  if (process.platform !== "win32") {
+    assert.equal(await realpath(alias), storedReal);
+    assert.equal(await readlink(alias), storedReal);
+  } else {
+    const original = await stat(storedReal, {bigint:true}); const linked = await stat(alias, {bigint:true});
+    assert.equal(linked.ino, original.ino); assert.equal(linked.dev, original.dev);
+  }
   assert.equal((await stat(alias)).size, 512 * 1024 + 1);
   assert.equal(await openableMp4Path(dataDir, storedReal, "video/mp4"), alias);
 });

@@ -228,6 +228,7 @@ impl Database {
         let db = Self { conn, data_dir };
         db.boot_maintenance()?;
         crate::session_collaboration::recover(&db)?;
+        db.recover_workflow_executions()?;
         Ok(db)
     }
 

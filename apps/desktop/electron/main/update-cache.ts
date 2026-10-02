@@ -18,7 +18,7 @@
  * alone rather than recursively deleted.
  */
 import { copyFile, cp, mkdir, rename, rm, rmdir, stat } from "node:fs/promises";
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join, resolve, win32, posix } from "node:path";
 
 /** Base cache directory override; an absolute path to the cache's parent. */
 export const UPDATE_CACHE_DIR_ENV = "PI_DESKTOP_UPDATE_CACHE_DIR";
@@ -39,10 +39,10 @@ export type UpdateCachePathInput = {
 export function defaultUpdateCacheBasePath(input: UpdateCachePathInput): string {
   const { platform, env, home } = input;
   if (platform === "win32") {
-    return env.LOCALAPPDATA || join(home, "AppData", "Local");
+    return env.LOCALAPPDATA || win32.join(home, "AppData", "Local");
   }
-  if (platform === "darwin") return join(home, "Library", "Caches");
-  return env.XDG_CACHE_HOME || join(home, ".cache");
+  if (platform === "darwin") return posix.join(home, "Library", "Caches");
+  return env.XDG_CACHE_HOME || posix.join(home, ".cache");
 }
 
 /**
@@ -87,7 +87,8 @@ export function sameUpdateCacheDir(
   right: string,
   platform: NodeJS.Platform = process.platform,
 ): boolean {
-  const resolved = [resolve(left), resolve(right)];
+  const paths = platform === "win32" ? win32 : posix;
+  const resolved = [paths.resolve(left), paths.resolve(right)];
   return platform === "win32"
     ? resolved[0].toLowerCase() === resolved[1].toLowerCase()
     : resolved[0] === resolved[1];

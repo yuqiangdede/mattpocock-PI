@@ -76,6 +76,8 @@ export interface SshTransport {
 }
 
 export type SystemSshTransportOptions = {
+  /** External process edge, injectable for executable fixtures on every OS. */
+  spawnProcess?: (binary: string, args: string[], options: { stdio: ["pipe", "pipe", "pipe"]; env?: NodeJS.ProcessEnv }) => ChildProcessWithoutNullStreams;
   /**
    * `ssh` executable to spawn. Defaults to `ssh` on PATH; tests point it at a
    * fixture script.
@@ -241,6 +243,7 @@ function runCommand(
     timeoutMs: number;
     /** Full environment for the child; defaults to the app's own. */
     env?: NodeJS.ProcessEnv;
+    spawnProcess?: SystemSshTransportOptions["spawnProcess"];
     /** Called with the spawned child so a transport can track and reap it. */
     onSpawn?: (child: ChildProcessWithoutNullStreams) => void;
   },
@@ -248,7 +251,7 @@ function runCommand(
   return new Promise((resolveRun, rejectRun) => {
     let child: ChildProcessWithoutNullStreams;
     try {
-      child = spawn(binary, args, { stdio: ["pipe", "pipe", "pipe"], env: options.env });
+      child = (options.spawnProcess ?? spawn)(binary, args, { stdio: ["pipe", "pipe", "pipe"], env: options.env });
     } catch (error) {
       rejectRun(
         fail(
@@ -347,7 +350,7 @@ export function createSystemSshTransport(
     args: string[],
     env?: NodeJS.ProcessEnv,
   ): ChildProcessWithoutNullStreams => {
-    const child = spawn(binary, args, { stdio: ["pipe", "pipe", "pipe"], env });
+    const child = (options.spawnProcess ?? spawn)(binary, args, { stdio: ["pipe", "pipe", "pipe"], env });
     children.add(child);
     child.once("close", () => children.delete(child));
     child.once("error", () => children.delete(child));
@@ -366,6 +369,7 @@ export function createSystemSshTransport(
     let result: SshExecResult;
     try {
       result = await runCommand(binary, args, {
+        spawnProcess: options.spawnProcess,
         input,
         timeoutMs,
         env,

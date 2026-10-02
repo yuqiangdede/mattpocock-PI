@@ -1,4 +1,6 @@
 import { app, dialog, shell } from "electron";
+import { fetchEngineeringSkills } from "../skill-market-catalog";
+import { createEngineeringSkillUpdater } from "../engineering-skill-update";
 import { importSkillFolders, readLastSkillImportDirectory, writeLastSkillImportDirectory } from "../skill-folder-import";
 import { ErrorCodes, IPC, type ActivationScope, type AgentCapabilityMove, type AgentCapabilityQuery, type UserSkillRecord, type UserSubagentRecord } from "@pi-desktop/shared";
 import { loadSubagentDefinitions, type UserSubagentDocument } from "@pi-desktop/agent-runtime";
@@ -100,6 +102,8 @@ export function registerSkillsIpc({
     };
   };
   let host: HostProcess | null = null;
+  const updateEngineeringSkills = createEngineeringSkillUpdater({ getHost, fetchBundle: fetchEngineeringSkills, notify: () => sendToRenderer(IPC.event.pluginChanged, { reason: "skill" }) });
+  registrar.handle(IPC.invoke.skillBundleUpdate, updateEngineeringSkills);
   const handle = (channel: string, fn: (...args: any[]) => Promise<any>) => {
     registrar.handle(channel, async (...args) => {
       host = getHost();

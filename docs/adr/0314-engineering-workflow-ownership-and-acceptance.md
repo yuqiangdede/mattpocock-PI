@@ -1,6 +1,6 @@
 # ADR 0314: Engineering Workflow Ownership and Acceptance
 
-- Status: Accepted design; not implemented
+- Status: Accepted; V0 implementation delivered in #5-#10
 - Date: 2026-10-01
 
 ## Context

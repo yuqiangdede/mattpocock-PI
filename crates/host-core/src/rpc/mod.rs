@@ -2,6 +2,7 @@ mod config_sync_rpc;
 mod scheduled_rpc;
 mod scheduled_tools;
 mod todos;
+mod workflows;
 
 use std::io::{self, BufRead, BufReader as StdBufReader, Read, Write};
 use std::path::{Path, PathBuf};
@@ -1710,6 +1711,10 @@ async fn handle_request(
     }
 
     match method {
+        method if method.starts_with("workflow.") => {
+            let st = state.lock().await;
+            workflows::handle(&st.db, method, &params)
+        }
         method if method.starts_with("session.collaboration.") => {
             let st = state.lock().await;
             crate::session_collaboration::handle(&st.db, method, &params)
@@ -2928,13 +2933,25 @@ async fn handle_request(
             let st = state.lock().await;
             let provider = params.get("providerId").and_then(Value::as_str);
             let model = params.get("modelId").and_then(Value::as_str);
-            let turn_id = match params.get("sessionMessageId").and_then(Value::as_str) {
-                Some(message_id) => crate::session_collaboration::begin_turn(
-                    &st.db, session_id, message_id, provider, model,
-                ),
-                None => sessions::begin_turn(&st.db, session_id, provider, model),
+            let turn_id = match params.get("workflowExecutionId").and_then(Value::as_str) {
+                Some(execution_id) => {
+                    st.db
+                        .begin_workflow_turn(execution_id, session_id, provider, model)
+                }
+                None => match params.get("sessionMessageId").and_then(Value::as_str) {
+                    Some(message_id) => crate::session_collaboration::begin_turn(
+                        &st.db, session_id, message_id, provider, model,
+                    ),
+                    None => sessions::begin_turn(&st.db, session_id, provider, model),
+                },
             }
-            .map_err(session_collaboration_rpc_err)?;
+            .map_err(|error| {
+                if params.get("workflowExecutionId").is_some() {
+                    workflows::map_error(error)
+                } else {
+                    session_collaboration_rpc_err(error)
+                }
+            })?;
             Ok(json!({ "turnId": turn_id }))
         }
         "session.recordUsage" => {
@@ -4592,6 +4609,19 @@ async fn handle_request(
             Ok(json!({ "server": server }))
         }
 
+        "skills.ensureBundled" => {
+            let mut st = state.lock().await;
+            Ok(json!(st.user_skills.ensure_bundled().map_err(skill_err)?))
+        }
+        "skills.updateBundled" => {
+            let bundle = serde_json::from_value(params)
+                .map_err(|error| rpc_err(1002, error.to_string(), "INVALID_PARAMS"))?;
+            let mut st = state.lock().await;
+            Ok(json!(st
+                .user_skills
+                .update_bundled(bundle)
+                .map_err(skill_err)?))
+        }
         "skills.list" => {
             let (level, project_path) = parse_capability_query(&params)?;
             let mut st = state.lock().await;

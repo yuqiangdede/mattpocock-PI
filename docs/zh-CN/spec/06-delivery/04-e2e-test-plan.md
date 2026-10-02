@@ -5466,10 +5466,85 @@ eleven-tool-round desktop paths are verified by
 - **自动化：** `pnpm test:e2e:todos` 从生产 Agent 的 ToolSearch/TodoWrite 路径进入，使用生产渲染器、真实 Host/SQLite 和隔离 Electron 配置验证清单旅程；仅替换外部模型流和 preload 传输，不使用真实 Provider 或用户配置。覆盖 Unicode 截断及警告重放、单一活动项归一化、首次读取失败后不切换会话的主机恢复、已缓存快照重新同步及旧事件拒绝。运行时 `runtime-todos.test.ts` 使用确定性 Provider 验证 Agent 工具校验、超长内容归一化和续跑。
 - **状态：** 构建 Desktop 和 Host 后，在确切的请求候选中执行。Host-core 和渲染器定向测试是辅助检查，不能替代 Electron 用户旅程。
 
+### Engineering Workflow：项目级流程、执行、验收与重开
+
+- **前提条件**：隔离的 Electron 配置、真实 WorkPanel/WorkflowTab、Main IPC、
+  Rust Host/SQLite 和 Pi Runtime。模型传输使用本地 fixture，不访问用户账户或付费服务。
+- **项目历史**：从原生入口创建 Run；切换项目与会话、关闭重开面板；归档、新建下一轮，
+  检查失效项目的只读历史及迟到响应的隔离。对应 `E2E-WORKFLOW-project-owned-runs`。
+- **Discovery**：检查会话、项目与 Skill 可用性；重复 Start 只产生一个预留。
+  普通输入与预留竞态时保留在 SQLite 队列，Discovery 结束后消费原输入。
+  renderer 重载保留执行，Host 重启标记 Interrupted 且不重发。
+  对应 `E2E-WORKFLOW-discovery`。
+- **恢复**：在绑定 turn 上 Stop、Retry 到正常结束、Continue 到失败；取消传输失败保持
+  所有权并显示错误，旧 Stop 不影响后续普通 turn。对应 `E2E-WORKFLOW-recovery`。
+- **六阶段验收**：执行并显式验收 Discovery、Spec、Tickets、Implement、Review、Retro。
+  测试跳阶段、忙碌/排队、陈旧 revision、后续失败及普通 turn 均不能满足验收。
+  重复 Implement 不产生虚构计数；验收不自动调用 Pi；Retro 验收后只读并可新建 Run。
+  对应 `E2E-WORKFLOW-six-stages`。
+- **重开**：确认前列出选中阶段和后续阶段；取消不变。Review 返回 Implement 保留
+  Discovery/Spec/Tickets 的验收。确认原子递增受影响 revision、撤回验收，保留历史执行
+  与引用；旧结果不能验收新版本。忙碌、陈旧、归档和完成状态拒绝重开。
+  Host/renderer 重启后检查相同历史。对应 `E2E-WORKFLOW-reopen`。
+- **规格**：[Engineering Workflow V0](/spec/01-product/engineering-workflow-v0)、ADR 0314。
+- **验收**：AC-01–AC-16、AC-18–AC-20；产物附件与权限检查后的打开（AC-17）属于 #10，不在当前测试范围内。
+- **验证命令**：`pnpm test:e2e:workflow-runs`、`pnpm test:e2e:workflow-discovery`、
+  `pnpm test:e2e:workflow-recovery`、`pnpm test:e2e:workflow-stages`、
+  `pnpm test:e2e:workflow-reopen`，以及 Host 与历史组件回归测试。
+- **里程碑**：M6+。完整 AppShell、发行包和真实服务是独立验证范围。
+
+### E2E-WORKFLOW-artifacts: Registered revision-associated references
+
+- **Preconditions**: Production Workflow panel, existing Files panel, Main file
+  reader and real Host/SQLite; isolated roots/profile and deterministic Pi I/O.
+- **Steps**: Create a run; register Discovery glossary before any execution;
+  open the real Markdown preview. Switch project while opening is held and
+  release the late result; return to the original project. Reject traversal,
+  absolute paths, foreign roots, escaping links, unknown kinds and stale writes.
+  Execute/accept/reopen Discovery; inspect the historical reference. Remove its
+  file, make the registered root unavailable, refresh, restart Host/renderer,
+  inspect retained identity/revision, archive and reject registration.
+- **Expected**: Registration/opening do not execute or accept stages. References
+  remain retained and explicitly historical/unavailable. Opening uses existing
+  permissions and cannot redirect a new project's panel. No generated content,
+  automatic completion, content verification or root reassociation occurs.
+- **Specs linked**: [Engineering Workflow V0](../01-product/engineering-workflow-v0.md).
+- **Acceptance criterion**: AC-07, AC-11, AC-16, AC-17, AC-20. Host boundary tests
+  additionally cover link replacement; Main tests retain file-reader permissions
+  and reject a changed Host or path during an open operation.
+- **Milestone**: M6+.
+- **Status**: Automated in `pnpm test:e2e:workflow-artifacts` against an isolated
+  uncommitted candidate based on `c1e3da0f4c9cb223781f63760621097ab3e056c4`.
+  Full AppShell, live accounts and macOS/Linux qualification are not covered.
+
+### E2E-ENGINEERING-skills: Installer supplies callable skills
+
+- **Preconditions**: Actual Windows packaged application, fresh isolated profile
+  and empty agents directory; local deterministic model endpoint and fixture key.
+- **Steps**: Launch offline and inspect 37 enabled skills. Open native Skills:
+  assert six default entries, then Show all. Configure the model and Agent chat,
+  create a Workflow Run, start Discovery and observe real Skill loads. Invoke
+  /tdd from the composer. Disable Retro, edit Grilling and restart. Explicitly
+  update from a pinned upstream revision; inspect retained edits and activation.
+- **Expected**: Complete skill packages need no external installer or Codex home.
+  Auxiliary skills remain callable; normal execution awaits explicit acceptance.
+  Startup and manual update retain local choices and resources. Failure does not
+  activate partial content; a changed Host generation refuses stale downloads.
+- **Specs linked**: Engineering Workflow V0; ADR 0315; engineering skills distribution.
+- **Acceptance criterion**: Installer-first skill availability, six default
+  entries, full callable catalog, safe explicit updates and restart persistence.
+- **Milestone**: Engineering Workflow V0 delivery.
+- **Status**: Automated by pnpm test:e2e:engineering-skills against the packaged
+  executable. PI_SKILLS_VERIFY_UPSTREAM=1 adds the explicit public upstream check.
+  OS installer-wizard execution and real paid models are separate qualification.
+
 ## 8. 可追溯性矩阵
 | 验收 | 应用场景 |
 |---|---|
 | C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
+| AC-01–AC-16 / AC-18–AC-20 — Engineering Workflow Run | E2E-WORKFLOW-project-owned-runs, E2E-WORKFLOW-discovery, E2E-WORKFLOW-recovery, E2E-WORKFLOW-six-stages, E2E-WORKFLOW-reopen |
+| AC-17 — Engineering artifact references | E2E-WORKFLOW-artifacts |
+| Installer-first engineering skills | E2E-ENGINEERING-skills |
 | C / E / Security / Quality — Live Voice 四阶段交互 | E2E-LIVE-VOICE-four-stage-ui |
 | C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
 | C / F / Quality — Saved project isolation | E2E-SCHEDULED-manual-workspace-binding |

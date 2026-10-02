@@ -33,6 +33,9 @@ const enEntries: ChangelogEntry[] = [
     version: "0.16.0",
     date: "2026-10-01",
     highlights: [
+      "Bundle all Matt Pocock engineering skills, with six default entries and manual updates that preserve local changes.",
+      "Register and open revision-associated engineering artifact references, retaining historical and unavailable files.",
+      "Add project-owned Engineering Workflow runs with six skill stages, explicit acceptance and safe execution recovery.",
       "Live Voice is now available to everyone and calls start in the current session.",
       "Add a session checklist that keeps its authoritative state after the local service restarts.",
       "Show one-off notices in the shared toast stack instead of blocking dialogs.",
@@ -873,6 +876,9 @@ const zhCNEntries: ChangelogEntry[] = [
     version: "0.16.0",
     date: "2026-10-01",
     highlights: [
+      "内置 Matt Pocock 全套工程技能，默认显示六个阶段入口，支持保留本地修改的手动更新。",
+      "支持登记并打开关联阶段修订的工程产物引用，保留历史记录和不可用文件状态。",
+      "新增项目级工程流程 Run，支持六个 Skill 阶段、显式验收及安全的执行恢复。",
       "实时语音现已面向所有用户开放，通话默认从当前会话开始。",
       "新增会话级待办清单，本地服务重启后仍会保留权威状态。",
       "一次性通知改用统一浮层提示，不再弹出阻塞式对话框。",
@@ -1713,6 +1719,9 @@ const zhTWEntries: ChangelogEntry[] = [
     version: "0.16.0",
     date: "2026-10-01",
     highlights: [
+      "內建 Matt Pocock 全套工程技能，預設顯示六個階段入口，支援保留本機修改的手動更新。",
+      "支援登記並開啟關聯階段修訂的工程產物參照，保留歷史記錄與無法使用的檔案狀態。",
+      "新增專案級工程流程 Run，支援六個 Skill 階段、明確驗收及安全的執行復原。",
       "即時語音現已開放給所有使用者，通話預設從目前工作階段開始。",
       "新增工作階段待辦清單，本機服務重新啟動後仍會保留權威狀態。",
       "一次性通知改用統一的浮層提示，不再彈出阻擋式對話框。",

@@ -8,6 +8,7 @@ import {
   type SubscriptionSink,
   type TurnStartRequest,
   type TurnSteerRequest,
+  type StartTurnParams,
 } from "@pi-desktop/agent-host";
 import {
   createHostQueueStore,
@@ -259,8 +260,7 @@ export function createAgentHostBridge(options: AgentHostBridgeOptions) {
   /** The desktop's queue operations, all under the owner principal. */
   const queue = {
     async push(request: AgentQueuePushRequest): Promise<QueuedTurnSummary> {
-      const result = await forIpc(() =>
-        agentHost.startTurn(DESKTOP_PRINCIPAL, {
+      const input: StartTurnParams = {
           sessionId: request.sessionId,
           admission: "queue",
             ...(request.idempotencyKey ? { idempotencyKey: request.idempotencyKey } : {}),
@@ -272,8 +272,16 @@ export function createAgentHostBridge(options: AgentHostBridgeOptions) {
             ...(request.attachments ? { attachments: request.attachments } : {}),
           },
           context: { requestId: `desktop-queue-${Date.now().toString(36)}` },
-        }),
-      );
+        };
+      const result = await forIpc(async () => {
+        try { return await agentHost.startTurn(DESKTOP_PRINCIPAL, input); }
+        catch (error) {
+          const failure = error as { code?: string; errorCode?: string; details?: { queueFull?: boolean } };
+          if ((failure.errorCode ?? failure.code) !== "AGENT_BUSY" || failure.details?.queueFull) throw error;
+          // Runtime admission is authoritative even if its busy projection lagged.
+          return agentHost.enqueueTurn(DESKTOP_PRINCIPAL, input);
+        }
+      });
       const entry = agentHost.queueEntries(request.sessionId).find((candidate) => candidate.turn.id === result.turn.id);
       return entry
         ? toQueueSummary(entry)
@@ -331,6 +339,7 @@ export function createAgentHostBridge(options: AgentHostBridgeOptions) {
       return agentHost.lookupTurnByIdempotency(DESKTOP_PRINCIPAL, request);
     },
     queue,
+    kickQueue: (sessionId: string) => agentHost.kick(sessionId),
     async steerWorkSession(input: { sessionId: string; expectedTurnId: string; content: string; userMessageId: string; voiceOrigin: import("@pi-desktop/shared").VoiceOrigin }): Promise<boolean> {
       const result = await options.invoke(options.channels.agentSteer, [{
         sessionId: input.sessionId,

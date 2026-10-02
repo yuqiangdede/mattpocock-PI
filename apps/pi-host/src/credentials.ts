@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { ensurePrivateCredentialDirectory } from "./private-credential-directory.js";
 
 import type { DeviceCredentialStore, DeviceRecord, PairingRecord } from "@pi-desktop/racp";
 
@@ -10,6 +11,7 @@ type CredentialFile = { devices: DeviceRecord[]; pairings: PairingRecord[] };
 const FILE_MODE = 0o600;
 
 async function readJson<T>(path: string): Promise<T | null> {
+  await ensurePrivateCredentialDirectory(dirname(path));
   try {
     return JSON.parse(await readFile(path, "utf8")) as T;
   } catch (error) {
@@ -19,7 +21,7 @@ async function readJson<T>(path: string): Promise<T | null> {
 }
 
 async function writeJsonAtomic(path: string, value: unknown): Promise<void> {
-  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  await ensurePrivateCredentialDirectory(dirname(path));
   const temp = `${path}.${process.pid}.tmp`;
   await writeFile(temp, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", mode: FILE_MODE });
   await rename(temp, path);

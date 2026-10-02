@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { directoryLink } from "./helpers/fs-links.mjs";
 import { spawnSync } from "node:child_process";
-import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -232,14 +233,14 @@ async function writeBundleFixture(release) {
   await writeFileWithParents(join(app, "Contents", "Resources", "native.node"), "node-fixture");
   await writeBinaryResource(join(app, "Contents", "Resources", "icudtl.dat"), 64);
   await writeFileWithParents(join(app, "Contents", "Info.plist"), "<plist/>");
-  await symlink(
+  await directoryLink(
     "A",
     join(app, "Contents", "Frameworks", "Foo.framework", "Versions", "Current"),
   );
   return app;
 }
 
-test("diagnostics report an available Developer ID identity", async (t) => {
+test("diagnostics report an available Developer ID identity", { skip: process.platform === "win32" ? "POSIX subprocess fixture" : false }, async (t) => {
   const root = await tempRoot(t, "pi-desktop-signing-diagnostics-");
   const bin = join(root, "bin");
   await writeDiagnosticsShims(bin, { identities: MATCHING_IDENTITY });
@@ -262,7 +263,7 @@ test("diagnostics report an available Developer ID identity", async (t) => {
   assert.doesNotMatch(result.stdout, /is not available/);
 });
 
-test("diagnostics fail closed when --require-identity finds no identity", async (t) => {
+test("diagnostics fail closed when --require-identity finds no identity", { skip: process.platform === "win32" ? "POSIX subprocess fixture" : false }, async (t) => {
   const root = await tempRoot(t, "pi-desktop-signing-required-");
   const bin = join(root, "bin");
   await writeDiagnosticsShims(bin, { identities: NO_IDENTITIES });
@@ -279,7 +280,7 @@ test("diagnostics fail closed when --require-identity finds no identity", async 
   );
 });
 
-test("diagnostics treat a missing identity as a warning by default", async (t) => {
+test("diagnostics treat a missing identity as a warning by default", { skip: process.platform === "win32" ? "POSIX subprocess fixture" : false }, async (t) => {
   const root = await tempRoot(t, "pi-desktop-signing-optional-");
   const bin = join(root, "bin");
   await writeDiagnosticsShims(bin, { identities: NO_IDENTITIES });
@@ -307,7 +308,7 @@ test("diagnostics refuse to run off macOS", async (t) => {
   assert.match(result.stderr, /must run on macOS/);
 });
 
-test("diagnostics never echo signing secrets", async (t) => {
+test("diagnostics never echo signing secrets", { skip: process.platform === "win32" ? "POSIX subprocess fixture" : false }, async (t) => {
   const root = await tempRoot(t, "pi-desktop-signing-redaction-");
   const bin = join(root, "bin");
   await writeDiagnosticsShims(bin, { leaky: true });
@@ -354,7 +355,7 @@ test("inventory counts the signing payload of a release directory", async (t) =>
     /^mach-o: 3 \(dylib: 1, node: 1, framework binaries: 1\)$/m,
   );
   assert.match(result.stdout, /^bundles: frameworks=1 nested-apps=1$/m);
-  assert.match(result.stdout, /^executables: script=1 mach-o=3$/m);
+  assert.match(result.stdout, process.platform === "win32" ? /^executables: script=0 mach-o=0$/m : /^executables: script=1 mach-o=3$/m);
   assert.match(result.stdout, /^binary-resources: 1$/m);
   assert.match(
     result.stdout,
@@ -382,8 +383,8 @@ test("inventory counts the signing payload of a release directory", async (t) =>
   assert.equal(json.nodeModules, 1);
   assert.equal(json.frameworks, 1);
   assert.equal(json.nestedApps, 1);
-  assert.equal(json.executableScripts, 1);
-  assert.equal(json.executableMachO, 3);
+  assert.equal(json.executableScripts, process.platform === "win32" ? 0 : 1);
+  assert.equal(json.executableMachO, process.platform === "win32" ? 0 : 3);
   assert.equal(json.machOOutsideFramework, 2);
   assert.equal(json.binaryResources, 1);
   assert.equal(json.signingCandidates, 5);
@@ -514,11 +515,11 @@ test("inventory survives a symlink cycle without hanging or double counting", as
   const app = appFixturePath(release);
   await writeFileWithParents(join(app, "Contents", "MacOS", "PI-Desktop"), "not-mach-o");
   await mkdir(join(app, "Contents", "Resources"), { recursive: true });
-  await symlink(
+  await directoryLink(
     join("..", ".."),
     join(app, "Contents", "Resources", "ancestor-loop"),
   );
-  await symlink("self-loop", join(app, "Contents", "Resources", "self-loop"));
+  await directoryLink("self-loop", join(app, "Contents", "Resources", "self-loop"));
 
   const startedAt = Date.now();
   const result = runInventory([app, "--json"]);
