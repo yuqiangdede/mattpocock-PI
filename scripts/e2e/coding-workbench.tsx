@@ -3,6 +3,7 @@ import { I18nextProvider } from "react-i18next";
 import i18n, { type i18n as I18n } from "i18next";
 import { initReactI18next } from "react-i18next";
 import { en, zhCN, flattenCatalog } from "@pi-desktop/i18n";
+import { CODING_SKILL_SHORTCUTS, CODING_MORE_SKILLS } from "../../apps/desktop/src/features/coding/CodingWorkbench";
 import { Composer } from "../../apps/desktop/src/components/Composer";
 import { useAppStore } from "../../apps/desktop/src/stores/app-store";
 import { api } from "../../apps/desktop/src/lib/api";
@@ -20,9 +21,15 @@ async function until<T>(read: () => T | false | null | Promise<T | false | null>
   throw new Error(`Shortcut fixture timed out: ${document.body.textContent?.slice(-800)}`);
 }
 const check = (value: unknown, message: string) => { if (!value) throw new Error(message); };
+const draftFor = (skill: string, body = "") => {
+  const action = skill === "ask-matt" ? "ask" : [...CODING_SKILL_SHORTCUTS, ...CODING_MORE_SKILLS].find(item => item.skill === skill)!.action;
+  const prompt = i18n.t(`coding.prompts.${action}`);
+  return `/${skill} ${prompt}` + (body ? "\n\n" + body : "");
+};
 const editor = () => document.querySelector<HTMLElement>(".composer-input")!;
 async function click(label: string) {
   const button = await until(() => [...document.querySelectorAll<HTMLButtonElement>("button")].find((item) => item.textContent?.trim() === label && !item.disabled));
+  console.info("SHORTCUT_SELECT", label);
   button.focus(); button.click();
 }
 globalThis.codingWorkbenchProbe = async (requirementsOnly = false) => {
@@ -35,7 +42,7 @@ globalThis.codingWorkbenchProbe = async (requirementsOnly = false) => {
   root.render(<I18nextProvider i18n={i18n as I18n}><Composer variant="home" /></I18nextProvider>);
   await until(() => editor());
   await click("Implement");
-  await until(() => readEditorValue(editor()) === "/implement ");
+  await until(() => readEditorValue(editor()) === draftFor("implement"));
   check((await fixture("snapshot") as { prompts: number }).prompts === 0, "Shortcut submitted automatically");
   check((await api.listFreeTasks(projectPath)).tasks.length === 0, "Shortcut created a Free Task");
   const mappings = [
@@ -56,11 +63,11 @@ globalThis.codingWorkbenchProbe = async (requirementsOnly = false) => {
       await until(() => document.querySelector(".coding-requirements-menu.is-open"));
     }
     await click(label);
-    await until(() => readEditorValue(editor()) === `/${skill} `);
+    await until(() => readEditorValue(editor()) === draftFor(skill));
     check(!document.querySelector(".coding-requirements-menu"), "Requirement selection left menu open");
   }
   await prefill(""); await click("Discuss requirements");
-  await until(() => readEditorValue(editor()) === "/grill-with-docs ");
+  await until(() => readEditorValue(editor()) === draftFor("grill-with-docs"));
   const requirementsTrigger = () => document.querySelector<HTMLButtonElement>(".coding-requirements-split [aria-haspopup='menu']")!;
   requirementsTrigger().click();
   await until(() => document.querySelector(".coding-requirements-menu.is-open"));
@@ -91,27 +98,39 @@ globalThis.codingWorkbenchProbe = async (requirementsOnly = false) => {
     root.unmount();
     return { ok: true, requirementsMenu: true, mappings: true, keyboard: true, disabled: true, narrow: true, localized: true };
   }
+  for (const shortcut of [{ action: "ask", skill: "ask-matt" }, ...CODING_MORE_SKILLS]) {
+    await prefill("");
+    if (shortcut.action !== "ask") await click("More");
+    await click(i18n.t(`coding.${shortcut.action}`));
+    const available = (await api.composerCommands()).commands.some(command => command.kind === "skill" && command.skillId === shortcut.skill);
+    if (available) {
+      await until(() => readEditorValue(editor()) === draftFor(shortcut.skill));
+    } else {
+      await until(() => document.querySelector(".coding-shortcut-error"));
+      check(readEditorValue(editor()) === "", "Unavailable More skill changed the draft");
+    }
+  }
   const token = nextChipToken();
   const body = `Keep this request\nwith its file ${token}`;
   const reference = { path: `${projectPath}/README.md`, name: "README.md", kind: "file" as const, token };
   await prefill(body, [reference]); await click("Review code");
-  await until(() => readEditorValue(editor()) === `/code-review ${body}`);
+  await until(() => readEditorValue(editor()) === draftFor("code-review", body));
   const saved = await until(() => {
     const draft = readComposerDraft(sessionId);
-    return draft?.text === `/code-review ${body}` && draft;
+    return draft?.text === draftFor("code-review", body) && draft;
   });
   check(saved?.fileReferences.some((item) => item.path === reference.path), "Shortcut lost attachment");
-  check(saved?.text === `/code-review ${body}`, "Shortcut lost persisted text");
+  check(saved?.text === draftFor("code-review", body), "Shortcut lost persisted text");
   root.unmount();
   root = createRoot(document.getElementById("root")!);
   root.render(<I18nextProvider i18n={i18n as I18n}><Composer variant="docked" /></I18nextProvider>);
-  await until(() => editor() && readEditorValue(editor()) === `/code-review ${body}`);
+  await until(() => editor() && readEditorValue(editor()) === draftFor("code-review", body));
   check(readComposerDraft(sessionId)?.fileReferences.some((item) => item.path === reference.path), "Composer remount lost attachment");
   check(!document.querySelector(".coding-task-panel,.coding-result"), "Legacy task UI remains");
   check((await fixture("snapshot") as { prompts: number }).prompts === 0, "Insertion started provider");
   // 人工发送经过真实 Store、IPC、Host 和 Agent Runtime。
   await prefill("Implement a simple empty state"); await click("Implement");
-  await until(() => readEditorValue(editor()) === "/implement Implement a simple empty state");
+  await until(() => readEditorValue(editor()) === draftFor("implement", "Implement a simple empty state"));
   await fixture("releaseLaunch");
   const send = await until(() => document.querySelector<HTMLButtonElement>(".send-btn:not(:disabled)"));
   send.click();
@@ -120,11 +139,14 @@ globalThis.codingWorkbenchProbe = async (requirementsOnly = false) => {
   check(selected.transformed.includes('in order: "implement"'), "Manual send did not resolve skill");
   check(selected.transformed.includes("Implement a simple empty state"), "Manual send lost request");
   await fixture("releaseProvider");
-  const loaded = await fixture("snapshot") as { skillIds: string[] };
+  const loaded = await until(async () => {
+    const snapshot = await fixture("snapshot") as { skillIds: string[] };
+    return snapshot.skillIds.at(-1) === "implement" && snapshot;
+  });
   check(loaded.skillIds.at(-1) === "implement", "Skill body was not loaded");
   check((await api.listFreeTasks(projectPath)).tasks.length === 0, "Manual send created Free Task");
   useAppStore.setState({ isRunning: false, runningSessions: {} });
-  await prefill("/implement Implement a simple empty state");
+  await prefill(draftFor("implement", "Implement a simple empty state"));
   await fixture("reset"); await fixture("releaseLaunch");
   (await until(() => document.querySelector<HTMLButtonElement>(".send-btn:not(:disabled)"))).click();
   await until(async () => (await fixture("snapshot") as { prompts: number }).prompts === 2);
@@ -132,12 +154,12 @@ globalThis.codingWorkbenchProbe = async (requirementsOnly = false) => {
   await fixture("releaseProvider");
   useAppStore.setState({ isRunning: false, runningSessions: {} });
   await prefill("Set up engineering conventions"); await click("Initialize");
-  await until(() => readEditorValue(editor()) === "/setup-matt-pocock-skills Set up engineering conventions");
+  await until(() => readEditorValue(editor()) === draftFor("setup-matt-pocock-skills", "Set up engineering conventions"));
   await fixture("reset"); await fixture("releaseLaunch");
   (await until(() => document.querySelector<HTMLButtonElement>(".send-btn:not(:disabled)"))).click();
   await until(async () => (await fixture("snapshot") as { prompts: number }).prompts === 3);
   await fixture("releaseProvider");
-  check((await fixture("snapshot") as { skillIds: string[] }).skillIds.at(-1) === "setup-matt-pocock-skills", "Setup skill was not loaded");
+  await until(async () => (await fixture("snapshot") as { skillIds: string[] }).skillIds.at(-1) === "setup-matt-pocock-skills");
   check((await api.listFreeTasks(projectPath)).tasks.length === 0, "Setup entered native initialization");
   useAppStore.setState({ isRunning: false, runningSessions: {} });
   await api.setProject(projectPath);
@@ -151,14 +173,14 @@ globalThis.codingWorkbenchProbe = async (requirementsOnly = false) => {
   useAppStore.setState({ page: "chat" });
   await fixture("setSkillEnabled", { path: projectPath, id: "implement", enabled: true });
   await click("Implement");
-  await until(() => readEditorValue(editor()) === "/implement Keep this draft for remediation");
+  await until(() => readEditorValue(editor()) === draftFor("implement", "Keep this draft for remediation"));
   await fixture("catalogUnavailable", true);
   await click("Review code");
   await until(() => document.querySelector(".coding-shortcut-error")?.textContent?.includes("catalog unavailable"));
-  check(readEditorValue(editor()) === "/implement Keep this draft for remediation", "Failed catalog changed draft");
+  check(readEditorValue(editor()) === draftFor("implement", "Keep this draft for remediation"), "Failed catalog changed draft");
   await fixture("catalogUnavailable", false);
   await click("Review code");
-  await until(() => readEditorValue(editor()) === "/code-review /implement Keep this draft for remediation");
+  await until(() => readEditorValue(editor()) === draftFor("code-review", draftFor("implement", "Keep this draft for remediation")));
   await prefill("Keep originating draft");
   await fixture("holdCatalog"); await click("Implement"); await fixture("waitForCatalog");
   const otherSessionId = params.get("otherSessionId")!;
@@ -166,24 +188,24 @@ globalThis.codingWorkbenchProbe = async (requirementsOnly = false) => {
   await until(() => readEditorValue(editor()) === "Other conversation");
   await fixture("releaseCatalog");
   await click("Review code");
-  await until(() => readEditorValue(editor()) === "/code-review Other conversation");
+  await until(() => readEditorValue(editor()) === draftFor("code-review", "Other conversation"));
   check(readComposerDraft(sessionId)?.text === "Keep originating draft", "Stale response modified originating draft");
   useAppStore.setState({ activeSessionId: sessionId });
   await until(() => readEditorValue(editor()) === "Keep originating draft");
   await fixture("holdCatalog"); await click("Implement"); await fixture("waitForCatalog");
   await prefill("Edited while catalog was loading");
   await fixture("releaseCatalog");
-  await until(() => readEditorValue(editor()) === "/implement Edited while catalog was loading");
+  await until(() => readEditorValue(editor()) === draftFor("implement", "Edited while catalog was loading"));
   console.info("SHORTCUT_PHASE busy");
   const turn = await fixture("hostCall", { method: "session.beginTurn", params: { sessionId } }) as { turnId: string };
   useAppStore.setState({ isRunning: true, runningSessions: { [sessionId]: true } });
   await prefill("Review after current work"); await click("Review code");
-  await until(() => readEditorValue(editor()) === "/code-review Review after current work");
+  await until(() => readEditorValue(editor()) === draftFor("code-review", "Review after current work"));
   check((await api.listQueuedPrompts(sessionId)).entries.length === 0, "Busy insertion queued automatically");
   (await until(() => document.querySelector<HTMLButtonElement>(".send-btn:not(:disabled)"))).click();
   const queued = await until(async () => (await api.listQueuedPrompts(sessionId)).entries[0]);
   console.info("SHORTCUT_PHASE queued");
-  check(useAppStore.getState().queuedPrompts[sessionId]?.some((item) => item.content === "/code-review Review after current work"), "Ordinary queue lost skill/request");
+  check(useAppStore.getState().queuedPrompts[sessionId]?.some((item) => item.content === draftFor("code-review", "Review after current work")), "Ordinary queue lost skill/request");
   await api.removeQueuedPrompt(queued.id);
   await fixture("hostCall", { method: "session.endTurn", params: { turnId: turn.turnId, status: "completed", createNotification: false } });
   useAppStore.setState({ isRunning: false, runningSessions: {}, queuedPrompts: {} });
@@ -197,9 +219,12 @@ globalThis.codingWorkbenchProbe = async (requirementsOnly = false) => {
   const implementation = buttons.find((button) => button.textContent === "Implement")!;
   implementation.focus(); await fixture("pressKey", "Space");
   console.info("SHORTCUT_PHASE keyboard");
-  await until(() => readEditorValue(editor()) === "/implement " && document.activeElement === editor());
+  await until(() => readEditorValue(editor()) === draftFor("implement") && document.activeElement === editor());
   await i18n.changeLanguage("zh-CN");
   await until(() => [...document.querySelectorAll(".coding-shortcuts button")].some((button) => button.textContent === "初始化"));
+  await prefill(""); await click("咨询下一步");
+  await until(() => readEditorValue(editor()) === draftFor("ask-matt"));
+  check(readEditorValue(editor()).includes(zhCN.coding.prompts.ask), "Localized default instruction missing");
   root.unmount();
   return { ok: true, inserted: true, manual: true, mappings: true, retained: true,
     setup: true, remediation: true, stale: true, queue: true, narrow: true, keyboard: true, localized: true };

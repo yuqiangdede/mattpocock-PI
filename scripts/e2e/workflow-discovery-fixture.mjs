@@ -1,3 +1,5 @@
+import { createEngineeringSkillChecks } from "../../apps/desktop/electron/main/engineering-skill-checks";
+import { createEngineeringSkillUpdater } from "../../apps/desktop/electron/main/engineering-skill-update";
 import { join } from "node:path";
 import { mkdir, rmdir, readFile, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
@@ -14,6 +16,14 @@ import { registerFreeTaskIpc } from "../../apps/desktop/electron/main/ipc/free-t
 
 /** The process/provider edge is deterministic; Pi, Main admission and Host stay real. */
 export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, root }) {
+  let updateOffline = false;
+  const updateRevision = "b".repeat(40);
+  const updater = createEngineeringSkillUpdater({ getHost, fetchBundle: async () => {
+    if (updateOffline) throw new Error("offline fixture");
+    const bundle = JSON.parse(await readFile(join(root, "crates/host-core/resources/workflow-skills.json"), "utf8"));
+    bundle.revision = updateRevision; return bundle;
+  }, notify: () => {} });
+  const checks = createEngineeringSkillChecks({ getHost, fetchRevision: async () => { if (updateOffline) throw new Error("offline fixture"); return updateRevision; }, update: updater, report: () => {} });
   const handlers = new Map();
   const agentRegistrar = { ...registrar, handle(channel, handler) { handlers.set(channel, handler); registrar.handle(channel, handler); } };
   const activeTurns = new Map();
@@ -48,6 +58,10 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
     loadComposerTemplatesCached: async () => [],
   });
   if (process.env.PI_CODING_WORKBENCH === "1") {
+    registrar.handle(IPC.invoke.settingsSet, settings => getHost().call("settings.set", settings));
+    registrar.handle(IPC.invoke.skillBundleStatus, checks.status);
+    registrar.handle(IPC.invoke.skillBundleCheck, checks.check);
+    registrar.handle(IPC.invoke.skillBundleUpdate, checks.update);
     registrar.handle(IPC.invoke.settingsGet, () => getHost().call("settings.get"));
     registrar.handle(IPC.invoke.todosGet, (input) => getHost().call("todos.get", input));
     registrar.handle(IPC.invoke.liveVoiceStatus, () => ({ enabled: false, bindings: [], selectedBindingId: null }));
@@ -194,6 +208,15 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
         contents.sendInputEvent({ type: "keyUp", keyCode: input });
         return;
       }
+      if (name === "customizeBundledSkill") {
+        const original = await getHost().call("skills.read", { id: "retro", level: "global" });
+        await getHost().call("skills.update", { id: "retro", name: "retro", level: "global", body: original.body + "\nLocal fixture customization." });
+        await getHost().call("skills.setEnabled", { id: "retro", level: "global", enabled: false });
+        return;
+      }
+      if (name === "readCustomizedSkill") return getHost().call("skills.read", { id: "retro", level: "global" });
+      if (name === "updateOffline") { updateOffline = input; return; }
+      if (name === "typeText") { const { BrowserWindow } = await import("electron"); await BrowserWindow.getAllWindows()[0].webContents.insertText(input); return; }
       if (name === "holdCatalog") {
         catalogGate = new Promise((resolve) => { releaseCatalog = resolve; });
         catalogStarted = new Promise((resolve) => { markCatalogStarted = resolve; });
@@ -222,7 +245,7 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
       if (name === "disableSkill") return getHost().call("skills.setEnabled", { id: "grill-with-docs", level: "project", projectPath: input.path, enabled: input.enabled });
       throw new Error(`Unknown Workflow fixture action: ${name}`);
     },
-    async dispose() { releaseLaunch(); releaseProvider(); await Promise.all([...runtimes].map((runtime) => runtime.dispose())); await Promise.all([...tasks]); },
+    async dispose() { checks.stop(); releaseLaunch(); releaseProvider(); await Promise.all([...runtimes].map((runtime) => runtime.dispose())); await Promise.all([...tasks]); },
   };
 }
 

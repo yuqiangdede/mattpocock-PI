@@ -43,6 +43,7 @@ import {
   IconPlus,
   IconTrash,
 } from "../icons";
+import { EngineeringSkillSettings } from "./EngineeringSkillSettings";
 import { SkillMarketPanel } from "./SkillMarketPanel";
 
 import { TooltipButton } from "../ui";
@@ -97,16 +98,6 @@ export function AgentSkillsPage() {
   const [editor, setEditor] = useState<SkillEditorState | null>(null);
   const [view, setView] = useState<"skills" | "market">("skills");
   const [showAllSkills, setShowAllSkills] = useState(false);
-  const updateEngineeringSkills = async () => {
-    setBusyId("engineering-update");
-    try {
-      const result = await api.updateEngineeringSkills();
-      await load();
-      showToast(t("settings.engineeringSkillsUpdated", { count: result.updated.length, preserved: result.preserved.length }));
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
-    } finally { setBusyId(null); }
-  };
   const [saving, setSaving] = useState(false);
   const { armed, setArmed } = useArmedDelete();
 
@@ -559,12 +550,12 @@ export function AgentSkillsPage() {
               </CapabilityButton>
               {marketButton}
               <CapabilityButton onClick={() => setShowAllSkills((value) => !value)}>{t(showAllSkills ? "settings.showWorkflowSkills" : "settings.showAllSkills")}</CapabilityButton>
-              <CapabilityButton busy={busyId === "engineering-update"} onClick={() => void updateEngineeringSkills()}>{t("settings.updateEngineeringSkills")}</CapabilityButton>
             </>
           }
         />
       }
     >
+      <EngineeringSkillSettings onUpdated={load} />
       <CapabilityPanel
         loading={loading}
         refreshing={refreshing}

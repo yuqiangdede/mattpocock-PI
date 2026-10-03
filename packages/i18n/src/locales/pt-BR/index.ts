@@ -607,6 +607,7 @@ export const ptBR = {
   settings: {
     showAllSkills: "Mostrar todas as habilidades",
     showWorkflowSkills: "Mostrar habilidades do fluxo",
+    engineering: en.settings.engineering,
     updateEngineeringSkills: "Atualizar habilidades de engenharia",
     engineeringSkillsUpdated: "{{count}} habilidades atualizadas; {{preserved}} alteradas ou removidas localmente preservadas.",
     power: "Energia",

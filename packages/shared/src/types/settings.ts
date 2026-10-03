@@ -25,6 +25,10 @@ export type ThemePreference = "system" | "light" | "dark" | `plugin:${string}`;
 export type CloseBehavior = "ask" | "tray" | "quit";
 
 export type AppSettings = {
+  engineeringShortcutPrompts?: import("../engineering-shortcuts.js").EngineeringShortcutPrompts;
+  engineeringSkillUpdateMode?: import("../engineering-shortcuts.js").EngineeringSkillUpdateMode;
+  /** Local check metadata, never synchronized across machines. */
+  engineeringSkillCheck?: import("../engineering-shortcuts.js").EngineeringSkillCheck;
   imageGeneration?: import("../image-generation.js").ImageGenerationBinding | null;
   /** All models marked for image generation; absent falls back to imageGeneration. */
   imageGenerationModels?: import("../image-generation.js").ImageGenerationBinding[] | null;

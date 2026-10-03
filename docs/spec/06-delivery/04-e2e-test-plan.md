@@ -16240,6 +16240,15 @@ renderer's durable transcript reads. No real model or provider is contacted.
 
 ## Coding Workbench Skill Shortcuts
 
+The shortcuts use two separate wrapping rows. The first row is Ask next step,
+Initialize, Engineering Workflow panel, and More features, in that order.
+The second row is Discuss requirements (with Form specification and Split
+tickets in its split-button menu), Implement, Diagnose bug, Review code,
+and Retrospective. Discuss requirements,
+Implement, and Diagnose bug use bold text; all other controls use regular text.
+At narrow widths each row wraps independently without horizontal overflow.
+
+
 - Specification: [Coding Workbench Skill Shortcuts](../01-product/coding-workbench-free-tasks.md).
 - Main seam: real buttons -> Composer draft -> explicit Send -> normal
   store/Main/Host/Agent Runtime -> Skill result. Only the external model is a fixture.
@@ -16248,7 +16257,7 @@ renderer's durable transcript reads. No real model or provider is contacted.
 
 | Scenario | Journey |
 | --- | --- |
-| E2E-CODING-insert-and-manual-send | Select all eight actions (Spec and Tickets through the requirements menu), Ask, and representative More items with empty input; preserve text/files; prove no automatic prompt or Free Task; manually send and compare with typed slash input. |
+| E2E-CODING-insert-and-manual-send | Select all eight actions (Spec and Tickets through the requirements menu), Ask, and every More item with localized editable default instructions with empty input; preserve text/files; prove no automatic prompt or Free Task; manually send and compare with typed slash input. |
 | E2E-CODING-requirements-menu | Main action remains Discuss requirements after selecting Spec or Tickets; keyboard opening, Escape, outside click, and disabling close the menu; secondary actions stay out of the toolbar. |
 | E2E-CODING-engineering-setup | Insert and send `/setup-matt-pocock-skills`, read its actual body; no native initialization task or preview. |
 | E2E-CODING-catalog-recovery | Disable the installed skill, preserve input and navigate to Skills; enable and retry. Fail the catalog read, preserve input and retry without silent installation. |
@@ -16263,3 +16272,16 @@ delivery record; they are not the current shortcut acceptance contract.
 Record tested commit and base main. Use isolated fixture state; do not attach to
 user-owned Desktop instances or paid providers. `verify:ui:*` still requires an
 explicit current-task user request.
+
+## Engineering Shortcut Settings and Update Detection
+
+- Contract: global instructions in coding-workbench-free-tasks.md and
+  engineering-skills-distribution.md.
+- Command: `node scripts/e2e-workflow-runs.mjs --engineering-settings`.
+- Real settings editor -> Host persistence -> Composer insertion; empty override
+  and localized restore; settings edits preserve an already prepared draft.
+- Switch to manual detection, check without install, explicitly update through
+  Main/Host, retain local skill edits and disabled state, then recover offline.
+- Only the GitHub source and model/provider boundary are isolated fixtures.
+- Controlled scheduler tests cover startup, daily gating, persisted failure
+  timestamps, no detection in manual mode, coalescing, Host restart and disposal.

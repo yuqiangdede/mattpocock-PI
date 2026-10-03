@@ -1,3 +1,4 @@
+import { validateEngineeringSettings, engineeringSettingsForWrite } from "@pi-desktop/shared";
 import {
   ErrorCodes as SharedErrorCodes,
   SESSION_THINKING_LEVELS,
@@ -162,6 +163,7 @@ export function createProviderCatalogRuntime({
     if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
       return settings;
     }
+    validateEngineeringSettings(settings);
     const value = settings as T & {
       defaultCommandShell?: unknown;
       infiniteProviderRetry?: unknown;
@@ -227,7 +229,7 @@ export function createProviderCatalogRuntime({
         (value as { speech?: unknown }).speech,
       );
     }
-    return settings;
+    return engineeringSettingsForWrite(settings);
   };
 
   const listRuntimeProviders = async (includeDisabled = true) => {

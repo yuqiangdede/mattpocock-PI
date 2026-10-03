@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { register } from "node:module";
 import test from "node:test";
-register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
+register(new URL("./helpers/engineering-settings-imports.mjs", import.meta.url));
 const renderer = await import("../src/lib/api.ts");
 const { createProviderCatalogRuntime } = await import("../electron/main/runtime/provider-catalog.ts");
 const main = createProviderCatalogRuntime({ getHost: () => null, modelsDevCatalog: {} });
@@ -32,5 +32,18 @@ test("invalid retry writes stay rejected at both boundaries", () => {
     const settings = { infiniteProviderRetry: value };
     assert.throws(() => renderer.validateSettingsWrite(settings), /infiniteProviderRetry is invalid/);
     assert.throws(() => main.validateSettingsWrite(settings), /infiniteProviderRetry is invalid/);
+  }
+});
+
+
+test("engineering preferences survive both settings boundaries without rewinding check metadata", () => {
+  const input = { engineeringShortcutPrompts: { ask: "", implement: null }, engineeringSkillUpdateMode: "manual", engineeringSkillCheck: { attemptedAt: 1 } };
+  const result = main.validateSettingsWrite(renderer.validateSettingsWrite(input));
+  assert.deepEqual(result.engineeringShortcutPrompts, input.engineeringShortcutPrompts);
+  assert.equal(result.engineeringSkillUpdateMode, "manual");
+  assert.equal(result.engineeringSkillCheck, undefined);
+  for (const invalid of [{ engineeringShortcutPrompts: { unknown: "x" } }, { engineeringSkillUpdateMode: "auto-install" }]) {
+    assert.throws(() => renderer.validateSettingsWrite(invalid), /invalid/);
+    assert.throws(() => main.validateSettingsWrite(invalid), /invalid/);
   }
 });

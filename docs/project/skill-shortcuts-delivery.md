@@ -8,7 +8,10 @@ Base main: `bd0ab10e86cb5ae0daddaff2fcc5743edcbc8424`.
 ## User operation / release note
 
 Use the eight engineering buttons above the home/conversation Composer.
-A click adds a skill to the existing draft; edit the request and manually Send.
+A click adds a skill and its localized default instruction to the existing draft;
+edit the request and manually Send. Ask next step inspects current project
+evidence before recommending a concrete action. Every More skill also has an
+editable instruction. Existing text and attachments remain intact.
 Engineering initialization uses `/setup-matt-pocock-skills` to configure the
 issue tracker, engineering documentation and skill conventions. Results and
 Stop appear in ordinary chat. Missing skills expose Configure skills.
@@ -89,3 +92,61 @@ Real paid providers, installers and macOS/Linux were not exercised.
 disposed and no task-owned workflow Electron/Host process remained. Unit-test
 HTTP fixtures use their existing cleanup paths. User-owned services were not
 used or stopped. This worktree remains attached for review and later delivery.
+
+## Default-instruction follow-up (2026-10-03)
+
+Branch: `codex/coding-shortcut-layout`; tested uncommitted working tree based on
+`c2cee028616b5e8079e8d537db0002a65b5b0826` (also origin/main at preparation).
+Adds two shortcut rows, priority text weights and 26 localized skill instructions.
+Eight targeted Node tests, Desktop typecheck, electron-vite build, Biome's
+configured lint surface, style-token and diff checks passed.
+`node scripts/e2e-workflow-runs.mjs --coding` passed all reported fields,
+including real manual Send/Skill loading, retained drafts/attachments, catalog
+recovery, stale-session isolation, queueing, narrow layout, keyboard and locale.
+Validation reused host dependencies, Electron, Host and Agent Runtime artifacts.
+The expanded coding fixture has a 120-second total deadline. Missing optional
+skills preserve the draft and show configuration guidance; the bundled pack
+does not include resolving-merge-conflicts. No live provider was contacted.
+
+## Global settings and update detection follow-up (2026-10-03)
+
+The user approved the design in engineering-shortcut-settings-design.md and
+requested implementation. Settings > Agent > Skills now edits all 26 global
+instructions, including empty overrides and per-item localized restoration.
+The two update modes use manual installation; automatic detection defaults to
+one attempt per 24 hours and retains attempt time across failures/restarts.
+Main-owned check metadata is excluded from ordinary renderer settings writes.
+
+Task candidate: uncommitted work on `codex/coding-shortcut-layout`.
+Base main: `c2cee028616b5e8079e8d537db0002a65b5b0826`; refreshed origin/main
+remains the same revision. No task commit or push was authorized.
+
+Validation: 23 targeted Node tests, four changelog tests, 749 Host tests,
+current Host preference validation tests, Shared/i18n builds, Desktop
+typecheck against current workspace sources, production Electron build,
+configured Biome lint, style-token checks, Rust fmt/clippy and diff checks.
+Clippy retains only the pre-existing guard/created_at warnings.
+
+Both `--coding` and `--engineering-settings` Electron fixtures passed.
+Settings acceptance includes save/remount/read/use, retaining the existing
+draft, empty override, restore, manual mode, check without install, explicit
+update, preserving locally edited/disabled skills, and offline recovery.
+Scheduler tests use a controlled clock and cover stale Host results, disposal,
+coalescing and manual detection concurrent with a skipped automatic tick.
+
+Logs/artifacts: ignored `cache/engineering-settings/`. The environment reuses
+existing dependencies, Electron, Cargo targets and Agent Runtime. Desktop
+typechecking uses a scratch tsconfig pointing at current Shared/i18n sources
+so old linked declarations do not mask contract changes. No dependencies were
+installed. The current shipped 37-package snapshot matches public upstream
+`d81f3a183412e71a5b1e84ca21bc1a35eea03a60`, rechecked during delivery.
+
+Real GitHub detection was checked read-only; installation behavior was
+validated through an isolated GitHub-source fixture. No real user skill
+installation, paid provider, installer/signing or cross-platform packaging
+was exercised in this request. Temporary Electron/Host processes exit and
+the fixture removes its profile/project directories.
+
+The user subsequently authorized commit, push and merge into remote main.
+Delivery refreshes the request against the newer version-source commit before
+validating the committed task and PR integration candidates.

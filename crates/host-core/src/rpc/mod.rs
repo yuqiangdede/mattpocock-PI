@@ -1,4 +1,5 @@
 mod config_sync_rpc;
+mod engineering_settings;
 mod free_tasks;
 mod scheduled_rpc;
 mod scheduled_tools;
@@ -905,6 +906,8 @@ fn effective_command_shell_id(settings: Option<&Value>) -> Option<String> {
 }
 
 fn validate_settings_value(value: &Value) -> Result<(), JsonRpcError> {
+    engineering_settings::validate(value)
+        .map_err(|message| rpc_err(1002, message, "INVALID_PARAMS"))?;
     let Some(object) = value.as_object() else {
         return Ok(());
     };

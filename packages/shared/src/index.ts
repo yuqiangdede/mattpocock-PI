@@ -74,3 +74,5 @@ export * from "./session-todos.js";
 export * from "./tool-call-lineage.js";
 export * from "./event-usage.js";
 export * from "./free-tasks.js";
+
+export * from "./engineering-shortcuts.js";

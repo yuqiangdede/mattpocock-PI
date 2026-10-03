@@ -618,6 +618,7 @@ export const ko = {
   settings: {
     showAllSkills: "모든 스킬 표시",
     showWorkflowSkills: "워크플로 스킬 표시",
+    engineering: en.settings.engineering,
     updateEngineeringSkills: "엔지니어링 스킬 업데이트",
     engineeringSkillsUpdated: "{{count}}개 스킬을 업데이트하고 로컬에서 수정하거나 삭제한 {{preserved}}개를 유지했습니다.",
     power: "전원",

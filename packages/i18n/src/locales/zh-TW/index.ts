@@ -613,6 +613,7 @@ export const zhTW = {
   settings: {
     showAllSkills: "顯示全部技能",
     showWorkflowSkills: "僅顯示階段技能",
+    engineering: en.settings.engineering,
     updateEngineeringSkills: "更新工程技能",
     engineeringSkillsUpdated: "已更新 {{count}} 個技能；保留了 {{preserved}} 個本機修改或移除的技能。",
     power: "電源",

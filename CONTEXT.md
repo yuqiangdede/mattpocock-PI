@@ -64,3 +64,15 @@ _Avoid_: Task execution, automatic send
 **Engineering Skills Setup**:
 Configuring a project's issue tracker, triage vocabulary and domain documentation conventions for engineering skills.
 _Avoid_: Project scaffolding, runtime installation
+
+**Shortcut Instruction**:
+The editable default request accompanying a Skill Shortcut in the conversation draft. A global customization applies across projects and is separate from the skill's own instructions.
+_Avoid_: Skill body, automatic execution
+
+**Engineering Skill Update Check**:
+Detecting whether a newer upstream engineering skill bundle is available. Detection does not install that bundle.
+_Avoid_: Skill installation, automatic update
+
+**Engineering Skill Update Mode**:
+The user's choice between automatic version detection with manual installation and fully manual detection and installation.
+_Avoid_: Automatic installation, application update mode

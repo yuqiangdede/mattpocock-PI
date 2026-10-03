@@ -1,65 +1,83 @@
 import { useEffect, useState } from "react";
-import { ChevronDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { ChevronDown } from "lucide-react";
 import { Button, TooltipButton } from "../../components/ui";
 import { AnchoredMenu } from "../../components/settings/AnchoredMenu";
 import { toolWorkPanelTab } from "../../lib/work-panel-tabs";
 import { useAppStore } from "../../stores/app-store";
 
-export const CODING_SKILL_SHORTCUTS = [
-  { action: "initialize", skill: "setup-matt-pocock-skills" },
-  { action: "discovery", skill: "grill-with-docs" },
-  { action: "spec", skill: "to-spec" },
-  { action: "tickets", skill: "to-tickets" },
-  { action: "implement", skill: "implement" },
-  { action: "diagnose", skill: "diagnosing-bugs" },
-  { action: "review", skill: "code-review" },
-  { action: "retro", skill: "retro" },
-] as const;
-
-/** Matt skills that are useful from the coding workbench but do not need a visible shortcut. */
-export const CODING_MORE_SKILLS = [
-  { action: "grillMe", skill: "grill-me" },
-  { action: "grilling", skill: "grilling" },
-  { action: "handoff", skill: "handoff" },
-  { action: "prototype", skill: "prototype" },
-  { action: "improveArchitecture", skill: "improve-codebase-architecture" },
-  { action: "codebaseDesign", skill: "codebase-design" },
-  { action: "domainModeling", skill: "domain-modeling" },
-  { action: "tdd", skill: "tdd" },
-  { action: "wayfinder", skill: "wayfinder" },
-  { action: "triage", skill: "triage" },
-  { action: "research", skill: "research" },
-  { action: "resolveConflicts", skill: "resolving-merge-conflicts" },
-  { action: "teach", skill: "teach" },
-  { action: "questionnaire", skill: "to-questionnaire" },
-  { action: "waitWhat", skill: "wait-what" },
-  { action: "wizard", skill: "wizard" },
-  { action: "writingForAgents", skill: "writing-for-agents" },
-] as const;
+import { CODING_SKILL_SHORTCUTS, CODING_MORE_SKILLS, resolveShortcutInstruction, type EngineeringShortcutAction } from "@pi-desktop/shared";
+export { CODING_SKILL_SHORTCUTS, CODING_MORE_SKILLS } from "@pi-desktop/shared";
 
 export function CodingWorkbench({ disabled, error, onSelect }: {
   disabled: boolean;
   error: string | null;
-  onSelect: (skill: string) => void;
+  onSelect: (skill: string, prompt: string) => void;
 }) {
   const { t } = useTranslation();
+  const overrides = useAppStore(state => state.settings?.engineeringShortcutPrompts);
+  const selectShortcut = (action: EngineeringShortcutAction, skill: string) => onSelect(skill, resolveShortcutInstruction(action, t(`coding.prompts.${action}`), overrides));
   const [moreOpen, setMoreOpen] = useState(false);
   const [requirementsOpen, setRequirementsOpen] = useState(false);
 
   useEffect(() => {
-    if (disabled) {
-      setMoreOpen(false);
-      setRequirementsOpen(false);
-    }
+    if (disabled) { setMoreOpen(false); setRequirementsOpen(false); }
   }, [disabled]);
 
   return <section className="coding-workbench" aria-label={t("coding.tools")}>
     <div className="coding-shortcuts">
-      {CODING_SKILL_SHORTCUTS.filter(({ action }) => action !== "spec" && action !== "tickets").map(({ action, skill }) => action === "discovery" ? <div className="coding-requirements-split" key={skill}>
-        <Button disabled={disabled} title={t("coding.discoveryHint")} onClick={() => {
+      <Button disabled={disabled} title={t("coding.askHint")} onClick={() => selectShortcut("ask", "ask-matt")}>
+        {t("coding.ask")}
+      </Button>
+      <Button disabled={disabled} title={t("coding.initializeHint")} onClick={() => selectShortcut("initialize", "setup-matt-pocock-skills")}>
+        {t("coding.initialize")}
+      </Button>
+      <Button onClick={() => useAppStore.getState().openWorkPanelTab(toolWorkPanelTab("workflow"))}>
+        {t("coding.formal")}
+      </Button>
+      <AnchoredMenu
+        open={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        role="menu"
+        label={t("coding.more")}
+        menuClassName="context-menu coding-more-menu"
+        trigger={(ref) => (
+          <Button
+            ref={ref}
+            type="button"
+            disabled={disabled}
+            title={t("coding.moreHint")}
+            aria-haspopup="menu"
+            aria-expanded={moreOpen}
+            onClick={() => { setRequirementsOpen(false); setMoreOpen((value) => !value); }}
+          >
+            {t("coding.more")}
+          </Button>
+        )}
+      >
+        {CODING_MORE_SKILLS.map(({ action, skill }) => (
+          <Button
+            key={skill}
+            type="button"
+            role="menuitem"
+            variant="ghost"
+            className="context-menu-item"
+            disabled={disabled}
+            onClick={() => {
+              setMoreOpen(false);
+              selectShortcut(action, skill);
+            }}
+          >
+            {t(`coding.${action}`)}
+          </Button>
+        ))}
+      </AnchoredMenu>
+    </div>
+    <div className="coding-shortcuts coding-shortcuts-primary">
+      {CODING_SKILL_SHORTCUTS.filter(({ action }) => action !== "initialize" && action !== "spec" && action !== "tickets").map(({ action, skill }) => action === "discovery" ? <div className="coding-requirements-split" key={skill}>
+        <Button className="coding-shortcut-emphasized" disabled={disabled} title={t("coding.discoveryHint")} onClick={() => {
           setRequirementsOpen(false);
-          onSelect(skill);
+          selectShortcut(action, skill);
         }}>{t("coding.discovery")}</Button>
         <AnchoredMenu
           open={requirementsOpen}
@@ -86,60 +104,15 @@ export function CodingWorkbench({ disabled, error, onSelect }: {
             title={t(`coding.${action}Hint`)}
             onClick={() => {
               setRequirementsOpen(false);
-              onSelect(skill);
+              selectShortcut(action, skill);
             }}
           >{t(`coding.${action}`)}</Button>)}
         </AnchoredMenu>
       </div> : <Button
         key={skill} disabled={disabled} title={t(`coding.${action}Hint`)}
-        onClick={() => onSelect(skill)}
+        className={["implement", "diagnose"].includes(action) ? "coding-shortcut-emphasized" : undefined}
+        onClick={() => selectShortcut(action, skill)}
       >{t(`coding.${action}`)}</Button>)}
-      <Button disabled={disabled} title={t("coding.askHint")} onClick={() => onSelect("ask-matt")}>
-        {t("coding.ask")}
-      </Button>
-      <AnchoredMenu
-        open={moreOpen}
-        onClose={() => setMoreOpen(false)}
-        role="menu"
-        label={t("coding.more")}
-        menuClassName="context-menu coding-more-menu"
-        trigger={(ref) => (
-          <Button
-            ref={ref}
-            type="button"
-            disabled={disabled}
-            title={t("coding.moreHint")}
-            aria-haspopup="menu"
-            aria-expanded={moreOpen}
-            onClick={() => {
-              setRequirementsOpen(false);
-              setMoreOpen((value) => !value);
-            }}
-          >
-            {t("coding.more")}
-          </Button>
-        )}
-      >
-        {CODING_MORE_SKILLS.map(({ action, skill }) => (
-          <Button
-            key={skill}
-            type="button"
-            role="menuitem"
-            variant="ghost"
-            className="context-menu-item"
-            disabled={disabled}
-            onClick={() => {
-              setMoreOpen(false);
-              onSelect(skill);
-            }}
-          >
-            {t(`coding.${action}`)}
-          </Button>
-        ))}
-      </AnchoredMenu>
-      <Button onClick={() => useAppStore.getState().openWorkPanelTab(toolWorkPanelTab("workflow"))}>
-        {t("coding.formal")}
-      </Button>
     </div>
     {error && <div className="coding-shortcut-error" role="alert">
       <span>{error}</span>
