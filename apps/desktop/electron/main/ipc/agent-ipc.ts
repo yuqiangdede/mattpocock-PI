@@ -825,7 +825,7 @@ export function registerAgentIpc({
     } catch (error) {
       // A definite refusal leaves the turn running. Its later normal terminal
       // event must not inherit the abandoned cancellation decision.
-      if ((req.workflowExecutionId || req.freeTaskId) && !isRpcTimeoutError(error)) clearAbortReason?.(req.sessionId, abortedTurnId);
+      if (req.freeTaskId && !isRpcTimeoutError(error)) clearAbortReason?.(req.sessionId, abortedTurnId);
       throw error;
     } finally {
       // A turn that already stopped owning the session is refused inside the
