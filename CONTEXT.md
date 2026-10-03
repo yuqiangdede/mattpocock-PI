@@ -48,3 +48,11 @@ _Avoid_: Workflow stage, shortcut stage completion
 **Project Initialization**:
 Preparing a new or existing project for coding work through an explicitly selected set of setup activities while retaining existing project configuration.
 _Avoid_: Open project, clone repository
+
+**Skill Shortcut**:
+A visible coding action that selects an engineering skill in the current conversation's draft. Selection is distinct from the user's explicit submission of that draft.
+_Avoid_: Task execution, automatic send
+
+**Engineering Skills Setup**:
+Configuring a project's issue tracker, triage vocabulary and domain documentation conventions for engineering skills.
+_Avoid_: Project scaffolding, runtime installation

@@ -1,5 +1,7 @@
 # Project Tracking
 
+- Skill Shortcuts: [confirmed simplification design](skill-shortcuts-interaction-design.md); draft insertion with manual submission, [current specification](../spec/01-product/coding-workbench-free-tasks.md) and [delivery evidence](skill-shortcuts-delivery.md).
+
 - Coding Home: [confirmed interaction design and implementation acceptance scenarios](coding-home-interaction-design.md)
 - Coding Workbench: [specification](../spec/01-product/coding-workbench-free-tasks.md), [task-candidate delivery](coding-workbench-delivery.md) and [GitHub issue #14](https://github.com/yuqiangdede/mattpocock-PI/issues/14); release pending.
 

@@ -1,5 +1,7 @@
 # Coding Workbench Task Candidate
 
+> Historical PR #15 behavior. The [skill shortcut design](skill-shortcuts-interaction-design.md) supersedes the task-card interaction. Retain this document as historical evidence.
+
 Date: 2026-10-03. Scope: [issue #14](https://github.com/yuqiangdede/mattpocock-PI/issues/14).
 Status: Local implementation and verification; no remote delivery or release.
 Base main: `00fae4b9116653a5aacce5232d0981d8127f8af0`.

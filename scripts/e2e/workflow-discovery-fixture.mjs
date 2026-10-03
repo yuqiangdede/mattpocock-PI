@@ -31,6 +31,11 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
   let prompts = 0;
   let skillLoads = 0;
   const skillIds = [];
+  let catalogUnavailable = false;
+  let catalogGate = Promise.resolve();
+  let releaseCatalog = () => {};
+  let catalogStarted = Promise.resolve();
+  let markCatalogStarted = () => {};
   let transformed = "";
   const runtimes = new Set();
   const boundRuntimes = new Map();
@@ -42,6 +47,18 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
     pluginActiveInProject: () => false,
     loadComposerTemplatesCached: async () => [],
   });
+  if (process.env.PI_CODING_WORKBENCH === "1") {
+    registrar.handle(IPC.invoke.settingsGet, () => getHost().call("settings.get"));
+    registrar.handle(IPC.invoke.todosGet, (input) => getHost().call("todos.get", input));
+    registrar.handle(IPC.invoke.liveVoiceStatus, () => ({ enabled: false, bindings: [], selectedBindingId: null }));
+    registrar.handle(IPC.invoke.composerCommands, async () => {
+      const { workspace } = await getHost().call("workspace.get");
+      markCatalogStarted();
+      await catalogGate;
+      if (catalogUnavailable) throw new Error("Deterministic catalog unavailable");
+      return { commands: await catalog.buildComposerCommands(workspace?.path ?? null) };
+    });
+  }
   const finishTurn = async (sessionId, status, errorCode, { turnId }) => {
     if (coordination.peekAbortReason(sessionId, turnId) === "aborted") { status = "aborted"; errorCode = "TURN_ABORTED"; }
     if (getHost()) await getHost().call("session.endTurn", { turnId, status, errorCode, createNotification: false });
@@ -170,6 +187,21 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
   }
   return {
     async action(name, input) {
+      if (name === "pressKey") {
+        const { BrowserWindow } = await import("electron");
+        const contents = BrowserWindow.getAllWindows()[0].webContents;
+        contents.sendInputEvent({ type: "keyDown", keyCode: input });
+        contents.sendInputEvent({ type: "keyUp", keyCode: input });
+        return;
+      }
+      if (name === "holdCatalog") {
+        catalogGate = new Promise((resolve) => { releaseCatalog = resolve; });
+        catalogStarted = new Promise((resolve) => { markCatalogStarted = resolve; });
+        return;
+      }
+      if (name === "waitForCatalog") { await catalogStarted; return; }
+      if (name === "releaseCatalog") { releaseCatalog(); return; }
+      if (name === "catalogUnavailable") { catalogUnavailable = input; return; }
       if (name === "setSkillEnabled") return getHost().call("skills.setEnabled", { id: input.id, level: "project", projectPath: input.path, enabled: input.enabled });
       if (name === "resize") { const { BrowserWindow } = await import("electron"); BrowserWindow.getAllWindows()[0].setSize(input.width, input.height); return; }
       if (name === "blockInitialization") { const parent = join(dataDir, "..", "project-a", "scripts"); await mkdir(parent, {recursive:true}); await mkdir(join(parent, "verify.ps1")); return; }

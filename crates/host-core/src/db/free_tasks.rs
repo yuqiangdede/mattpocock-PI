@@ -423,6 +423,9 @@ mod tests {
         assert_eq!(db.read_free_task(&id).unwrap()["phase"], "interrupted");
         assert!(db.read_free_task(&id).unwrap().get("turnId").is_none());
         assert_eq!(db.read_free_task(&id).unwrap()["sessionId"], session_id);
+        let next = crate::sessions::begin_turn(&db, &session_id, None, None).unwrap();
+        crate::sessions::end_turn(&db, &next, "completed", None, None, false).unwrap();
+        assert_eq!(db.read_free_task(&id).unwrap()["phase"], "interrupted");
     }
     #[test]
     fn future_documents_are_retained_without_blocking_unrelated_chat() {

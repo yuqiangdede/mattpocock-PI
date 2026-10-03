@@ -37,7 +37,11 @@ try {
     format: "esm",
     jsx: "automatic",
     loader: { ".css": "empty" },
-    define: { "process.env.NODE_ENV": '"production"' },
+    plugins: [{ name: "fixture-asset-url", setup(builder) {
+      builder.onResolve({ filter: /\?url$/ }, (args) => ({ path: args.path, namespace: "asset-url" }));
+      builder.onLoad({ filter: /.*/, namespace: "asset-url" }, () => ({ contents: 'export default "fixture-asset";', loader: "js" }));
+    } }],
+    define: { "process.env.NODE_ENV": '"production"', "import.meta.env.DEV": "false" },
     alias: {
       "@pi-desktop/i18n": join(root, "packages/i18n/src/index.ts"),
       "@pi-desktop/shared": join(root, "packages/shared/src/index.ts"),
@@ -62,9 +66,16 @@ try {
   });
 
   const styleNames = ["tokens", "base", "ui-kit", "work-panel", ...(codingFixture ? ["coding-workbench"] : [])];
-  const styles = (await Promise.all(styleNames.map((name) =>
+  let styles = (await Promise.all(styleNames.map((name) =>
     readFile(join(root, `apps/desktop/src/styles/${name}.css`), "utf8"),
   ))).join("\n").replace(/@theme(?: inline)?/g, ":root");
+  if (codingFixture) {
+    const rendererRoot = join(root, "apps/desktop/out/renderer");
+    const html = await readFile(join(rendererRoot, "index.html"), "utf8");
+    const paths = [...html.matchAll(/href="([^" ]+\.css)"/g)].map((match) => match[1]);
+    assert.ok(paths.length, "Build the Desktop before running Composer acceptance");
+    styles = (await Promise.all(paths.map((path) => readFile(join(rendererRoot, path), "utf8")))).join("\n") + "\n" + styles;
+  }
   await writeFile(join(temp, "styles.css"), `${styles}
     body { margin: 0; background: var(--ds-bg-primary); }
     .workflow-tab { height: 100vh; }
@@ -72,12 +83,17 @@ try {
       gap: 8px; padding: 10px; background: #171717; color: #fff; }
   `, "utf8");
   await writeFile(join(temp, "index.html"), `<!doctype html><html lang="en"><meta charset="utf-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:">
     <link rel="stylesheet" href="styles.css"><body><div id="root"></div>
     <script type="module" src="renderer.js"></script></body></html>`, "utf8");
   await writeFile(join(temp, "preload.cjs"), `
     const { contextBridge, ipcRenderer } = require("electron");
     contextBridge.exposeInMainWorld("piDesktop", {
+      on: (channel, listener) => {
+        const handler = (_event, payload) => listener(payload);
+        ipcRenderer.on(channel, handler);
+        return () => ipcRenderer.removeListener(channel, handler);
+      },
       invoke: async (channel, ...args) => {
         try { const result = await ipcRenderer.invoke(channel, ...args); return typeof result?.ok === "boolean" ? result : { ok: true, data: result }; }
         catch (error) { return { ok: false, error: { message: error.message, code: error.errorCode } }; }
@@ -126,10 +142,9 @@ try {
   const result = JSON.parse(resultLine.slice("WORKFLOW_RUNS_PROBE ".length));
   assert.equal(result.ok, true);
   if (codingFixture) {
-    assert.equal(result.direct, true);
-    assert.equal(result.handoff, true);
-    assert.equal(result.initialization, true);
-    for (const field of ["waiting", "cancellation", "partialRetry", "newProject", "keyboard", "narrow", "newConversation", "removableContext", "remediation"]) assert.equal(result[field], true, field);
+    assert.equal(result.inserted, true);
+    assert.equal(result.manual, true);
+    for (const field of ["mappings", "retained", "setup", "remediation", "stale", "queue", "narrow", "keyboard", "localized"]) assert.equal(result[field], true, field);
   } else if (artifactsFixture) {
     assert.equal(result.registeredBeforeExecution, true);
     assert.equal(result.previewed, true);
