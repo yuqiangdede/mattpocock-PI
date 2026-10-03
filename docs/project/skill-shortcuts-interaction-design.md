@@ -1,0 +1,93 @@
+# Skill Shortcut Interaction Design
+
+Date: 2026-10-03
+Status: User-confirmed interaction direction; implementation candidate in progress.
+Purpose: Simplify the coding workbench into shortcuts for existing Composer skills.
+This is a proposed change to the shipped PR #15 behavior, not a claim that the
+runtime has already changed.
+
+## Confirmed interaction
+
+Selecting a shortcut adds the corresponding skill marker to the current
+conversation's Composer draft. Existing text remains intact. The shortcut
+does not submit the draft, start execution or create a separate task.
+The user reviews and edits the draft, then explicitly sends it using the
+ordinary Composer controls.
+
+An empty draft receives only the selected skill marker. A non-empty draft
+retains its existing content and adds the marker. Use the existing slash-skill
+insertion semantics rather than implementing a second skill invocation format.
+Ordinary submission supplies context, Skill loading, permissions, queueing,
+Stop, errors and conversation output exactly as manual slash invocation does.
+
+## Visible controls
+
+Use a compact button area rather than task cards with separate forms:
+
+| Button | Skill |
+| --- | --- |
+| Engineering initialization | `setup-matt-pocock-skills` |
+| Discuss requirements | `grill-with-docs` |
+| Form specification | `to-spec` |
+| Split tickets | `to-tickets` |
+| Implement | `implement` |
+| Diagnose bug | `diagnosing-bugs` |
+| Review code | `code-review` |
+| Retrospective | `retro` |
+
+Keep the shortcuts available on the home surface and through a compact
+conversation entry. Skill identity and availability follow the existing
+catalog and user definitions; unavailable skills are not silently installed,
+enabled or replaced. All labels and accessible names follow application i18n.
+
+## Engineering initialization boundary
+
+Engineering initialization invokes the actual `setup-matt-pocock-skills` skill.
+It configures the issue tracker, triage vocabulary and domain documentation
+conventions. The skill performs its own discovery and confirmation in chat.
+It does not create a project code skeleton or install runtime dependencies.
+This replaces the former native project-preparation button in the proposed UI.
+
+## Simplification boundary
+
+- Remove the shortcut-triggered task intake panel and independent result cards.
+- Do not create new Free Task records or a parallel execution path from shortcuts.
+- Use ordinary chat for skill questions, results, waiting and recovery.
+- Retain the existing optional strict Engineering Workflow in its original
+  Work Panel location; selecting a shortcut does not accept its stages.
+- Preserve existing project files, initialization backups and persisted task
+  history. Removing presentation must not delete user data. Legacy unsettled
+  reservations and their recovery need inspection before retiring task APIs.
+
+The user corrected the earlier click-to-send recommendation: click-to-insert
+with manual submission is authoritative for this design.
+
+## Existing seams and implementation handoff
+
+Composer completion already updates the editor draft without sending;
+ordinary Composer submission then calls the existing prompt/queue path.
+Prefer those public entry points for button insertion and manual submission.
+Do not add a task form, automatic send, a new provider invocation or a new
+Host persistence model to implement shortcut selection.
+
+## Acceptance checks
+
+1. Click each of the eight shortcuts in an empty Composer: its corresponding
+   marker appears, the input can be edited, and no prompt or task is submitted.
+2. Click with existing text and attachments: content and attachments remain;
+   only skill selection changes. Closing or switching views does not lose draft data.
+3. Manually send a selected skill with task text: the same skill and current
+   conversation context are used as the equivalent manually composed slash input.
+4. While a conversation is running, shortcut selection only edits the draft;
+   manual submission follows normal queueing or unsupported-session behavior.
+5. Engineering initialization loads `setup-matt-pocock-skills`; it does not
+   enter native file preview, directory creation or dependency installation.
+6. Missing/disabled skills retain existing catalog, activation and permission
+   behavior, without silent fallback to another skill or literal execution.
+7. The home and conversation entry use localized, keyboard-accessible controls
+   and compact wrapping at narrow widths.
+8. Retiring the former workbench presentation preserves old histories,
+   initialization backups and strict Workflow acceptance behavior.
+
+Implementation synchronizes the product and E2E specifications and verifies the
+public Composer interaction and existing Host recovery boundaries.

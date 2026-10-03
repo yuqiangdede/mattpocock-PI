@@ -1,5 +1,6 @@
 export const en = {
   coding: {
+    configureSkills: "Configure skills",
     removeContext: "Remove reference",
     "title": "Coding Workbench",
     "tools": "Coding Tools",
@@ -60,7 +61,7 @@ export const en = {
     "spec": "Form specification",
     "tickets": "Split tickets",
     "implement": "Implement",
-    "initialize": "Initialize project",
+    "initialize": "Engineering initialization",
     "diagnose": "Diagnose bug",
     "review": "Review code",
     "retro": "Retrospective",
@@ -68,7 +69,7 @@ export const en = {
     "specHint": "Turn requirements into an accepted specification.",
     "ticketsHint": "Break work into manageable tickets.",
     "implementHint": "Implement a request directly or use a ticket.",
-    "initializeHint": "Prepare a new or existing project safely.",
+    "initializeHint": "Configure the issue tracker, engineering docs and skill conventions.",
     "diagnoseHint": "Investigate evidence and the root cause.",
     "reviewHint": "Review changes and identify risks.",
     "retroHint": "Reflect and identify actionable improvements."

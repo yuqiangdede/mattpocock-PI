@@ -2,6 +2,7 @@ import { en, type EnglishCatalog } from "../en/index.js";
 
 export const zhCN = {
   coding: {
+    configureSkills: "配置技能",
     removeContext: "移除引用",
     "title": "编码工作台",
     "tools": "编码工具",
@@ -62,7 +63,7 @@ export const zhCN = {
     "spec": "需求固化",
     "tickets": "拆分工单",
     "implement": "实现",
-    "initialize": "初始化项目",
+    "initialize": "工程初始化",
     "diagnose": "Bug 排查",
     "review": "代码审查",
     "retro": "复盘",
@@ -70,7 +71,7 @@ export const zhCN = {
     "specHint": "将需求固化为可验收的规格。",
     "ticketsHint": "拆成可独立交付的开发任务。",
     "implementHint": "直接实现简单需求，也可选择工单。",
-    "initializeHint": "安全准备新项目或已有项目。",
+    "initializeHint": "配置工单系统、工程文档和技能约定。",
     "diagnoseHint": "从证据定位问题根因。",
     "reviewHint": "检查改动与潜在风险。",
     "retroHint": "总结经验与下一步改进。"

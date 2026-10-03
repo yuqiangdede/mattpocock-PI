@@ -46,3 +46,17 @@ and user data remain intact. Unknown future documents must remain unchanged.
 Unsettled tasks recover as Interrupted with explicit retry. Concurrent writes
 without a distinct worktree are rejected before mutation. Installation remains
 explicit and existing user skill definitions retain precedence.
+
+## 2026-10-03 presentation amendment
+
+The user simplified the workbench to ordinary Composer skill insertion and
+manual submission. Renderer no longer reserves or automatically dispatches
+Free Tasks from engineering buttons. The native initialization button is
+replaced by the actual `setup-matt-pocock-skills` prompt.
+
+This changes presentation, not persisted ownership or historical data. Retain
+Host APIs, versioned records, restart interruption and initialization backups
+for existing data/clients. Ordinary turns still use the same admission and
+permissions. No schema migration or automatic replay is introduced. The
+[current product specification](../spec/01-product/coding-workbench-free-tasks.md)
+supersedes the original workbench intake/result presentation.

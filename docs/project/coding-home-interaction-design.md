@@ -1,5 +1,7 @@
 # Coding Home Interaction Design
 
+> Historical PR #15 behavior. The [skill shortcut design](skill-shortcuts-interaction-design.md) supersedes the task-card interaction. Retain this document as historical evidence.
+
 Date: 2026-10-02
 Status: Interaction decisions Q1-Q12 accepted; requirements consolidated in the [product specification](../spec/01-product/coding-workbench-free-tasks.md).
 Audience: Developers using PI-Desktop for coding work.
