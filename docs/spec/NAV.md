@@ -12,6 +12,7 @@
 - [01-product-scope.md](01-product/01-product-scope.md)
 - [02-non-goals.md](01-product/02-non-goals.md)
 - [engineering-workflow-v0.md](01-product/engineering-workflow-v0.md)
+- [coding-workbench-free-tasks.md](01-product/coding-workbench-free-tasks.md)
 
 ## 2. Architecture
 - [README.md](02-architecture/README.md)

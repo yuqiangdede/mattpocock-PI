@@ -52,6 +52,7 @@ coverage/
 .pi-desktop/
 .pi-desktop-test/
 /cache/electron-builder/
+/cache/coding-validation/
 .pi/
 .cc-connect/
 

@@ -229,6 +229,7 @@ impl Database {
         db.boot_maintenance()?;
         crate::session_collaboration::recover(&db)?;
         db.recover_workflow_executions()?;
+        db.recover_free_tasks()?;
         Ok(db)
     }
 

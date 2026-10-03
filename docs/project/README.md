@@ -1,5 +1,8 @@
 # Project Tracking
 
+- Coding Home: [confirmed interaction design and implementation acceptance scenarios](coding-home-interaction-design.md)
+- Coding Workbench: [specification](../spec/01-product/coding-workbench-free-tasks.md), [task-candidate delivery](coding-workbench-delivery.md) and [GitHub issue #14](https://github.com/yuqiangdede/mattpocock-PI/issues/14); release pending.
+
 - Engineering Workflow V0: [published tickets and acceptance coverage](engineering-workflow-v0-tickets.md)
 - Engineering Workflow V0: [delivery acceptance and remaining release gates](engineering-workflow-v0-closeout.md)
 

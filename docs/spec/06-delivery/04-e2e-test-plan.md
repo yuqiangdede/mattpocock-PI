@@ -16237,3 +16237,27 @@ renderer's durable transcript reads. No real model or provider is contacted.
 - Installed Electron, real account/paid API and cross-version rollback are
   separate release qualification. No MCP, Codemode or virtual-router migration
   is included. See `docs/project/pi-0991-adoption.md` for candidate evidence.
+
+## Coding Workbench and Free Tasks
+
+- Specification: [Coding Workbench and Free Tasks](../01-product/coding-workbench-free-tasks.md).
+- Status: Implemented task candidate. See the [delivery evidence](../../project/coding-workbench-delivery.md)
+  for executed fixture journeys and the component/Host coverage mapping.
+- Main seam: workbench action -> task intake -> real internal execution wiring
+  -> result card -> previewed next-action intake. Mock only external providers.
+
+| Scenario | Journey and observable outcome | Spec criteria |
+| --- | --- | --- |
+| E2E-CODING-direct-implementation | Select Implement, enter a plain request without a ticket/spec, start, inspect results, launch Review with removable previewed references. | AC-01, AC-02, AC-04, AC-09, AC-10 |
+| E2E-CODING-free-order-and-formal-isolation | Exercise all eight action mappings in free order; existing strict acceptance remains unchanged and its prerequisites still reject invalid transitions. | AC-02, AC-11 |
+| E2E-CODING-busy-and-isolation | Prepare while busy, withdraw waiting work, or select a new conversation; reject duplicates and isolate concurrent code writes. | AC-05, AC-06 |
+| E2E-CODING-cancellation-and-recovery | Stop the bound attempt, surface cancellation failure, switch project, retry and restart; no stale result reassignment, later-turn cancellation or silent replay. | AC-07, AC-08, AC-17 |
+| E2E-CODING-initialization-safe-retry | Create/adopt project, inspect Add/Modify/Keep preview, preserve existing files, detect stale files/path escapes, fail partially and retry after user edits. | AC-12, AC-13 |
+| E2E-CODING-remediation-and-navigation | Remedy project/model/skill blockers without draft loss; return to workbench while running and read retained status/outcomes after restart. | AC-03, AC-14, AC-15, AC-17 |
+| E2E-CODING-responsive-keyboard | Operate all cards, task fields, artifacts and result actions at narrow width with keyboard; verify focus restoration, text status and localized accessible names. | AC-16 |
+
+Use component/integration tests for user paths that do not require Electron.
+Use fixture-based candidate E2E only for actual cross-process, restart and
+filesystem boundaries. Record tested commit and base main. Do not run
+`verify:ui:*` without an explicit user request, use paid providers by default,
+or attach to a user-owned Desktop instance for these scenarios.

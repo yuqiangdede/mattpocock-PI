@@ -3414,6 +3414,12 @@ pub(crate) fn begin_turn_inner(
     if db.workflow_session_reserved(session_id, workflow_execution_id)? {
         return Err(anyhow!("AGENT_BUSY"));
     }
+    if db.free_task_session_reserved(session_id, workflow_execution_id)? {
+        return Err(anyhow!("AGENT_BUSY"));
+    }
+    if db.free_task_project_reserved(session_id, workflow_execution_id)? {
+        return Err(anyhow!("FREE_TASK_ISOLATION_REQUIRED"));
+    }
     let id = Uuid::new_v4().to_string();
     let inserted = db
         .conn()
@@ -3558,6 +3564,7 @@ pub fn end_turn_settling(
     };
     if n > 0 {
         db.finish_workflow_turn(turn_id, status, error_code)?;
+        db.settle_free_task_turn(turn_id, status, error_code)?;
     }
     tx.commit()?;
     // Settle the in-flight checkpoint (D299, D327). A caller that knows the

@@ -1,4 +1,5 @@
 mod config_sync_rpc;
+mod free_tasks;
 mod scheduled_rpc;
 mod scheduled_tools;
 mod todos;
@@ -1711,6 +1712,10 @@ async fn handle_request(
     }
 
     match method {
+        method if method.starts_with("freeTask.") => {
+            let st = state.lock().await;
+            free_tasks::handle(&st.db, method, &params)
+        }
         method if method.starts_with("workflow.") => {
             let st = state.lock().await;
             workflows::handle(&st.db, method, &params)
@@ -2933,17 +2938,21 @@ async fn handle_request(
             let st = state.lock().await;
             let provider = params.get("providerId").and_then(Value::as_str);
             let model = params.get("modelId").and_then(Value::as_str);
-            let turn_id = match params.get("workflowExecutionId").and_then(Value::as_str) {
-                Some(execution_id) => {
-                    st.db
-                        .begin_workflow_turn(execution_id, session_id, provider, model)
+            let turn_id = if let Some(id) = params.get("freeTaskId").and_then(Value::as_str) {
+                st.db.begin_free_task_turn(id, session_id, provider, model)
+            } else {
+                match params.get("workflowExecutionId").and_then(Value::as_str) {
+                    Some(execution_id) => {
+                        st.db
+                            .begin_workflow_turn(execution_id, session_id, provider, model)
+                    }
+                    None => match params.get("sessionMessageId").and_then(Value::as_str) {
+                        Some(message_id) => crate::session_collaboration::begin_turn(
+                            &st.db, session_id, message_id, provider, model,
+                        ),
+                        None => sessions::begin_turn(&st.db, session_id, provider, model),
+                    },
                 }
-                None => match params.get("sessionMessageId").and_then(Value::as_str) {
-                    Some(message_id) => crate::session_collaboration::begin_turn(
-                        &st.db, session_id, message_id, provider, model,
-                    ),
-                    None => sessions::begin_turn(&st.db, session_id, provider, model),
-                },
             }
             .map_err(|error| {
                 if params.get("workflowExecutionId").is_some() {

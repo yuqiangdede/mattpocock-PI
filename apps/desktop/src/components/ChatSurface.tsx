@@ -15,6 +15,7 @@ import { ConversationWidthHandles } from "./ConversationWidthHandles";
 import { useAppStore } from "../stores/app-store";
 import { headPermission } from "../lib/pending-permissions";
 import { headAsk } from "../lib/pending-asks";
+import { CodingWorkbench } from "../features/coding/CodingWorkbench";
 
 const StableComposer = memo(Composer);
 
@@ -57,6 +58,7 @@ export const ChatSurface = memo(function ChatSurface({
   // Only the error layer's retry affordance needs the run state here; each pane
   // reads its own session's flag.
   const isRunning = useAppStore((state) => state.isRunning);
+  const [workbenchSession, setWorkbenchSession] = useState<string | null>(null);
   const workspace = useAppStore((state) => state.workspace);
   const error = useAppStore((state) => state.error);
   const errorCode = useAppStore((state) => state.errorCode);
@@ -152,6 +154,7 @@ export const ChatSurface = memo(function ChatSurface({
         </div>
       ) : null}
       <ConversationWidthHandles />
+      <CodingWorkbench home={showEmptyState || Boolean(activeSessionId && workbenchSession === activeSessionId)} onHome={() => setWorkbenchSession(activeSessionId ?? null)} onChat={() => setWorkbenchSession(null)} />
       {showEmptyState ? (
         <div
           className="home-main-content"
@@ -193,7 +196,7 @@ export const ChatSurface = memo(function ChatSurface({
         </div>
       ) : (
         <>
-          <div className="session-panes">
+          <div className={`session-panes${activeSessionId && workbenchSession === activeSessionId ? " coding-panes-hidden" : ""}`}>
             {retainedSessionIds.map((id) => (
               <SessionPane
                 key={id}

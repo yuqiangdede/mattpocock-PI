@@ -1,5 +1,11 @@
 # Unreleased changes
 
+- Coding Workbench exposes eight engineering actions with free ordering,
+  task intake, bound execution outcomes and explicit artifact handoff.
+  Simple requests can go directly to implementation; optional formal
+  Workflow acceptance remains unchanged. Project preparation previews files
+  and preserves existing configuration by default (issue #14).
+
 - `/compact` and automatic context compaction work again on a gateway that
   fronts a Codex backend. The summary request of a checkpoint now carries the
   conversation identity every other turn of the session sends

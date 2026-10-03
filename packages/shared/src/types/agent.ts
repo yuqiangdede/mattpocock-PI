@@ -15,6 +15,8 @@ export type AgentPromptRequest = {
   sessionMessageId?: string;
   /** Host-owned Workflow reservation; validated and bound at beginTurn. */
   workflowExecutionId?: string;
+  /** Canonical Host-owned free task, independent of formal stage acceptance. */
+  freeTaskId?: string;
   /** Attachments are resolved by Electron main and never trusted by the sidecar. */
   attachments?: AgentPromptAttachment[];
   /**

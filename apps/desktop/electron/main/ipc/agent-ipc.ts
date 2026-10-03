@@ -40,6 +40,7 @@ export type AgentIpcDependencies = {
    * completion. A session without a live turn locks nothing.
    */
   lockAbortReason: (sessionId: string, turnId: string | null | undefined) => void;
+  clearAbortReason?: (sessionId: string, turnId: string | null | undefined) => void;
   finishApprovedExecution: (executionId: string, status: PlanExecutionFinishStatus, errorCode?: string) => Promise<void>;
   dispatchApprovedPlan: (execution: unknown) => Promise<void>;
   dispatchExecutionForProposal: (proposalId: string) => Promise<void>;
@@ -96,6 +97,7 @@ export function registerAgentIpc({
   acquireSessionOperation,
   finishTurn,
   lockAbortReason,
+  clearAbortReason,
   finishApprovedExecution,
   dispatchApprovedPlan,
   dispatchExecutionForProposal,
@@ -108,8 +110,11 @@ export function registerAgentIpc({
   let host: HostProcess | null = null;
   let sidecar: AgentSidecar | null = null;
   let agentHostBridge: AgentHostBridge | null = null;
+  const freeTaskBindings = new Map<string, { id: string; turnId: string }>();
   const handle = (channel: string, fn: (...args: any[]) => Promise<any>) => {
     registrar.handle(channel, async (...args) => {
+      if (host !== getHost()) freeTaskBindings.clear();
+      for (const [session, binding] of freeTaskBindings) if (activeTurns.get(session) !== binding.turnId) freeTaskBindings.delete(session);
       host = getHost();
       sidecar = getSidecar();
       agentHostBridge = getAgentHostBridge();
@@ -317,6 +322,10 @@ export function registerAgentIpc({
   handle(IPC.invoke.agentPrompt, async (req: AgentPromptRequest) => {
     if (!sidecar) throw new Error("sidecar unavailable");
     const workflowExecutionId = typeof req.workflowExecutionId === "string" ? req.workflowExecutionId.trim() : undefined;
+    const freeTaskId = typeof req.freeTaskId === "string" ? req.freeTaskId.trim() : undefined;
+    if (req.freeTaskId !== undefined && (!freeTaskId || workflowExecutionId || req.sessionMessageId || req.attachments?.length || req.permissionMode || req.voiceOrigin || req.truncateFromMessageId || req.truncateBefore !== undefined || req.sessionId.startsWith("native-pi:"))) {
+      throw new Error("Free task submissions require canonical input and an existing Desktop session");
+    }
     if (req.workflowExecutionId !== undefined && (!workflowExecutionId || req.sessionId.startsWith("native-pi:") || req.sessionMessageId || req.truncateFromMessageId || req.truncateBefore !== undefined || req.attachments?.length || req.voiceOrigin || req.permissionMode)) {
       throw Object.assign(new Error("Workflow submissions require their existing Desktop session and canonical input"), { errorCode: "WORKFLOW_INVALID_REQUEST" });
     }
@@ -452,6 +461,13 @@ export function registerAgentIpc({
 
     let submittedContent = req.content;
     let workflowSkillId: string | undefined;
+    if (freeTaskId) {
+      const context = await host.call<{ projectPath: string; skillId: string; prompt: string }>("freeTask.context", { id: freeTaskId, sessionId: req.sessionId });
+      const commands = await composerCommandService.buildComposerCommands(context.projectPath);
+      if (!commands.some((command) => command.kind === "skill" && command.name === context.skillId && command.skillId === context.skillId)) throw new Error("Free task skill unavailable");
+      submittedContent = context.prompt;
+      workflowSkillId = context.skillId;
+    }
     if (workflowExecutionId) {
       const context = await host.call<{ projectPath: string; skillId: string; prompt: string }>("workflow.execution.context", {
         executionId: workflowExecutionId, sessionId: req.sessionId,
@@ -471,12 +487,15 @@ export function registerAgentIpc({
       modelId: launch.modelId,
       ...(sessionMessage ? { sessionMessageId: sessionMessage.origin.messageId } : {}),
       ...(workflowExecutionId ? { workflowExecutionId } : {}),
+      ...(freeTaskId ? { freeTaskId } : {}),
     });
     const durableTurnId = String(turn?.turnId ?? "").trim();
     if (!durableTurnId) {
       throw new Error("session.beginTurn returned no turn");
     }
     activeTurns.set(req.sessionId, durableTurnId);
+    if (freeTaskId) freeTaskBindings.set(req.sessionId, { id: freeTaskId, turnId: durableTurnId });
+    else freeTaskBindings.delete(req.sessionId);
     activeTurnUsages.delete(req.sessionId);
 
     // Slash expansion (D123, ADR 0024): templates expand before persistence
@@ -505,13 +524,13 @@ export function registerAgentIpc({
             ? [[item.name, item.skillId] as const]
             : []),
         );
-        if (workflowExecutionId && (!workflowSkillId || activeSkills.get(workflowSkillId) !== workflowSkillId)) {
+        if ((workflowExecutionId || freeTaskId) && (!workflowSkillId || activeSkills.get(workflowSkillId) !== workflowSkillId)) {
           throw Object.assign(new Error("Workflow skill disappeared before dispatch"), { errorCode: "WORKFLOW_SKILL_UNAVAILABLE" });
         }
         // The reserved stage's leading alias owns workflow skill selection;
         // slash text inside the run title remains metadata in the prompt body.
         const mentions = findSkillMentions(submittedContent, activeSkills).filter((mention) =>
-          !workflowExecutionId || (mention.start === 0 && mention.id === workflowSkillId),
+          !(workflowExecutionId || freeTaskId) || (mention.start === 0 && mention.id === workflowSkillId),
         );
         if (mentions.length > 0 && (!command || command.kind === "skill")) {
           let body = "";
@@ -539,7 +558,7 @@ export function registerAgentIpc({
           }
         }
       } catch (error) {
-        if (workflowExecutionId) {
+        if (workflowExecutionId || freeTaskId) {
           await finishTurn(req.sessionId, "error", "WORKFLOW_SKILL_UNAVAILABLE", { turnId: durableTurnId });
           throw error;
         }
@@ -672,6 +691,7 @@ export function registerAgentIpc({
         },
       );
     } catch (e) {
+      if (freeTaskId && isRpcTimeoutError(e)) throw e;
       if (workflowExecutionId && isRpcTimeoutError(e)) {
         await host.call("workflow.execution.reconcile", { executionId: workflowExecutionId });
         throw e;
@@ -681,6 +701,11 @@ export function registerAgentIpc({
       });
       throw e;
     }
+    if (freeTaskId && (result?.accepted !== true || result.turnId !== durableTurnId)) {
+      if (result?.accepted === false) await finishTurn(req.sessionId, "error", "FREE_TASK_REJECTED", { turnId: durableTurnId });
+      throw new Error("Free task admission was not acknowledged");
+    }
+    if (freeTaskId) await host.call("freeTask.running", { id: freeTaskId, turnId: durableTurnId });
     if (workflowExecutionId) {
       if (result?.accepted !== true || result.turnId !== durableTurnId) {
         const explicitRejection = result?.accepted === false;
@@ -756,12 +781,19 @@ export function registerAgentIpc({
     return result;
   });
 
-  handle(IPC.invoke.agentAbort, async (req: { sessionId: string; turnId?: string; workflowExecutionId?: string }) => {
+  handle(IPC.invoke.agentAbort, async (req: { sessionId: string; turnId?: string; workflowExecutionId?: string; freeTaskId?: string }) => {
     if (!sidecar) throw new Error("sidecar unavailable");
+    const binding = freeTaskBindings.get(req.sessionId);
+    if (!req.freeTaskId && binding && activeTurns.get(req.sessionId) === binding.turnId) req = { ...req, freeTaskId: binding.id, turnId: req.turnId ?? binding.turnId };
     const releaseSessionOperation = req.turnId ? await acquireSessionOperation(req.sessionId) : undefined;
     try {
     const abortedTurnId = activeTurns.get(req.sessionId);
     if (req.turnId && abortedTurnId !== req.turnId) return { ok: false, aborted: false };
+    if (req.freeTaskId) {
+      if (!host || !req.turnId) throw new Error("Task cancellation requires the bound turn");
+      const task = await host.call<{ turnId?: string; sessionId: string; phase: string }>("freeTask.read", { id: req.freeTaskId });
+      if (task.turnId !== req.turnId || task.sessionId !== req.sessionId || !["pending", "running"].includes(task.phase)) return { ok: false, aborted: false };
+    }
     if (req.workflowExecutionId) {
       if (!host || !req.turnId) throw new Error("workflow cancellation requires the bound turn");
       const target = await host.call<{ turnId?: string | null; sessionId: string }>("workflow.execution.stop", { executionId: req.workflowExecutionId });
@@ -785,15 +817,20 @@ export function registerAgentIpc({
       agentExtensions.cancelPrompts(req.sessionId);
       cancelSessionTools(req.sessionId, "Session turn was aborted");
       result = await sidecar.call("agent.abort", req);
-      if (req.workflowExecutionId && result && typeof result === "object" &&
+      if ((req.workflowExecutionId || req.freeTaskId) && result && typeof result === "object" &&
           ((result as { aborted?: boolean }).aborted === false || (result as { ok?: boolean }).ok === false)) {
         throw Object.assign(new Error("Workflow cancellation was not acknowledged"), { errorCode: "WORKFLOW_CANCELLATION_FAILED" });
       }
       canceled = true;
+    } catch (error) {
+      // A definite refusal leaves the turn running. Its later normal terminal
+      // event must not inherit the abandoned cancellation decision.
+      if (req.freeTaskId && !isRpcTimeoutError(error)) clearAbortReason?.(req.sessionId, abortedTurnId);
+      throw error;
     } finally {
       // A turn that already stopped owning the session is refused inside the
       // finalizer, so the identity captured above is the only one used here.
-      if (abortedTurnId && (!req.workflowExecutionId || canceled)) {
+      if (abortedTurnId && (!(req.workflowExecutionId || req.freeTaskId) || canceled)) {
         await finishTurn(req.sessionId, "aborted", "TURN_ABORTED", {
           turnId: abortedTurnId,
         });

@@ -1,6 +1,7 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const ptBR = {
+  coding: en.coding,
   app: {
     shellName: "PI-Desktop",
     tagline: "Parceiro local de programação com IA",

@@ -1,6 +1,7 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const tr = {
+  coding: en.coding,
   app: {
     shellName: "PI-Desktop",
     tagline: "Yerel AI kodlama ortağı",
