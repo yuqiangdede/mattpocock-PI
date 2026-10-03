@@ -26,7 +26,7 @@ Use a compact button area rather than task cards with separate forms:
 
 | Button | Skill |
 | --- | --- |
-| Engineering initialization | `setup-matt-pocock-skills` |
+| Initialize | `setup-matt-pocock-skills` |
 | Discuss requirements | `grill-with-docs` |
 | Form specification | `to-spec` |
 | Split tickets | `to-tickets` |
@@ -34,6 +34,12 @@ Use a compact button area rather than task cards with separate forms:
 | Diagnose bug | `diagnosing-bugs` |
 | Review code | `code-review` |
 | Retrospective | `retro` |
+
+Add an **Ask** button for `ask-matt`. Add a **More** menu for the other Matt
+skills routed by `ask-matt`: `grill-me`, `grilling`, `handoff`, `prototype`,
+`improve-codebase-architecture`, `codebase-design`, `domain-modeling`, `tdd`,
+`wayfinder`, `triage`, `research`, `resolving-merge-conflicts`, `teach`,
+`to-questionnaire`, `wait-what`, `wizard`, and `writing-for-agents`.
 
 Keep the shortcuts available on the home surface and through a compact
 conversation entry. Skill identity and availability follow the existing
@@ -72,8 +78,9 @@ Host persistence model to implement shortcut selection.
 
 ## Acceptance checks
 
-1. Click each of the eight shortcuts in an empty Composer: its corresponding
-   marker appears, the input can be edited, and no prompt or task is submitted.
+1. Click each primary shortcut, Ask, and a More item in an empty Composer: its
+   corresponding marker appears, the input can be edited, and no prompt or task
+   is submitted.
 2. Click with existing text and attachments: content and attachments remain;
    only skill selection changes. Closing or switching views does not lose draft data.
 3. Manually send a selected skill with task text: the same skill and current

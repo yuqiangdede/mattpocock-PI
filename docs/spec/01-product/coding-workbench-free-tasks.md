@@ -7,9 +7,11 @@
 
 ## Interaction contract
 
-The Composer presents eight compact, visible engineering skill buttons on both
-home and conversation surfaces. Actions can be selected in any order. Selecting
-a button adds its slash skill marker to the current draft, using the same
+The Composer presents compact engineering skill buttons on both home and
+conversation surfaces. The eight primary actions stay visible; an Ask button
+opens `ask-matt`, and a More menu exposes the remaining Matt skills used by its
+router. Actions can be selected in any order. Selecting a button adds its slash
+skill marker to the current draft, using the same
 `formatCommandInsert` representation as slash completion. Existing text, file
 references and image attachments remain intact. The marker is prepended so it
 cannot accidentally become an argument to a leading builtin command.
@@ -23,7 +25,7 @@ including prior markers; ordinary slash processing resolves those mentions.
 
 | Button | Skill |
 | --- | --- |
-| Engineering initialization | `setup-matt-pocock-skills` |
+| Initialize | `setup-matt-pocock-skills` |
 | Discuss requirements | `grill-with-docs` |
 | Form specification | `to-spec` |
 | Split tickets | `to-tickets` |
@@ -31,6 +33,12 @@ including prior markers; ordinary slash processing resolves those mentions.
 | Diagnose bug | `diagnosing-bugs` |
 | Review code | `code-review` |
 | Retrospective | `retro` |
+
+The Ask button inserts `ask-matt`. The More menu inserts `grill-me`, `grilling`,
+`handoff`, `prototype`, `improve-codebase-architecture`, `codebase-design`,
+`domain-modeling`, `tdd`, `wayfinder`, `triage`, `research`,
+`resolving-merge-conflicts`, `teach`, `to-questionnaire`, `wait-what`, `wizard`,
+or `writing-for-agents`.
 
 ## Catalog and lifecycle
 
@@ -85,7 +93,8 @@ with real store, Main/Host and Agent Runtime wiring and only the external model
 fixture substituted. Host recovery is verified through its existing public
 reservation/read/session boundaries.
 
-- All eight mappings insert without execution, including engineering setup.
+- All eight primary mappings, Ask, and every More item insert without execution,
+  including engineering setup.
 - Existing text and attachments survive insertion and navigation.
 - Explicit Send loads the same skill and prompt as equivalent manual slash input.
 - Busy insertion only edits; manual Send uses ordinary queueing.

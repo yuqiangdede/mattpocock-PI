@@ -16247,7 +16247,7 @@ renderer's durable transcript reads. No real model or provider is contacted.
 
 | Scenario | Journey |
 | --- | --- |
-| E2E-CODING-insert-and-manual-send | Select all eight actions with empty input; preserve text/files; prove no automatic prompt or Free Task; manually send and compare with typed slash input. |
+| E2E-CODING-insert-and-manual-send | Select the eight primary actions, Ask, and representative More items with empty input; preserve text/files; prove no automatic prompt or Free Task; manually send and compare with typed slash input. |
 | E2E-CODING-engineering-setup | Insert and send `/setup-matt-pocock-skills`, read its actual body; no native initialization task or preview. |
 | E2E-CODING-catalog-recovery | Disable the installed skill, preserve input and navigate to Skills; enable and retry. Fail the catalog read, preserve input and retry without silent installation. |
 | E2E-CODING-session-ownership | Hold catalog response, switch conversations and release it; only the intended current draft changes. Preserve edits made during the catalog wait. |
