@@ -1,7 +1,7 @@
 # Skill Shortcut Interaction Design
 
 Date: 2026-10-03
-Status: User-confirmed interaction direction; implementation candidate in progress.
+Status: User-confirmed interaction direction; implemented and validated locally.
 Purpose: Simplify the coding workbench into shortcuts for existing Composer skills.
 This is a proposed change to the shipped PR #15 behavior, not a claim that the
 runtime has already changed.
