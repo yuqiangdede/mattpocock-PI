@@ -1,4 +1,8 @@
 .coding-workbench { min-width: 0; }
 .coding-shortcuts, .coding-shortcut-error { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .coding-shortcuts .btn { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.coding-requirements-split { display: inline-flex; align-items: stretch; max-width: 100%; }
+.coding-requirements-split > .btn { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.coding-requirements-split > div { display: flex; flex-shrink: 0; }
+.coding-requirements-split > div > .btn { border-top-left-radius: 0; border-bottom-left-radius: 0; }
 .coding-shortcut-error { margin-top: 6px; color: var(--ds-text-secondary); overflow-wrap: anywhere; }

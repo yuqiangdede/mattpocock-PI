@@ -8,7 +8,7 @@
 ## Interaction contract
 
 The Composer presents compact engineering skill buttons on both home and
-conversation surfaces. The eight primary actions stay visible; an Ask button
+conversation surfaces. The primary actions stay available; an Ask button
 opens `ask-matt`, and a More menu exposes the remaining Matt skills used by its
 router. Actions can be selected in any order. Selecting a button adds its slash
 skill marker to the current draft, using the same
@@ -105,3 +105,12 @@ reservation/read/session boundaries.
 
 See [E2E scenarios](../06-delivery/04-e2e-test-plan.md#coding-workbench-skill-shortcuts)
 and [delivery evidence](../../project/skill-shortcuts-delivery.md).
+
+## Requirements split button
+
+Discuss requirements is the fixed primary action. Its adjacent arrow opens a
+menu containing Form specification and Split tickets. Selecting either inserts
+the corresponding skill and closes the menu without changing the primary action.
+Escape and outside clicks dismiss the menu; disabling the Composer closes it.
+The group wraps as one unit at narrow widths. Existing draft and manual-send
+semantics remain unchanged.

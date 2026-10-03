@@ -56,3 +56,8 @@ Development validation: `pnpm test:e2e:workflow-runs`,
 `pnpm test:e2e:workflow-artifacts` use isolated
 local fixtures without live accounts.
 Use the repository README for initialization and Desktop startup requirements.
+
+For independent chat drafts, use **Discuss requirements** in the Composer.
+Its adjacent arrow offers **Form specification** and **Split tickets**.
+These selections only insert a skill into the draft; send it explicitly.
+The main button always stays **Discuss requirements**.

@@ -171,7 +171,7 @@ async function main(): Promise<void> {
     try {
       let result;
       if (process.env.PI_CODING_WORKBENCH === "1") {
-        result = await window.webContents.executeJavaScript("globalThis.codingWorkbenchProbe()");
+        result = await window.webContents.executeJavaScript(`globalThis.codingWorkbenchProbe(${process.env.PI_REQUIREMENTS_MENU === "1"})`);
       } else if (process.env.PI_WORKFLOW_ARTIFACTS === "1") {
         const checkpoint = await window.webContents.executeJavaScript("globalThis.workflowArtifactsProbe()");
         await host.dispose();

@@ -98,3 +98,12 @@ Host persistence model to implement shortcut selection.
 
 Implementation synchronizes the product and E2E specifications and verifies the
 public Composer interaction and existing Host recovery boundaries.
+
+## Requirements split button
+
+Discuss requirements is the fixed primary action. Its adjacent arrow opens a
+menu containing Form specification and Split tickets. Selecting either inserts
+the corresponding skill and closes the menu without changing the primary action.
+Escape and outside clicks dismiss the menu; disabling the Composer closes it.
+The group wraps as one unit at narrow widths. Existing draft and manual-send
+semantics remain unchanged.
