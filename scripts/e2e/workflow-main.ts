@@ -135,6 +135,7 @@ async function main(): Promise<void> {
   await app.whenReady();
   try {
     await host.handshake();
+    if (process.env.PI_CODING_WORKBENCH === "1") await host.call("skills.ensureBundled");
     await host.call("workspace.set", { path: projectA });
     await host.call("project.group.create", { name: "Project A", folders: [projectA] });
     await host.call("workspace.set", { path: projectB });
@@ -169,7 +170,9 @@ async function main(): Promise<void> {
     });
     try {
       let result;
-      if (process.env.PI_WORKFLOW_ARTIFACTS === "1") {
+      if (process.env.PI_CODING_WORKBENCH === "1") {
+        result = await window.webContents.executeJavaScript("globalThis.codingWorkbenchProbe()");
+      } else if (process.env.PI_WORKFLOW_ARTIFACTS === "1") {
         const checkpoint = await window.webContents.executeJavaScript("globalThis.workflowArtifactsProbe()");
         await host.dispose();
         host = new HostProcess({ binaryPath, dataDir, env: { PI_DESKTOP_AGENTS_DIR: join(__dirname, "agents") }, onStderr: (text) => console.error(text.trimEnd()) });

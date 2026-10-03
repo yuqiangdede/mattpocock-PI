@@ -537,6 +537,15 @@ function normalizePlansChangedEvent(value: unknown): PlanningStateEvent {
 }
 
 export const api = {
+  startFreeTask: (input: import("@pi-desktop/shared").FreeTaskRequest) => invoke<import("@pi-desktop/shared").FreeTask>(IPC.invoke.freeTaskStart, input),
+  checkFreeTask: (sessionId: string) => invoke<{ busy: boolean }>(IPC.invoke.freeTaskCheck, { sessionId }),
+  listFreeTasks: (projectPath: string) => invoke<{ tasks: import("@pi-desktop/shared").FreeTask[]; unavailableCount?: number }>(IPC.invoke.freeTaskList, { projectPath }),
+  readFreeTask: (id: string) => invoke<import("@pi-desktop/shared").FreeTask>(IPC.invoke.freeTaskRead, { id }),
+  stopFreeTask: (id: string) => invoke<import("@pi-desktop/shared").FreeTask>(IPC.invoke.freeTaskStop, { id }),
+  previewProjectInit: (sessionId: string, projectPath: string, description: string) => invoke<import("@pi-desktop/shared").ProjectInitPreview>(IPC.invoke.projectInitPreview, { sessionId, projectPath, description }),
+  applyProjectInit: (id: string, selected: string[]) => invoke<import("@pi-desktop/shared").ProjectInitPreview>(IPC.invoke.projectInitApply, { id, selected }),
+  readProjectInit: (id: string) => invoke<import("@pi-desktop/shared").ProjectInitPreview>(IPC.invoke.projectInitRead, { id }),
+  createInitializationDirectory: (parentPath: string, name: string) => invoke<{ projectPath: string }>(IPC.invoke.projectInitCreateDirectory, { parentPath, name }),
   getVersion: () => invoke<AppVersionInfo>(IPC.invoke.appGetVersion),
   health: () => invoke<HostHealth>(IPC.invoke.appHealth),
   getOnboarding: () => invoke<OnboardingState>(IPC.invoke.appGetOnboarding),

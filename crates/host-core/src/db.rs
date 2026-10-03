@@ -15,10 +15,12 @@ pub const PLAN_APPROVAL_TIMEOUT_MS: i64 = 30 * 60 * 1000;
 /// Durable notification rows kept globally.
 pub const NOTIFICATION_KEEP: i64 = 200;
 
+mod free_tasks;
 mod migrations;
 mod model;
 mod plugin_providers_migration;
 mod project_groups;
+mod project_initialization;
 mod repositories;
 mod schema;
 mod session_collaboration_migration;

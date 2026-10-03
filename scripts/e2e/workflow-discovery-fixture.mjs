@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { mkdir, rmdir, readFile, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { registerAgentIpc } from "../../apps/desktop/electron/main/ipc/agent-ipc";
 import { registerWorkflowIpc } from "../../apps/desktop/electron/main/ipc/workflow-ipc";
@@ -8,6 +9,8 @@ import { createSessionCoordination } from "../../apps/desktop/electron/main/runt
 import { createAgentHostBridge } from "../../apps/desktop/electron/main/agent-host-bridge";
 import { formatSkillToolContent } from "../../apps/desktop/electron/main/skill-document";
 import { IPC } from "../../packages/shared/src/protocol";
+import { createFreeTaskService } from "../../apps/desktop/electron/main/services/free-task-execution";
+import { registerFreeTaskIpc } from "../../apps/desktop/electron/main/ipc/free-task-ipc";
 
 /** The process/provider edge is deterministic; Pi, Main admission and Host stay real. */
 export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, root }) {
@@ -128,6 +131,7 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
     approvedExecutionIdsBySession: new Map(), claimedExecutionSessions: new Map(),
     async resolveAgentRuntimeLaunch(sessionId, session) {
       await launchGate;
+      if (mode === "modelMissing") throw Object.assign(new Error("Model not configured"), { errorCode: "MODEL_NOT_CONFIGURED" });
       const commandShell = (await getHost().call("commandShells.list")).effective;
       return { projectPath: session.projectPath, providerId: "workflow-fixture", modelId: "fixture-model", sidecarParams: {
         sessionId, projectPath: session.projectPath, mode: "agent", thinkingLevel: "off", commandShell,
@@ -135,7 +139,7 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
         pluginSkills: (await getHost().call("skills.active", { projectPath: session.projectPath })).skills,
       } };
     },
-    acquireSessionOperation: coordination.acquireSessionOperation, finishTurn, lockAbortReason: coordination.lockAbortReason,
+    acquireSessionOperation: coordination.acquireSessionOperation, finishTurn, lockAbortReason: coordination.lockAbortReason, clearAbortReason: coordination.clearAbortReason,
     finishApprovedExecution: async () => {}, dispatchApprovedPlan: async () => {}, dispatchExecutionForProposal: async () => {},
     emitAgentEvent() {}, setNotificationViewingSessionId() {}, optionalWorkspaceRoot: async () => null,
     composerCommandService: catalog, loadComposerTemplatesCached: async () => [],
@@ -145,8 +149,33 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
     onIdle: (sessionId) => bridge.kickQueue(sessionId),
     cancel: (request) => handlers.get(IPC.invoke.agentAbort)(request),
   }) });
+  if (process.env.PI_CODING_WORKBENCH === "1") {
+    registerFreeTaskIpc(registrar, createFreeTaskService({ getHost,
+      catalog: (path) => catalog.buildComposerCommands(path),
+      submit: (request) => handlers.get(IPC.invoke.agentPrompt)(request),
+      cancel: (request) => handlers.get(IPC.invoke.agentAbort)(request),
+    }));
+    registrar.handle(IPC.invoke.projectInitPreview, (input) => getHost().call("freeTask.initPreview", input));
+    registrar.handle(IPC.invoke.projectInitApply, (input) => getHost().call("freeTask.initApply", input));
+    registrar.handle(IPC.invoke.projectInitRead, (input) => getHost().call("freeTask.initRead", input));
+    registrar.handle(IPC.invoke.projectInitCreateDirectory, (input) => getHost().call("freeTask.initCreateDirectory", input));
+    registrar.handle(IPC.invoke.projectGroupCreate, (input) => getHost().call("project.group.create", input));
+    registrar.handle(IPC.invoke.projectPickFolders, () => ({ folders: [join(dataDir, "..", "project-b")] }));
+    registrar.handle(IPC.invoke.sessionList, () => getHost().call("session.list"));
+    registrar.handle(IPC.invoke.sessionGet, (input) => getHost().call("session.get", input));
+    registrar.handle(IPC.invoke.sessionCreate, (input) => getHost().call("session.create", input));
+    registrar.handle(IPC.invoke.projectSet, (path) => getHost().call("workspace.set", { path }));
+    registrar.handle(IPC.invoke.skillList, (input) => getHost().call("skills.list", input));
+    registrar.handle(IPC.invoke.skillSetEnabled, (input) => getHost().call("skills.setEnabled", input));
+  }
   return {
     async action(name, input) {
+      if (name === "setSkillEnabled") return getHost().call("skills.setEnabled", { id: input.id, level: "project", projectPath: input.path, enabled: input.enabled });
+      if (name === "resize") { const { BrowserWindow } = await import("electron"); BrowserWindow.getAllWindows()[0].setSize(input.width, input.height); return; }
+      if (name === "blockInitialization") { const parent = join(dataDir, "..", "project-a", "scripts"); await mkdir(parent, {recursive:true}); await mkdir(join(parent, "verify.ps1")); return; }
+      if (name === "unblockInitialization") { await rmdir(join(dataDir, "..", "project-a", "scripts", "verify.ps1")); await writeFile(join(dataDir, "..", "project-a", "AGENTS.md"), "Later user configuration", "utf8"); return; }
+      if (name === "readInitializationConvention") return readFile(join(dataDir, "..", "project-a", "AGENTS.md"), "utf8");
+      if (name === "allowCancellation") { mode = "normal"; return; }
       if (name === "releaseLaunch") { releaseLaunch(); return; }
       if (name === "holdDispatch") { dispatchGate = new Promise((resolve) => { releaseDispatch = resolve; }); return; }
       if (name === "releaseDispatch") { releaseDispatch(); return; }
@@ -154,7 +183,7 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
       if (name === "reset") { mode = input ?? "normal"; launchGate = new Promise((resolve) => { releaseLaunch = resolve; }); providerGate = new Promise((resolve) => { releaseProvider = resolve; }); return; }
       if (name === "snapshot") return { prompts, skillLoads, transformed, skillIds };
       if (name === "hostCall") {
-        if (!input.method.startsWith("workflow.") && !input.method.startsWith("session.")) throw new Error("Fixture Host method is not allowed");
+        if (!input.method.startsWith("workflow.") && !input.method.startsWith("session.") && !input.method.startsWith("freeTask.")) throw new Error("Fixture Host method is not allowed");
         return getHost().call(input.method, input.params);
       }
       if (name === "ordinaryPrompt") return handlers.get(IPC.invoke.agentPrompt)(input);

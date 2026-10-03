@@ -9239,3 +9239,25 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **验收：** 缓存路径、迁移和清理单测通过；Windows task-candidate 验证应覆盖更新源传输、安装器交接和文件系统行为，且不连接真实发布源。
 - **里程碑：** M6+
 - **状态：** 单测和源码契约覆盖（`update-cache.test.mjs`、`auto-update.test.mjs`）；仍需 Windows 安装器/E2E 验证。
+## Coding Workbench and Free Tasks
+
+- Specification: [Coding Workbench and Free Tasks](/zh-CN/spec/01-product/coding-workbench-free-tasks).
+- Status: Implemented task candidate. See [delivery evidence](/project/coding-workbench-delivery) for executed journeys and Host coverage.
+- Main seam: workbench action -> task intake -> real internal execution wiring
+  -> result card -> previewed next-action intake. Mock only external providers.
+
+| Scenario | Journey and observable outcome | Spec criteria |
+| --- | --- | --- |
+| E2E-CODING-direct-implementation | Select Implement, enter a plain request without a ticket/spec, start, inspect results, launch Review with removable previewed references. | AC-01, AC-02, AC-04, AC-09, AC-10 |
+| E2E-CODING-free-order-and-formal-isolation | Exercise all eight action mappings in free order; existing strict acceptance remains unchanged and its prerequisites still reject invalid transitions. | AC-02, AC-11 |
+| E2E-CODING-busy-and-isolation | Prepare while busy, withdraw waiting work, or select a new conversation; reject duplicates and isolate concurrent code writes. | AC-05, AC-06 |
+| E2E-CODING-cancellation-and-recovery | Stop the bound attempt, surface cancellation failure, switch project, retry and restart; no stale result reassignment, later-turn cancellation or silent replay. | AC-07, AC-08, AC-17 |
+| E2E-CODING-initialization-safe-retry | Create/adopt project, inspect Add/Modify/Keep preview, preserve existing files, detect stale files/path escapes, fail partially and retry after user edits. | AC-12, AC-13 |
+| E2E-CODING-remediation-and-navigation | Remedy project/model/skill blockers without draft loss; return to workbench while running and read retained status/outcomes after restart. | AC-03, AC-14, AC-15, AC-17 |
+| E2E-CODING-responsive-keyboard | Operate all cards, task fields, artifacts and result actions at narrow width with keyboard; verify focus restoration, text status and localized accessible names. | AC-16 |
+
+Use component/integration tests for user paths that do not require Electron.
+Use fixture-based candidate E2E only for actual cross-process, restart and
+filesystem boundaries. Record tested commit and base main. Do not run
+`verify:ui:*` without an explicit user request, use paid providers by default,
+or attach to a user-owned Desktop instance for these scenarios.

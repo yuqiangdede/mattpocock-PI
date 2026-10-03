@@ -40,3 +40,11 @@ _Avoid_: Current directory, current chat
 **Review Acceptance**:
 The user's explicit decision that implementation is ready to proceed to Retro after review. Findings can instead return the run to Implement without invalidating the accepted Discovery, Spec, or Tickets stages.
 _Avoid_: Review turn completion
+
+**Free Task**:
+A developer-selected engineering activity that can be undertaken independently, without completing prerequisite workflow stages. Its result does not by itself complete a stage in a Workflow Run.
+_Avoid_: Workflow stage, shortcut stage completion
+
+**Project Initialization**:
+Preparing a new or existing project for coding work through an explicitly selected set of setup activities while retaining existing project configuration.
+_Avoid_: Open project, clone repository

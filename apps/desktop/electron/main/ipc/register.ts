@@ -11,6 +11,8 @@ import { registerAgentIpc } from "./agent-ipc";
 import { registerWorkflowIpc } from "./workflow-ipc";
 import { registerWorkflowArtifactsIpc } from "./workflow-artifacts-ipc";
 import { createWorkflowExecutionService } from "../services/workflow-execution";
+import { createFreeTaskService } from "../services/free-task-execution";
+import { registerFreeTaskIpc } from "./free-task-ipc";
 import { registerAppIpc } from "./app-ipc";
 import { registerDiagnosticsIpc } from "./diagnostics-ipc";
 import { registerMarketIpc } from "./market-ipc";
@@ -148,6 +150,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     resolveAgentRuntimeLaunch,
     finishTurn,
     lockAbortReason,
+    clearAbortReason,
     finishApprovedExecution,
     dispatchApprovedPlan,
     dispatchExecutionForProposal,
@@ -393,6 +396,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     acquireSessionOperation,
     finishTurn,
     lockAbortReason,
+    clearAbortReason,
     finishApprovedExecution,
     dispatchApprovedPlan,
     dispatchExecutionForProposal,
@@ -404,6 +408,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
   });
 
   registerWorkflowIpc({
+    // Formal workflow admission remains independent of free tasks.
     registrar,
     getHost,
     execution: createWorkflowExecutionService({
@@ -428,6 +433,37 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     if (!handler) throw new Error("file preview handler unavailable");
     return handler({ path });
   } });
+  registerFreeTaskIpc(registrar, createFreeTaskService({
+    getHost,
+    onIdle: (sessionId) => getAgentHostBridge()?.kickQueue(sessionId),
+    catalog: (path) => composerCommandService.buildComposerCommands(path),
+    submit: async (request) => {
+      const handler = ipcHandlers.get(IPC.invoke.agentPrompt);
+      if (!handler) throw new Error("Agent prompt unavailable");
+      return handler(request);
+    },
+    cancel: async (request) => {
+      const handler = ipcHandlers.get(IPC.invoke.agentAbort);
+      if (!handler) throw new Error("Agent cancellation unavailable");
+      return handler(request);
+    },
+  }));
+  registrar.handle(IPC.invoke.projectInitPreview, async (input: { sessionId: string; projectPath: string; description: string }) => {
+    const host = getHost(); if (!host) throw new Error("Host unavailable");
+    return host.call("freeTask.initPreview", input);
+  });
+  registrar.handle(IPC.invoke.projectInitApply, async (input: { id: string; selected: string[] }) => {
+    const host = getHost(); if (!host) throw new Error("Host unavailable");
+    return host.call("freeTask.initApply", input);
+  });
+  registrar.handle(IPC.invoke.projectInitRead, async (input: { id: string }) => {
+    const host = getHost(); if (!host) throw new Error("Host unavailable");
+    return host.call("freeTask.initRead", input);
+  });
+  registrar.handle(IPC.invoke.projectInitCreateDirectory, async (input: { parentPath: string; name: string }) => {
+    const host = getHost(); if (!host) throw new Error("Host unavailable");
+    return host.call("freeTask.initCreateDirectory", input);
+  });
 
   registerPluginIpc({
     registrar,

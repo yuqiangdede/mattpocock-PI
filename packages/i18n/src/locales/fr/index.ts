@@ -1,6 +1,7 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const fr = {
+  coding: en.coding,
   "app": {
     "shellName": "PI-Desktop",
     "tagline": "Partenaire de codage IA local",
