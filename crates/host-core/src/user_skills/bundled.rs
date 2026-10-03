@@ -421,6 +421,11 @@ impl UserSkillRegistry {
             .collect()
     }
 
+    // 只读取已安装清单；检测版本不得触发安装或创建目录。
+    pub fn bundled_revision(&self) -> Result<String> {
+        Ok(self.bundle_state()?.revision)
+    }
+
     pub fn ensure_bundled(&mut self) -> Result<BundleResult> {
         let state = self.bundle_state()?;
         if !state.revision.is_empty() {

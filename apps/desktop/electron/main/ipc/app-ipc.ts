@@ -3,7 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import { existsSync, statSync } from "node:fs";
 import { listInstalledFonts } from "../system-fonts";
 import {
-  APP_NAME,
+  APP_DISPLAY_NAME,
   APP_VERSION,
   ErrorCodes,
   IPC,
@@ -15,6 +15,9 @@ import { globalInstructionPath } from "@pi-desktop/agent-runtime";
 import type { HostProcess } from "../host-process";
 import type { AppUpdaterController } from "../updater";
 import type { IpcRegistrar } from "./types";
+import { createVersionSourceChecker, VERSION_REPOSITORIES } from "../version-sources";
+import { fetchVersionSource } from "../skill-market-catalog";
+import type { VersionSourceId } from "../../../../../packages/shared/src/version-sources";
 
 export type AppIpcDependencies = {
   registrar: IpcRegistrar;
@@ -35,6 +38,24 @@ export function registerAppIpc({
   updater,
 }: AppIpcDependencies): void {
   const { handle, handleWithEvent } = registrar;
+
+  const sources = createVersionSourceChecker({
+    request: fetchVersionSource,
+    appVersion: APP_VERSION,
+    skillVersion: async () => {
+      const host = getHost();
+      if (!host) throw new Error("host unavailable");
+      const result = await host.call<{ revision: string }>("skills.getBundledVersion");
+      return result.revision || null;
+    },
+  });
+  handle(IPC.invoke.versionSourcesList, () => sources.list());
+  handle(IPC.invoke.versionSourcesCheck, (id: VersionSourceId) => sources.check(id));
+  handle(IPC.invoke.versionSourcesOpen, async (id: VersionSourceId) => {
+    if (!Object.hasOwn(VERSION_REPOSITORIES, id)) throw new Error("Invalid version source");
+    await safeOpenExternal(`https://github.com/${VERSION_REPOSITORIES[id]}${id === "mattpocock-skills" ? "" : "/releases"}`);
+    return { ok: true };
+  });
 
   handle(IPC.invoke.pluginLauncherToggle, async () => {
     await togglePluginLauncher();
@@ -78,7 +99,7 @@ export function registerAppIpc({
         )
       : undefined;
     return {
-      name: APP_NAME,
+      name: APP_DISPLAY_NAME,
       version: APP_VERSION,
       protocolVersion: PROTOCOL_VERSION,
       hostProtocolVersion: hostVersion?.protocolVersion,

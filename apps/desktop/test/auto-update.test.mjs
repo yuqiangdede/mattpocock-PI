@@ -136,7 +136,7 @@ test("updater gates delivery mode by platform and delivery policy", () => {
   assert.match(updaterSource, /autoUpdater\.on\("error"/);
   assert.match(
     updaterSource,
-    /github\.com\/vastsa\/PI-Desktop\/releases/,
+    /APP_REPOSITORY.*releases/,
     "releases fallback URL",
   );
   assert.match(
@@ -181,7 +181,8 @@ test("renderer exposes the updates API, banner and settings row", () => {
   assert.match(bannerSource, /className="update-notice"/);
   assert.match(bannerSource, /manualReminder === true/);
   assert.match(bannerSource, /role="progressbar"/);
-  assert.match(settingsSource, /<UpdatesRow[\s\S]*currentVersion=\{version\?\.version\}/);
+  assert.match(settingsSource, /<VersionSourcesSection \/>/);
+  assert.doesNotMatch(settingsSource, /<UpdatesRow/);
   assert.match(settingsSource, /settings=\{settings\}/);
   assert.match(settingsSource, /saveSettings=\{saveSettings\}/);
   assert.match(settingsSource, /update-settings-notes/);
@@ -244,8 +245,8 @@ test("packaging publishes an electron-updater feed for GitHub Releases", () => {
   const pkg = JSON.parse(pkgSource);
   assert.ok(pkg.dependencies["electron-updater"], "electron-updater dependency");
   assert.equal(pkg.build.publish[0].provider, "github");
-  assert.equal(pkg.build.publish[0].owner, "vastsa");
-  assert.equal(pkg.build.publish[0].repo, "PI-Desktop");
+  assert.equal(pkg.build.publish[0].owner, "yuqiangdede");
+  assert.equal(pkg.build.publish[0].repo, "mattpocock-PI");
   const macTargets = pkg.build.mac.target.map((entry) => entry.target);
   assert.ok(macTargets.includes("zip"), "mac zip target (Squirrel.Mac feed)");
   // electron-builder must never self-publish (implicit tag publishing would

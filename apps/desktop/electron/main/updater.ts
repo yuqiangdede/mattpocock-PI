@@ -26,6 +26,8 @@ import type { AppUpdater, UpdateInfo, ProgressInfo } from "electron-updater";
 import {
   formatChangelogNotes,
   IPC,
+  APP_REPOSITORY,
+  APP_MANUAL_UPDATES_ONLY,
   type UpdatePreference,
   type UpdateState,
 } from "@pi-desktop/shared";
@@ -51,6 +53,8 @@ import {
   type WindowsDistribution,
 } from "./update-policy";
 import { ManualUpdateReminderTracker } from "./manual-update-reminder";
+import { createVersionSourceChecker } from "./version-sources";
+import { fetchVersionSource } from "./skill-market-catalog";
 
 export { resolveUpdateMode } from "./update-policy";
 export type { WindowsDistribution } from "./update-policy";
@@ -72,7 +76,7 @@ function createRelocatedUpdater(
   return platform === "win32" ? new RelocatedNsisUpdater(baseCachePath) : null;
 }
 
-export const RELEASES_URL = "https://github.com/vastsa/PI-Desktop/releases/latest";
+export const RELEASES_URL = `https://github.com/${APP_REPOSITORY}/releases`;
 
 const AUTO_CHECK_INITIAL_DELAY_MS = 15_000;
 const AUTO_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -141,6 +145,7 @@ export class AppUpdaterController {
   private installRequested = false;
   private readonly autoUpdater: AppUpdater;
   private readonly cacheMaintenance: UpdateCacheMaintenance;
+  private readonly versionSources: ReturnType<typeof createVersionSourceChecker>;
 
   private readPackagedDistribution(
     isPackaged: boolean,
@@ -170,6 +175,7 @@ export class AppUpdaterController {
   }
 
   constructor(options: UpdaterOptions) {
+    this.versionSources = createVersionSourceChecker({ request: fetchVersionSource, appVersion: options.currentVersion, skillVersion: async () => null });
     this.logger = options.logger;
     this.send = options.send;
     this.getLocale = options.getLocale ?? (() => "en");
@@ -184,14 +190,14 @@ export class AppUpdaterController {
     this.isPackaged = isPackaged;
     this.env = process.env;
     this.distribution = distribution;
-    this.defaultPreference = resolveDefaultUpdatePreference(
+    this.defaultPreference = APP_MANUAL_UPDATES_ONLY ? "manual" : resolveDefaultUpdatePreference(
       platform,
       isPackaged,
       this.env,
       distribution,
     );
     this.preference = this.defaultPreference;
-    this.automaticSupported = supportsAutomaticUpdates(
+    this.automaticSupported = !APP_MANUAL_UPDATES_ONLY && supportsAutomaticUpdates(
       platform,
       isPackaged,
       this.env,
@@ -231,6 +237,8 @@ export class AppUpdaterController {
       );
     }
     this.autoUpdater = relocated ?? autoUpdater;
+    // 显式覆盖历史包的 feed，防止沿用原版的 app-update.yml。
+    if (mode !== "disabled") this.autoUpdater.setFeedURL({ provider: "github", owner: APP_REPOSITORY.split("/")[0]!, repo: APP_REPOSITORY.split("/")[1]! });
     this.cacheMaintenance = new UpdateCacheMaintenance({
       resourcesPath: process.resourcesPath,
       activeBasePath,
@@ -252,6 +260,8 @@ export class AppUpdaterController {
 
   /** Localized product notes for a discovered version, if catalogued. */
   private notesFor(version: string | undefined): string | undefined {
+    // 原版内置 changelog 不能作为 fork 新版本的发布说明。
+    if (APP_MANUAL_UPDATES_ONLY) return undefined;
     if (!version) return undefined;
     return formatChangelogNotes(version, this.getLocale());
   }
@@ -482,6 +492,20 @@ export class AppUpdaterController {
   /** User- or schedule-triggered check. Resolves with the settled state. */
   async check(options: { manual?: boolean } = {}): Promise<UpdateState> {
     await this.ensureSettingsLoaded();
+    if (APP_MANUAL_UPDATES_ONLY) {
+      if (this.state.status === "checking") return this.state;
+      this.setState({ status: "checking", error: undefined });
+      const result = await this.versionSources.check("mattpocock-pi");
+      this.setState({
+        mode: "manual", preference: "manual", automaticSupported: false,
+        status: result.status === "error" || result.status === "no-release" ? "error" : result.status === "available" ? "available" : "up-to-date",
+        availableVersion: result.status === "available" ? result.latestVersion ?? undefined : undefined,
+        releaseNotes: undefined,
+        error: result.status === "no-release" ? "mattpocock-PI 暂无可用发布" : result.error,
+        manualReminder: result.status === "available" && Boolean(options.manual),
+      });
+      return this.state;
+    }
     if (this.state.mode === "disabled") {
       throw new Error("updates are disabled in development builds");
     }
@@ -582,6 +606,7 @@ export class AppUpdaterController {
    * first window or pin the updater on `checking`.
    */
   startAutoCheck() {
+    if (APP_MANUAL_UPDATES_ONLY) return;
     if (this.autoCheckStarted || this.state.mode === "disabled") return;
     this.autoCheckStarted = true;
     void this.ensureSettingsLoaded().then(() => {

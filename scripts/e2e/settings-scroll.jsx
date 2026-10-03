@@ -62,6 +62,10 @@ window.piDesktop = {
       case IPC.invoke.sessionList: data = { sessions: [] }; break;
       case IPC.invoke.appGetOnboarding: data = {}; break;
       case IPC.invoke.updatesGetState: data = updateState; break;
+      case IPC.invoke.appGetVersion: data = {name: "mattpocock-PI", version: "0.16.0-beta.1", protocolVersion: 11}; break;
+      case IPC.invoke.versionSourcesList:
+        data = ["pi-desktop", "mattpocock-skills", "mattpocock-pi"].map((id) => ({id, currentVersion: "0.16.0-beta.1", latestVersion: null, status: "idle", checkedAt: null, url: "https://github.com"}));
+        break;
       case IPC.invoke.configSyncGetState:
         data = {
           configured: false,
@@ -94,7 +98,7 @@ await i18n.use(initReactI18next).init({
   },
   interpolation: { escapeValue: false },
 });
-useAppStore.setState({ settings, settingsTab: "ai", page: "settings" });
+useAppStore.setState({ settings, settingsTab: "ai", page: "settings", version: {name: "mattpocock-PI", version: "0.16.0-beta.1", protocolVersion: 11, hostVersion: "0.16.0-beta.1"} });
 initLanguageSync();
 const root = createRoot(document.getElementById("root"));
 flushSync(() => root.render(<SettingsPage />));
@@ -161,47 +165,13 @@ async function scroll() {
 async function exerciseUpdatePreference() {
   await select("Info");
   await settle();
-  const trigger = () => document.querySelector('button[aria-label="Update behavior"]');
-  assert(trigger() instanceof HTMLButtonElement, "Update behavior selector must render");
-  assert(trigger().textContent?.includes("Automatic"), "Installed package defaults to Automatic");
-  assert(
-    [...document.querySelectorAll(".update-settings-actions button")]
-      .some((button) => button.textContent?.includes("Check for updates")),
-    "Automatic mode keeps the existing update check action",
-  );
-
-  async function choosePreference(label, value) {
-    const selectTrigger = trigger();
-    assert(selectTrigger instanceof HTMLButtonElement, "Update selector trigger must remain mounted");
-    flushSync(() => selectTrigger.click());
-    await settle();
-    const option = [...document.querySelectorAll('[role="option"]')]
-      .find((candidate) => candidate.textContent?.trim() === label);
-    assert(option instanceof HTMLButtonElement, `Missing update preference option: ${label}`);
-    flushSync(() => option.click());
-    await settle();
-    assert(settings.updatePreference === value, `${label} preference must persist through settings IPC`);
-    assert(useAppStore.getState().settings?.updatePreference === value, `${label} preference must update the renderer store`);
-    assert(updateState.preference === value, `${label} preference must update the shared update state`);
-  }
-
-  await choosePreference("Manual", "manual");
-  assert(trigger().textContent?.includes("Manual"), "Manual must become the selected value");
-  assert(
-    [...document.querySelectorAll(".update-settings-actions button")]
-      .some((button) => button.textContent?.includes("View release")),
-    "Manual mode must offer the release page for an available version",
-  );
-
-  await select("AI");
-  await select("Info");
-  await settle();
-  assert(trigger().textContent?.includes("Manual"), "Manual preference must survive leaving and reopening Info");
-  await choosePreference("Automatic", "automatic");
-  assert(trigger().textContent?.includes("Automatic"), "Automatic must be selectable again");
-  return { updatePreference: settings.updatePreference, updateMode: updateState.mode };
+  assert(!document.querySelector('button[aria-label="Update behavior"]'), "不再展示原版自动更新选择器");
+  assert(document.body.textContent.includes("mattpocock-PI"), "关于页应显示本应用名称");
+  assert(document.body.textContent.includes("PI-Desktop 原版"), "保留原版作为独立检测来源");
+  assert(document.body.textContent.includes("Matt Pocock 技能包"), "技能包版本检测必须可见");
+  assert([...document.querySelectorAll("button")].some((button) => button.textContent.trim() === "检查全部更新"), "统一手动检测入口必须可见");
+  return { manualVersionSources: true };
 }
-
 async function exerciseBrazilianPortuguese() {
   await select("General");
   const trigger = document.querySelector(".settings-language-trigger");
@@ -237,6 +207,9 @@ async function exerciseBrazilianPortuguese() {
   assert(selectedLabel?.textContent?.trim() === "Português (Brasil)", "Picker must show the selected native name");
   return { locale: i18n.language, language: settings.language, label: selectedLabel.textContent.trim() };
 }
+
+// 只运行本次关于页调整的验收，独立于其他设置功能的历史测试。
+window.settingsAboutProbe = async () => ({ ok: true, checks: [await exerciseUpdatePreference()] });
 window.settingsScrollProbe = async () => {
   await settle();
   assert(

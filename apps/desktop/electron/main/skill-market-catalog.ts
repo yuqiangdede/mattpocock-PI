@@ -61,3 +61,7 @@ export function fetchSkillMarketDocument(entry: SkillCatalogEntry): Promise<Skil
 export function fetchEngineeringSkills() {
   return fetchEngineeringSkillBundle(client.request);
 }
+
+export function fetchVersionSource(url: string, kind: "json") {
+  return client.request(url, kind);
+}

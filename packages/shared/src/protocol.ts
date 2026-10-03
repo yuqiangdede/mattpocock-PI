@@ -1,7 +1,13 @@
 export const PROTOCOL_VERSION = 11 as const;
 export const SCHEMA_VERSION = 16 as const;
 export const APP_ID = "net.aiuo.pi-desktop";
+// APP_NAME 参与 Electron 配置目录命名；保留兼容名称，显示名称单独设置。
 export const APP_NAME = "PI-Desktop";
+export const APP_DISPLAY_NAME = "mattpocock-PI";
+export const APP_REPOSITORY = "yuqiangdede/mattpocock-PI";
+export const UPSTREAM_REPOSITORY = "vastsa/PI-Desktop";
+// 本应用采用手动检测与发布页升级，旧的自动更新偏好不触发安装。
+export const APP_MANUAL_UPDATES_ONLY = true;
 export const APP_VERSION = "0.16.0-beta.1";
 
 export const APP_MENU_COMMANDS = [
@@ -64,6 +70,9 @@ export const IPC = {
     /** Installed system font families, resolved by Electron main. */
     systemFontsList: "pi-desktop/app/systemFonts",
     updatesGetState: "pi-desktop/updates/getState",
+    versionSourcesList: "pi-desktop/versionSources/list",
+    versionSourcesCheck: "pi-desktop/versionSources/check",
+    versionSourcesOpen: "pi-desktop/versionSources/open",
     updatesCheck: "pi-desktop/updates/check",
     updatesDownload: "pi-desktop/updates/download",
     updatesInstall: "pi-desktop/updates/install",

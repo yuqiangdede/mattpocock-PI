@@ -1,3 +1,4 @@
+import type { VersionSourceId, VersionSourceState } from "../../../../packages/shared/src/version-sources";
 import type {
   ScheduledTaskRun,
   ActivationScope,
@@ -547,6 +548,9 @@ export const api = {
   readProjectInit: (id: string) => invoke<import("@pi-desktop/shared").ProjectInitPreview>(IPC.invoke.projectInitRead, { id }),
   createInitializationDirectory: (parentPath: string, name: string) => invoke<{ projectPath: string }>(IPC.invoke.projectInitCreateDirectory, { parentPath, name }),
   getVersion: () => invoke<AppVersionInfo>(IPC.invoke.appGetVersion),
+  versionSourcesList: () => invoke<VersionSourceState[]>(IPC.invoke.versionSourcesList),
+  versionSourcesCheck: (id: VersionSourceId) => invoke<VersionSourceState>(IPC.invoke.versionSourcesCheck, id),
+  versionSourcesOpen: (id: VersionSourceId) => invoke(IPC.invoke.versionSourcesOpen, id),
   health: () => invoke<HostHealth>(IPC.invoke.appHealth),
   getOnboarding: () => invoke<OnboardingState>(IPC.invoke.appGetOnboarding),
   dismissOnboarding: () => invoke(IPC.invoke.appDismissOnboarding),

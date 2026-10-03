@@ -4618,6 +4618,10 @@ async fn handle_request(
             Ok(json!({ "server": server }))
         }
 
+        "skills.getBundledVersion" => {
+            let st = state.lock().await;
+            Ok(json!({ "revision": st.user_skills.bundled_revision().map_err(skill_err)? }))
+        }
         "skills.ensureBundled" => {
             let mut st = state.lock().await;
             Ok(json!(st.user_skills.ensure_bundled().map_err(skill_err)?))

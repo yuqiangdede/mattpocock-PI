@@ -1,5 +1,27 @@
 use super::*;
 
+#[test]
+fn bundled_revision_reads_actual_manifest_without_installing() {
+    let root = tempfile::tempdir().unwrap();
+    let profile = root.path().join("profile");
+    let registry = UserSkillRegistry::new(&profile);
+    assert_eq!(registry.bundled_revision().unwrap(), "");
+    assert!(!profile.exists());
+
+    let bundle_root = profile.join("engineering-skills");
+    fs::create_dir_all(&bundle_root).unwrap();
+    let manifest = bundle_root.join("state.json");
+    let bytes = br#"{"schemaVersion":1,"revision":"actual-installed-revision","packages":{}}"#;
+    fs::write(&manifest, bytes).unwrap();
+    assert_eq!(registry.bundled_revision().unwrap(), "actual-installed-revision");
+    assert_eq!(fs::read(&manifest).unwrap(), bytes);
+    assert!(!bundle_root.join("releases").exists());
+
+    fs::write(&manifest, b"invalid manifest").unwrap();
+    assert!(registry.bundled_revision().is_err());
+    assert_eq!(fs::read(&manifest).unwrap(), b"invalid manifest");
+}
+
 fn directory_link(target: &Path, link: &Path) {
     #[cfg(windows)]
     {

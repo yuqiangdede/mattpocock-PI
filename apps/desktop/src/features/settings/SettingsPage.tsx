@@ -8,6 +8,7 @@ import type {
 } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
 import { api } from "../../lib/api";
+import { VersionSourcesSection } from "./VersionSourcesSection";
 import {
   isSettingsDestinationHidden,
   SETTINGS_NAV_GROUP_LABELS,
@@ -57,7 +58,7 @@ import {
   SettingsCard,
   SettingsRow,
 } from "./primitives";
-import { AgentInstructionsSection, UpdatesRow } from "./agent-sections";
+import { AgentInstructionsSection } from "./agent-sections";
 import { ImportSection } from "./import-page";
 import { PromptEnhancementCard } from "./prompt-enhancement-card";
 import { CloseBehaviorSection, DeveloperSection } from "./developer-sections";
@@ -583,7 +584,7 @@ export function SettingsPage() {
                 <SettingsRow title={t("settings.application")}>
                   <div className="settings-about-meta">
                     <div className="font-medium">
-                      {version?.name || "PI-Desktop"} {version?.version}
+                      {version?.name || "mattpocock-PI"} {version?.version}
                     </div>
                     <div className="font-mono text-xs-plus text-text-muted">
                       protocol {version?.protocolVersion} · host {version?.hostVersion}
@@ -597,7 +598,7 @@ export function SettingsPage() {
                 </SettingsRow>
                 <SettingsRow
                   title={t("settings.feedback")}
-                  description={t("settings.feedbackDesc")}
+                  description="向 mattpocock-PI 仓库提交问题，并自动带上当前版本。"
                 >
                   <Button
                     variant="secondary"
@@ -606,13 +607,9 @@ export function SettingsPage() {
                     {t("settings.openFeedback")}
                   </Button>
                 </SettingsRow>
-                <UpdatesRow
-                  currentVersion={version?.version}
-                  settings={settings ?? null}
-                  saveSettings={saveSettings}
-                />
               </SettingsCard>
 
+              <VersionSourcesSection />
               {settings && (
                 <DeveloperSection settings={settings} saveSettings={saveSettings} />
               )}
