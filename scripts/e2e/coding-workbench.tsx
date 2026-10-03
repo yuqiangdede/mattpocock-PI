@@ -9,7 +9,7 @@ import { api } from "../../apps/desktop/src/lib/api";
 import { readComposerDraft } from "../../apps/desktop/src/lib/composer-draft-cache";
 import { nextChipToken, readEditorValue } from "../../apps/desktop/src/features/chat/composer/editor";
 
-declare global { var codingWorkbenchProbe: () => Promise<unknown>; interface Window { workflowFixture: { action: (name: string, input?: unknown) => Promise<unknown> } } }
+declare global { var codingWorkbenchProbe: (requirementsOnly?: boolean) => Promise<unknown>; interface Window { workflowFixture: { action: (name: string, input?: unknown) => Promise<unknown> } } }
 const params = new URLSearchParams(location.search);
 const sessionId = params.get("sessionId")!;
 const projectPath = params.get("projectA")!;
@@ -25,7 +25,7 @@ async function click(label: string) {
   const button = await until(() => [...document.querySelectorAll<HTMLButtonElement>("button")].find((item) => item.textContent?.trim() === label && !item.disabled));
   button.focus(); button.click();
 }
-globalThis.codingWorkbenchProbe = async () => {
+globalThis.codingWorkbenchProbe = async (requirementsOnly = false) => {
   await i18n.use(initReactI18next).init({ lng: "en", resources: { en: { translation: flattenCatalog(en) }, "zh-CN": { translation: flattenCatalog(zhCN) } }, interpolation: { escapeValue: false } });
   const sessions = (await api.listSessions()).sessions;
   useAppStore.setState({ activeSessionId: sessionId, sessions: sessions.map((session) => ({ ...session, providerId: "workflow-fixture", modelId: "fixture-model" })),
@@ -48,8 +48,48 @@ globalThis.codingWorkbenchProbe = async () => {
     await until(() => readEditorValue(editor()) === text);
   };
   for (const [label, skill] of mappings) {
-    await prefill(""); await click(label);
+    await prefill("");
+    if (skill === "to-spec" || skill === "to-tickets") {
+      check(![...document.querySelectorAll(".coding-shortcuts button")].some((button) => button.textContent?.trim() === label), "Secondary requirement action remains in toolbar");
+      const trigger = document.querySelector<HTMLButtonElement>(".coding-requirements-split [aria-haspopup='menu']")!;
+      trigger.focus(); await fixture("pressKey", "Space");
+      await until(() => document.querySelector(".coding-requirements-menu.is-open"));
+    }
+    await click(label);
     await until(() => readEditorValue(editor()) === `/${skill} `);
+    check(!document.querySelector(".coding-requirements-menu"), "Requirement selection left menu open");
+  }
+  await prefill(""); await click("Discuss requirements");
+  await until(() => readEditorValue(editor()) === "/grill-with-docs ");
+  const requirementsTrigger = () => document.querySelector<HTMLButtonElement>(".coding-requirements-split [aria-haspopup='menu']")!;
+  requirementsTrigger().click();
+  await until(() => document.querySelector(".coding-requirements-menu.is-open"));
+  await fixture("pressKey", "Escape");
+  await until(() => !document.querySelector(".coding-requirements-menu") && document.activeElement === requirementsTrigger());
+  requirementsTrigger().click();
+  await until(() => document.querySelector(".coding-requirements-menu.is-open"));
+  document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+  await until(() => !document.querySelector(".coding-requirements-menu"));
+  requirementsTrigger().click();
+  await until(() => document.querySelector(".coding-requirements-menu.is-open"));
+  const currentSessions = useAppStore.getState().sessions;
+  useAppStore.setState({ sessions: currentSessions.map((session) => session.id === sessionId ? { ...session, source: "pi-native" } : session) });
+  await until(() => requirementsTrigger().disabled && !document.querySelector(".coding-requirements-menu"));
+  useAppStore.setState({ sessions: currentSessions });
+  await until(() => !requirementsTrigger().disabled);
+  if (requirementsOnly) {
+    await fixture("resize", { width: 460, height: 760 });
+    await until(() => innerWidth <= 460);
+    check(document.documentElement.scrollWidth <= innerWidth, "Requirements split button overflows narrow layout");
+    await i18n.changeLanguage("zh-CN");
+    await until(() => document.querySelector(".coding-requirements-split")?.textContent?.includes("需求讨论"));
+    requirementsTrigger().focus(); await fixture("pressKey", "Space");
+    await until(() => document.querySelector(".coding-requirements-menu.is-open"));
+    check(document.querySelector(".coding-requirements-menu")?.textContent?.includes("需求固化"), "Localized specification item missing");
+    check(document.querySelector(".coding-requirements-menu")?.textContent?.includes("拆分工单"), "Localized tickets item missing");
+    check((await fixture("snapshot") as { prompts: number }).prompts === 0, "Requirements menu submitted a prompt");
+    root.unmount();
+    return { ok: true, requirementsMenu: true, mappings: true, keyboard: true, disabled: true, narrow: true, localized: true };
   }
   const token = nextChipToken();
   const body = `Keep this request\nwith its file ${token}`;

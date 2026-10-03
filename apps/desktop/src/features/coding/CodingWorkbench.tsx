@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Button } from "../../components/ui";
+import { Button, TooltipButton } from "../../components/ui";
 import { AnchoredMenu } from "../../components/settings/AnchoredMenu";
 import { toolWorkPanelTab } from "../../lib/work-panel-tabs";
 import { useAppStore } from "../../stores/app-store";
@@ -44,14 +45,52 @@ export function CodingWorkbench({ disabled, error, onSelect }: {
 }) {
   const { t } = useTranslation();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [requirementsOpen, setRequirementsOpen] = useState(false);
 
   useEffect(() => {
-    if (disabled) setMoreOpen(false);
+    if (disabled) {
+      setMoreOpen(false);
+      setRequirementsOpen(false);
+    }
   }, [disabled]);
 
   return <section className="coding-workbench" aria-label={t("coding.tools")}>
     <div className="coding-shortcuts">
-      {CODING_SKILL_SHORTCUTS.map(({ action, skill }) => <Button
+      {CODING_SKILL_SHORTCUTS.filter(({ action }) => action !== "spec" && action !== "tickets").map(({ action, skill }) => action === "discovery" ? <div className="coding-requirements-split" key={skill}>
+        <Button disabled={disabled} title={t("coding.discoveryHint")} onClick={() => {
+          setRequirementsOpen(false);
+          onSelect(skill);
+        }}>{t("coding.discovery")}</Button>
+        <AnchoredMenu
+          open={requirementsOpen}
+          onClose={() => setRequirementsOpen(false)}
+          role="menu"
+          side="top"
+          restoreFocus={!disabled}
+          label={`${t("coding.discovery")} · ${t("coding.more")}`}
+          menuClassName="context-menu coding-requirements-menu"
+          trigger={(ref) => <TooltipButton
+            ref={ref} type="button" disabled={disabled}
+            className="btn btn-secondary"
+            tooltip={`${t("coding.discovery")} · ${t("coding.more")}`}
+            aria-haspopup="menu" aria-expanded={requirementsOpen}
+            onClick={() => {
+              setMoreOpen(false);
+              setRequirementsOpen((value) => !value);
+            }}
+          ><ChevronDown size={14} aria-hidden="true" /></TooltipButton>}
+        >
+          {CODING_SKILL_SHORTCUTS.filter(({ action }) => action === "spec" || action === "tickets").map(({ action, skill }) => <Button
+            key={skill} type="button" role="menuitem" variant="ghost"
+            className="context-menu-item" disabled={disabled}
+            title={t(`coding.${action}Hint`)}
+            onClick={() => {
+              setRequirementsOpen(false);
+              onSelect(skill);
+            }}
+          >{t(`coding.${action}`)}</Button>)}
+        </AnchoredMenu>
+      </div> : <Button
         key={skill} disabled={disabled} title={t(`coding.${action}Hint`)}
         onClick={() => onSelect(skill)}
       >{t(`coding.${action}`)}</Button>)}
@@ -72,7 +111,10 @@ export function CodingWorkbench({ disabled, error, onSelect }: {
             title={t("coding.moreHint")}
             aria-haspopup="menu"
             aria-expanded={moreOpen}
-            onClick={() => setMoreOpen((value) => !value)}
+            onClick={() => {
+              setRequirementsOpen(false);
+              setMoreOpen((value) => !value);
+            }}
           >
             {t("coding.more")}
           </Button>

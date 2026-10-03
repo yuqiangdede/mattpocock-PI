@@ -11,7 +11,7 @@ import { resolveElectronBinary } from "./e2e/boot.mjs";
 const execFileAsync = promisify(execFile);
 const root = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
 const recoveryFixture = process.argv.includes("--recovery");
-const codingFixture = process.argv.includes("--coding");
+const codingFixture = process.argv.includes("--coding") || process.argv.includes("--requirements-menu");
 const stagesFixture = process.argv.includes("--stages");
 const reopenFixture = process.argv.includes("--reopen");
 const artifactsFixture = process.argv.includes("--artifacts");
@@ -112,6 +112,7 @@ try {
   const env = { ...process.env, PI_DESKTOP_HOST_BIN: hostBinary, PI_WORKFLOW_ARTIFACTS: artifactsFixture ? "1" : "0", PI_WORKFLOW_DISCOVERY: discoveryFixture ? "1" : "0", PI_WORKFLOW_REOPEN: reopenFixture ? "1" : "0", PI_WORKFLOW_STAGES: stagesFixture ? "1" : "0", PI_WORKFLOW_RECOVERY: recoveryFixture ? "1" : "0", PI_WORKFLOW_REPO_ROOT: root };
   delete env.ELECTRON_RUN_AS_NODE;
   env.PI_CODING_WORKBENCH = codingFixture ? "1" : "0";
+  env.PI_REQUIREMENTS_MENU = process.argv.includes("--requirements-menu") ? "1" : "0";
   const child = spawn(electronBinary, [join(temp, "main.mjs")], {
     cwd: root,
     env,
@@ -141,7 +142,9 @@ try {
   assert.equal(exitCode, 0, output.slice(-5000));
   const result = JSON.parse(resultLine.slice("WORKFLOW_RUNS_PROBE ".length));
   assert.equal(result.ok, true);
-  if (codingFixture) {
+  if (process.argv.includes("--requirements-menu")) {
+    for (const field of ["requirementsMenu", "mappings", "keyboard", "disabled", "narrow", "localized"]) assert.equal(result[field], true, field);
+  } else if (codingFixture) {
     assert.equal(result.inserted, true);
     assert.equal(result.manual, true);
     for (const field of ["mappings", "retained", "setup", "remediation", "stale", "queue", "narrow", "keyboard", "localized"]) assert.equal(result[field], true, field);
