@@ -609,6 +609,7 @@ export const fr = {
   "settings": {
     showAllSkills: "Afficher tous les skills",
     showWorkflowSkills: "Afficher les skills du workflow",
+    engineering: en.settings.engineering,
     updateEngineeringSkills: "Mettre à jour les skills d’ingénierie",
     engineeringSkillsUpdated: "{{count}} skills mis à jour ; {{preserved}} skills modifiés ou supprimés localement préservés.",
     "power": "Alimentation",

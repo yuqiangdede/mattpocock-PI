@@ -1,4 +1,5 @@
 import type { VersionSourceId, VersionSourceState } from "../../../../packages/shared/src/version-sources";
+import { validateEngineeringSettings, engineeringSettingsForWrite, type EngineeringShortcutPrompts, type EngineeringSkillUpdateMode, type EngineeringSkillStatus } from "@pi-desktop/shared";
 import type {
   ScheduledTaskRun,
   ActivationScope,
@@ -380,6 +381,7 @@ export function normalizeSettings(settings: AppSettings): AppSettings {
 }
 
 export function validateSettingsWrite(settings: AppSettings): AppSettings {
+  validateEngineeringSettings(settings);
   if (
     settings.thinkingDisplayMode !== undefined &&
     settings.thinkingDisplayMode !== "detailed" &&
@@ -492,7 +494,7 @@ export function validateSettingsWrite(settings: AppSettings): AppSettings {
       (value as { speech?: unknown }).speech,
     );
   }
-  return settings;
+  return engineeringSettingsForWrite(settings);
 }
 
 function normalizePlanProposal(proposal: PlanProposal): PlanProposal {
@@ -1169,6 +1171,9 @@ export const api = {
     ),
 
   // --- Skills the user owns -------------------------------------------------
+  engineeringSkillStatus: () => invoke<EngineeringSkillStatus>(IPC.invoke.skillBundleStatus),
+  checkEngineeringSkills: (automatic = false) => invoke<EngineeringSkillStatus>(IPC.invoke.skillBundleCheck, { automatic }),
+  setEngineeringSettings: (patch: { engineeringShortcutPrompts?: EngineeringShortcutPrompts; engineeringSkillUpdateMode?: EngineeringSkillUpdateMode }) => { validateEngineeringSettings(patch); return invoke(IPC.invoke.settingsSet, patch); },
   updateEngineeringSkills: () => invoke<{ revision: string; updated: string[]; preserved: string[] }>(IPC.invoke.skillBundleUpdate),
   listUserSkills: (query?: AgentCapabilityQuery) =>
     invoke<{ skills: UserSkillRecord[] }>(IPC.invoke.skillList, query),

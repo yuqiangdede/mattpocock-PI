@@ -64,3 +64,5 @@ electron.vite.config.*.mjs
 
 .playwright-cli
 worktrees
+
+/cache/engineering-settings/

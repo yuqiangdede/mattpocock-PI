@@ -327,6 +327,8 @@ export const IPC = {
     mcpImportRun: "pi-desktop/mcp/importRun",
     mcpMarketSearch: "pi-desktop/mcp/market/search",
     skillList: "pi-desktop/skill/list",
+    skillBundleStatus: "pi-desktop/skill/bundle/status",
+    skillBundleCheck: "pi-desktop/skill/bundle/check",
     skillBundleUpdate: "pi-desktop/skill/bundle/update",
     skillCreate: "pi-desktop/skill/create",
     skillImport: "pi-desktop/skill/import",

@@ -9,7 +9,7 @@
 import { net, session } from "electron";
 import type { SkillCatalogEntry, SkillMarketSource } from "@pi-desktop/shared";
 import { createPublicHttpsClient } from "./public-https-fetch";
-import { fetchEngineeringSkillBundle } from "./engineering-skill-update";
+import { fetchEngineeringSkillBundle, fetchEngineeringSkillRevision } from "./engineering-skill-update";
 import {
   allowInsecureUserEndpointsEnabled,
   noteInsecureUserEndpoint,
@@ -65,3 +65,4 @@ export function fetchEngineeringSkills() {
 export function fetchVersionSource(url: string, kind: "json") {
   return client.request(url, kind);
 }
+export function checkEngineeringSkillRevision() { return fetchEngineeringSkillRevision(client.request); }

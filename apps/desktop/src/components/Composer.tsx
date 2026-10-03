@@ -520,7 +520,7 @@ export function Composer({
         <CodingWorkbench
           disabled={inputBlocked || composing || skillShortcut.pending}
           error={skillShortcut.error}
-          onSelect={(skill) => void skillShortcut.select(skill)}
+          onSelect={(skill, prompt) => void skillShortcut.select(skill, prompt)}
         />
         {activeSessionId ? <TodoDock sessionId={activeSessionId} /> : null}
         {planCheckpoint?.status === "pending" ? (

@@ -1,5 +1,6 @@
 import { app, dialog, shell } from "electron";
-import { fetchEngineeringSkills } from "../skill-market-catalog";
+import { createEngineeringSkillChecks } from "../engineering-skill-checks";
+import { fetchEngineeringSkills, checkEngineeringSkillRevision } from "../skill-market-catalog";
 import { createEngineeringSkillUpdater } from "../engineering-skill-update";
 import { importSkillFolders, readLastSkillImportDirectory, writeLastSkillImportDirectory } from "../skill-folder-import";
 import { ErrorCodes, IPC, type ActivationScope, type AgentCapabilityMove, type AgentCapabilityQuery, type UserSkillRecord, type UserSubagentRecord } from "@pi-desktop/shared";
@@ -103,7 +104,12 @@ export function registerSkillsIpc({
   };
   let host: HostProcess | null = null;
   const updateEngineeringSkills = createEngineeringSkillUpdater({ getHost, fetchBundle: fetchEngineeringSkills, notify: () => sendToRenderer(IPC.event.pluginChanged, { reason: "skill" }) });
-  registrar.handle(IPC.invoke.skillBundleUpdate, updateEngineeringSkills);
+  const checks = createEngineeringSkillChecks({ getHost, fetchRevision: checkEngineeringSkillRevision, update: updateEngineeringSkills, report: error => logger.app("runtime", "warn", "engineering skill check failed", { data: String(error) }) });
+  registrar.handle(IPC.invoke.skillBundleStatus, checks.status);
+  registrar.handle(IPC.invoke.skillBundleCheck, checks.check);
+  registrar.handle(IPC.invoke.skillBundleUpdate, checks.update);
+  void app.whenReady().then(() => checks.start());
+  app.once("before-quit", () => checks.stop());
   const handle = (channel: string, fn: (...args: any[]) => Promise<any>) => {
     registrar.handle(channel, async (...args) => {
       host = getHost();

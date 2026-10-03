@@ -14,11 +14,20 @@ does not submit the draft, start execution or create a separate task.
 The user reviews and edits the draft, then explicitly sends it using the
 ordinary Composer controls.
 
-An empty draft receives only the selected skill marker. A non-empty draft
+An empty draft receives the selected skill marker and its default instruction. A non-empty draft
 retains its existing content and adds the marker. Use the existing slash-skill
 insertion semantics rather than implementing a second skill invocation format.
 Ordinary submission supplies context, Skill loading, permissions, queueing,
 Stop, errors and conversation output exactly as manual slash invocation does.
+
+
+Every skill shortcut, including Ask and every More menu item, inserts its
+localized editable default instruction after the resolved slash marker.
+Existing draft text is preserved verbatim after a blank line; attachments and
+manual Send behavior remain unchanged. Workflow navigation and opening More
+do not insert instructions. Ask inspects current project evidence and proposes
+a concrete next action before implementation; the remaining prompts follow
+the corresponding Matt skill methodology. Prompts do not authorize Git delivery.
 
 ## Visible controls
 
@@ -45,6 +54,15 @@ Keep the shortcuts available on the home surface and through a compact
 conversation entry. Skill identity and availability follow the existing
 catalog and user definitions; unavailable skills are not silently installed,
 enabled or replaced. All labels and accessible names follow application i18n.
+
+
+The shortcuts use two separate wrapping rows. The first row is Ask next step,
+Initialize, Engineering Workflow panel, and More features, in that order.
+The second row is Discuss requirements (with Form specification and Split
+tickets in its split-button menu), Implement, Diagnose bug, Review code,
+and Retrospective. Discuss requirements,
+Implement, and Diagnose bug use bold text; all other controls use regular text.
+At narrow widths each row wraps independently without horizontal overflow.
 
 ## Engineering initialization boundary
 
@@ -79,10 +97,10 @@ Host persistence model to implement shortcut selection.
 ## Acceptance checks
 
 1. Click each primary shortcut, Ask, and a More item in an empty Composer: its
-   corresponding marker appears, the input can be edited, and no prompt or task
+   corresponding marker and localized default instruction appear, the input can be edited, and no prompt or task
    is submitted.
 2. Click with existing text and attachments: content and attachments remain;
-   only skill selection changes. Closing or switching views does not lose draft data.
+   the marker and default instruction are added. Closing or switching views does not lose draft data.
 3. Manually send a selected skill with task text: the same skill and current
    conversation context are used as the equivalent manually composed slash input.
 4. While a conversation is running, shortcut selection only edits the draft;

@@ -618,6 +618,7 @@ export const tr = {
   settings: {
     showAllSkills: "Tüm becerileri göster",
     showWorkflowSkills: "İş akışı becerilerini göster",
+    engineering: en.settings.engineering,
     updateEngineeringSkills: "Mühendislik becerilerini güncelle",
     engineeringSkillsUpdated: "{{count}} beceri güncellendi; yerel olarak değiştirilen veya kaldırılan {{preserved}} beceri korundu.",
     power: "Güç",

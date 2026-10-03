@@ -16,6 +16,15 @@ skill marker to the current draft, using the same
 references and image attachments remain intact. The marker is prepended so it
 cannot accidentally become an argument to a leading builtin command.
 
+
+Every skill shortcut, including Ask and every More menu item, inserts its
+localized editable default instruction after the resolved slash marker.
+Existing draft text is preserved verbatim after a blank line; attachments and
+manual Send behavior remain unchanged. Workflow navigation and opening More
+do not insert instructions. Ask inspects current project evidence and proposes
+a concrete next action before implementation; the remaining prompts follow
+the corresponding Matt skill methodology. Prompts do not authorize Git delivery.
+
 Selection does not submit, create a session, reserve a Free Task, initialize
 files, call a model or change Workflow stage acceptance. The user edits and
 explicitly sends the draft through ordinary Composer controls. Skill loading,
@@ -39,6 +48,29 @@ The Ask button inserts `ask-matt`. The More menu inserts `grill-me`, `grilling`,
 `domain-modeling`, `tdd`, `wayfinder`, `triage`, `research`,
 `resolving-merge-conflicts`, `teach`, `to-questionnaire`, `wait-what`, `wizard`,
 or `writing-for-agents`.
+
+
+The shortcuts use two separate wrapping rows. The first row is Ask next step,
+Initialize, Engineering Workflow panel, and More features, in that order.
+The second row is Discuss requirements (with Form specification and Split
+tickets in its split-button menu), Implement, Diagnose bug, Review code,
+and Retrospective. Discuss requirements,
+Implement, and Diagnose bug use bold text; all other controls use regular text.
+At narrow widths each row wraps independently without horizontal overflow.
+
+## Global instruction settings
+
+Settings > Agent > Skills edits all 26 shortcut instructions globally across
+projects, including More menu skills. Saving an empty string selects only
+the skill marker. Restore default clears the override and uses the current
+UI language's built-in instruction. Custom text remains verbatim when the
+UI language changes and survives skill updates. Existing Composer drafts
+and attachments are never rewritten by a settings edit.
+
+Host persists optional engineeringShortcutPrompts, preserving older profiles.
+Null per action means restore; an empty string is a deliberate empty override.
+Each instruction is limited to 16,000 UTF-16 code units. Boundary validation
+rejects unknown actions, invalid values and embedded NUL characters.
 
 ## Catalog and lifecycle
 

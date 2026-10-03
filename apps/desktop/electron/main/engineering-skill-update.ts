@@ -7,10 +7,15 @@ const REPOSITORY = "https://api.github.com/repos/mattpocock/skills";
 const REQUIRED = ["grill-with-docs", "to-spec", "to-tickets", "implement", "code-review", "retro"];
 function record(value: unknown): value is Record<string, unknown> { return value !== null && typeof value === "object" && !Array.isArray(value); }
 
-/** Fetch one immutable upstream revision. Nothing is installed on partial failure. */
-export async function fetchEngineeringSkillBundle(request: PublicHttpsClient["request"]): Promise<EngineeringSkillBundle> {
+export async function fetchEngineeringSkillRevision(request: PublicHttpsClient["request"]): Promise<string> {
   const commit = await request(`${REPOSITORY}/commits/main`, "json");
   if (!record(commit) || typeof commit.sha !== "string" || !/^[a-f0-9]{40}$/.test(commit.sha)) throw new Error("Invalid engineering skills revision");
+  return commit.sha;
+}
+
+/** Fetch one immutable upstream revision. Nothing is installed on partial failure. */
+export async function fetchEngineeringSkillBundle(request: PublicHttpsClient["request"]): Promise<EngineeringSkillBundle> {
+  const commit = { sha: await fetchEngineeringSkillRevision(request) };
   const tree = await request(`${REPOSITORY}/git/trees/${commit.sha}?recursive=1`, "json");
   if (!record(tree) || tree.truncated !== false || !Array.isArray(tree.tree) || tree.tree.length > 4096) throw new Error("Incomplete engineering skills tree");
   const entries: Array<{ source: string; id: string; path: string; size: number }> = [];
@@ -44,7 +49,7 @@ export function createEngineeringSkillUpdater({ getHost, fetchBundle, notify }: 
   fetchBundle: () => Promise<EngineeringSkillBundle>;
   notify: () => void;
 }) {
-  let pending: Promise<unknown> | null = null;
+  let pending: Promise<{ revision: string; updated: string[]; preserved: string[] }> | null = null;
   return () => {
     if (pending) return pending;
     const owner = getHost();
@@ -56,7 +61,7 @@ export function createEngineeringSkillUpdater({ getHost, fetchBundle, notify }: 
     pending = (async () => {
       const bundle = await fetchBundle();
       assertOwner();
-      const result = await owner.call("skills.updateBundled", bundle);
+      const result = await owner.call<{ revision: string; updated: string[]; preserved: string[] }>("skills.updateBundled", bundle);
       assertOwner();
       notify();
       return result;

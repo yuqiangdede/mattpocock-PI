@@ -23,6 +23,13 @@ precedence over the shipped fallback. The ordinary skill controls can disable,
 edit or remove an installed skill. Startup never re-enables, overwrites or
 reinstalls a removed skill after initial installation.
 
+Settings offers automatic detection with manual installation (the default)
+and fully manual detection and installation. The default checks at startup
+when due and at most once per 24 hours afterward. Attempt timestamps persist,
+including failures; failures do not retry on every scheduler tick. Status and
+new versions appear only in the skill settings page. Check now always permits
+an explicit retry without installing. Neither mode installs automatically.
+
 Update engineering skills is an explicit user action on that page. Main uses
 the existing public-HTTPS policy to fetch one immutable revision of
 https://github.com/mattpocock/skills. The complete bundle must validate before

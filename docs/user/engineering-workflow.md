@@ -9,7 +9,17 @@ Matt Pocock skills and their companion files are bundled and enabled on first
 startup. **Settings > Agent > Skills** initially shows the six stage skills; use Show all skills or
 search to manage the others. Type `/tdd` or another skill name to invoke an
 auxiliary skill directly. Update engineering skills checks upstream explicitly,
-preserving locally edited/removed packages and enabled states. Existing personal
+preserving locally edited/removed packages and enabled states. Settings also
+provides global Engineering shortcut instructions: edit, Save, or Restore
+default for each shortcut. Saving an empty instruction inserts only the skill.
+Changing settings does not rewrite an existing draft.
+
+Engineering skill updates defaults to automatic version detection, with an
+initial check when due and at most one attempt per 24 hours. New-version status
+appears in that settings section; installation always requires Update engineering
+skills. Choose Manual detection and update to disable background checks, or
+Check for updates to detect/retry now. Installed snapshot and preserved local
+skills are displayed separately. Existing personal
 skills take precedence over the bundled fallback.
 
 Enable the stage's skill on that page if you previously disabled it.

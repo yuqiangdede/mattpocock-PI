@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { TFunction } from "i18next";
-import { formatCommandInsert } from "@pi-desktop/shared";
+import { buildSkillShortcutDraft } from "../skill-shortcut-draft";
 import { api } from "../../../../lib/api";
 import type { ComposerFileReference } from "../model";
 
@@ -28,7 +28,7 @@ export function useComposerSkillShortcut(options: {
     return () => { generation.current += 1; };
   }, [options.draftKey, options.workspacePath]);
 
-  const select = async (skill: string) => {
+  const select = async (skill: string, prompt: string) => {
     const owner = latest.current;
     if (owner.inputBlocked || owner.composing || inFlight.current) return;
     const stamp = generation.current;
@@ -49,7 +49,7 @@ export function useComposerSkillShortcut(options: {
         setError(draft.t("coding.skillMissing"));
         return;
       }
-      const text = formatCommandInsert(command.name) + draft.readLiveDraft();
+      const text = buildSkillShortcutDraft(command.name, prompt, draft.readLiveDraft());
       draft.invalidatePromptEnhancement();
       draft.applyEditorDraft(text, draft.fileReferencesRef.current, text.length);
     } catch (cause) {

@@ -42,8 +42,14 @@ function dropLegacyFontFallbacks(): Plugin {
   };
 }
 
+const sharedSourceAliases = [
+  { find: /^@pi-desktop\/shared$/, replacement: resolve(__dirname, "../../packages/shared/src/index.ts") },
+  { find: "@pi-desktop/shared/protocol", replacement: resolve(__dirname, "../../packages/shared/src/protocol.ts") },
+];
+
 export default defineConfig({
   main: {
+    resolve: { alias: sharedSourceAliases },
     // `ws` loads its optional native accelerators (bufferutil, utf-8-validate)
     // inside `require` + try/catch and falls back to its own JavaScript
     // implementation when they are absent. A bundle cannot fail a require, and
@@ -82,6 +88,7 @@ export default defineConfig({
     },
   },
   preload: {
+    resolve: { alias: sharedSourceAliases },
     // The preload must be a fully bundled CJS file so it can run in a
     // sandboxed renderer without Node module resolution.
     build: {
@@ -114,11 +121,12 @@ export default defineConfig({
     },
     plugins: [react(), tailwindcss(), tightenCsp(), dropLegacyFontFallbacks()],
     resolve: {
-      alias: {
-        "@renderer": resolve("src"),
-        // Always read locale source so new keys work without a stale packages/*/dist.
-        "@pi-desktop/i18n": resolve(__dirname, "../../packages/i18n/src/index.ts"),
-      },
+      alias: [
+        ...sharedSourceAliases,
+        { find: "@renderer", replacement: resolve("src") },
+        // Read current workspace source rather than stale dependency build outputs.
+        { find: "@pi-desktop/i18n", replacement: resolve(__dirname, "../../packages/i18n/src/index.ts") },
+      ],
     },
   },
 });
