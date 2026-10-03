@@ -1,7 +1,7 @@
 # Skill Shortcut Delivery
 
 Date: 2026-10-03
-Status: Implemented and validated locally; not pushed or merged.
+Status: Implemented and validated; release pending. Delivery and current merge status: [PR #16](https://github.com/yuqiangdede/mattpocock-PI/pull/16).
 Branch: `docs/skill-shortcuts-design`.
 Base main: `bd0ab10e86cb5ae0daddaff2fcc5743edcbc8424`.
 
@@ -40,8 +40,9 @@ Formatting only the private commit message produced
 The subsequent documentation-only commit records these results.
 
 Standards and Spec were independently reviewed against `bd0ab10`; both have
-zero confirmed findings. No issue/PR was created, and remote/local main was
-not modified by this implementation request.
+zero confirmed findings. The implementation round left main unchanged. The
+user subsequently authorized delivery to main through PR #16. Integration
+candidate results are retained with the validation evidence.
 
 ## Validation results
 
