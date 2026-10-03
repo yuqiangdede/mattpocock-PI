@@ -21,7 +21,7 @@ await mkdir(scratchRoot, { recursive: true });
 const require = createRequire(join(root, "packages/agent-runtime/package.json"));
 const { build } = require("esbuild");
 const { electronBinary } = resolveElectronBinary(root);
-const hostBinary = join(root, "target/debug", `pi-desktop-host-core${process.platform === "win32" ? ".exe" : ""}`);
+const hostBinary = process.env.PI_DESKTOP_HOST_BIN ?? join(root, "target/debug", `pi-desktop-host-core${process.platform === "win32" ? ".exe" : ""}`);
 const temp = await mkdtemp(join(scratchRoot, "workflow-runs-"));
 const tempResolved = resolve(temp);
 if (!tempResolved.startsWith(`${resolve(scratchRoot)}${sep}`)) {

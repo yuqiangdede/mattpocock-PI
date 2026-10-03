@@ -39,7 +39,7 @@ globalThis.codingWorkbenchProbe = async () => {
   check((await fixture("snapshot") as { prompts: number }).prompts === 0, "Shortcut submitted automatically");
   check((await api.listFreeTasks(projectPath)).tasks.length === 0, "Shortcut created a Free Task");
   const mappings = [
-    ["Engineering initialization", "setup-matt-pocock-skills"], ["Discuss requirements", "grill-with-docs"],
+    ["Initialize", "setup-matt-pocock-skills"], ["Discuss requirements", "grill-with-docs"],
     ["Form specification", "to-spec"], ["Split tickets", "to-tickets"], ["Implement", "implement"],
     ["Diagnose bug", "diagnosing-bugs"], ["Review code", "code-review"], ["Retrospective", "retro"],
   ];
@@ -91,7 +91,7 @@ globalThis.codingWorkbenchProbe = async () => {
   check((await fixture("snapshot") as { transformed: string }).transformed === selected.transformed, "Shortcut differs from manual slash prompt");
   await fixture("releaseProvider");
   useAppStore.setState({ isRunning: false, runningSessions: {} });
-  await prefill("Set up engineering conventions"); await click("Engineering initialization");
+  await prefill("Set up engineering conventions"); await click("Initialize");
   await until(() => readEditorValue(editor()) === "/setup-matt-pocock-skills Set up engineering conventions");
   await fixture("reset"); await fixture("releaseLaunch");
   (await until(() => document.querySelector<HTMLButtonElement>(".send-btn:not(:disabled)"))).click();
@@ -159,7 +159,7 @@ globalThis.codingWorkbenchProbe = async () => {
   console.info("SHORTCUT_PHASE keyboard");
   await until(() => readEditorValue(editor()) === "/implement " && document.activeElement === editor());
   await i18n.changeLanguage("zh-CN");
-  await until(() => [...document.querySelectorAll(".coding-shortcuts button")].some((button) => button.textContent === "工程初始化"));
+  await until(() => [...document.querySelectorAll(".coding-shortcuts button")].some((button) => button.textContent === "初始化"));
   root.unmount();
   return { ok: true, inserted: true, manual: true, mappings: true, retained: true,
     setup: true, remediation: true, stale: true, queue: true, narrow: true, keyboard: true, localized: true };
