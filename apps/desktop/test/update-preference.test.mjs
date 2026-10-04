@@ -56,8 +56,8 @@ test("manual preference disables in-app delivery and explicit automatic restores
   assert.equal(resolveUpdateMode("win32", true, {}, "installed", "manual"), "manual");
   assert.equal(resolveUpdateMode("win32", true, {}, "zip"), "manual");
   assert.equal(resolveUpdateMode("win32", true, {}, "portable"), "manual");
-  assert.equal(resolveUpdateMode("win32", true, {}, "zip", "automatic"), "in-app");
-  assert.equal(resolveUpdateMode("win32", true, {}, "portable", "automatic"), "in-app");
+  assert.equal(resolveUpdateMode("win32", true, {}, "zip", "automatic"), "manual");
+  assert.equal(resolveUpdateMode("win32", true, {}, "portable", "automatic"), "manual");
   assert.equal(resolveUpdateMode("darwin", true, {}, undefined, "automatic"), "in-app");
   assert.equal(resolveUpdateMode("linux", true, {}, undefined, "automatic"), "manual");
   assert.equal(resolveUpdateMode("win32", false, {}, undefined, "automatic"), "disabled");

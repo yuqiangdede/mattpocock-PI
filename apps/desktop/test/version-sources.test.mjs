@@ -10,9 +10,11 @@ test("官方源码基线独立于定制版版本，定制版版本较高也能�
   const checker = createVersionSourceChecker({ appVersion: "99.0.0", upstreamVersion: "0.16.1",
     skillVersion: async () => sha, request: async () => [release("0.16.2")] });
   const initial = await checker.list();
-  assert.equal(initial[0].currentVersion, "0.16.1");
-  assert.equal(initial[2].currentVersion, "99.0.0");
-  assert.equal((await checker.check("pi-desktop")).status, "available");
+  assert.deepEqual(initial.map(row => row.id), ["mattpocock-skills", "mattpocock-pi"]);
+  assert.equal(initial[1].currentVersion, "99.0.0");
+  const upstream = await checker.check("pi-desktop");
+  assert.equal(upstream.currentVersion, "0.16.1");
+  assert.equal(upstream.status, "available");
   assert.equal((await checker.check("mattpocock-pi")).status, "current");
 });
 
@@ -22,7 +24,7 @@ test("版本比较支持预发布与旧版本，避免降级提示", () => {
   assert.equal(compareReleaseVersions("1.0.0-beta.10", "1.0.0-beta.2"), 1);
   assert.equal(compareReleaseVersions("custom", "0.16.0"), null);
 });
-test("三个来源独立查询，只读取已安装技能版本，并缓存检测结果", async () => {
+test("only the two updatable sources are listed without network access", async () => {
   const urls = [];
   const checker = createVersionSourceChecker({appVersion: "0.16.0-beta.1", skillVersion: async () => sha, request: async (url) => {
     urls.push(url);
@@ -32,12 +34,28 @@ test("三个来源独立查询，只读取已安装技能版本，并缓存检�
   }});
   const initial = await checker.list();
   assert.equal(urls.length, 0);
-  assert.equal(initial[1].currentVersion, sha);
+  assert.equal(initial[0].currentVersion, sha);
+  assert.deepEqual(initial.map(row => row.id), ["mattpocock-skills", "mattpocock-pi"]);
   const results = await Promise.all(initial.map((row) => checker.check(row.id)));
-  assert.deepEqual(results.map((row) => row.status), ["current", "current", "available"]);
-  assert.equal(urls.length, 3);
-  assert.deepEqual((await checker.list()).map((row) => row.status), ["current", "current", "available"]);
+  assert.deepEqual(results.map((row) => row.status), ["current", "available"]);
+  assert.equal(urls.length, 2);
+  assert.deepEqual((await checker.list()).map((row) => row.status), ["current", "available"]);
   assert.ok(urls.every((url) => !url.includes("trees") && !url.includes("raw.githubusercontent")));
+});
+
+test("release channel selects the highest valid version and never offers a downgrade", async () => {
+  let channel = "stable";
+  const checker = createVersionSourceChecker({ appVersion: "0.16.0-beta.2", skillVersion: async () => sha,
+    getChannel: () => channel, request: async () => [
+      release("0.15.0"), release("0.18.0-beta.1", true), release("0.17.0"), release("custom"),
+      { ...release("9.0.0"), draft: true },
+    ],
+  });
+  assert.equal((await checker.check("mattpocock-pi")).latestVersion, "0.17.0");
+  channel = "prerelease";
+  assert.equal((await checker.check("mattpocock-pi")).latestVersion, "0.18.0-beta.1");
+  const older = createVersionSourceChecker({appVersion:"1.0.0", skillVersion:async()=>sha, request:async()=>[release("0.17.0")]});
+  assert.equal((await older.check("mattpocock-pi")).status, "current");
 });
 test("失败可重试，单项失败不影响其他来源，空发布不冒充最新版", async () => {
   let offline = true;

@@ -46,6 +46,8 @@ Update engineering skills explicitly fetches one complete immutable upstream
 revision through existing public-HTTPS policy. Host validates the bundle before
 activation, retains changed/removed packages, preserves activation state and
 keeps old versions. A failed download does not activate partial content.
+The explicit Settings update/backup/restore journey and upstream removal rules
+are specified in [executable updates](executable-updates.md).
 Stage start still reports disabled/missing skills rather than installing them.
 
 ### Stage definitions

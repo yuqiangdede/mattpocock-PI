@@ -2,13 +2,14 @@ import { ENGINEERING_CHECK_INTERVAL, type AppSettings, type EngineeringSkillChec
 import type { HostProcess } from "./host-process";
 
 type Owner = Pick<HostProcess, "call" | "generation">;
-type UpdateResult = { revision: string; updated: string[]; preserved: string[] };
+type UpdateResult = { revision: string; updated: string[]; preserved: string[]; removed?: string[] };
 
 /** Main owns detection and its timer; Host owns durable preferences and bundle writes. */
 export function createEngineeringSkillChecks(options: {
   getHost: () => Owner | null;
   fetchRevision: () => Promise<string>;
   update: () => Promise<UpdateResult>;
+  restore?: () => Promise<UpdateResult>;
   report: (error: unknown) => void;
   now?: () => number;
   schedule?: (tick: () => void) => () => void;
@@ -17,6 +18,7 @@ export function createEngineeringSkillChecks(options: {
   let checking: Promise<EngineeringSkillStatus> | null = null;
   let attempt: { fetched: boolean } | null = null;
   let updating: Promise<UpdateResult> | null = null;
+  let restoringActive = false;
   let cancelTimer: (() => void) | null = null;
   let stopped = false;
   const owner = () => {
@@ -32,8 +34,9 @@ export function createEngineeringSkillChecks(options: {
     const generation = host.generation;
     const settings = await host.call<AppSettings>("settings.get");
     const bundle = await host.call<{ revision: string }>("skills.ensureBundled");
+    const recovery = await host.call<{ hasBackup?: boolean; tasksRunning?: boolean }>("skills.getBundledVersion");
     assertOwner(host, generation);
-    return { attemptedAt: 0, ...settings.engineeringSkillCheck, revision: bundle.revision, checking: checking !== null, updating: updating !== null };
+    return { attemptedAt: 0, ...settings.engineeringSkillCheck, ...recovery, revision: bundle.revision, checking: checking !== null, updating: updating !== null };
   };
   const check = (automatic = false): Promise<EngineeringSkillStatus> => {
     if (checking) {
@@ -70,15 +73,21 @@ export function createEngineeringSkillChecks(options: {
     })().finally(() => { checking = null; attempt = null; });
     return checking.then(value => ({ ...value, checking: false }));
   };
-  const update = (): Promise<UpdateResult> => {
-    if (updating) return updating;
+  const mutate = (operation: () => Promise<UpdateResult>, restoring = false): Promise<UpdateResult> => {
+    if (updating) return restoringActive === restoring ? updating : Promise.reject(new Error("Skill maintenance already running"));
+    restoringActive = restoring;
     updating = (async () => {
       if (checking) await checking;
       const host = owner();
       const generation = host.generation;
-      const result = await options.update();
+      const previous = restoring ? (await host.call<AppSettings>("settings.get")).engineeringSkillCheck : undefined;
       assertOwner(host, generation);
-      await host.call("settings.set", { engineeringSkillCheck: { attemptedAt: now(), checkedAt: now(), latestRevision: result.revision.slice(0, 40), preserved: result.preserved } });
+      const result = await operation();
+      assertOwner(host, generation);
+      await host.call("settings.set", { engineeringSkillCheck: {
+        attemptedAt: now(), ...(restoring ? previous : { checkedAt: now(), latestRevision: result.revision.slice(0, 40) }),
+        preserved: result.preserved,
+      } });
       assertOwner(host, generation);
       return result;
     })().finally(() => { updating = null; });
@@ -91,7 +100,8 @@ export function createEngineeringSkillChecks(options: {
     status, check: (input?: { automatic?: boolean }) => {
       if (input !== undefined && (!input || typeof input !== "object" || Array.isArray(input) || (input.automatic !== undefined && typeof input.automatic !== "boolean"))) return Promise.reject(new Error("Invalid engineering skill check request"));
       return check(input?.automatic === true);
-    }, update,
+    }, update: () => mutate(options.update),
+    restore: () => options.restore ? mutate(options.restore, true) : Promise.reject(new Error("Restore unavailable")),
     start() {
       if (cancelTimer || stopped) return;
       cancelTimer = options.schedule ? options.schedule(tick) : (() => { const timer = setInterval(tick, 60000); timer.unref(); return () => clearInterval(timer); })();

@@ -1,6 +1,7 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const zhTW = {
+  versionUpdates: en.versionUpdates,
   coding: {
     ...en.coding,
     more: "更多",

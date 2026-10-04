@@ -5,3 +5,4 @@ export const app = {
 };
 
 export const shell = { openExternal: async () => undefined };
+export const net = { fetch: async () => { throw new Error("Network forbidden in updater fixture"); } };

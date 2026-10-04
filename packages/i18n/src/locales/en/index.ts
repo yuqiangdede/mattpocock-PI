@@ -1,6 +1,48 @@
 import { engineeringSkillGuides } from "./engineering-skill-guides.js";
 
 export const en = {
+  versionUpdates: {
+  "title": "Versions and updates",
+  "hint": "Check both sources; downloads and installation require explicit actions.",
+  "checkAll": "Check all updates",
+  "skills": "Matt Pocock skills",
+  "skillsHint": "Back up before updating; preserve local changes.",
+  "app": "mattpocock-PI",
+  "appHint": "Update the current application from its own release channel.",
+  "current": "Current",
+  "latest": "Latest release",
+  "working": "Working…",
+  "available": "Update available",
+  "currentStatus": "Up to date",
+  "unchecked": "Not checked",
+  "check": "Check updates",
+  "updateSkills": "Update skills",
+  "restore": "Restore last backup",
+  "view": "View release notes",
+  "preserved": "Preserved local changes",
+  "removed": "Removed unmodified upstream-deleted skills: {{names}}.",
+  "updated": "Updated {{count}} skills; preserved {{preserved}}.",
+  "restored": "Restored {{count}} skills; preserved {{preserved}}.",
+  "channel": "Update channel",
+  "stable": "Stable",
+  "prerelease": "Prerelease",
+  "download": "Download update",
+  "restart": "Restart and update",
+  "manualHint": "The verified download will open in its folder. Exit the app, then replace the Portable/ZIP files manually.",
+  "development": "Development builds cannot install application updates.",
+  "noRelease": "No release is available for this channel.",
+  "tasksRunning": "Wait for running tasks before updating skills, restoring a backup, or restarting.",
+  "appStatus": {
+    "idle": "Not checked",
+    "checking": "Checking…",
+    "available": "Update available",
+    "up-to-date": "Up to date",
+    "downloading": "Downloading…",
+    "downloaded": "Download complete",
+    "error": "Update failed; check again to retry"
+  }
+},
+
   coding: {
     groups: {
       exploration: "Requirements and exploration",

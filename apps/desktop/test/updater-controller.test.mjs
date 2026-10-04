@@ -19,6 +19,7 @@ class FakeUpdater extends EventEmitter {
   nextVersion = "0.16.1";
   downloadStarts = [];
   cancellations = [];
+  downloadStarted = new Promise(resolve => { this.markDownloadStarted = resolve; });
 
   setFeedURL(feed) { this.feed = feed; }
 
@@ -45,7 +46,9 @@ class FakeUpdater extends EventEmitter {
   }
 
   async downloadUpdate() {
-    return [];
+    this.downloadStarts.push(this.nextVersion);
+    this.markDownloadStarted();
+    return new Promise((_resolve, reject) => { this.rejectDownload = reject; });
   }
 
   quitAndInstall() {}
@@ -76,10 +79,15 @@ test("dismissing an in-app update cancels its download and disables install on q
   });
 
   await controller.check();
+  assert.deepEqual(updater.downloadStarts, []);
+  const download = controller.download();
+  await updater.downloadStarted;
   assert.deepEqual(updater.downloadStarts, ["0.16.1"]);
   assert.equal(controller.getState().status, "downloading");
 
   await controller.dismiss();
+  updater.rejectDownload(new Error("cancelled"));
+  await download;
 
   assert.deepEqual(updater.cancellations, ["0.16.1"]);
   assert.equal(updater.autoDownload, false);
@@ -90,7 +98,7 @@ test("dismissing an in-app update cancels its download and disables install on q
   controller.dispose();
 });
 
-test("a restored dismissal blocks that release and a newer release resumes automatic delivery", async () => {
+test("a restored dismissal blocks that notice and a newer release requires explicit delivery", async () => {
   const updater = new FakeUpdater();
   const persisted = [];
   let clearDismissal;
@@ -115,9 +123,9 @@ test("a restored dismissal blocks that release and a newer release resumes autom
   updater.nextVersion = "0.16.2";
   await controller.check();
   await cleared;
-  assert.deepEqual(updater.downloadStarts, ["0.16.2"]);
-  assert.equal(updater.autoDownload, true);
-  assert.equal(updater.autoInstallOnAppQuit, true);
+  assert.deepEqual(updater.downloadStarts, []);
+  assert.equal(updater.autoDownload, false);
+  assert.equal(updater.autoInstallOnAppQuit, false);
   assert.equal(controller.getState().dismissed, false);
   assert.deepEqual(persisted, [null]);
   controller.dispose();

@@ -22,7 +22,7 @@ export async function resolve(specifier, context, nextResolve) {
     return { url: "data:text/javascript," + encodeURIComponent('export * from ' + JSON.stringify(shared) + '; export const APP_MANUAL_UPDATES_ONLY = false;'), shortCircuit: true };
   }
   if (specifier === "./skill-market-catalog" && context.parentURL?.endsWith("/updater.ts")) {
-    return { url: "data:text/javascript," + encodeURIComponent('export async function fetchVersionSource() { throw new Error("Network forbidden in updater fixture"); }'), shortCircuit: true };
+    return { url: "data:text/javascript," + encodeURIComponent('export async function fetchVersionSource() { throw new Error("Network forbidden in updater fixture"); } export async function assertPublicUpdateUrl() { throw new Error("Network forbidden in updater fixture"); }'), shortCircuit: true };
   }
   return nextResolve(specifier, context);
 }

@@ -82,6 +82,7 @@ export const IPC = {
     versionSourcesOpen: "pi-desktop/versionSources/open",
     updatesCheck: "pi-desktop/updates/check",
     updatesDownload: "pi-desktop/updates/download",
+    updatesSetChannel: "pi-desktop/updates/setChannel",
     updatesInstall: "pi-desktop/updates/install",
     updatesOpenReleases: "pi-desktop/updates/openReleases",
     /** Persist the user's decision to stop nudging about one version (#1317). */
@@ -340,6 +341,7 @@ export const IPC = {
     skillBundleStatus: "pi-desktop/skill/bundle/status",
     skillBundleCheck: "pi-desktop/skill/bundle/check",
     skillBundleUpdate: "pi-desktop/skill/bundle/update",
+    skillBundleRestore: "pi-desktop/skill/bundle/restore",
     skillCreate: "pi-desktop/skill/create",
     skillImport: "pi-desktop/skill/import",
     skillImportScan: "pi-desktop/skill/importScan",

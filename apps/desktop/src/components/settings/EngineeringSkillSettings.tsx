@@ -12,6 +12,7 @@ export function EngineeringSkillSettings({ onUpdated }: { onUpdated: () => Promi
   const { t } = useTranslation();
   const prompts = useAppStore(state => state.settings?.engineeringShortcutPrompts);
   const mode = useAppStore(state => state.settings?.engineeringSkillUpdateMode ?? "auto-check");
+  const tasksRunning = useAppStore(state => Object.values(state.runningSessions).some(Boolean));
   const [action, setAction] = useState<EngineeringShortcutAction>("ask");
   const defaults = t(`coding.prompts.${action}`);
   const saved = resolveShortcutInstruction(action, defaults, prompts);
@@ -95,13 +96,14 @@ export function EngineeringSkillSettings({ onUpdated }: { onUpdated: () => Promi
         <Button disabled={Boolean(working)} onClick={() => void check()}>{t("settings.engineering.check")}</Button>
       </SettingsRow>
       <SettingsRow title={t("settings.engineering.latest")} detail={status?.latestRevision ?? t("settings.engineering.notChecked")}>
-        <Button disabled={Boolean(working)} onClick={() => void update()}>{t("settings.updateEngineeringSkills")}</Button>
+        <Button disabled={Boolean(working || tasksRunning)} onClick={() => void update()}>{t("settings.updateEngineeringSkills")}</Button>
       </SettingsRow>
       <SettingsRow title={t("settings.engineering.lastCheck")} detail={status?.checkedAt ? new Date(status.checkedAt).toLocaleString() : t("settings.engineering.notChecked")}>
         <span role="status">{working ? t("settings.engineering.working") : status?.error ? t("settings.engineering.checkFailed") : available ? t("settings.engineering.available") : status?.latestRevision ? t("settings.engineering.current") : ""}</span>
       </SettingsRow>
       {Boolean(status?.preserved?.length) && <SettingsRow title={t("settings.engineering.preserved")} detail={status!.preserved!.join(", ")}><span>{t("settings.engineering.preservedHint")}</span></SettingsRow>}
     </SettingsCard>
+    {tasksRunning && <div role="status">{t("versionUpdates.tasksRunning")}</div>}
     {error && <div role="alert">{t("coding.error")}: {error}</div>}
   </>;
 }

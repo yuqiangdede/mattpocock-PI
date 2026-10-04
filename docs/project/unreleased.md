@@ -1,5 +1,12 @@
 # Unreleased changes
 
+- Settings > Info now updates the Matt Pocock skill bundle and mattpocock-PI
+  independently, with stable/prerelease channels. The upstream comparison row
+  is removed. Skill updates snapshot the previous catalog, preserve local edits,
+  and offer Restore last backup. Running tasks block skill maintenance and app
+  restart. Windows installs explicitly download and restart; Portable/ZIP
+  downloads are checksum-verified and revealed for manual replacement.
+
 - Coding Workbench prioritizes Ask next step, Discuss requirements, Implement,
   Diagnose bug and Review code in the first Composer row. Workflow navigation
   and More occupy a subdued second row; More groups occasional skills, including

@@ -1,15 +1,12 @@
 /**
- * App auto-update via electron-updater against GitHub Releases.
+ * Explicit fork updates via electron-updater against GitHub Releases.
  *
- * The feed (latest*.yml + installers) is attached to each GitHub Release by
- * .github/workflows/release.yml. Discovery always tracks the latest stable
- * release (`allowPrerelease = false`) so RC installs still graduate to newer
- * stables. Delivery mode per install:
- *  - Windows NSIS / Linux AppImage / packaged macOS → full in-app flow: silent
- *    background download, "restart to update" prompt, install-on-quit fallback.
+ * Release manifests and installers must be published together. Discovery follows
+ * the persisted stable/prerelease choice without allowing downgrades.
+ *  - Windows NSIS / Linux AppImage / packaged macOS: explicit download and restart.
  *  - Windows ZIP / legacy portable (`piDistribution = "zip"` or
- *    `PORTABLE_EXECUTABLE_FILE`) → notify + link. The
- *    NSIS installer must not replace a no-install run.
+ *    `PORTABLE_EXECUTABLE_FILE`): verified download for manual replacement.
+ *    These formats never execute an NSIS installer.
  *  - Linux deb (no $APPIMAGE in env) → notify + link.
  *  - Unpackaged dev runs → disabled (no app-update.yml in resources).
  *
@@ -20,15 +17,17 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { app, shell } from "electron";
+import { app, shell, net } from "electron";
 import electronUpdaterPkg from "electron-updater";
 import type { AppUpdater, UpdateInfo, ProgressInfo } from "electron-updater";
+import type { AppUpdaterEvents } from "electron-updater/out/AppUpdater";
 import {
   formatChangelogNotes,
   IPC,
   APP_REPOSITORY,
   APP_MANUAL_UPDATES_ONLY,
   type UpdatePreference,
+  type UpdateChannel,
   type UpdateState,
 } from "@pi-desktop/shared";
 import type { Logger } from "./logger";
@@ -53,8 +52,9 @@ import {
   type WindowsDistribution,
 } from "./update-policy";
 import { ManualUpdateReminderTracker } from "./manual-update-reminder";
-import { createVersionSourceChecker } from "./version-sources";
-import { fetchVersionSource } from "./skill-market-catalog";
+import { createVersionSourceChecker, compareReleaseVersions } from "./version-sources";
+import { fetchVersionSource, assertPublicUpdateUrl } from "./skill-market-catalog";
+import { downloadManualUpdate, selectManualUpdateArtifact } from "./manual-update-download";
 
 export { resolveUpdateMode } from "./update-policy";
 export type { WindowsDistribution } from "./update-policy";
@@ -86,6 +86,7 @@ export const AUTO_CHECK_TIMEOUT_MS = 8_000;
 export const MANUAL_CHECK_TIMEOUT_MS = 15_000;
 
 export type UpdaterSettings = {
+  updateChannel?: unknown;
   updatePreference?: unknown;
   lastNotifiedUpdateVersion?: unknown;
   updateDismissedVersion?: unknown;
@@ -97,6 +98,7 @@ export type UpdaterOptions = {
   currentVersion: string;
   readUpdateSettings?: () => Promise<UpdaterSettings>;
   persistLastNotifiedVersion?: (version: string) => Promise<void>;
+  persistChannel?: (channel: UpdateChannel) => Promise<void>;
   /** Persists the version whose update notice the user dismissed (#1317). */
   persistDismissedVersion?: (version: string | null) => Promise<void>;
   /** Overrides the Electron singleton in controller tests. */
@@ -161,6 +163,14 @@ export class AppUpdaterController {
   private readonly autoUpdater: AppUpdater;
   private readonly cacheMaintenance: UpdateCacheMaintenance;
   private readonly versionSources: ReturnType<typeof createVersionSourceChecker>;
+  private channel: UpdateChannel;
+  private readonly persistChannel?: (channel: UpdateChannel) => Promise<void>;
+  private pendingDownload: Promise<UpdateState> | null = null;
+  private manualDownloadAbort: AbortController | null = null;
+  private changingChannel = false;
+  private feedCheck: ReturnType<AppUpdater["checkForUpdates"]> | null = null;
+  private downloadCancellationToken?: NonNullable<Awaited<ReturnType<AppUpdater["checkForUpdates"]>>>["cancellationToken"];
+  private listenerCleanup: Array<() => void> = [];
 
   private readPackagedDistribution(
     isPackaged: boolean,
@@ -190,7 +200,9 @@ export class AppUpdaterController {
   }
 
   constructor(options: UpdaterOptions) {
-    this.versionSources = createVersionSourceChecker({ request: fetchVersionSource, appVersion: options.currentVersion, skillVersion: async () => null });
+    this.channel = options.currentVersion.includes("-") ? "prerelease" : "stable";
+    this.persistChannel = options.persistChannel;
+    this.versionSources = createVersionSourceChecker({ request: fetchVersionSource, appVersion: options.currentVersion, skillVersion: async () => null, getChannel: () => this.channel });
     this.logger = options.logger;
     this.send = options.send;
     this.getLocale = options.getLocale ?? (() => "en");
@@ -205,19 +217,20 @@ export class AppUpdaterController {
     this.isPackaged = isPackaged;
     this.env = process.env;
     this.distribution = distribution;
-    this.defaultPreference = APP_MANUAL_UPDATES_ONLY ? "manual" : resolveDefaultUpdatePreference(
+    this.defaultPreference = resolveDefaultUpdatePreference(
       platform,
       isPackaged,
       this.env,
       distribution,
     );
     this.preference = this.defaultPreference;
-    this.automaticSupported = !APP_MANUAL_UPDATES_ONLY && supportsAutomaticUpdates(
+    this.automaticSupported = (platform !== "win32" || distribution === "installed") && supportsAutomaticUpdates(
       platform,
       isPackaged,
       this.env,
-    );
+    ) && resolveUpdateModePolicy(platform, isPackaged, this.env, distribution, "automatic") === "in-app";
     this.readUpdateSettings = options.readUpdateSettings;
+    this.preference = resolveEffectiveUpdatePreference(this.preference, this.automaticSupported);
     this.persistLastNotifiedVersion = options.persistLastNotifiedVersion;
     this.persistDismissedVersion = options.persistDismissedVersion;
     const mode = resolveUpdateModePolicy(
@@ -262,6 +275,8 @@ export class AppUpdaterController {
       logger: this.logger,
     });
     this.state = {
+      channel: this.channel,
+      manualDownloadSupported: platform === "win32" && isPackaged && (distribution === "zip" || distribution === "portable" || Boolean(this.env.PORTABLE_EXECUTABLE_FILE)),
       mode,
       preference: this.preference,
       defaultPreference: this.defaultPreference,
@@ -287,12 +302,19 @@ export class AppUpdaterController {
     const preferenceRevision = this.preferenceRevision;
     this.settingsReady = (async () => {
       if (!this.readUpdateSettings) {
-        this.applyPreference(this.preference, false);
+        this.applyPreference(this.preference);
         return;
       }
       try {
         const settings = await this.readUpdateSettings();
         if (this.disposed) return;
+        if (settings.updateChannel === "stable" || settings.updateChannel === "prerelease") {
+          this.channel = settings.updateChannel;
+          this.autoUpdater.channel = this.channel === "prerelease" ? "alpha" : "latest";
+          this.autoUpdater.allowPrerelease = this.channel === "prerelease";
+          this.autoUpdater.allowDowngrade = false;
+          this.setState({ channel: this.channel });
+        }
         const lastNotifiedVersion = settings.lastNotifiedUpdateVersion;
         if (
           typeof lastNotifiedVersion === "string" &&
@@ -317,14 +339,14 @@ export class AppUpdaterController {
           this.defaultPreference,
         );
         if (preferenceRevision === this.preferenceRevision) {
-          this.applyPreference(preference, false);
+          this.applyPreference(preference);
         }
       } catch (error) {
         this.logger.app("updater", "warn", "update preferences unavailable", {
           data: { detail: String(error) },
         });
         if (preferenceRevision === this.preferenceRevision) {
-          this.applyPreference("manual", false);
+          this.applyPreference("manual");
         }
       }
     })();
@@ -345,7 +367,6 @@ export class AppUpdaterController {
 
   private applyPreference(
     preference: UpdatePreference,
-    checkImmediately: boolean,
   ): void {
     const previousMode = this.state.mode;
     const effectivePreference = resolveEffectiveUpdatePreference(
@@ -362,11 +383,8 @@ export class AppUpdaterController {
     const preferenceChanged =
       effectivePreference !== this.preference || mode !== previousMode;
     this.preference = effectivePreference;
-    const dismissed =
-      this.state.availableVersion !== undefined &&
-      this.dismissedVersion === this.state.availableVersion;
-    this.autoUpdater.autoDownload = mode === "in-app" && !dismissed;
-    this.autoUpdater.autoInstallOnAppQuit = mode === "in-app" && !dismissed;
+    this.autoUpdater.autoDownload = false;
+    this.autoUpdater.autoInstallOnAppQuit = false;
     if (!preferenceChanged) return;
 
     const patch: Partial<UpdateState> = {
@@ -389,19 +407,13 @@ export class AppUpdaterController {
       }
     }
     this.setState(patch);
-    if (
-      checkImmediately &&
-      previousMode === "manual" &&
-      mode === "in-app"
-    ) {
-      void this.check().catch(() => undefined);
-    }
   }
 
   setPreference(preference: UpdatePreference): void {
     if (preference !== "automatic" && preference !== "manual") return;
+    if (this.pendingDownload || this.state.status === "downloaded") throw new Error("Finish the current update before changing delivery preferences");
     this.preferenceRevision += 1;
-    this.applyPreference(preference, true);
+    this.applyPreference(preference);
   }
 
   /**
@@ -428,6 +440,10 @@ export class AppUpdaterController {
     if (this.activeDownloadCancellation?.version === version) {
       this.activeDownloadCancellation.cancel();
       this.activeDownloadCancellation = undefined;
+    }
+    if (this.pendingDownload) {
+      this.downloadCancellationToken?.cancel();
+      this.manualDownloadAbort?.abort();
     }
     await this.persistDismissedVersionInOrder(version);
   }
@@ -466,6 +482,10 @@ export class AppUpdaterController {
   private attachListeners() {
     if (this.listenersAttached) return;
     this.listenersAttached = true;
+    const listen = <Event extends keyof AppUpdaterEvents>(event: Event, listener: AppUpdaterEvents[Event]) => {
+      this.autoUpdater.on(event, listener);
+      this.listenerCleanup.push(() => this.autoUpdater.removeListener(event, listener));
+    };
 
     // Do not let cached updates download or install before Host preferences load.
     this.autoUpdater.autoDownload = false;
@@ -475,7 +495,10 @@ export class AppUpdaterController {
     // GitHub provider to the same custom channel ("rc") and never offers a
     // newer stable release such as 0.2.2. Always track GitHub's latest
     // stable release so RC installs can graduate to stable.
-    this.autoUpdater.allowPrerelease = false;
+    this.autoUpdater.allowPrerelease = this.channel === "prerelease";
+    // GitHub's alpha lane admits all prerelease families, including beta/rc.
+    this.autoUpdater.channel = this.channel === "prerelease" ? "alpha" : "latest";
+    this.autoUpdater.allowDowngrade = false;
     // Only automatic mode may install on quit; manual mode never hands an
     // installer a no-install/portable directory.
     this.autoUpdater.logger = {
@@ -497,34 +520,37 @@ export class AppUpdaterController {
         }),
     };
 
-    this.autoUpdater.on("checking-for-update", () => {
+    listen("checking-for-update", () => {
       this.setState({ status: "checking", error: undefined });
     });
-    this.autoUpdater.on("update-available", (info: UpdateInfo) => {
+    listen("update-available", (info: UpdateInfo) => {
+      if (compareReleaseVersions(info.version, this.state.currentVersion) !== 1) {
+        this.setState({ status: "up-to-date", latestVersion: info.version, availableVersion: undefined, manualReminder: false });
+        return;
+      }
       // A newly discovered version supersedes any earlier dismissal.
       if (this.dismissedVersion && this.dismissedVersion !== info.version) {
         this.dismissedVersion = undefined;
         void this.persistDismissedVersionInOrder(null);
       }
       const dismissed = this.dismissedVersion === info.version;
-      const automatic = this.state.mode === "in-app" && !dismissed;
-      this.autoUpdater.autoDownload = automatic;
-      this.autoUpdater.autoInstallOnAppQuit = automatic;
+      this.autoUpdater.autoDownload = false;
+      this.autoUpdater.autoInstallOnAppQuit = false;
       this.setState({
-        status: automatic ? "downloading" : "available",
+        status: "available",
         availableVersion: info.version,
+        latestVersion: info.version,
         releaseNotes: this.notesFor(info.version),
-        progressPercent: automatic ? 0 : undefined,
+        progressPercent: undefined,
+        manualReminder: this.state.mode === "manual" && this.manualReminderFor(info.version),
         dismissed,
-        manualReminder: automatic
-          ? false
-          : this.manualReminderFor(info.version),
       });
     });
-    this.autoUpdater.on("update-not-available", () => {
+    listen("update-not-available", (info: UpdateInfo) => {
       this.setState({
         status: "up-to-date",
         availableVersion: undefined,
+        latestVersion: info.version,
         releaseNotes: undefined,
         progressPercent: undefined,
         manualReminder: false,
@@ -536,7 +562,7 @@ export class AppUpdaterController {
         void this.cacheMaintenance.discardDownloadedInstaller();
       }
     });
-    this.autoUpdater.on("download-progress", (progress: ProgressInfo) => {
+    listen("download-progress", (progress: ProgressInfo) => {
       if (this.state.mode !== "in-app") return;
       if (this.dismissedVersion === this.state.availableVersion) return;
       this.setState({
@@ -547,11 +573,11 @@ export class AppUpdaterController {
         progressPercent: Math.round(progress.percent),
       });
     });
-    this.autoUpdater.on("update-downloaded", (info: UpdateInfo) => {
+    listen("update-downloaded", (info: UpdateInfo) => {
       const dismissed = this.dismissedVersion === info.version;
       const automatic = this.state.mode === "in-app" && !dismissed;
       this.activeDownloadCancellation = undefined;
-      this.autoUpdater.autoInstallOnAppQuit = automatic;
+      this.autoUpdater.autoInstallOnAppQuit = false;
       this.setState({
         status: automatic ? "downloaded" : "available",
         availableVersion: info.version,
@@ -563,7 +589,7 @@ export class AppUpdaterController {
           : this.manualReminderFor(info.version),
       });
     });
-    this.autoUpdater.on("update-cancelled", (info: UpdateInfo) => {
+    listen("update-cancelled", (info: UpdateInfo) => {
       if (this.activeDownloadCancellation?.version === info.version) {
         this.activeDownloadCancellation = undefined;
       }
@@ -574,7 +600,7 @@ export class AppUpdaterController {
         dismissed: true,
       });
     });
-    this.autoUpdater.on("error", (error: Error) => {
+    listen("error", (error: Error) => {
       // Auto checks fail quietly (offline, private repo, rate limits);
       // the renderer only surfaces errors when `manual` is set.
       this.logger.app("updater", "warn", "updater error", { data: String(error) });
@@ -583,6 +609,7 @@ export class AppUpdaterController {
   }
 
   private setState(patch: Partial<UpdateState>) {
+    if (this.disposed) return;
     this.state = { ...this.state, ...patch, manual: this.manualRequested };
     this.send(IPC.event.updatesState, this.state);
   }
@@ -605,29 +632,23 @@ export class AppUpdaterController {
 
   /** User- or schedule-triggered check. Resolves with the settled state. */
   async check(options: { manual?: boolean } = {}): Promise<UpdateState> {
+    if (this.disposed || this.changingChannel) throw new Error("Updater unavailable");
     await this.ensureSettingsLoaded();
-    if (APP_MANUAL_UPDATES_ONLY) {
-      if (this.state.status === "checking") return this.state;
+    this.manualRequested = Boolean(options.manual);
+    if (this.state.status === "checking" || this.state.status === "downloading" || this.state.status === "downloaded") {
+      return this.state;
+    }
+    if (!this.automaticSupported) {
       this.setState({ status: "checking", error: undefined });
       const result = await this.versionSources.check("mattpocock-pi");
       this.setState({
-        mode: "manual", preference: "manual", automaticSupported: false,
         status: result.status === "error" || result.status === "no-release" ? "error" : result.status === "available" ? "available" : "up-to-date",
         availableVersion: result.status === "available" ? result.latestVersion ?? undefined : undefined,
+        latestVersion: result.latestVersion ?? undefined,
         releaseNotes: undefined,
-        error: result.status === "no-release" ? "mattpocock-PI 暂无可用发布" : result.error,
+        error: result.status === "no-release" ? "UPDATE_NO_RELEASE" : result.error,
         manualReminder: result.status === "available" && Boolean(options.manual),
       });
-      return this.state;
-    }
-    if (this.state.mode === "disabled") {
-      throw new Error("updates are disabled in development builds");
-    }
-    if (
-      this.state.status === "checking" ||
-      this.state.status === "downloading" ||
-      this.state.status === "downloaded"
-    ) {
       return this.state;
     }
     this.manualRequested = Boolean(options.manual);
@@ -639,10 +660,12 @@ export class AppUpdaterController {
       // first-window path. The race only bounds *our* wait; electron-updater
       // may still finish later and emit available/up-to-date.
       const checkPromise = this.autoUpdater.checkForUpdates();
-      void checkPromise.then(
-        (result) => this.trackAutomaticDownload(result),
-        () => undefined,
-      );
+      this.feedCheck = checkPromise;
+      void checkPromise.then(result => {
+        this.downloadCancellationToken = result?.cancellationToken;
+        this.trackAutomaticDownload(result);
+        if (this.disposed) this.downloadCancellationToken?.cancel();
+      }).finally(() => { if (this.feedCheck === checkPromise) this.feedCheck = null; }).catch(() => undefined);
       await raceWithTimeout(checkPromise, timeoutMs, "update check");
     } catch (error) {
       const timedOut =
@@ -671,13 +694,86 @@ export class AppUpdaterController {
 
   /** Explicit download for in-app installs when a check was manual-only. */
   async download(): Promise<UpdateState> {
-    if (this.state.mode !== "in-app") {
-      throw new Error("in-app download is not supported on this install");
+    if (this.pendingDownload) return this.pendingDownload;
+    if (this.disposed || this.changingChannel) throw new Error("Updater unavailable");
+    if (this.state.status !== "available") throw new Error("Check for a newer update before downloading");
+    if (this.state.mode !== "in-app" && !this.state.manualDownloadSupported) {
+      if (!this.automaticSupported || this.state.mode === "disabled") throw new Error("in-app download is not supported on this install");
     }
-    if (this.state.status === "downloading" || this.state.status === "downloaded") {
+    this.pendingDownload = (async () => {
+      if (this.dismissedVersion) {
+        this.dismissedVersion = undefined;
+        this.setState({ dismissed: false });
+        await this.persistDismissedVersionInOrder(null);
+      }
+      if (this.state.mode === "manual" && !this.state.manualDownloadSupported) {
+        this.applyPreference("automatic");
+        // Prime the installer lane with a feed-verified candidate.
+        await this.check({ manual: true });
+        if (this.getState().status !== "available") throw new Error("No feed-verified update available");
+      }
+      return this.performDownload();
+    })().finally(() => { this.pendingDownload = null; });
+    return this.pendingDownload;
+  }
+
+  private async performDownload(): Promise<UpdateState> {
+    this.setState({ status: "downloading", progressPercent: 0, error: undefined });
+    try {
+      if (this.state.mode === "in-app") {
+        await this.autoUpdater.downloadUpdate(this.downloadCancellationToken);
+      } else {
+        const version = this.state.availableVersion;
+        if (!version) throw new Error("No update version selected");
+        const releases = await fetchVersionSource(`https://api.github.com/repos/${APP_REPOSITORY}/releases?per_page=100`, "json");
+        if (this.disposed) throw new Error("Updater disposed");
+        if (this.dismissedVersion === version) throw new DOMException("Update download cancelled", "AbortError");
+        const release = Array.isArray(releases) ? releases.find(item => item && item.tag_name === version && item.draft === false) : undefined;
+        const artifact = selectManualUpdateArtifact(release, version, this.distribution === "zip" ? "zip" : "portable");
+        this.manualDownloadAbort = new AbortController();
+        const signal = AbortSignal.any([this.manualDownloadAbort.signal, AbortSignal.timeout(30 * 60 * 1000)]);
+        const path = await downloadManualUpdate({
+          artifact, directory: join(app.getPath("userData"), "cache", "updates"),
+          fetch: (url, init) => net.fetch(url, init), assertPublicUrl: assertPublicUpdateUrl,
+          progress: progressPercent => this.setState({ progressPercent }), signal,
+        });
+        if (this.disposed) throw new Error("Updater disposed");
+        this.setState({ status: "downloaded", progressPercent: 100 });
+        shell.showItemInFolder(path);
+      }
       return this.state;
-    }
-    await this.autoUpdater.downloadUpdate();
+    } catch (error) {
+      const cancelled = error instanceof Error && (error.name === "AbortError" || error.name === "CancellationError" || error.message === "cancelled");
+      if (cancelled && this.state.dismissed) {
+        this.setState({ status: "available", progressPercent: undefined, error: undefined });
+        return this.state;
+      }
+      this.setState({ status: "error", error: error instanceof Error ? error.message : String(error) });
+      throw error;
+    } finally { this.manualDownloadAbort = null; }
+  }
+
+  async setChannel(channel: UpdateChannel): Promise<UpdateState> {
+    if (channel !== "stable" && channel !== "prerelease") throw new Error("Invalid update channel");
+    if (this.disposed || this.changingChannel) throw new Error("Updater unavailable");
+    this.changingChannel = true;
+    try {
+      await this.ensureSettingsLoaded();
+      if (this.feedCheck || this.pendingDownload || this.state.status === "checking" || this.state.status === "downloading" || this.state.status === "downloaded") throw new Error("Finish the current update before switching channels");
+      if (this.channel === channel) return this.state;
+      await this.persistChannel?.(channel);
+      if (this.disposed) throw new Error("Updater disposed");
+      this.channel = channel;
+      this.autoUpdater.channel = channel === "prerelease" ? "alpha" : "latest";
+      this.autoUpdater.allowPrerelease = channel === "prerelease";
+      this.autoUpdater.allowDowngrade = false;
+      this.setState({ channel, status: "idle", latestVersion: undefined, availableVersion: undefined, progressPercent: undefined, error: undefined, manualReminder: false });
+      return this.state;
+    } finally { this.changingChannel = false; }
+  }
+
+  async readyState(): Promise<UpdateState> {
+    await this.ensureSettingsLoaded();
     return this.state;
   }
 
@@ -694,14 +790,19 @@ export class AppUpdaterController {
 
   /** Quit and install a downloaded update (in-app mode). */
   install(): void {
-    if (this.state.mode !== "in-app" || this.state.status !== "downloaded") {
+    if (this.disposed || this.installRequested || this.state.mode !== "in-app" || this.state.status !== "downloaded") {
       throw new Error("no downloaded update to install");
     }
     // Marked before the call: quitAndInstall spawns the installer itself, so
     // the shutdown handler must already know this quit is the update restart.
     this.installRequested = true;
     // Fires 'before-quit' first, so host/sidecar shutdown still runs.
-    this.autoUpdater.quitAndInstall(false, true);
+    try {
+      this.autoUpdater.quitAndInstall(false, true);
+      // electron-updater reports synchronous refusal through an error event.
+      if (this.getState().status === "error") throw new Error(this.getState().error ?? "Update installer failed");
+    }
+    catch (error) { this.installRequested = false; throw error; }
   }
   /** Adopt legacy NSIS cache files before the first update check. */
   reclaimRelocatedUpdateCache(): Promise<void> {
@@ -737,6 +838,9 @@ export class AppUpdaterController {
 
   dispose() {
     this.disposed = true;
+    this.manualDownloadAbort?.abort();
+    this.downloadCancellationToken?.cancel();
+    for (const remove of this.listenerCleanup.splice(0)) remove();
     if (this.initialTimer) clearTimeout(this.initialTimer);
     if (this.intervalTimer) clearInterval(this.intervalTimer);
     this.initialTimer = null;

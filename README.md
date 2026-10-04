@@ -763,3 +763,17 @@ See [LICENSE](LICENSE) for details.
 <sub>Local-first · Model-agnostic · Plugin-powered</sub>
 
 </div>
+
+### mattpocock-PI update controls
+
+Settings > Info exposes independent updates for the application and the Matt
+Pocock skill bundle. Checking never installs anything. Skill updates back up
+the current bundle and preserve local edits; Restore last backup retains edits
+made afterwards. Running tasks must finish before skill maintenance or restart.
+Installed Windows builds download then offer Restart and update. Portable/ZIP
+builds download a verified artifact and reveal it for manual replacement after
+exiting. Stable/prerelease channels never downgrade the installed application.
+
+See [update behavior and compatibility](docs/spec/01-product/executable-updates.md).
+Validate the feature with `node scripts/e2e-executable-updates.mjs` after the
+workspace packages, Desktop and Host have been built.

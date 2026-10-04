@@ -2,6 +2,48 @@ import { en, type EnglishCatalog } from "../en/index.js";
 import { engineeringSkillGuides } from "./engineering-skill-guides.js";
 
 export const zhCN = {
+  versionUpdates: {
+  "title": "版本与更新",
+  "hint": "分别检测技能包与应用；下载和安装均需手动操作。",
+  "checkAll": "检查全部更新",
+  "skills": "Matt Pocock 技能包",
+  "skillsHint": "更新前备份，保留本地修改。",
+  "app": "mattpocock-PI",
+  "appHint": "通过当前应用自身的发布渠道更新。",
+  "current": "当前",
+  "latest": "最新发布",
+  "working": "正在处理…",
+  "available": "有新版本",
+  "currentStatus": "已是最新",
+  "unchecked": "尚未检测",
+  "check": "检测更新",
+  "updateSkills": "更新技能包",
+  "restore": "恢复上次备份",
+  "view": "查看更新内容",
+  "preserved": "已保留的本地修改",
+  "removed": "已移除上游删除且未经修改的技能：{{names}}。",
+  "updated": "已更新 {{count}} 个技能，保留 {{preserved}} 个。",
+  "restored": "已恢复 {{count}} 个技能，保留 {{preserved}} 个。",
+  "channel": "更新渠道",
+  "stable": "稳定版",
+  "prerelease": "预发布版",
+  "download": "下载新版",
+  "restart": "重启并更新",
+  "manualHint": "下载校验完成后打开文件位置。请退出应用，再手动替换 Portable/ZIP 文件。",
+  "development": "开发版本不支持安装应用更新。",
+  "noRelease": "当前渠道暂无可用发布。",
+  "tasksRunning": "请等待运行中的任务结束，再更新技能、恢复备份或重启。",
+  "appStatus": {
+    "idle": "尚未检测",
+    "checking": "正在检测…",
+    "available": "有新版本",
+    "up-to-date": "已是最新",
+    "downloading": "正在下载…",
+    "downloaded": "下载完成",
+    "error": "更新失败，请重新检测后重试"
+  }
+},
+
   coding: {
     groups: {
       exploration: "需求与探索",

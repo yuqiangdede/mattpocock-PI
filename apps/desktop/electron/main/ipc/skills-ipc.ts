@@ -104,10 +104,23 @@ export function registerSkillsIpc({
   };
   let host: HostProcess | null = null;
   const updateEngineeringSkills = createEngineeringSkillUpdater({ getHost, fetchBundle: fetchEngineeringSkills, notify: () => sendToRenderer(IPC.event.pluginChanged, { reason: "skill" }) });
-  const checks = createEngineeringSkillChecks({ getHost, fetchRevision: checkEngineeringSkillRevision, update: updateEngineeringSkills, report: error => logger.app("runtime", "warn", "engineering skill check failed", { data: String(error) }) });
+  const checks = createEngineeringSkillChecks({
+    getHost, fetchRevision: checkEngineeringSkillRevision, update: updateEngineeringSkills,
+    restore: async () => {
+      const owner = getHost();
+      if (!owner) throw new Error("host unavailable");
+      const generation = owner.generation;
+      const result = await owner.call<{ revision: string; updated: string[]; preserved: string[] }>("skills.restoreBundled");
+      if (getHost() !== owner || owner.generation !== generation) throw new Error("host changed during skill restore");
+      sendToRenderer(IPC.event.pluginChanged, { reason: "skill" });
+      return result;
+    },
+    report: error => logger.app("runtime", "warn", "engineering skill check failed", { data: String(error) }),
+  });
   registrar.handle(IPC.invoke.skillBundleStatus, checks.status);
   registrar.handle(IPC.invoke.skillBundleCheck, checks.check);
   registrar.handle(IPC.invoke.skillBundleUpdate, checks.update);
+  registrar.handle(IPC.invoke.skillBundleRestore, checks.restore);
   void app.whenReady().then(() => checks.start());
   app.once("before-quit", () => checks.stop());
   const handle = (channel: string, fn: (...args: any[]) => Promise<any>) => {

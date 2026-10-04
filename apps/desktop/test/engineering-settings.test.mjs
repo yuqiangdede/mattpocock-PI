@@ -13,6 +13,7 @@ function fixture(initial = {}) {
     if (method === "settings.get") return structuredClone(settings);
     if (method === "settings.set") { validateEngineeringSettings(value); settings = { ...settings, ...structuredClone(value) }; return { ok: true }; }
     if (method === "skills.ensureBundled") return { revision };
+    if (method === "skills.getBundledVersion") return { revision, hasBackup: installs > 0, tasksRunning: false };
     throw new Error(method);
   } };
   let fetchRevision = async () => { fetches++; return sha; };

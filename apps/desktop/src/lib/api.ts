@@ -561,6 +561,7 @@ export const api = {
   updatesGetState: () => invoke<UpdateState>(IPC.invoke.updatesGetState),
   updatesCheck: () => invoke<UpdateState>(IPC.invoke.updatesCheck),
   updatesDownload: () => invoke<UpdateState>(IPC.invoke.updatesDownload),
+  updatesSetChannel: (channel: "stable" | "prerelease") => invoke<UpdateState>(IPC.invoke.updatesSetChannel, channel),
   updatesInstall: () => invoke(IPC.invoke.updatesInstall),
   updatesOpenReleases: () => invoke(IPC.invoke.updatesOpenReleases),
   updatesDismiss: () => invoke(IPC.invoke.updatesDismiss),
@@ -1192,7 +1193,8 @@ export const api = {
   engineeringSkillStatus: () => invoke<EngineeringSkillStatus>(IPC.invoke.skillBundleStatus),
   checkEngineeringSkills: (automatic = false) => invoke<EngineeringSkillStatus>(IPC.invoke.skillBundleCheck, { automatic }),
   setEngineeringSettings: (patch: { engineeringShortcutPrompts?: EngineeringShortcutPrompts; engineeringSkillUpdateMode?: EngineeringSkillUpdateMode }) => { validateEngineeringSettings(patch); return invoke(IPC.invoke.settingsSet, patch); },
-  updateEngineeringSkills: () => invoke<{ revision: string; updated: string[]; preserved: string[] }>(IPC.invoke.skillBundleUpdate),
+  updateEngineeringSkills: () => invoke<{ revision: string; updated: string[]; preserved: string[]; removed?: string[] }>(IPC.invoke.skillBundleUpdate),
+  restoreEngineeringSkills: () => invoke<{ revision: string; updated: string[]; preserved: string[]; removed: string[] }>(IPC.invoke.skillBundleRestore),
   listUserSkills: (query?: AgentCapabilityQuery) =>
     invoke<{ skills: UserSkillRecord[] }>(IPC.invoke.skillList, query),
   createUserSkill: (skill: UserSkillInput) =>

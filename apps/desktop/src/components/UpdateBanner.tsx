@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { UpdateState } from "@pi-desktop/shared";
 import { api } from "../lib/api";
 import { useUpdateState } from "../hooks/use-update-state";
+import { useAppStore } from "../stores/app-store";
 import { Button, TooltipButton } from "./ui";
 import { IconClose, IconCloudDown, IconExternal } from "./icons";
 
@@ -18,6 +19,7 @@ const shownManualReminderVersions = new Set<string>();
 export function UpdateBanner() {
   const { t } = useTranslation();
   const update = useUpdateState();
+  const tasksRunning = useAppStore(state => Object.values(state.runningSessions).some(Boolean));
   const manualReminderVersion =
     update?.status === "available" &&
     update.mode === "manual" &&
@@ -95,11 +97,12 @@ export function UpdateBanner() {
         )}
 
         <div className="update-notice-actions">
-          {update.status === "downloaded" && (
+          {update.status === "downloaded" && update.mode === "in-app" && (
             <Button
               variant="primary"
               size="sm"
-              onClick={() => void api.updatesInstall().catch(() => undefined)}
+              disabled={tasksRunning}
+              onClick={() => void api.updatesInstall().catch(error => useAppStore.getState().showToast(String(error), { variant: "error" }))}
             >
               {t("updates.restart")}
             </Button>

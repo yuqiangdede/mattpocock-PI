@@ -48,6 +48,8 @@ pub struct AppState {
     pub started_at: Instant,
     pub handshook: bool,
     pub shutting_down: bool,
+    /// Admission fence between an idle check and installer handoff.
+    pub update_installing: bool,
     /// session_id -> toolName grants
     pub session_grants: HashMap<String, Vec<String>>,
     /// executionId -> responder for plugin tool dispatches awaiting the
@@ -140,6 +142,7 @@ impl AppState {
             started_at: Instant::now(),
             handshook: false,
             shutting_down: false,
+            update_installing: false,
             session_grants: HashMap::new(),
             plugin_execs: HashMap::new(),
             plugin_import_rates: HashMap::new(),
@@ -254,7 +257,7 @@ impl AppState {
         session_id: &str,
         tool_call_id: &str,
     ) -> Result<tokio::sync::watch::Receiver<bool>, String> {
-        if self.shutting_down {
+        if self.shutting_down || self.update_installing {
             return Err("HOST_SHUTTING_DOWN".into());
         }
         self.prune_bash_abort_tombstones();

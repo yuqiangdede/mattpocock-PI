@@ -35,7 +35,7 @@ export type EngineeringShortcutAction = typeof ENGINEERING_SHORTCUTS[number]["ac
 export type EngineeringShortcutPrompts = Partial<Record<EngineeringShortcutAction, string | null>>;
 export type EngineeringSkillUpdateMode = "auto-check" | "manual";
 export type EngineeringSkillCheck = { attemptedAt: number; checkedAt?: number; latestRevision?: string; error?: string; preserved?: string[] };
-export type EngineeringSkillStatus = EngineeringSkillCheck & { revision: string; checking: boolean; updating: boolean };
+export type EngineeringSkillStatus = EngineeringSkillCheck & { revision: string; checking: boolean; updating: boolean; hasBackup?: boolean; tasksRunning?: boolean };
 export const ENGINEERING_PROMPT_MAX_LENGTH = 16000;
 export const ENGINEERING_CHECK_INTERVAL = 24 * 60 * 60 * 1000;
 

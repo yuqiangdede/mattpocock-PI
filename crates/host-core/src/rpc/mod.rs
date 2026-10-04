@@ -4,6 +4,7 @@ mod free_tasks;
 mod scheduled_rpc;
 mod scheduled_tools;
 mod todos;
+mod update_safety;
 mod workflows;
 
 use std::io::{self, BufRead, BufReader as StdBufReader, Read, Write};
@@ -1002,6 +1003,15 @@ fn validate_settings_value(value: &Value) -> Result<(), JsonRpcError> {
             ));
         }
     }
+    if let Some(channel) = object.get("updateChannel") {
+        if !matches!(channel.as_str(), Some("stable") | Some("prerelease")) {
+            return Err(rpc_err(
+                1002,
+                "updateChannel must be stable or prerelease",
+                "INVALID_PARAMS",
+            ));
+        }
+    }
     if let Some(version) = object.get("lastNotifiedUpdateVersion") {
         let Some(version) = version.as_str() else {
             return Err(rpc_err(
@@ -1726,6 +1736,13 @@ async fn handle_request(
         }
         if st.shutting_down {
             return Err(rpc_err(1001, "host is shutting down", "HOST_SHUTTING_DOWN"));
+        }
+        if st.update_installing && method != "updates.cancelInstall" {
+            return Err(rpc_err(
+                1008,
+                "application update is installing",
+                "UPDATE_INSTALLING",
+            ));
         }
     }
 
@@ -2962,6 +2979,13 @@ async fn handle_request(
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
+            if st.update_installing || st.shutting_down {
+                return Err(rpc_err(
+                    1008,
+                    "application update is installing",
+                    "UPDATE_INSTALLING",
+                ));
+            }
             let provider = params.get("providerId").and_then(Value::as_str);
             let model = params.get("modelId").and_then(Value::as_str);
             let turn_id = if let Some(id) = params.get("freeTaskId").and_then(Value::as_str) {
@@ -3634,7 +3658,7 @@ async fn handle_request(
 
             let durable_mode = {
                 let st = state.lock().await;
-                if st.shutting_down {
+                if st.shutting_down || st.update_installing {
                     return Err(rpc_err(1001, "host is shutting down", "HOST_SHUTTING_DOWN"));
                 }
                 sessions::session_mode(&st.db, &p.session_id)
@@ -3676,7 +3700,7 @@ async fn handle_request(
                     permission_shell_id,
                 ) = {
                     let mut st = state.lock().await;
-                    if st.shutting_down {
+                    if st.shutting_down || st.update_installing {
                         return Err(rpc_err(1001, "host is shutting down", "HOST_SHUTTING_DOWN"));
                     }
                     // Effective permission mode (D115): per-session override
@@ -4646,7 +4670,11 @@ async fn handle_request(
 
         "skills.getBundledVersion" => {
             let st = state.lock().await;
-            Ok(json!({ "revision": st.user_skills.bundled_revision().map_err(skill_err)? }))
+            Ok(json!({
+                "revision": st.user_skills.bundled_revision().map_err(skill_err)?,
+                "hasBackup": st.user_skills.bundled_has_backup().map_err(skill_err)?,
+                "tasksRunning": update_safety::tasks_running(&st)?
+            }))
         }
         "skills.ensureBundled" => {
             let mut st = state.lock().await;
@@ -4656,10 +4684,35 @@ async fn handle_request(
             let bundle = serde_json::from_value(params)
                 .map_err(|error| rpc_err(1002, error.to_string(), "INVALID_PARAMS"))?;
             let mut st = state.lock().await;
+            update_safety::assert_idle(&st)?;
             Ok(json!(st
                 .user_skills
                 .update_bundled(bundle)
                 .map_err(skill_err)?))
+        }
+        "skills.restoreBundled" => {
+            let mut st = state.lock().await;
+            update_safety::assert_idle(&st)?;
+            Ok(json!(st
+                .user_skills
+                .restore_bundled()
+                .map_err(skill_err)?))
+        }
+        "updates.assertIdle" => {
+            let st = state.lock().await;
+            update_safety::assert_idle(&st)?;
+            Ok(json!({ "ok": true }))
+        }
+        "updates.prepareInstall" => {
+            let mut st = state.lock().await;
+            update_safety::assert_idle(&st)?;
+            st.update_installing = true;
+            Ok(json!({ "ok": true }))
+        }
+        "updates.cancelInstall" => {
+            let mut st = state.lock().await;
+            st.update_installing = false;
+            Ok(json!({ "ok": true }))
         }
         "skills.list" => {
             let (level, project_path) = parse_capability_query(&params)?;

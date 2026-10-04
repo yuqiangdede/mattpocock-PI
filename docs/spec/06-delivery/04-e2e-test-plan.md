@@ -16651,6 +16651,35 @@ explicit current-task user request.
   `scripts/e2e-engineering-skills.mjs`, and the release acceptance probes.
   NSIS user-install/upgrade, updater, signing and clean-VM acceptance are
   separate qualification lanes; these probes do not alter an existing install.
+
+### Explicit fork and skill updates (2026-10-05)
+
+- Settings displays only Matt Pocock skills and mattpocock-PI. Check all updates
+  detects both without downloading. A successful skill update exposes its local
+  preservation list and Restore last backup. Restore switches atomically.
+- Running tasks disable skill update/restore and Restart and update. Real Host
+  RPCs reject those actions while a turn runs, including a turn admitted during
+  a pending download. The installer admission fence blocks new turns until
+  handoff or cancellation; cancellation reopens admission.
+- Stable/prerelease selection persists, invalidates old idle results and offers
+  only newer versions. Checks and normal quit never download or install.
+- Known Windows installed builds explicitly download then restart. Portable/ZIP
+  downloads verify the selected fork artifact's SHA256 and byte count, reveal
+  the file, and show manual replacement guidance without an install button.
+  Missing assets/checksums, blocked redirects, corrupt or incomplete downloads
+  fail visibly and never reveal a partial artifact.
+- Installer refusal delivered as an error event must reject the restart request,
+  clear the installation latch, and cancel Host admission fencing so the user
+  can continue working without restarting a blocked application.
+- Coverage: `executable-updates.test.mjs`, `version-sources.test.mjs`,
+  `engineering-settings.test.mjs`, `engineering-skill-update.test.mjs`,
+  Host bundled recovery tests, and `node scripts/e2e-executable-updates.mjs`.
+  The E2E script uses real Host RPCs plus the production React component in an
+  isolated Electron process, with a fixture preload boundary and local data.
+  Installer/network controller tests substitute only external Electron and
+  updater transports. Published-feed/real NSIS replacement, signing and clean-VM
+  qualification remain separate; no fixture result claims those passed.
+
 ### E2E-SYSTEM-TRANSCRIPT: Ordered model state survives restart and compaction
 
 - Fixture: isolated Host data directory, production AgentSidecar transport and
