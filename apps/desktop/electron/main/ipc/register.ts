@@ -26,6 +26,7 @@ import { registerProviderIpc } from "./provider-ipc";
 import { registerScheduledIpc } from "./scheduled-ipc";
 import { registerSessionIpc } from "./session-ipc";
 import { registerSettingsIpc } from "./settings-ipc";
+import { registerStorageIpc } from "../storage/ipc";
 import { registerConfigSyncIpc } from "./config-sync-ipc";
 import { registerSkillsIpc } from "./skills-ipc";
 import { registerAgentImportIpc } from "./agent-import-ipc";
@@ -63,6 +64,7 @@ export type RegisterIpcDependencies = {
   activeUserSubagentDocuments: (...args: any[]) => Promise<any>;
   disabledBuiltinSubagents: () => Promise<string[]>;
   liveCallService?: LiveCallService;
+  restartForStorage: () => void;
   mcpOAuth?: McpOAuthManager;
   [name: string]: any;
 };
@@ -240,6 +242,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     safeOpenExternal,
     updater,
   });
+  registerStorageIpc({ registrar, getMainWindow, restart: dependencies.restartForStorage });
   registerNotificationIpc({
     registrar,
     getHost,

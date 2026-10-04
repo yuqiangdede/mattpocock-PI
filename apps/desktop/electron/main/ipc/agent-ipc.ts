@@ -1,8 +1,9 @@
-import { IPC, ErrorCodes, compactionRecordId, findSkillMentions, isGlobalPermissionMode, isRpcTimeoutError, type AgentEventEnvelope, type AgentPromptRequest, type AgentSteerRequest, type UiMessage, type AgentQueuePushRequest, type AgentStopRequest, type AskToolResolution, type GlobalPermissionMode, type MessageUsage, type PlanExecutionFinishStatus, type PlanResolutionResult, type PlanResolveRequest, type PromptEnhancementRequest, type SessionSummarizeTitleRequest, type VoiceOrigin, canonicalThinkingLevel, type ThinkingLevel } from "@pi-desktop/shared";
+import { IPC, ErrorCodes, compactionRecordId, findSkillMentions, isGlobalPermissionMode, isRpcTimeoutError, type AgentEventEnvelope, type AgentPromptRequest, type AgentSteerRequest, type UiMessage, type AgentQueuePushRequest, type AgentStopRequest, type AskToolResolution, type PendingInteractiveRequests, type GlobalPermissionMode, type MessageUsage, type PlanExecutionFinishStatus, type PlanResolutionResult, type PlanResolveRequest, type PromptEnhancementRequest, type SessionSummarizeTitleRequest, type VoiceOrigin, canonicalThinkingLevel, type ThinkingLevel } from "@pi-desktop/shared";
 import type { FinishTurn } from "../runtime/plans";
 import { expandSlashInvocation, enhancePromptDraft, summarizeSessionTitle, visionFromModelConfig, type ComposerTemplate, type RuntimeProviderConfig } from "@pi-desktop/agent-runtime";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
 import { appendPromptFallbackPaths, durableUserMessageId, preparePromptAttachments, type PreparedPromptAttachment } from "../prompt-attachments";
+import { resolveSessionReferences } from "../session-references";
 import { executionFromResponse, resolveSessionMessageInput } from "@pi-desktop/host-runtime";
 import type { AgentExtensionBridge } from "../agent-extensions";
 import type { AgentHostBridge } from "../agent-host-bridge";
@@ -591,6 +592,19 @@ export function registerAgentIpc({
       });
       throw error;
     }
+    // A `pi-desktop://session/<id>` link in the draft becomes a bounded excerpt
+    // that travels with this message from now on (issue #1324). A skipped link
+    // stays plain text; nothing else about the prompt changes.
+    const sessionReferences = await resolveSessionReferences({
+      host,
+      logger,
+      sessionId: req.sessionId,
+      projectPath:
+        typeof session.projectPath === "string" && session.projectPath.trim()
+          ? session.projectPath.trim()
+          : undefined,
+      content: req.content,
+    });
     const modelContent = appendPromptFallbackPaths(
       promptContent,
       preparedAttachments,
@@ -617,8 +631,13 @@ export function registerAgentIpc({
       ...(sessionMessage ? { sessionMessage: sessionMessage.origin } : {}),
       createdAt: new Date().toISOString(),
       status: "complete" as const,
-      ...(preparedAttachments.length
-        ? { attachments: preparedAttachments.map((attachment) => attachment.message) }
+      ...(preparedAttachments.length || sessionReferences.length
+        ? {
+            attachments: [
+              ...preparedAttachments.map((attachment) => attachment.message),
+              ...sessionReferences,
+            ],
+          }
         : {}),
       ...(voiceOrigin ? { voiceOrigin } : {}),
       ...(slashCommand ? { command: slashCommand } : {}),
@@ -672,16 +691,26 @@ export function registerAgentIpc({
           turnId: durableTurnId,
           content: modelContent,
           ...(sessionMessage ? { sessionMessage: sessionMessage.origin } : {}),
-          attachments: preparedAttachments
-            .filter((attachment) => attachment.inlineData)
-            .map((attachment) => ({
-              path: attachment.message.ref,
-              name: attachment.message.name,
-              kind: attachment.message.kind,
-              mimeType: attachment.message.mimeType,
-              size: attachment.message.size,
-              data: attachment.inlineData,
+          attachments: [
+            ...preparedAttachments
+              .filter((attachment) => attachment.inlineData)
+              .map((attachment) => ({
+                path: attachment.message.ref,
+                name: attachment.message.name,
+                kind: attachment.message.kind,
+                mimeType: attachment.message.mimeType,
+                size: attachment.message.size,
+                data: attachment.inlineData,
+              })),
+            // A referenced conversation crosses the sidecar as quoted text for
+            // this turn; the durable record above keeps it for later turns.
+            ...sessionReferences.map((attachment) => ({
+              path: attachment.ref,
+              name: attachment.name,
+              kind: attachment.kind,
+              text: attachment.text,
             })),
+          ],
           userMessageId: userMessage.id,
           // Per-turn permission ceiling override (R1 leftover; spec §7.3). The
           // sidecar records it on the turn context; enforcement of a NARROWER
@@ -928,11 +957,33 @@ export function registerAgentIpc({
     const sessionId = String(resolution?.sessionId ?? "").trim();
     const requestId = String(resolution?.requestId ?? "").trim();
     if (!sessionId || !requestId) throw new Error("asktool resolution identity required");
+    // Prefer the Host-owned input path when it still holds this ask: it
+    // deletes the pending input before settling the sidecar, so switching
+    // windows back to the session cannot resurrect the answered card via
+    // `pendingInteractiveRequests`. Unknown requests keep the direct
+    // sidecar resolve for compatibility.
+    const settled = await agentHostBridge?.resolveAskByRequestId({
+      ...resolution,
+      sessionId,
+      requestId,
+    });
+    if (settled) return settled;
     return sidecar.call("asktool.resolve", {
       ...resolution,
       sessionId,
       requestId,
     });
+  });
+
+  handle(IPC.invoke.pendingInteractive, async (input: { sessionId?: string } = {}) => {
+    const sessionId = String(input.sessionId ?? "").trim();
+    if (!sessionId) {
+      throw Object.assign(new Error("sessionId required"), { errorCode: ErrorCodes.INVALID_ARGUMENT });
+    }
+    const empty: PendingInteractiveRequests = { asks: [], permissions: [] };
+    if (sessionId.startsWith("native-pi:")) return empty;
+    const bridge = getAgentHostBridge();
+    return bridge ? bridge.pendingInteractiveRequests(sessionId) : empty;
   });
 
   handle(IPC.invoke.plansPending, async (input: { sessionId?: string } = {}) => {
