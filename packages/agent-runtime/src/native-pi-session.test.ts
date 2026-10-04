@@ -1,6 +1,6 @@
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, basename } from "node:path";
+import { basename, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentSession, ModelRuntime, SessionManager } from "@earendil-works/pi-coding-agent";
 import { createAssistantMessageEventStream, type AssistantMessage } from "@earendil-works/pi-ai";
@@ -59,6 +59,24 @@ describe("NativePiSessionService", () => {
     const detail = service.detail(sessions[0].id);
     expect(detail?.messages.map((message) => message.content)).toEqual(["hello", "active branch"]);
     expect(readFileSync(f.file)).toEqual(before);
+  });
+
+  it("collapses copied session files onto one entry per native id (#1359)", async () => {
+    const f = fixture();
+    // A backup copy of the session under a subdirectory of the scan root:
+    // same header id, different path. It must not become a second session.
+    const backupDir = join(f.sessionRoot, "backup");
+    mkdirSync(backupDir, { recursive: true });
+    writeFileSync(join(backupDir, "fixture-copy.jsonl"), f.text);
+
+    // Control: without the copy, list() names the original file's id.
+    const control = new NativePiSessionService({ agentDir: f.agentDir, sessionRoot: f.sessionRoot });
+    const [original] = await control.list();
+
+    const service = new NativePiSessionService({ agentDir: f.agentDir, sessionRoot: f.sessionRoot });
+    const sessions = await service.list();
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].id).toBe(original.id);
   });
 
   it("searches native metadata and active-branch message text without rewriting JSONL", async () => {
@@ -543,9 +561,13 @@ describe("native fork children", () => {
       await expect.poll(() => service.status(child.id).status.isRunning).toBe(false);
       const after = readFileSync(childPath, "utf8");
       expect(after.startsWith(childBytes)).toBe(true);
-      const appended = after.split("\n").filter(Boolean).map((line) => JSON.parse(line));
-      expect(appended.filter((entry) => entry.type === "message" && entry.message.role === "user" && JSON.stringify(entry.message.content).includes("follow-up"))).toHaveLength(1);
-      expect(appended.filter((entry) => entry.type === "message" && entry.message.role === "assistant" && JSON.stringify(entry.message.content).includes("fixture reply"))).toHaveLength(1);
+      // 只计数持久化消息，父目录指令中的同名文字不代表重复用户消息。
+      const persisted = after.split("\n").filter(Boolean).map((line) => JSON.parse(line));
+      const countMessage = (role: string, text: string) => persisted.filter((entry) =>
+        entry.type === "message" && entry.message.role === role &&
+        entry.message.content.some((part: { type: string; text?: string }) => part.type === "text" && part.text === text));
+      expect(countMessage("user", "follow-up")).toHaveLength(1);
+      expect(countMessage("assistant", "fixture reply")).toHaveLength(1);
       const reopened = SessionManager.open(childPath);
       const branch = reopened.getBranch().filter((entry) => entry.type === "message");
       const visibleBranch = branch.filter((entry) => entry.message.role !== "system");

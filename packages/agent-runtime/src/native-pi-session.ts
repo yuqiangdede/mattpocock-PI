@@ -45,8 +45,9 @@ import {
   nativePiSnapshot,
   type NativePiSnapshot,
 } from "./native-pi-session-lease.js";
+import { NATIVE_PI_SESSION_PREFIX } from "./native-pi-session-id.js";
 
-export const NATIVE_PI_SESSION_PREFIX = "native-pi:";
+export { NATIVE_PI_SESSION_PREFIX };
 
 export type NativePiReadOnlyReason =
   | "busy"
@@ -546,7 +547,30 @@ export class NativePiSessionService {
         }
       }),
     );
-    return summaries
+    // A copied session file (backup, manual copy) under the scan root must
+    // not become a second session: identity follows the header id, not the
+    // path. Keep the newest write per native id and drop the stale copies
+    // from the records map so lookups cannot route to a dead duplicate
+    // (#1359).
+    const seenNativeIds = new Set<string>();
+    const deduped: Array<SessionSummary | undefined> = [];
+    const sortedByRecency = [...summaries].sort((a, b) =>
+      (b?.updatedAt ?? "").localeCompare(a?.updatedAt ?? ""),
+    );
+    const winnerIds = new Set<string>();
+    for (const summary of sortedByRecency) {
+      if (!summary) continue;
+      const record = this.records.get(summary.id);
+      if (!record) continue;
+      if (seenNativeIds.has(record.nativeId)) {
+        this.records.delete(summary.id);
+        continue;
+      }
+      seenNativeIds.add(record.nativeId);
+      winnerIds.add(summary.id);
+    }
+    deduped.push(...summaries.filter((summary) => summary && winnerIds.has(summary.id)));
+    return deduped
       .filter((session): session is SessionSummary => Boolean(session))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }

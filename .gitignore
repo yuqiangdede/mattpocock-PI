@@ -66,3 +66,6 @@ electron.vite.config.*.mjs
 worktrees
 
 /cache/engineering-settings/
+
+# 项目内更新报告、验证日志与临时数据
+/cache/

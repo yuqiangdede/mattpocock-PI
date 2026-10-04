@@ -12,6 +12,7 @@ use std::sync::{Mutex, OnceLock};
 use crate::transcripts::{self, CompactionRecord, MessageRecord, RevisionRecord};
 
 mod fork_files;
+mod model_system;
 mod usage;
 pub use usage::record_usage;
 
@@ -115,6 +116,13 @@ pub struct SessionSummary {
     pub permission_mode: String,
     pub updated_at: String,
     pub created_at: String,
+    /// True when this session is the transcript owned by a scheduled-task run.
+    /// Automation transcripts are entered from the Scheduled page, so the
+    /// sidebar and session search hide them (issue #1291). The value is derived
+    /// from `task_runs.session_id` on read; no session column stores it, and
+    /// deleting the task frees its sessions back into the ordinary lists.
+    #[serde(default)]
+    pub scheduled_run: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -146,6 +154,11 @@ pub struct MessageAttachment {
     pub mime_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<i64>,
+    /// Bounded excerpt of a referenced conversation (`kind: "session"`), written
+    /// by Electron main when the prompt carried a `pi-desktop://session/<id>`
+    /// link. Travels with the user message so the model keeps reading it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -230,6 +243,9 @@ pub struct UiMessage {
     /// as an additive `hostedSearch` transcript block; no SQL migration.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hosted_search: Option<Value>,
+    /// Internal model-context state, preserved outside visible message text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_system: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -309,6 +325,9 @@ fn is_default_title(title: &str) -> bool {
 /// the search index row (None for tool rows, matching the FTS triggers).
 pub(crate) fn ui_to_record(message: &UiMessage) -> (MessageRecord, Option<String>) {
     let mut meta_obj = serde_json::Map::new();
+    if let Some(system) = &message.model_system {
+        meta_obj.insert("modelSystem".into(), system.clone());
+    }
     if let Some(command) = &message.command {
         meta_obj.insert("command".into(), json!(command));
     }
@@ -432,6 +451,9 @@ pub(crate) fn ui_to_record(message: &UiMessage) -> (MessageRecord, Option<String
                 if let Some(size) = attachment.size {
                     block.insert("size".into(), json!(size));
                 }
+                if let Some(text) = &attachment.text {
+                    block.insert("text".into(), json!(text));
+                }
                 blocks.push(Value::Object(block));
             }
         }
@@ -458,6 +480,7 @@ pub(crate) fn record_to_ui(record: MessageRecord) -> UiMessage {
         _ => Vec::new(),
     };
     let meta = record.meta.unwrap_or(Value::Null);
+    let model_system = meta.get("modelSystem").cloned();
     let command = meta
         .get("command")
         .and_then(Value::as_str)
@@ -568,6 +591,10 @@ pub(crate) fn record_to_ui(record: MessageRecord) -> UiMessage {
                     .and_then(|v| v.as_str())
                     .map(str::to_string),
                 size: block.get("size").and_then(|v| v.as_i64()),
+                text: block
+                    .get("text")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
             })
         })
         .collect::<Vec<_>>();
@@ -627,6 +654,7 @@ pub(crate) fn record_to_ui(record: MessageRecord) -> UiMessage {
             nested_parent_tool_call_id,
             agent_name,
             hosted_search: hosted_search.clone(),
+            model_system: None,
         }
     } else {
         let content = blocks
@@ -671,6 +699,7 @@ pub(crate) fn record_to_ui(record: MessageRecord) -> UiMessage {
             nested_parent_tool_call_id,
             agent_name,
             hosted_search,
+            model_system,
         }
     }
 }
@@ -890,6 +919,19 @@ fn clone_records_for_fork(
                 .cloned()
                 .unwrap_or_else(|| Uuid::new_v4().to_string());
             if let Some(meta) = record.meta.as_mut().and_then(Value::as_object_mut) {
+                if let Some(system) = meta.get_mut("modelSystem").and_then(Value::as_object_mut) {
+                    for key in ["beforeMessageId", "afterMessageId"] {
+                        if let Some(new_id) = system
+                            .get(key)
+                            .and_then(Value::as_str)
+                            .and_then(|id| message_ids.get(id))
+                        {
+                            system.insert(key.into(), json!(new_id));
+                        } else {
+                            system.remove(key);
+                        }
+                    }
+                }
                 meta.remove("revisionRootId");
                 meta.remove("revisionCount");
                 meta.remove("activeRevision");
@@ -1175,7 +1217,8 @@ fn session_created_at(db: &Database, session_id: &str) -> Result<String> {
 
 const SUMMARY_SELECT: &str =
     "SELECT s.id, s.title, s.last_seq, p.path, s.model_id, s.provider_id, s.mode,
-            s.thinking_level, s.permission_mode, s.updated_at, s.created_at
+            s.thinking_level, s.permission_mode, s.updated_at, s.created_at,
+            EXISTS (SELECT 1 FROM task_runs r WHERE r.session_id = s.id) AS scheduled_run
      FROM sessions s LEFT JOIN projects p ON p.id = s.project_id
      WHERE s.deleted_at IS NULL";
 
@@ -1192,6 +1235,9 @@ pub(crate) fn summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Sess
         permission_mode: row.get(8)?,
         updated_at: ms_to_ts(row.get(9)?),
         created_at: ms_to_ts(row.get(10)?),
+        // Read by name: search and listing build their own column lists, so the
+        // alias keeps this mapper independent of any one query's column order.
+        scheduled_run: row.get("scheduled_run")?,
     })
 }
 
@@ -1357,6 +1403,8 @@ pub fn create_session_with_options(
         permission_mode,
         updated_at: ms_to_ts(now),
         created_at: ms_to_ts(now),
+        // The run row that owns this transcript is written after creation.
+        scheduled_run: false,
     })
 }
 
@@ -1717,6 +1765,8 @@ pub fn fork_session_through(
         permission_mode: source.summary.permission_mode,
         updated_at: created_at.clone(),
         created_at,
+        // A fork is the user's own conversation, not the automation's transcript.
+        scheduled_run: false,
     };
     let messages = records.into_iter().map(record_to_ui).collect();
     Ok(ForkSessionResult::Created(Box::new(SessionDetail {
@@ -1888,6 +1938,7 @@ pub fn append_message(
     message: &UiMessage,
     turn_id: Option<&str>,
 ) -> Result<()> {
+    model_system::validate(message)?;
     let message = crate::session_collaboration::prepare_append(db, session_id, message, turn_id)?;
     let session_created = ensure_session_for_append(db, session_id)?;
     let (mut record, text) = ui_to_record(&message);
@@ -3966,6 +4017,7 @@ mod tests {
             nested_parent_tool_call_id: None,
             agent_name: None,
             hosted_search: None,
+            model_system: None,
             session_message: None,
         }
     }
@@ -4454,6 +4506,8 @@ mod tests {
             mode: "agent".into(),
             thinking_level: "off".into(),
             permission_mode: "inherit".into(),
+            // Ownership is derived from `task_runs`, so an import is never one.
+            scheduled_run: false,
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-02T00:00:00Z".into(),
         };
@@ -4504,6 +4558,8 @@ mod tests {
             mode: "agent".into(),
             thinking_level: "off".into(),
             permission_mode: "inherit".into(),
+            // Ownership is derived from `task_runs`, so an import is never one.
+            scheduled_run: false,
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-01T00:00:00Z".into(),
         };
@@ -4614,6 +4670,7 @@ mod tests {
             nested_parent_tool_call_id: None,
             agent_name: None,
             hosted_search: None,
+            model_system: None,
             session_message: None,
         };
         append_message(&db, &session.id, &tool, None).unwrap();
@@ -4789,6 +4846,7 @@ mod tests {
             reference: "attachments/abc123".into(),
             mime_type: Some("image/png".into()),
             size: Some(42),
+            text: None,
         }]);
 
         append_message(&db, &session.id, &user, None).unwrap();
@@ -5128,6 +5186,7 @@ mod tests {
             nested_parent_tool_call_id: None,
             agent_name: None,
             hosted_search: None,
+            model_system: None,
             session_message: None,
         };
         append_message(&db, &session.id, &assistant, None).unwrap();
@@ -5207,6 +5266,7 @@ mod tests {
             parent_tool_call_id: None,
             nested_parent_tool_call_id: None,
             agent_name: None,
+            model_system: None,
             hosted_search: Some(json!({
                 "status": "completed",
                 "rounds": [
@@ -5329,6 +5389,8 @@ mod tests {
             mode: "agent".into(),
             thinking_level: "medium".into(),
             permission_mode: "inherit".into(),
+            // Ownership is derived from `task_runs`, so an import is never one.
+            scheduled_run: false,
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-01T00:00:00Z".into(),
         };
