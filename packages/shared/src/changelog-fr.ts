@@ -5,7 +5,7 @@ export const frEntries: ChangelogEntry[] = [
     "version": "0.16.0",
     "date": "2026-10-01",
     "highlights": [
-      "Compétences Matt intégrées, instructions de raccourcis configurables et détection automatique des versions ; les mises à jour manuelles préservent les modifications locales.",
+      "Compétences Matt intégrées, instructions de raccourcis configurables, conseils d’utilisation et exemples, et détection automatique des versions ; les mises à jour manuelles préservent les modifications locales.",
       "Enregistrez et ouvrez les références aux artefacts liées aux révisions, en conservant les fichiers historiques et indisponibles.",
       "Workflows d’ingénierie par projet avec six étapes de skills, acceptation explicite et reprise sûre.",
       "Live Voice est désormais accessible à tous et les appels démarrent dans la conversation en cours.",

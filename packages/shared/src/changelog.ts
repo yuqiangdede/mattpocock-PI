@@ -33,7 +33,7 @@ const enEntries: ChangelogEntry[] = [
     version: "0.16.0",
     date: "2026-10-01",
     highlights: [
-      "Bundle Matt engineering skills, configurable shortcut instructions and automatic version detection, with manual updates that preserve local changes.",
+      "Bundle Matt engineering skills, configurable shortcut instructions, usage guidance and examples, and automatic version detection, with manual updates that preserve local changes.",
       "Register and open revision-associated engineering artifact references, retaining historical and unavailable files.",
       "Add project-owned Engineering Workflow runs with six skill stages, explicit acceptance and safe execution recovery.",
       "Live Voice is now available to everyone and calls start in the current session.",
@@ -876,7 +876,7 @@ const zhCNEntries: ChangelogEntry[] = [
     version: "0.16.0",
     date: "2026-10-01",
     highlights: [
-      "内置 Matt 工程技能，支持快捷提示词配置和版本自动检测，手动更新保留本地修改。",
+      "内置 Matt 工程技能，支持快捷提示词配置、适用时机与用途说明、使用示例和版本自动检测，手动更新保留本地修改。",
       "支持登记并打开关联阶段修订的工程产物引用，保留历史记录和不可用文件状态。",
       "新增项目级工程流程 Run，支持六个 Skill 阶段、显式验收及安全的执行恢复。",
       "实时语音现已面向所有用户开放，通话默认从当前会话开始。",
@@ -1719,7 +1719,7 @@ const zhTWEntries: ChangelogEntry[] = [
     version: "0.16.0",
     date: "2026-10-01",
     highlights: [
-      "內建 Matt 工程技能，支援快捷提示詞設定與版本自動偵測，手動更新保留本機修改。",
+      "內建 Matt 工程技能，支援快捷提示詞設定、適用時機與用途說明、使用範例和版本自動偵測，手動更新保留本機修改。",
       "支援登記並開啟關聯階段修訂的工程產物參照，保留歷史記錄與無法使用的檔案狀態。",
       "新增專案級工程流程 Run，支援六個 Skill 階段、明確驗收及安全的執行復原。",
       "即時語音現已開放給所有使用者，通話預設從目前工作階段開始。",

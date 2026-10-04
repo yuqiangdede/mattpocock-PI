@@ -16278,6 +16278,14 @@ explicit current-task user request.
 - Contract: global instructions in coding-workbench-free-tasks.md and
   engineering-skills-distribution.md.
 - Command: `node scripts/e2e-workflow-runs.mjs --engineering-settings`.
+- Select engineering entries in Settings > Agent > Skills. Each entry shows
+  localized usage timing, purpose and one example before its prompt editor;
+  switching entries updates the guidance without saving or executing it.
+  Component coverage: `engineering-skill-description.test.mjs` renders all
+  26 entries in English and Simplified Chinese with the real catalogs.
+  Electron coverage switches all English entries plus Ask and Review in
+  Simplified Chinese, checking guidance, prompt selection and unchanged
+  persisted overrides before the existing save/update journey.
 - Real settings editor -> Host persistence -> Composer insertion; empty override
   and localized restore; settings edits preserve an already prepared draft.
 - Switch to manual detection, check without install, explicitly update through
