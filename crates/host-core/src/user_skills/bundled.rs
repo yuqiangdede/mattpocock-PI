@@ -31,13 +31,15 @@ struct Installed {
     directory: String,
     digest: String,
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct BundleState {
     #[serde(default = "bundle_schema_version")]
     schema_version: u32,
     revision: String,
     packages: BTreeMap<String, Installed>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    backup: Option<String>,
 }
 fn bundle_schema_version() -> u32 {
     1
@@ -48,6 +50,7 @@ impl Default for BundleState {
             schema_version: 1,
             revision: String::new(),
             packages: BTreeMap::new(),
+            backup: None,
         }
     }
 }
@@ -57,6 +60,7 @@ pub struct BundleResult {
     pub revision: String,
     pub updated: Vec<String>,
     pub preserved: Vec<String>,
+    pub removed: Vec<String>,
 }
 
 fn digest(files: &[(String, Vec<u8>)]) -> String {
@@ -220,7 +224,7 @@ fn state_from(directory: &Dir) -> Result<BundleState> {
     match read_bounded(directory, "state.json", MAX_BUNDLE_BYTES) {
         Ok(bytes) => {
             let state: BundleState = serde_json::from_slice(&bytes)?;
-            if state.schema_version != 1 {
+            if state.schema_version != 1 && state.schema_version != 2 {
                 bail!("SKILL_INVALID: incompatible bundle manifest version");
             }
             Ok(state)
@@ -426,6 +430,10 @@ impl UserSkillRegistry {
         Ok(self.bundle_state()?.revision)
     }
 
+    pub fn bundled_has_backup(&self) -> Result<bool> {
+        Ok(self.bundle_state()?.backup.is_some())
+    }
+
     pub fn ensure_bundled(&mut self) -> Result<BundleResult> {
         let state = self.bundle_state()?;
         if !state.revision.is_empty() {
@@ -445,10 +453,27 @@ impl UserSkillRegistry {
             .open_bundle_dir(true)?
             .ok_or_else(|| anyhow::anyhow!("SKILL_INVALID: bundle directory missing"))?;
         let mut state = state_from(&directory)?;
+        let backup = self.snapshot_bundle(&directory, &state)?;
         let mut result = BundleResult {
             revision: bundle.revision.clone(),
             ..Default::default()
         };
+        let incoming: HashSet<_> = bundle
+            .packages
+            .iter()
+            .map(|package| package.id.clone())
+            .collect();
+        for (id, previous) in state.packages.clone() {
+            if incoming.contains(&id) {
+                continue;
+            }
+            if files_digest(&directory, &previous.directory)?.as_deref() == Some(&previous.digest) {
+                state.packages.remove(&id);
+                result.removed.push(id);
+            } else {
+                result.preserved.push(id);
+            }
+        }
         // Each replacement is written to a new directory. The old package is
         // never overwritten, including edits made by an external editor.
         for package in bundle.packages {
@@ -503,12 +528,16 @@ impl UserSkillRegistry {
             result.updated.push(package.id);
         }
         state.revision = bundle.revision;
+        state.schema_version = 2;
+        state.backup = backup;
         let temporary = format!("state-{}.tmp", Uuid::new_v4());
         write_new(&directory, &temporary, &serde_json::to_vec(&state)?)?;
         directory.rename(&temporary, &directory, "state.json")?;
         Ok(result)
     }
 }
+
+mod recovery;
 
 #[cfg(test)]
 mod tests;

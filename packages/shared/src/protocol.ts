@@ -6,7 +6,7 @@ export const APP_NAME = "PI-Desktop";
 export const APP_DISPLAY_NAME = "mattpocock-PI";
 export const APP_REPOSITORY = "yuqiangdede/mattpocock-PI";
 export const UPSTREAM_REPOSITORY = "vastsa/PI-Desktop";
-// 本应用采用手动检测与发布页升级，旧的自动更新偏好不触发安装。
+// Explicit checks/downloads only; background checks remain disabled for this fork.
 export const APP_MANUAL_UPDATES_ONLY = true;
 export const APP_VERSION = "0.16.0-beta.2";
 
@@ -75,6 +75,7 @@ export const IPC = {
     versionSourcesOpen: "pi-desktop/versionSources/open",
     updatesCheck: "pi-desktop/updates/check",
     updatesDownload: "pi-desktop/updates/download",
+    updatesSetChannel: "pi-desktop/updates/setChannel",
     updatesInstall: "pi-desktop/updates/install",
     updatesOpenReleases: "pi-desktop/updates/openReleases",
     notificationList: "pi-desktop/notification/list",
@@ -330,6 +331,7 @@ export const IPC = {
     skillBundleStatus: "pi-desktop/skill/bundle/status",
     skillBundleCheck: "pi-desktop/skill/bundle/check",
     skillBundleUpdate: "pi-desktop/skill/bundle/update",
+    skillBundleRestore: "pi-desktop/skill/bundle/restore",
     skillCreate: "pi-desktop/skill/create",
     skillImport: "pi-desktop/skill/import",
     skillImportScan: "pi-desktop/skill/importScan",

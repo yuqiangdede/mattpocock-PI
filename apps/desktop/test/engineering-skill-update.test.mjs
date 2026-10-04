@@ -39,7 +39,7 @@ test("concurrent updates settle once and a Host restart during download cannot i
   const bundle = { revision: sha, packages: [] };
   let held = new Promise((resolve) => { release = resolve; });
   const installed = [];
-  const owner = { generation: 1, call: async (method, input) => { installed.push({method,input}); return {revision:sha}; } };
+  const owner = { generation: 1, call: async (method, input) => { if (method === "skills.updateBundled") installed.push({method,input}); return {revision:sha}; } };
   let notifications = 0;
   const update = createEngineeringSkillUpdater({getHost:()=>owner,fetchBundle:()=>held,notify:()=>{notifications++;}});
   const first = update(); const second = update();

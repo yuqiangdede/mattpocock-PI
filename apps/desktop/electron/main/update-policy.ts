@@ -50,6 +50,7 @@ export function resolveUpdateMode(
   preference?: UpdatePreference,
 ): UpdateMode {
   if (!isPackaged) return "disabled";
+  if (platform === "win32" && (Boolean(env.PORTABLE_EXECUTABLE_FILE) || distribution === "zip" || distribution === "portable")) return "manual";
   if (!supportsAutomaticUpdates(platform, isPackaged, env)) return "manual";
   const selected =
     preference ??

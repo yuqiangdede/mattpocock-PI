@@ -239,6 +239,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     togglePluginLauncher,
     safeOpenExternal,
     updater,
+    hasRunningTasks: () => activeTurns.size > 0,
   });
   registerNotificationIpc({
     registrar,

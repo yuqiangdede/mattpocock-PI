@@ -1,6 +1,7 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const fr = {
+  versionUpdates: en.versionUpdates,
   coding: en.coding,
   "app": {
     "shellName": "PI-Desktop",

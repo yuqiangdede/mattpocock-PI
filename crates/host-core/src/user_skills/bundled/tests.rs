@@ -1,6 +1,71 @@
 use super::*;
 
 #[test]
+fn update_backup_restore_and_upstream_removal_preserve_user_changes() {
+    let root = tempfile::tempdir().unwrap();
+    fs::create_dir(root.path().join("profile")).unwrap();
+    let mut registry = UserSkillRegistry::new(&root.path().join("profile"));
+    registry.ensure_bundled().unwrap();
+    let before = registry.bundle_state().unwrap();
+    let mut bundle: SkillBundle = serde_json::from_str(SHIPPED).unwrap();
+    bundle.revision = "b".repeat(40);
+    let removed = bundle.packages.pop().unwrap().id;
+    let changed = bundle.packages[0].id.clone();
+    bundle.packages[0]
+        .files
+        .iter_mut()
+        .find(|f| f.path == "SKILL.md")
+        .unwrap()
+        .content
+        .push_str("\nUpdated fixture.");
+    let result = registry.update_bundled(bundle).unwrap();
+    assert!(result.removed.contains(&removed));
+    assert!(registry.bundled_has_backup().unwrap());
+    let current = registry.bundle_state().unwrap();
+    assert!(!current.packages.contains_key(&removed));
+    let path = package_destination(
+        &registry.bundled_root,
+        &current.packages[&changed].directory,
+    )
+    .unwrap()
+    .join("SKILL.md");
+    let edited = format!(
+        "{}\nUser edit after updating.",
+        fs::read_to_string(&path).unwrap()
+    );
+    fs::write(&path, &edited).unwrap();
+    let restored = registry.restore_bundled().unwrap();
+    assert!(restored.preserved.contains(&changed));
+    assert_eq!(registry.bundled_revision().unwrap(), before.revision);
+    assert!(registry
+        .bundle_state()
+        .unwrap()
+        .packages
+        .contains_key(&removed));
+    assert_eq!(fs::read_to_string(path).unwrap(), edited);
+    assert!(!registry.bundled_has_backup().unwrap());
+}
+
+#[test]
+fn invalid_update_keeps_active_state_and_existing_backup() {
+    let root = tempfile::tempdir().unwrap();
+    fs::create_dir(root.path().join("profile")).unwrap();
+    let mut registry = UserSkillRegistry::new(&root.path().join("profile"));
+    registry.ensure_bundled().unwrap();
+    let mut bundle: SkillBundle = serde_json::from_str(SHIPPED).unwrap();
+    bundle.revision = "b".repeat(40);
+    registry.update_bundled(bundle.clone()).unwrap();
+    let state = fs::read(registry.bundled_root.join("state.json")).unwrap();
+    bundle.packages[0].files[0].path = "../escape".into();
+    assert!(registry.update_bundled(bundle).is_err());
+    assert_eq!(
+        fs::read(registry.bundled_root.join("state.json")).unwrap(),
+        state
+    );
+    assert!(registry.bundled_has_backup().unwrap());
+}
+
+#[test]
 fn bundled_revision_reads_actual_manifest_without_installing() {
     let root = tempfile::tempdir().unwrap();
     let profile = root.path().join("profile");
@@ -13,7 +78,10 @@ fn bundled_revision_reads_actual_manifest_without_installing() {
     let manifest = bundle_root.join("state.json");
     let bytes = br#"{"schemaVersion":1,"revision":"actual-installed-revision","packages":{}}"#;
     fs::write(&manifest, bytes).unwrap();
-    assert_eq!(registry.bundled_revision().unwrap(), "actual-installed-revision");
+    assert_eq!(
+        registry.bundled_revision().unwrap(),
+        "actual-installed-revision"
+    );
     assert_eq!(fs::read(&manifest).unwrap(), bytes);
     assert!(!bundle_root.join("releases").exists());
 

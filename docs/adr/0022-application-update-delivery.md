@@ -27,7 +27,8 @@ download-and-install flow.
    run. Legacy portable executables remain manual when
    `PORTABLE_EXECUTABLE_FILE` is present. (Packaged macOS was notify-and-link
    until D450 / ADR 0289 qualified the signed in-app channel.)
-3. The updater always sets `allowPrerelease = false`. electron-updater would
+3. Initially the updater always set `allowPrerelease = false`. Superseded by the
+   explicit fork-update amendment below. electron-updater would
    otherwise pin prerelease installs (for example `0.2.0-rc.6`) to the same
    custom channel (`rc`) and never offer a newer stable GitHub latest release.
    Prerelease-channel policy remains an operational follow-up if a dedicated
@@ -117,7 +118,33 @@ JSON and is intentionally omitted from portable configuration sync.
 
 Installed Windows NSIS, packaged macOS, and Linux AppImage default to Automatic.
 Windows ZIP/portable packages default to Manual; opting into Automatic is
-available on supported Windows packages only after the UI warns that NSIS may
-replace the extracted no-install copy. Unsupported installer formats remain
+historical behavior, superseded by the explicit fork-update amendment below.
+Unsupported installer formats remain
 Manual. This additive setting requires no database schema or host protocol
 version change.
+
+## Amendment: explicit fork updates (2026-10-05)
+
+The fork exposes only its application and its engineering skill bundle as
+update targets. Windows installed builds retain electron-updater's fixed fork
+feed, checksum verification and quit lifecycle, but download and restart both
+require explicit actions. Auto-download and install-on-quit are always disabled.
+Existing automatic/manual preferences cannot authorize a Portable/ZIP installer.
+Only known installed Windows metadata qualifies for in-app installer handoff.
+
+Host settings gain an optional stable/prerelease channel.
+Prerelease installs default to prerelease; stable installs default to stable.
+The GitHub provider's broad prerelease lane admits alpha/beta/rc releases,
+while allowDowngrade remains false. Active checks/downloads cannot change channels.
+Upstream release-note catalogs are not used to describe a fork release.
+
+Portable/ZIP updates are downloaded into the selected app profile cache.
+Main chooses a matching named artifact from the fixed fork repository, requires
+its published SHA256 and exact byte count, guards every public HTTPS redirect,
+then reveals the verified file. Missing checksum/artifact/feed fails visibly.
+No downloaded archive is executed or extracted automatically.
+
+Before installer handoff, Host atomically checks for running tasks and reserves
+process-local admission. New turns cannot start until shutdown or an explicit
+Main cancellation after a failed handoff. A restart clears the reservation.
+This closes the gap between an idle check and starting an installer.

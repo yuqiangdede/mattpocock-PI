@@ -37,6 +37,7 @@ export type HostStatusEvent = {
 
 /** User-selected update behavior; unsupported installers remain manual. */
 export type UpdatePreference = "automatic" | "manual";
+export type UpdateChannel = "stable" | "prerelease";
 
 /**
  * Effective update delivery on this install:
@@ -57,6 +58,8 @@ export type UpdateStatus =
 
 /** Snapshot pushed on the `updatesState` event and returned by updates IPC. */
 export type UpdateState = {
+  channel?: UpdateChannel;
+  manualDownloadSupported?: boolean;
   mode: UpdateMode;
   preference: UpdatePreference;
   defaultPreference: UpdatePreference;
@@ -66,6 +69,7 @@ export type UpdateState = {
   status: UpdateStatus;
   currentVersion: string;
   availableVersion?: string;
+  latestVersion?: string;
   /**
    * Localized product highlights for `availableVersion` from the shipped-locale
    * in-app changelog. Plain text (bullet lines); absent when the version has

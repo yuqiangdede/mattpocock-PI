@@ -293,6 +293,11 @@ const updater = new AppUpdaterController({
     if (!host?.isAvailable()) throw new Error("host unavailable");
     await host.call("settings.set", { lastNotifiedUpdateVersion: version });
   },
+  persistChannel: async (updateChannel) => {
+    const host = getHost();
+    if (!host?.isAvailable()) throw new Error("host unavailable");
+    await host.call("settings.set", { updateChannel });
+  },
 });
 
 /**
