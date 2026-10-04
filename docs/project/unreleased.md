@@ -1,10 +1,10 @@
 # Unreleased changes
 
-- Coding Workbench now exposes eight compact engineering skill buttons in the
-  Composer. A click preserves the draft and adds a skill; execution requires
-  manual Send and uses ordinary chat. Engineering initialization invokes
-  `/setup-matt-pocock-skills`. Legacy task records, files and backups are retained;
-  optional formal Workflow acceptance remains unchanged.
+- Coding Workbench prioritizes Ask next step, Discuss requirements, Implement,
+  Diagnose bug and Review code in the first Composer row. Workflow navigation
+  and More occupy a subdued second row; More groups occasional skills, including
+  initialization and retrospective. Skill selection preserves the draft and
+  requires manual Send. Usage guidance and examples explain each skill.
 - `/compact` and automatic context compaction work again on a gateway that
   fronts a Codex backend. The summary request of a checkpoint now carries the
   conversation identity every other turn of the session sends

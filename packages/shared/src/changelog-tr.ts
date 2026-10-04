@@ -5,7 +5,7 @@ export const trEntries: ChangelogEntry[] = [
     "version": "0.16.0",
     "date": "2026-10-01",
     "highlights": [
-      "Matt mühendislik becerileri, yapılandırılabilir kısayol yönergeleri, kullanım rehberi ve örnekler ile otomatik sürüm denetimi; manuel güncellemeler yerel değişiklikleri korur.",
+      "Matt mühendislik becerileri, yapılandırılabilir kısayol yönergeleri, kullanım rehberi ve örnekler ile otomatik sürüm denetimi; manuel güncellemeler yerel değişiklikleri korur. Sık kullanılan Composer işlemleri öne alınır; diğer beceriler gruplanmış Daha fazla menüsünde yer alır.",
       "Revizyonlarla ilişkili mühendislik çıktısı başvurularını kaydedip açın; geçmiş ve kullanılamayan dosyaları koruyun.",
       "Proje bazlı mühendislik iş akışları: altı beceri aşaması, açık kabul ve güvenli yürütme kurtarma.",
       "Canlı Ses artık herkesin kullanımına açık ve görüşmeler geçerli oturumda başlıyor.",

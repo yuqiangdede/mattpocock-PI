@@ -5,7 +5,7 @@ export const ptBREntries: ChangelogEntry[] = [
     "version": "0.16.0",
     "date": "2026-10-01",
     "highlights": [
-      "Inclui habilidades de engenharia Matt, instruções configuráveis, orientações de uso e exemplos, e detecção automática de versões; atualizações manuais preservam alterações locais.",
+      "Inclui habilidades de engenharia Matt, instruções configuráveis, orientações de uso e exemplos, e detecção automática de versões; atualizações manuais preservam alterações locais. As ações frequentes do Composer aparecem primeiro; as habilidades ocasionais ficam agrupadas em Mais.",
       "Registre e abra referências de artefatos vinculadas a revisões, mantendo o histórico e os arquivos indisponíveis.",
       "Fluxos de engenharia por projeto com seis etapas de skills, aceitação explícita e recuperação segura.",
       "O Live Voice agora está disponível para todos e as chamadas começam na sessão atual.",
