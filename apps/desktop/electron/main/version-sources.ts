@@ -1,3 +1,4 @@
+import { UPSTREAM_BASELINE } from "../../../../packages/shared/src/upstream";
 import type { VersionSourceId, VersionSourceState } from "../../../../packages/shared/src/version-sources";
 import type { UpdateChannel } from "@pi-desktop/shared";
 import { APP_REPOSITORY, UPSTREAM_REPOSITORY } from "../../../../packages/shared/src/protocol";
@@ -35,16 +36,17 @@ export function compareReleaseVersions(left: string, right: string): number | nu
   return 0;
 }
 
-export function createVersionSourceChecker({ request, appVersion, skillVersion, getChannel }: {
+export function createVersionSourceChecker({ request, appVersion, upstreamVersion = UPSTREAM_BASELINE.version, skillVersion, getChannel }: {
   request: (url: string, kind: "json") => Promise<unknown>;
   appVersion: string;
+  upstreamVersion?: string;
   skillVersion: () => Promise<string | null>;
   getChannel?: () => UpdateChannel;
 }) {
   const cache = new Map<VersionSourceId, VersionSourceState>();
   const pending = new Map<VersionSourceId, Promise<VersionSourceState>>();
   const initial = (id: VersionSourceId): VersionSourceState => ({
-    id, currentVersion: id === "mattpocock-skills" ? null : appVersion,
+    id, currentVersion: id === "mattpocock-skills" ? null : id === "pi-desktop" ? upstreamVersion : appVersion,
     latestVersion: null, status: "idle", checkedAt: null,
     url: `https://github.com/${VERSION_REPOSITORIES[id]}${id === "mattpocock-skills" ? "" : "/releases"}`,
   });
@@ -84,7 +86,7 @@ export function createVersionSourceChecker({ request, appVersion, skillVersion, 
             else {
               if (typeof latest.tag_name !== "string") throw new Error("Invalid release tag");
               row.latestVersion = latest.tag_name;
-              const comparison = compareReleaseVersions(latest.tag_name, appVersion);
+              const comparison = compareReleaseVersions(latest.tag_name, row.currentVersion!);
               row.status = comparison === null ? "different" : comparison > 0 ? "available" : "current";
             }
           }

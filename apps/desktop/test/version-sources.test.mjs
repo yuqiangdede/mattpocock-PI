@@ -6,6 +6,18 @@ const { createVersionSourceChecker, compareReleaseVersions } = await import("../
 const sha = "a".repeat(40);
 const release = (tag_name, prerelease = false) => ({tag_name, prerelease, draft: false});
 
+test("官方源码基线独立于定制版版本，定制版版本较高也能发现官方更新", async () => {
+  const checker = createVersionSourceChecker({ appVersion: "99.0.0", upstreamVersion: "0.16.1",
+    skillVersion: async () => sha, request: async () => [release("0.16.2")] });
+  const initial = await checker.list();
+  assert.deepEqual(initial.map(row => row.id), ["mattpocock-skills", "mattpocock-pi"]);
+  assert.equal(initial[1].currentVersion, "99.0.0");
+  const upstream = await checker.check("pi-desktop");
+  assert.equal(upstream.currentVersion, "0.16.1");
+  assert.equal(upstream.status, "available");
+  assert.equal((await checker.check("mattpocock-pi")).status, "current");
+});
+
 test("版本比较支持预发布与旧版本，避免降级提示", () => {
   assert.equal(compareReleaseVersions("v0.16.0", "0.16.0-beta.1"), 1);
   assert.equal(compareReleaseVersions("0.15.9", "0.16.0-beta.1"), -1);

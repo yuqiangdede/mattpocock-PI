@@ -100,6 +100,25 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 ## 2. Section contents
 
 ### General
+
+- **Storage** shows the effective application data path and the reclaimable cache
+  size. It is included in settings search. Choose directory uses the native picker;
+  confirmation displays both application and browser source paths, the target,
+  migration scope and the restart/backup policy. Cancelling has no side effects.
+  Accepting locks repeat actions until the app exits through ordered shutdown.
+- A separate sandboxed cold-maintenance window shows localized scanning, copying,
+  verifying and internal-path relocation stages, file counts, copied/verified bytes
+  and determinate progress where known. It does not load plugins or agent services.
+  Failure explains that the original profile remains active, then returns to it;
+  settings exposes the error and permits retry. A disconnected selected volume
+  blocks startup with a recovery explanation instead of silently using empty data.
+- **Clear cache** shows a size and requires an inline confirmation describing the
+  retained durable data before clearing and restarting. **Delete old backups** is
+  separate, lists original paths and warns users to check their plugins and old
+  attachments first. Arbitrary plugin-owned absolute references cannot be rewritten
+  by the host. Environment-controlled profiles display why maintenance is disabled.
+  Confirmation gets keyboard focus, asynchronous errors remain visible, and all
+  visible copy is localized. These operations affect only this local installation.
 - **Appearance** card:
   - **Theme**: a searchable picker row (same anchored-menu pattern as
     Language). The closed trigger sizes to the current label, capped by the
@@ -574,6 +593,9 @@ system while preserving their different data ownership:
   Move to Global. With no project selected the Move into <project> item is not
   offered and the project group asks for a project selection instead, so a
   capability is never sent to an unnamed project.
+- The MCP editor's optional connection timeout accepts 1–600 seconds. A blank
+  value clears the server override and restores the default; saving a changed
+  timeout refreshes that server's live connection.
 - Skeleton rows appear on first paint only. A later refresh keeps the rows it
   already has and dims the list instead, announcing the refresh to assistive
   technology, so toggling a switch never replaces the list with skeletons.
@@ -790,6 +812,10 @@ system while preserving their different data ownership:
   list under the status text (same notes as the ambient banner; D164). The
   full-history modal remains available when the app is up to date or update
   checks are disabled in development
+- Dismissing an update applies to that version across restarts. In-app
+  dismissal cancels an active download and prevents install-on-quit; discovery
+  continues, and a newer version clears the dismissal and resumes automatic
+  delivery.
 
 ## 3. Navigation rules
 
