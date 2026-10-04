@@ -16285,3 +16285,15 @@ explicit current-task user request.
 - Only the GitHub source and model/provider boundary are isolated fixtures.
 - Controlled scheduler tests cover startup, daily gating, persisted failure
   timestamps, no detection in manual mode, coalescing, Host restart and disposal.
+
+## E2E-Release-documentation-preflight
+
+- Run the release checker through its CLI in an isolated fixture without
+  installed dependencies, using Node 22.19 or newer.
+- A prerelease defaults to its stable documentation version while workspace
+  version surfaces retain the prerelease identifier; the explicit stable target
+  also succeeds and a mismatched target fails.
+- Reject workspace version, English/localized catalog, highlight count,
+  changelog test-list and README release-line drift.
+- Automated coverage: `node --test scripts/check-release-docs.test.mjs
+  scripts/release-version-check.test.mjs`. No Desktop or provider is required.

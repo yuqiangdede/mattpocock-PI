@@ -17,8 +17,8 @@
  *   4. packages/shared/src/changelog.test.ts pins the version as newest.
  *   5. README.md and README.zh-CN.md declare the current release line
  *      (`<major>.<minor>.x`) in their status section.
- * For a prerelease preview, pass the stable version being previewed so the
- * changelog/README checks run against that catalog rather than x.y.z-beta.*.
+ * Prerelease previews default to the stable version's changelog/README;
+ * an explicit version still validates the requested release target.
  */
 import {
   readdirSync,
@@ -28,7 +28,7 @@ import {
   writeFileSync,
   rmSync,
 } from "node:fs";
-import { createRequire } from "node:module";
+import { stripTypeScriptTypes } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import { resolveReleaseDocumentCheck } from "./release-version-check.mjs";
@@ -95,8 +95,6 @@ try {
 // directory so this preflight does not depend on a prior workspace build or on
 // Node's experimental TypeScript module resolution.
 async function loadChangelogCatalog() {
-  const require = createRequire(path.join(root, "packages/shared/package.json"));
-  const typescript = require("typescript");
   const tempDir = mkdtempSync(path.join(root, ".release-changelog-"));
   writeFileSync(path.join(tempDir, "package.json"), '{"type":"module"}\n', "utf8");
   const sources = [
@@ -110,13 +108,8 @@ async function loadChangelogCatalog() {
   ];
   try {
     for (const relPath of sources) {
-      const output = typescript.transpileModule(read(relPath), {
-        compilerOptions: {
-          module: typescript.ModuleKind.ESNext,
-          target: typescript.ScriptTarget.ES2022,
-        },
-        fileName: relPath,
-      }).outputText;
+      // Strip types using the minimum supported Node version without installed dependencies.
+      const output = stripTypeScriptTypes(read(relPath), { mode: "strip" });
       writeFileSync(
         path.join(tempDir, path.basename(relPath, ".ts") + ".js"),
         output,
