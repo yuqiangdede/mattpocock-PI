@@ -76,7 +76,11 @@ and on manual dispatch, skipping both when a change touches only `docs/**` or
 `pnpm docs:check` (the docs locale pair check) when `docs/**`, the READMEs, the
 shared changelog sources, or the check scripts change. `check:release-docs` is
 deliberately not in CI because release branches must pass it with the stable
-version explicitly supplied for a prerelease preview.
+version for a prerelease preview. Without an argument, the check derives that
+stable version from the workspace prerelease version. It uses Node's built-in
+TypeScript stripping and needs neither installed dependencies nor a prior build.
+Run its regression suite with `node --test scripts/check-release-docs.test.mjs
+scripts/release-version-check.test.mjs`.
 
 `.github/workflows/release.yml` builds on a `v*.*.*` tag. A `verify` job first
 repeats the `ci.yml` checks (a tag push does not trigger `ci.yml`), and the

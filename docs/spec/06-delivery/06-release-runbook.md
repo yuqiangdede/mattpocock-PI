@@ -151,12 +151,13 @@ Blocking steps:
    the source of truth and the zh-CN file links the `docs/zh-CN/` mirrors.
 6. Run the preflight and fix every reported surface:
    `pnpm check:release-docs [version]` (`node scripts/check-release-docs.mjs`).
-   For a prerelease, run it against the **stable** version being previewed
-   (`pnpm check:release-docs x.y.z`) so changelog/README alignment is
+   For a prerelease, the default derives the **stable** version being previewed;
+   you may also specify it (`pnpm check:release-docs x.y.z`). Changelog/README alignment is
    checked even though `scripts/release.mjs` skips that preflight for
    `x.y.z-beta.*` / `x.y.z-rc.*`. The preflight compiles the TypeScript
-   changelog in a temporary directory, so it does not require a prior
-   workspace build. `scripts/release.mjs` still refreshes models.dev for
+   changelog with Node's built-in TypeScript stripping in a temporary directory,
+   so it requires neither installed dependencies nor a prior workspace build.
+   `scripts/release.mjs` still refreshes models.dev for
    prereleases; `--skip-docs-check` exists only for a deliberate
    non-release bump.
 7. Commit the documentation updates so the tagged commit contains notes and

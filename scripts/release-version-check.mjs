@@ -1,7 +1,6 @@
 export function resolveReleaseDocumentCheck(currentVersion, requestedVersion) {
-  const documentVersion = requestedVersion ?? currentVersion;
+  const documentVersion = requestedVersion ?? currentVersion.split("-")[0];
   const isPrereleasePreview =
-    requestedVersion !== undefined &&
     currentVersion !== documentVersion &&
     currentVersion.startsWith(`${documentVersion}-`);
 
