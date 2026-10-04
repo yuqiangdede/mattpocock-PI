@@ -481,6 +481,19 @@
   padding: 12px 14px 14px;
 }
 
+.engineering-skill-description {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  min-width: 0;
+}
+
+.engineering-skill-description dd {
+  margin: 4px 0 0;
+  color: var(--ds-text-secondary);
+  overflow-wrap: anywhere;
+}
+
 .settings-config-sync-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

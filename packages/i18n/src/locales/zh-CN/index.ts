@@ -1,7 +1,9 @@
 import { en, type EnglishCatalog } from "../en/index.js";
+import { engineeringSkillGuides } from "./engineering-skill-guides.js";
 
 export const zhCN = {
   coding: {
+    skillGuides: engineeringSkillGuides,
     prompts: {
       ask: "根据当前项目的实际情况，仔细判断下一步最应该做什么。先检查项目规则、README、规格、代码与测试、Git 状态，以及可访问的任务、PR 和验收记录；区分已完成、未完成和阻塞项，不把旧计划当作现状。给出最优先的一个具体行动、依据、完成标准和适合的 Matt 技能或流程；必要时列出后续两三步。无法核实的信息明确标注；本轮先分析建议，不直接开始实现。",
       initialize: "检查当前项目已有的工程约定，按 Matt 方法初始化或补齐任务追踪方式、分诊标签、CONTEXT.md 领域术语和 ADR 文档约定。复用现有设置并保留已有内容；只有需要用户决策的配置才提问。说明配置结果和验证方式。",
@@ -737,6 +739,9 @@ export const zhCN = {
     showAllSkills: "显示全部技能",
     showWorkflowSkills: "仅显示阶段技能",
     engineering: {
+      when: "什么时候使用",
+      purpose: "具体用途",
+      example: "使用示例",
       instructions: "工程快捷提示词",
       instructionsHint: "全局设置，所有项目共用。点击按钮将技能和提示词填入草稿，手动发送后执行。更新技能不会覆盖你的自定义提示词。",
       shortcut: "选择快捷入口",

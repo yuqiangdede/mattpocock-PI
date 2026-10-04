@@ -1,5 +1,8 @@
+import { engineeringSkillGuides } from "./engineering-skill-guides.js";
+
 export const en = {
   coding: {
+    skillGuides: engineeringSkillGuides,
     prompts: {
       ask: "Inspect the current project rules, README, specs, code, tests, Git state, and accessible tickets, PRs and acceptance evidence. Distinguish completed work, remaining work and blockers; verify old plans against reality. Recommend one concrete highest-priority next action with evidence, completion criteria and the appropriate Matt skill or flow, followed by two or three steps if useful. Mark unverified information. Analyze and recommend before implementing.",
       initialize: "Inspect existing engineering conventions and configure or complete the issue tracker, triage labels, CONTEXT.md domain vocabulary and ADR conventions using Matt’s setup method. Reuse existing settings and preserve content. Ask only for configuration decisions the user must make; report the result and verification.",
@@ -745,6 +748,9 @@ export const en = {
     showAllSkills: "Show all skills",
     showWorkflowSkills: "Show workflow skills",
     engineering: {
+      when: "When to use",
+      purpose: "What it does",
+      example: "Example request",
       instructions: "Engineering shortcut instructions",
       instructionsHint: "Global across projects. Shortcuts fill the draft; Send starts execution. Skill updates preserve custom instructions.",
       shortcut: "Shortcut",

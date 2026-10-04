@@ -60,6 +60,13 @@ At narrow widths each row wraps independently without horizontal overflow.
 
 ## Global instruction settings
 
+For every one of the 26 engineering entries, the instruction editor shows
+localized guidance before the prompt: when to use the skill, what it does,
+and one concrete example request. Selecting a different entry switches all
+three descriptions together. Guidance is read-only product copy, separate
+from editable prompt overrides and installed skill definitions. Reading it
+does not insert a draft, save settings or execute a skill.
+
 Settings > Agent > Skills edits all 26 shortcut instructions globally across
 projects, including More menu skills. Saving an empty string selects only
 the skill marker. Restore default clears the override and uses the current

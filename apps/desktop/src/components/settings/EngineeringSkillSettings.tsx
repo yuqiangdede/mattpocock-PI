@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { ENGINEERING_SHORTCUTS, ENGINEERING_PROMPT_MAX_LENGTH, resolveShortcutInstruction, type EngineeringShortcutAction, type EngineeringSkillStatus, type EngineeringSkillUpdateMode } from "@pi-desktop/shared";
 import { Button, Field, Textarea } from "../ui";
 import { SettingsMenuSelect } from "./SettingsMenuSelect";
+import { EngineeringSkillDescription } from "./EngineeringSkillDescription";
 import { SettingsCard, SettingsRow } from "../../features/settings/primitives";
 import { useAppStore } from "../../stores/app-store";
 import { api } from "../../lib/api";
@@ -74,6 +75,7 @@ export function EngineeringSkillSettings({ onUpdated }: { onUpdated: () => Promi
           onChange={value => setAction(value as EngineeringShortcutAction)} />
       </SettingsRow>
       <div className="settings-form-grid">
+        <EngineeringSkillDescription action={action} />
         <Field label={t("settings.engineering.prompt")} hint={t("settings.engineering.emptyHint")}>
           <Textarea aria-label={t("settings.engineering.prompt")} className="settings-instruction-editor" value={text} maxLength={ENGINEERING_PROMPT_MAX_LENGTH} disabled={busy} onChange={event => setText(event.target.value)} />
         </Field>
