@@ -823,6 +823,9 @@ export const api = {
     invoke<WorkflowDiscoveryStatus>(IPC.invoke.workflowStageCheck, input),
   startWorkflowStage: (input: import("@pi-desktop/shared").WorkflowStageRequest) =>
     invoke<WorkflowAdmission>(IPC.invoke.workflowStageStart, input),
+  readRequirementsHistory: (projectGroupId: string) => invoke<import("@pi-desktop/shared").RequirementsHistory>(IPC.invoke.requirementsHistory, { projectGroupId }),
+  previewRequirements: (input: import("@pi-desktop/shared").RequirementsTarget) => invoke<import("@pi-desktop/shared").RequirementsPreview>(IPC.invoke.requirementsPreview, input),
+  confirmRequirements: (input: import("@pi-desktop/shared").RequirementsDecision) => invoke<import("@pi-desktop/shared").RequirementsHistory>(IPC.invoke.requirementsConfirm, input),
   acceptWorkflowStage: (input: { projectGroupId: string; runId: string; stageId: import("@pi-desktop/shared").WorkflowStageId; expectedRevision: number }) =>
     invoke<{ history: WorkflowProjectHistory }>(IPC.invoke.workflowStageAccept, input),
   reopenWorkflowStage: (input: { projectGroupId: string; runId: string; stageId: import("@pi-desktop/shared").WorkflowStageId; expectedRevision: number; confirmed: true }) =>

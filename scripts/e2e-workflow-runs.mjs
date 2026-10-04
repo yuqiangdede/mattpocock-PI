@@ -12,7 +12,8 @@ const execFileAsync = promisify(execFile);
 const root = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
 const recoveryFixture = process.argv.includes("--recovery");
 const settingsFixture = process.argv.includes("--engineering-settings");
-const codingFixture = process.argv.includes("--coding") || process.argv.includes("--requirements-menu") || settingsFixture;
+const requirementsFixture = process.argv.includes("--requirements-confirmation");
+const codingFixture = process.argv.includes("--coding") || process.argv.includes("--requirements-menu") || settingsFixture || requirementsFixture;
 const stagesFixture = process.argv.includes("--stages");
 const reopenFixture = process.argv.includes("--reopen");
 const artifactsFixture = process.argv.includes("--artifacts");
@@ -31,7 +32,7 @@ if (!tempResolved.startsWith(`${resolve(scratchRoot)}${sep}`)) {
 
 try {
   await build({
-    entryPoints: [join(root, settingsFixture ? "scripts/e2e/engineering-settings.tsx" : codingFixture ? "scripts/e2e/coding-workbench.tsx" : artifactsFixture ? "scripts/e2e/workflow-artifacts.tsx" : reopenFixture ? "scripts/e2e/workflow-reopen.tsx" : stagesFixture ? "scripts/e2e/workflow-stages.tsx" : recoveryFixture ? "scripts/e2e/workflow-recovery.tsx" : discoveryFixture ? "scripts/e2e/workflow-discovery.tsx" : "scripts/e2e/workflow-runs.tsx")],
+    entryPoints: [join(root, requirementsFixture ? "scripts/e2e/requirements-confirmation.tsx" : settingsFixture ? "scripts/e2e/engineering-settings.tsx" : codingFixture ? "scripts/e2e/coding-workbench.tsx" : artifactsFixture ? "scripts/e2e/workflow-artifacts.tsx" : reopenFixture ? "scripts/e2e/workflow-reopen.tsx" : stagesFixture ? "scripts/e2e/workflow-stages.tsx" : recoveryFixture ? "scripts/e2e/workflow-recovery.tsx" : discoveryFixture ? "scripts/e2e/workflow-discovery.tsx" : "scripts/e2e/workflow-runs.tsx")],
     outfile: join(temp, "renderer.js"),
     bundle: true,
     platform: "browser",
@@ -113,6 +114,7 @@ try {
   const env = { ...process.env, PI_DESKTOP_HOST_BIN: hostBinary, PI_WORKFLOW_ARTIFACTS: artifactsFixture ? "1" : "0", PI_WORKFLOW_DISCOVERY: discoveryFixture ? "1" : "0", PI_WORKFLOW_REOPEN: reopenFixture ? "1" : "0", PI_WORKFLOW_STAGES: stagesFixture ? "1" : "0", PI_WORKFLOW_RECOVERY: recoveryFixture ? "1" : "0", PI_WORKFLOW_REPO_ROOT: root };
   delete env.ELECTRON_RUN_AS_NODE;
   env.PI_REQUIREMENTS_MENU = process.argv.includes("--requirements-menu") ? "1" : "0";
+  env.PI_REQUIREMENTS_CONFIRMATION = requirementsFixture ? "1" : "0";
   env.PI_CODING_WORKBENCH = codingFixture ? "1" : "0";
   const child = spawn(electronBinary, [join(temp, "main.mjs")], {
     cwd: root,
@@ -143,7 +145,9 @@ try {
   assert.equal(exitCode, 0, output.slice(-5000));
   const result = JSON.parse(resultLine.slice("WORKFLOW_RUNS_PROBE ".length));
   assert.equal(result.ok, true);
-  if (process.argv.includes("--requirements-menu")) {
+  if (requirementsFixture) {
+    for (const field of ["confirmed", "shared", "reconfirmed", "persisted", "cancelled", "isolated", "stale", "localized", "manual"]) assert.equal(result[field], true, field);
+  } else if (process.argv.includes("--requirements-menu")) {
     for (const field of ["requirementsMenu", "mappings", "keyboard", "disabled", "narrow", "localized"]) assert.equal(result[field], true, field);
   } else if (settingsFixture) {
     for (const field of ["customized", "persisted", "empty", "restored", "manual", "detected", "updated", "preserved", "offline"]) assert.equal(result[field], true, field);

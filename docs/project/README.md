@@ -1,5 +1,7 @@
 # Project Tracking
 
+- Requirements Confirmation: [confirmed product direction](requirements-confirmation-design.md) and [implementation specification](../spec/01-product/requirements-confirmation.md); shared human approval of specification content, independent of Workflow stage execution; implementation candidate.
+
 - Skill Shortcuts: [confirmed simplification design](skill-shortcuts-interaction-design.md); draft insertion with manual submission, [current specification](../spec/01-product/coding-workbench-free-tasks.md) and [delivery evidence](skill-shortcuts-delivery.md).
 
 - Coding Home: [confirmed interaction design and implementation acceptance scenarios](coding-home-interaction-design.md)

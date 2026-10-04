@@ -5,6 +5,7 @@ import { Button, TooltipButton } from "../../components/ui";
 import { AnchoredMenu } from "../../components/settings/AnchoredMenu";
 import { toolWorkPanelTab } from "../../lib/work-panel-tabs";
 import { useAppStore } from "../../stores/app-store";
+import { RequirementsConfirmation } from "../requirements/RequirementsConfirmation";
 
 import { CODING_SKILL_SHORTCUTS, CODING_MORE_SKILLS, resolveShortcutInstruction, type EngineeringShortcutAction } from "@pi-desktop/shared";
 export { CODING_SKILL_SHORTCUTS, CODING_MORE_SKILLS } from "@pi-desktop/shared";
@@ -16,6 +17,7 @@ export function CodingWorkbench({ disabled, error, onSelect }: {
 }) {
   const { t } = useTranslation();
   const overrides = useAppStore(state => state.settings?.engineeringShortcutPrompts);
+  const projectPath = useAppStore(state => state.workspace?.path ?? "");
   const selectShortcut = (action: EngineeringShortcutAction, skill: string) => onSelect(skill, resolveShortcutInstruction(action, t(`coding.prompts.${action}`), overrides));
   const [moreOpen, setMoreOpen] = useState(false);
   const [requirementsOpen, setRequirementsOpen] = useState(false);
@@ -74,7 +76,7 @@ export function CodingWorkbench({ disabled, error, onSelect }: {
       </AnchoredMenu>
     </div>
     <div className="coding-shortcuts coding-shortcuts-primary">
-      {CODING_SKILL_SHORTCUTS.filter(({ action }) => action !== "initialize" && action !== "spec" && action !== "tickets").map(({ action, skill }) => action === "discovery" ? <div className="coding-requirements-split" key={skill}>
+      {CODING_SKILL_SHORTCUTS.filter(({ action }) => action !== "initialize" && action !== "spec" && action !== "tickets").map(({ action, skill }) => action === "discovery" ? <div className="coding-requirements-controls" key={skill}><div className="coding-requirements-split">
         <Button className="coding-shortcut-emphasized" disabled={disabled} title={t("coding.discoveryHint")} onClick={() => {
           setRequirementsOpen(false);
           selectShortcut(action, skill);
@@ -108,6 +110,7 @@ export function CodingWorkbench({ disabled, error, onSelect }: {
             }}
           >{t(`coding.${action}`)}</Button>)}
         </AnchoredMenu>
+        </div><RequirementsConfirmation projectPath={projectPath} disabled={disabled} />
       </div> : <Button
         key={skill} disabled={disabled} title={t(`coding.${action}Hint`)}
         className={["implement", "diagnose"].includes(action) ? "coding-shortcut-emphasized" : undefined}

@@ -1,5 +1,10 @@
 # Unreleased changes
 
+- Composer and Workflow share a Confirm requirements action. Users inspect a
+  specification file and approve its content version without starting an Agent
+  or creating a Workflow Run. Changed content requires renewed confirmation;
+  historical decisions remain available after restart.
+
 - Coding Workbench now exposes eight compact engineering skill buttons in the
   Composer. A click preserves the draft and adds a skill; execution requires
   manual Send and uses ordinary chat. Engineering initialization invokes

@@ -16,6 +16,7 @@ import { WorkflowExecutionControls } from "./WorkflowExecutionControls";
 import { WorkflowExecutionHistory } from "./WorkflowExecutionHistory";
 import { WorkflowArtifacts } from "./WorkflowArtifacts";
 import { WORKFLOW_STAGES } from "@pi-desktop/shared";
+import { RequirementsConfirmation } from "../../features/requirements/RequirementsConfirmation";
 
 const STAGES = WORKFLOW_STAGES.map((stage) => stage.id);
 
@@ -295,6 +296,7 @@ export function WorkflowTab({
 
       {projectGroup && !projectGroupArchived ? (
         <section className="workflow-project" aria-label={t("panel.workflow.title")}>
+          <RequirementsConfirmation projectPath={projectPath ?? ""} />
           {history?.error ? (
             <div className="workflow-error" role="alert">
               <p>{t("panel.workflow.documentError", { details: history.error })}</p>

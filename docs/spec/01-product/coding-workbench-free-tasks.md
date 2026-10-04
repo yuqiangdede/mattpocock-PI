@@ -58,6 +58,15 @@ and Retrospective. Discuss requirements,
 Implement, and Diagnose bug use bold text; all other controls use regular text.
 At narrow widths each row wraps independently without horizontal overflow.
 
+## Requirements confirmation
+
+Confirm requirements is a native action beside Discuss requirements, rather
+than a skill shortcut. It opens the shared project specification preview and
+confirmation dialog without inserting text or sending the Composer draft.
+See [Requirements Confirmation](requirements-confirmation.md) for content-version
+approval, history and freshness rules. Existing skill shortcuts retain the
+draft-only behavior described above.
+
 ## Global instruction settings
 
 Settings > Agent > Skills edits all 26 shortcut instructions globally across

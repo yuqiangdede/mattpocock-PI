@@ -8,6 +8,23 @@
 
 ## 1. Goals
 
+### E2E-REQUIREMENTS-content-confirmation
+
+- **Preconditions:** Built Renderer components and Host, isolated project roots,
+  data/profile and local Agent fixture; no live providers.
+- **Steps:** Preview a specification through Composer; cancel and retain the
+  draft. Confirm the selected version without a run. Inspect the same approval
+  through Workflow without unlocking Spec. Edit, refresh, edit again, reject
+  stale submission and reconfirm. Switch projects during delayed preview, check
+  Chinese labels, then restart Host and inspect retained version history.
+- **Expected:** One shared project history; explicit human decisions only;
+  content changes require reconfirmation; old decisions survive. No prompts,
+  automatic task breakdown or stage advancement. Stale previews cannot change
+  another project's UI or approve changed content.
+- **Coverage:** `pnpm test:e2e:requirements-confirmation`; Host and IPC tests also
+  cover unavailable, oversized, malformed and denied inputs.
+- **Spec:** [Requirements Confirmation](../01-product/requirements-confirmation.md).
+
 ### E2E-LIVE-VOICE-public-settings-and-reconnect
 
 - **Preconditions:** A built production Renderer and real Electron/Main/Host,

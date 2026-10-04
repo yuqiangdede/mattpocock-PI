@@ -22,6 +22,7 @@ mod plugin_providers_migration;
 mod project_groups;
 mod project_initialization;
 mod repositories;
+mod requirements;
 mod schema;
 mod session_collaboration_migration;
 mod workflows;
@@ -40,6 +41,7 @@ pub(crate) use repositories::{
     strip_obsolete_plan_approval_permission_mode, upsert_project_row, MAX_PROJECT_MEMORY_BYTES,
     OBSOLETE_PLAN_APPROVAL_PERMISSION_MODE,
 };
+pub use requirements::{RequirementsDecision, RequirementsTarget};
 pub(crate) use schema::{PLAN_APPROVALS_SCHEMA, SCHEMA_LATEST, SESSION_TODO_DDL};
 pub use workflows::{
     WorkflowArtifactRegistration, WorkflowProjectHistory, WorkflowRunOutcome, WorkflowRunRecord,

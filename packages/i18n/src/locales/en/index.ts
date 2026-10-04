@@ -1,5 +1,20 @@
 export const en = {
   coding: {
+    requirements: {
+      action: "Confirm requirements", title: "Confirm requirements", hint: "Review and approve a specification content version.",
+      description: "Approve the selected specification as the current basis for work. You can revise it later; this does not start task breakdown or implementation.",
+      root: "Project root", path: "Specification file", pathPlaceholder: "docs/requirements.md", pathHint: "Enter a project-relative Markdown or UTF-8 text path (up to 256 KiB).",
+      preview: "Preview / refresh", loading: "Checking requirements…", summary: "Specification excerpt", content: "Read full specification",
+      version: "Content version: {{version}}", confirm: "Confirm this version", history: "Confirmation history ({{count}})",
+      record: "Version {{version}} · {{date}}", changedHint: "Requirements changed. Confirm the new version and review affected tasks. Earlier decisions remain in history.",
+      status: { confirmed: "Current version confirmed", changed: "Requirements changed — confirmation needed", unconfirmed: "Awaiting human confirmation" },
+      errors: {
+        REQUIREMENTS_PROJECT_UNAVAILABLE: "Open an available project to confirm requirements.", REQUIREMENTS_PATH_DENIED: "The selected file is outside the project's allowed roots.",
+        REQUIREMENTS_INVALID_PATH: "Enter a project-relative Markdown or text path.", REQUIREMENTS_FILE_UNAVAILABLE: "The file is missing or cannot be read. Select a file and refresh.",
+        REQUIREMENTS_INVALID_FILE: "Select a nonempty UTF-8 text file no larger than 256 KiB.", REQUIREMENTS_CONFLICT: "The file or confirmation history changed. Refresh and inspect it before confirming.",
+        REQUIREMENTS_HISTORY_UNAVAILABLE: "Confirmation history is unavailable. Existing records have been preserved.", REQUIREMENTS_UNAVAILABLE: "Unable to check or confirm requirements. Check file access and refresh.",
+      },
+    },
     prompts: {
       ask: "Inspect the current project rules, README, specs, code, tests, Git state, and accessible tickets, PRs and acceptance evidence. Distinguish completed work, remaining work and blockers; verify old plans against reality. Recommend one concrete highest-priority next action with evidence, completion criteria and the appropriate Matt skill or flow, followed by two or three steps if useful. Mark unverified information. Analyze and recommend before implementing.",
       initialize: "Inspect existing engineering conventions and configure or complete the issue tracker, triage labels, CONTEXT.md domain vocabulary and ADR conventions using Matt’s setup method. Reuse existing settings and preserve content. Ask only for configuration decisions the user must make; report the result and verification.",

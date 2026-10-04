@@ -119,6 +119,11 @@ queued until the bound turn releases the existing queue.
 
 ### Six-stage acceptance (#8)
 
+The project also exposes [Requirements Confirmation](requirements-confirmation.md)
+using the same file-content approval records as Composer. This action is
+available without a run. Content approval does not satisfy tracked-execution
+prerequisites or change stage acceptance, eligibility or reopening.
+
 The six stage/skill pairs above share one admission path. Host transitions reject
 unaccepted prerequisites, stale document revisions, immutable runs and accepted
 stages. Each acceptance records the current revision, latest Normal execution

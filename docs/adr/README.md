@@ -354,3 +354,4 @@ Each ADR includes:
 | provider-system-certificates | [Desktop sidecar uses OS-trusted certificates](provider-system-certificates.md) | Accepted |
 | image-generation-capability | [Image generation as a configured Agent capability](image-generation-capability.md) | Accepted |
 | retained-browser-pages-per-tab | [Retain a host-owned browser page per resource tab](retained-browser-pages-per-tab.md) | Accepted |
+| requirements-confirmation-baseline | [Share requirements content approval independently of Workflow stages](requirements-confirmation-baseline.md) | Accepted for implementation |
