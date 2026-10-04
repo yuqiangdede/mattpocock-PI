@@ -2,6 +2,12 @@ import { engineeringSkillGuides } from "./engineering-skill-guides.js";
 
 export const en = {
   coding: {
+    groups: {
+      exploration: "Requirements and exploration",
+      maintenance: "Implementation and maintenance",
+      collaboration: "Collaboration and reflection",
+      projectSetup: "Project setup",
+    },
     skillGuides: engineeringSkillGuides,
     prompts: {
       ask: "Inspect the current project rules, README, specs, code, tests, Git state, and accessible tickets, PRs and acceptance evidence. Distinguish completed work, remaining work and blockers; verify old plans against reality. Recommend one concrete highest-priority next action with evidence, completion criteria and the appropriate Matt skill or flow, followed by two or three steps if useful. Mark unverified information. Analyze and recommend before implementing.",

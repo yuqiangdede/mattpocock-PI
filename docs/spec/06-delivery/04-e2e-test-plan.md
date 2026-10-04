@@ -16241,12 +16241,14 @@ renderer's durable transcript reads. No real model or provider is contacted.
 ## Coding Workbench Skill Shortcuts
 
 The shortcuts use two separate wrapping rows. The first row is Ask next step,
-Initialize, Engineering Workflow panel, and More features, in that order.
-The second row is Discuss requirements (with Form specification and Split
-tickets in its split-button menu), Implement, Diagnose bug, Review code,
-and Retrospective. Discuss requirements,
-Implement, and Diagnose bug use bold text; all other controls use regular text.
-At narrow widths each row wraps independently without horizontal overflow.
+Discuss requirements (with Form specification and Split tickets in its
+split-button menu), Implement, Diagnose bug, and Review code, in that order.
+The second row contains the subdued Engineering Workflow panel and More.
+More groups skills into Requirements and exploration, Implementation and
+maintenance, Collaboration and reflection (including Retrospective), and
+Project setup (Initialize). Every skill remains available exactly once.
+All shortcuts use regular text. At narrow widths each row wraps independently
+without horizontal overflow; order stays fixed across task states.
 
 
 - Specification: [Coding Workbench Skill Shortcuts](../01-product/coding-workbench-free-tasks.md).

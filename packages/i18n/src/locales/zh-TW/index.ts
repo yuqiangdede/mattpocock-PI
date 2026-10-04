@@ -1,7 +1,16 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const zhTW = {
-  coding: en.coding,
+  coding: {
+    ...en.coding,
+    more: "更多",
+    groups: {
+      exploration: "需求與探索",
+      maintenance: "實作與維護",
+      collaboration: "協作與總結",
+      projectSetup: "專案設定",
+    },
+  },
   app: {
     shellName: "PI-Desktop",
     tagline: "本地 AI 程式設計助手",

@@ -3,6 +3,12 @@ import { engineeringSkillGuides } from "./engineering-skill-guides.js";
 
 export const zhCN = {
   coding: {
+    groups: {
+      exploration: "需求与探索",
+      maintenance: "实现与维护",
+      collaboration: "协作与总结",
+      projectSetup: "项目设置",
+    },
     skillGuides: engineeringSkillGuides,
     prompts: {
       ask: "根据当前项目的实际情况，仔细判断下一步最应该做什么。先检查项目规则、README、规格、代码与测试、Git 状态，以及可访问的任务、PR 和验收记录；区分已完成、未完成和阻塞项，不把旧计划当作现状。给出最优先的一个具体行动、依据、完成标准和适合的 Matt 技能或流程；必要时列出后续两三步。无法核实的信息明确标注；本轮先分析建议，不直接开始实现。",
@@ -95,7 +101,7 @@ export const zhCN = {
     "implement": "实现",
     "initialize": "初始化",
     "ask": "咨询下一步",
-    "more": "更多功能",
+    "more": "更多",
     "diagnose": "Bug 排查",
     "review": "代码审查",
     "retro": "复盘",

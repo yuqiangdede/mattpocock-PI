@@ -9,4 +9,4 @@
 
 .coding-shortcuts + .coding-shortcuts { margin-top: 6px; }
 .coding-shortcuts .btn { font-weight: 400; }
-.coding-shortcuts .coding-shortcut-emphasized { font-weight: 700; }
+.coding-menu-group-label { padding: 6px 10px; color: var(--ds-text-secondary); font-size: var(--text-sm); }

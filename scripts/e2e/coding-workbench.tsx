@@ -41,6 +41,19 @@ globalThis.codingWorkbenchProbe = async (requirementsOnly = false) => {
   let root = createRoot(document.getElementById("root")!);
   root.render(<I18nextProvider i18n={i18n as I18n}><Composer variant="home" /></I18nextProvider>);
   await until(() => editor());
+  const primaryLabels = [...document.querySelectorAll(".coding-shortcuts-primary > button, .coding-shortcuts-primary > .coding-requirements-split > button")].map(button => button.textContent?.trim());
+  check(JSON.stringify(primaryLabels) === JSON.stringify([i18n.t("coding.ask"), "Discuss requirements", "Implement", "Diagnose bug", "Review code"]), "Common shortcut order changed");
+  const more = async () => {
+    await click(i18n.t("coding.more"));
+    await until(() => document.querySelector(".coding-more-menu.is-open"));
+  };
+  await more();
+  const groups = [...document.querySelectorAll(".coding-more-menu [role='group']")];
+  check(groups.length === 4 && groups.every(group => group.getAttribute("aria-label")), "More groups need accessible names");
+  const menuLabels = [...document.querySelectorAll(".coding-more-menu [role='menuitem']")].map(button => button.textContent?.trim());
+  check(menuLabels.length === 19 && new Set(menuLabels).size === 19, "More skills missing or duplicated");
+  await fixture("pressKey", "Escape");
+  await until(() => !document.querySelector(".coding-more-menu"));
   await click("Implement");
   await until(() => readEditorValue(editor()) === draftFor("implement"));
   check((await fixture("snapshot") as { prompts: number }).prompts === 0, "Shortcut submitted automatically");
@@ -62,6 +75,7 @@ globalThis.codingWorkbenchProbe = async (requirementsOnly = false) => {
       trigger.focus(); await fixture("pressKey", "Space");
       await until(() => document.querySelector(".coding-requirements-menu.is-open"));
     }
+    if (skill === "setup-matt-pocock-skills" || skill === "retro") await more();
     await click(label);
     await until(() => readEditorValue(editor()) === draftFor(skill));
     check(!document.querySelector(".coding-requirements-menu"), "Requirement selection left menu open");
@@ -153,7 +167,7 @@ globalThis.codingWorkbenchProbe = async (requirementsOnly = false) => {
   check((await fixture("snapshot") as { transformed: string }).transformed === selected.transformed, "Shortcut differs from manual slash prompt");
   await fixture("releaseProvider");
   useAppStore.setState({ isRunning: false, runningSessions: {} });
-  await prefill("Set up engineering conventions"); await click("Initialize");
+  await prefill("Set up engineering conventions"); await more(); await click("Initialize");
   await until(() => readEditorValue(editor()) === draftFor("setup-matt-pocock-skills", "Set up engineering conventions"));
   await fixture("reset"); await fixture("releaseLaunch");
   (await until(() => document.querySelector<HTMLButtonElement>(".send-btn:not(:disabled)"))).click();
@@ -221,7 +235,7 @@ globalThis.codingWorkbenchProbe = async (requirementsOnly = false) => {
   console.info("SHORTCUT_PHASE keyboard");
   await until(() => readEditorValue(editor()) === draftFor("implement") && document.activeElement === editor());
   await i18n.changeLanguage("zh-CN");
-  await until(() => [...document.querySelectorAll(".coding-shortcuts button")].some((button) => button.textContent === "初始化"));
+  await until(() => [...document.querySelectorAll(".coding-shortcuts button")].some((button) => button.textContent === "咨询下一步"));
   await prefill(""); await click("咨询下一步");
   await until(() => readEditorValue(editor()) === draftFor("ask-matt"));
   check(readEditorValue(editor()).includes(zhCN.coding.prompts.ask), "Localized default instruction missing");
