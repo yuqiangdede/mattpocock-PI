@@ -5,7 +5,7 @@ export const esEntries: ChangelogEntry[] = [
     "version": "0.16.0",
     "date": "2026-10-01",
     "highlights": [
-      "Incluye habilidades de ingeniería de Matt, instrucciones configurables, orientación de uso y ejemplos, y detección automática de versiones; las actualizaciones manuales conservan los cambios locales.",
+      "Incluye habilidades de ingeniería de Matt, instrucciones configurables, orientación de uso y ejemplos, y detección automática de versiones; las actualizaciones manuales conservan los cambios locales. Las acciones habituales del Composer aparecen primero; las habilidades ocasionales se agrupan en Más.",
       "Registra y abre referencias a artefactos vinculadas a revisiones, conservando el historial y los archivos no disponibles.",
       "Flujos de ingeniería por proyecto con seis etapas de skills, aceptación explícita y recuperación segura.",
       "Live Voice ya está disponible para todos y las llamadas comienzan en la conversación actual.",

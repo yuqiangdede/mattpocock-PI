@@ -598,7 +598,7 @@ export function SettingsPage() {
                 </SettingsRow>
                 <SettingsRow
                   title={t("settings.feedback")}
-                  description="向 mattpocock-PI 仓库提交问题，并自动带上当前版本。"
+                  description={t("settings.feedbackDesc")}
                 >
                   <Button
                     variant="secondary"

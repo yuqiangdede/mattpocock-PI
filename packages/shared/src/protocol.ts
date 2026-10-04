@@ -8,7 +8,7 @@ export const APP_REPOSITORY = "yuqiangdede/mattpocock-PI";
 export const UPSTREAM_REPOSITORY = "vastsa/PI-Desktop";
 // 本应用采用手动检测与发布页升级，旧的自动更新偏好不触发安装。
 export const APP_MANUAL_UPDATES_ONLY = true;
-export const APP_VERSION = "0.16.0-beta.1";
+export const APP_VERSION = "0.16.0-beta.2";
 
 export const APP_MENU_COMMANDS = [
   "newTask",

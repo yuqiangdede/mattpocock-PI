@@ -16307,3 +16307,23 @@ explicit current-task user request.
   changelog test-list and README release-line drift.
 - Automated coverage: `node --test scripts/check-release-docs.test.mjs
   scripts/release-version-check.test.mjs`. No Desktop or provider is required.
+
+### E2E-WIN-beta2-packaged-skill-shortcuts
+
+- **Preconditions:** Windows x64 release artifacts built from the release
+  candidate, isolated data/profile directories, and a local provider fixture.
+- **Steps:** Start the packaged app from an unrelated working directory; check
+  version, sandbox preload/IPC and the 800-session responsiveness probe. Verify
+  the first row contains Ask, Discuss requirements, Implement, Diagnose bug and
+  Review code; open More and inspect its four groups and 19 items. Run real
+  Workflow/Skill requests against the fixture and restart after a local skill
+  edit. Switch settings language and inspect the Feedback help text.
+- **Expected:** Host and app versions agree; shortcut selection preserves the
+  draft and requires manual Send. Bundled skill resources load and local edits
+  survive restart. Feedback help uses the active locale. The real Portable
+  launcher starts its own packaged Host and releases its debugger port on quit.
+- **Coverage:** `coding-workbench-shortcuts.test.mjs`,
+  `settings-help-tooltip.test.mjs`, isolated Composer Electron acceptance,
+  `scripts/e2e-engineering-skills.mjs`, and the release acceptance probes.
+  NSIS user-install/upgrade, updater, signing and clean-VM acceptance are
+  separate qualification lanes; these probes do not alter an existing install.

@@ -5,7 +5,7 @@ export const deEntries: ChangelogEntry[] = [
     "version": "0.16.0",
     "date": "2026-10-01",
     "highlights": [
-      "Matt-Engineering-Skills mit konfigurierbaren Shortcut-Anweisungen, Anwendungshinweisen und Beispielen sowie automatischer Versionsprüfung; manuelle Updates bewahren lokale Änderungen.",
+      "Matt-Engineering-Skills mit konfigurierbaren Shortcut-Anweisungen, Anwendungshinweisen und Beispielen sowie automatischer Versionsprüfung; manuelle Updates bewahren lokale Änderungen. Häufige Composer-Aktionen stehen zuerst; seltene Skills sind im gruppierten Mehr-Menü verfügbar.",
       "Technische Artefaktverweise mit Phasenrevision registrieren und öffnen; historische und nicht verfügbare Dateien bleiben sichtbar.",
       "Projektbezogene Engineering-Workflow-Läufe mit sechs Skill-Phasen, expliziter Bestätigung und sicherer Wiederaufnahme.",
       "Live Voice steht jetzt allen zur Verfügung, und Anrufe starten im aktuellen Verlauf.",
