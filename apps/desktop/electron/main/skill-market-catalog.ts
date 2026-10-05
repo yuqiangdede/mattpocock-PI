@@ -66,3 +66,4 @@ export function fetchVersionSource(url: string, kind: "json") {
   return client.request(url, kind);
 }
 export function checkEngineeringSkillRevision() { return fetchEngineeringSkillRevision(client.request); }
+export function assertPublicUpdateUrl(url: string) { return client.assertPublicUrl(url); }

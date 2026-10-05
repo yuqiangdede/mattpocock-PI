@@ -46,6 +46,8 @@ Update engineering skills explicitly fetches one complete immutable upstream
 revision through existing public-HTTPS policy. Host validates the bundle before
 activation, retains changed/removed packages, preserves activation state and
 keeps old versions. A failed download does not activate partial content.
+The explicit Settings update/backup/restore journey and upstream removal rules
+are specified in [executable updates](executable-updates.md).
 Stage start still reports disabled/missing skills rather than installing them.
 
 ### Stage definitions
@@ -344,3 +346,7 @@ no runtime acceptance is claimed until implementation and checks pass.
 - The configured tracker is GitHub Issues in yuqiangdede/mattpocock-PI with the five canonical triage labels. Implementation tickets #5-#10 are published with ready-for-agent and native blocking relationships. The repository specification is not a separately published parent issue.
 - User confirmation in the future product is independent of this interview's instruction to accept design recommendations automatically. The product continues to require explicit stage acceptance.
 - No application behavior, IPC implementation, runtime, or stored user data changes as a result of finalizing this specification.
+
+## 官方基线版本检测
+
+PI-Desktop 原版的当前版本来自已接入源码的 `UPSTREAM_BASELINE.version`，定制版当前版本来自 `APP_VERSION`；分别与各自发布来源比较。版本检测不安装源码或二进制。官方基线只随人工接入的更新候选变更，必须通过更新验证后交付。

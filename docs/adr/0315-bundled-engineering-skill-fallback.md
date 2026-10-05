@@ -47,3 +47,20 @@ skills continue to win. Removed or locally edited defaults need a deliberate
 user edit/reinstallation before they can be replaced. Retained versions consume
 profile storage; automatic garbage collection is deferred. Product behavior and
 acceptance are specified in the engineering skills distribution document.
+
+## Amendment: explicit backup and recovery (2026-10-05)
+
+Host snapshots the complete active bundled package contents before updating.
+The active manifest upgrades from version 1 to version 2 on a successful
+mutation, with an optional pointer to a validated profile-local snapshot.
+Version 1 is still read without rewriting; unknown versions fail closed.
+Older Host binaries supporting only version 1 cannot read a version 2 catalog.
+The backup pointer and active catalog commit together through the existing
+atomic manifest replacement. Partial writes never change the active catalog.
+
+Restore switches to the snapshot but retains current local modifications and
+removals. Global/project definitions and activation choices remain untouched.
+Unmodified upstream-removed packages leave the active catalog; edited or locally
+removed packages stay protected. Their retained directories remain available
+for recovery. Update and restore require idle Host task state under the same
+mutex as the manifest mutation.

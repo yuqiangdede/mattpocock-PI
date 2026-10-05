@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 /**
  * What the settings picker's catalog fallback lists.
  *
@@ -16,7 +17,7 @@ register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
 
 const { ModelsDevCatalog } = await import("../electron/main/models-dev-catalog.ts");
 
-const catalogPath = new URL("../resources/models.dev/api.json", import.meta.url).pathname;
+const catalogPath = fileURLToPath(new URL("../resources/models.dev/api.json", import.meta.url));
 
 async function loadedCatalog() {
   const catalog = new ModelsDevCatalog({ catalogPath });

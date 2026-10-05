@@ -9,6 +9,7 @@ export * from "./transcript-truncation.js";
 export * from "./keyboard-shortcuts.js";
 export * from "./changelog.js";
 export * from "./composer-trigger.js";
+export * from "./session-link.js";
 export * from "./fuzzy.js";
 export * from "./mcp-import.js";
 export * from "./mcp-catalog.js";
@@ -77,3 +78,6 @@ export * from "./event-usage.js";
 export * from "./free-tasks.js";
 
 export * from "./engineering-shortcuts.js";
+export * from "./storage.js";
+
+export * from "./upstream.js";

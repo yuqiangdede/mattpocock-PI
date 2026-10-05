@@ -26,6 +26,7 @@ export type AppIpcDependencies = {
   togglePluginLauncher: () => Promise<void>;
   safeOpenExternal: (url: unknown) => Promise<void>;
   updater: AppUpdaterController;
+  hasRunningTasks: () => boolean;
 };
 
 /** Register app, instruction, launcher and update channels. */
@@ -36,6 +37,7 @@ export function registerAppIpc({
   togglePluginLauncher,
   safeOpenExternal,
   updater,
+  hasRunningTasks,
 }: AppIpcDependencies): void {
   const { handle, handleWithEvent } = registrar;
 
@@ -48,6 +50,7 @@ export function registerAppIpc({
       const result = await host.call<{ revision: string }>("skills.getBundledVersion");
       return result.revision || null;
     },
+    getChannel: () => updater.getState().channel ?? "stable",
   });
   handle(IPC.invoke.versionSourcesList, () => sources.list());
   handle(IPC.invoke.versionSourcesCheck, (id: VersionSourceId) => sources.check(id));
@@ -245,15 +248,30 @@ export function registerAppIpc({
     },
   );
 
-  handle(IPC.invoke.updatesGetState, async () => updater.getState());
+  handle(IPC.invoke.updatesGetState, async () => updater.readyState());
   handle(IPC.invoke.updatesCheck, async () => updater.check({ manual: true }));
   handle(IPC.invoke.updatesDownload, async () => updater.download());
+  handle(IPC.invoke.updatesSetChannel, async (channel: "stable" | "prerelease") => updater.setChannel(channel));
   handle(IPC.invoke.updatesInstall, async () => {
-    updater.install();
+    const host = getHost();
+    if (!host || hasRunningTasks()) throw new Error("TASKS_RUNNING");
+    const generation = host.generation;
+    await host.call("updates.prepareInstall");
+    try {
+      if (getHost() !== host || generation !== host.generation || hasRunningTasks()) throw new Error("TASKS_RUNNING");
+      updater.install();
+    } catch (error) {
+      if (getHost() === host && generation === host.generation) await host.call("updates.cancelInstall");
+      throw error;
+    }
     return { ok: true };
   });
   handle(IPC.invoke.updatesOpenReleases, async () => {
     await updater.openReleases();
+    return { ok: true };
+  });
+  handle(IPC.invoke.updatesDismiss, async () => {
+    await updater.dismiss();
     return { ok: true };
   });
 }

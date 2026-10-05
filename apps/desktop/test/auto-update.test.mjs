@@ -57,6 +57,7 @@ test("update IPC channels are declared and whitelisted for the preload bridge", 
     "updatesDownload",
     "updatesInstall",
     "updatesOpenReleases",
+    "updatesDismiss",
     "updatesState",
   ]) {
     assert.match(protocolSource, new RegExp(`${channel}:`), channel);
@@ -79,6 +80,7 @@ test("main process registers update handlers and the auto-check lifecycle", () =
     "IPC.invoke.updatesDownload",
     "IPC.invoke.updatesInstall",
     "IPC.invoke.updatesOpenReleases",
+    "IPC.invoke.updatesDismiss",
   ]) {
     assert.ok(mainSource.includes(channel), channel);
   }
@@ -101,17 +103,17 @@ test("updater gates delivery mode by platform and delivery policy", () => {
   assert.match(updaterSource, /piDistribution/);
   assert.match(updaterSource, /autoUpdater\.autoDownload = false/);
   assert.match(updaterSource, /autoUpdater\.autoInstallOnAppQuit = false/);
-  assert.match(updaterSource, /autoUpdater\.autoDownload = mode === "in-app"/);
-  assert.match(updaterSource, /autoUpdater\.autoInstallOnAppQuit = mode === "in-app"/);
-  assert.match(updaterSource, /this\.applyPreference\(preference, false\)/);
+  assert.match(updaterSource, /autoUpdater\.autoDownload = false/);
+  assert.match(updaterSource, /autoUpdater\.autoInstallOnAppQuit = false/);
+  assert.match(updaterSource, /this\.applyPreference\(preference\)/);
   assert.match(updaterSource, /manualReminderTracker/);
-  assert.match(updaterSource, /applyPreference\(this\.preference, false\)/);
+  assert.match(updaterSource, /applyPreference\(this\.preference\)/);
   assert.match(updaterSource, /resolveStoredUpdatePreference/);
   assert.match(updaterSource, /if \(!preferenceChanged\) return/);
   assert.match(
     updaterSource,
-    /allowPrerelease = false/,
-    "prerelease installs must still track the stable GitHub latest release",
+    /allowPrerelease = this\.channel === "prerelease"/,
+    "the selected stable/prerelease channel governs discovery",
   );
   assert.match(updaterSource, /quitAndInstall/);
   assert.match(
@@ -133,7 +135,7 @@ test("updater gates delivery mode by platform and delivery policy", () => {
     updaterSource,
     /state\.status === "downloaded"[\s\S]*return this\.state/,
   );
-  assert.match(updaterSource, /autoUpdater\.on\("error"/);
+  assert.match(updaterSource, /listen\("error"/);
   assert.match(
     updaterSource,
     /APP_REPOSITORY.*releases/,
@@ -172,6 +174,8 @@ test("renderer exposes the updates API, banner and settings row", () => {
   assert.match(apiSource, /updatesGetState:/);
   assert.match(apiSource, /updatesCheck:/);
   assert.match(apiSource, /updatesInstall:/);
+  assert.match(bannerSource, /update\.dismissed === true/);
+  assert.match(bannerSource, /api\.updatesDismiss\(\)/);
   assert.match(apiSource, /onUpdateState:/);
   assert.match(bannerSource, /updates\.restart/);
   assert.match(bannerSource, /updates\.viewRelease/);

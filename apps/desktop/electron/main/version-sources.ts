@@ -1,4 +1,6 @@
+import { UPSTREAM_BASELINE } from "../../../../packages/shared/src/upstream";
 import type { VersionSourceId, VersionSourceState } from "../../../../packages/shared/src/version-sources";
+import type { UpdateChannel } from "@pi-desktop/shared";
 import { APP_REPOSITORY, UPSTREAM_REPOSITORY } from "../../../../packages/shared/src/protocol";
 
 export const VERSION_REPOSITORIES = {
@@ -34,21 +36,23 @@ export function compareReleaseVersions(left: string, right: string): number | nu
   return 0;
 }
 
-export function createVersionSourceChecker({ request, appVersion, skillVersion }: {
+export function createVersionSourceChecker({ request, appVersion, upstreamVersion = UPSTREAM_BASELINE.version, skillVersion, getChannel }: {
   request: (url: string, kind: "json") => Promise<unknown>;
   appVersion: string;
+  upstreamVersion?: string;
   skillVersion: () => Promise<string | null>;
+  getChannel?: () => UpdateChannel;
 }) {
   const cache = new Map<VersionSourceId, VersionSourceState>();
   const pending = new Map<VersionSourceId, Promise<VersionSourceState>>();
   const initial = (id: VersionSourceId): VersionSourceState => ({
-    id, currentVersion: id === "mattpocock-skills" ? null : appVersion,
+    id, currentVersion: id === "mattpocock-skills" ? null : id === "pi-desktop" ? upstreamVersion : appVersion,
     latestVersion: null, status: "idle", checkedAt: null,
     url: `https://github.com/${VERSION_REPOSITORIES[id]}${id === "mattpocock-skills" ? "" : "/releases"}`,
   });
   return {
     async list(): Promise<VersionSourceState[]> {
-      const rows = Object.keys(VERSION_REPOSITORIES).map((id) => ({ ...(cache.get(id as VersionSourceId) ?? initial(id as VersionSourceId)) }));
+      const rows = (["mattpocock-skills", "mattpocock-pi"] as const).map((id) => ({ ...(cache.get(id) ?? initial(id)) }));
       // 当前技能版本只读取 Host 清单，不联网也不安装。
       const skills = rows.find((row) => row.id === "mattpocock-skills")!;
       try { skills.currentVersion = await skillVersion(); } catch { skills.currentVersion = null; }
@@ -71,14 +75,18 @@ export function createVersionSourceChecker({ request, appVersion, skillVersion }
           } else {
             const releases = await request(`https://api.github.com/repos/${VERSION_REPOSITORIES[id]}/releases?per_page=100`, "json");
             if (!Array.isArray(releases)) throw new Error("Invalid release response");
-            // 原版跟随稳定发布；fork 在没有稳定发布时展示预发布。
+            // Select by semantic version rather than API response order.
             const published = releases.filter((release) => record(release) && release.draft === false);
-            const latest = published.find((release) => release.prerelease === false) ?? (id === "mattpocock-pi" ? published[0] : undefined);
+            const channel = getChannel?.() ?? (appVersion.includes("-") ? "prerelease" : "stable");
+            const latest = published.filter((release) => typeof release.tag_name === "string"
+              && compareReleaseVersions(release.tag_name, appVersion) !== null
+              && (release.prerelease === false || (id === "mattpocock-pi" && channel === "prerelease")))
+              .sort((a, b) => compareReleaseVersions(String(b.tag_name), String(a.tag_name)) ?? 0)[0];
             if (!latest) row.status = "no-release";
             else {
               if (typeof latest.tag_name !== "string") throw new Error("Invalid release tag");
               row.latestVersion = latest.tag_name;
-              const comparison = compareReleaseVersions(latest.tag_name, appVersion);
+              const comparison = compareReleaseVersions(latest.tag_name, row.currentVersion!);
               row.status = comparison === null ? "different" : comparison > 0 ? "available" : "current";
             }
           }

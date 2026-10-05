@@ -51,12 +51,14 @@ or `writing-for-agents`.
 
 
 The shortcuts use two separate wrapping rows. The first row is Ask next step,
-Initialize, Engineering Workflow panel, and More features, in that order.
-The second row is Discuss requirements (with Form specification and Split
-tickets in its split-button menu), Implement, Diagnose bug, Review code,
-and Retrospective. Discuss requirements,
-Implement, and Diagnose bug use bold text; all other controls use regular text.
-At narrow widths each row wraps independently without horizontal overflow.
+Discuss requirements (with Form specification and Split tickets in its
+split-button menu), Implement, Diagnose bug, and Review code, in that order.
+The second row contains the subdued Engineering Workflow panel and More.
+More groups skills into Requirements and exploration, Implementation and
+maintenance, Collaboration and reflection (including Retrospective), and
+Project setup (Initialize). Every skill remains available exactly once.
+All shortcuts use regular text. At narrow widths each row wraps independently
+without horizontal overflow; order stays fixed across task states.
 
 ## Requirements confirmation
 
@@ -68,6 +70,21 @@ approval, history and freshness rules. Existing skill shortcuts retain the
 draft-only behavior described above.
 
 ## Global instruction settings
+
+Composer skill buttons, including the requirements and More menu entries,
+show the same localized usage timing, purpose and example on pointer hover
+or keyboard focus. Guidance uses the shared portal tooltip so menu clipping
+does not hide it; it wraps within the viewport. Reading a tooltip does not
+change the draft or execute a skill. Clicking dismisses it and retains the
+existing draft insertion behavior. Buttons retain short accessible names
+and expose their guidance as accessible descriptions.
+
+For every one of the 26 engineering entries, the instruction editor shows
+localized guidance before the prompt: when to use the skill, what it does,
+and one concrete example request. Selecting a different entry switches all
+three descriptions together. Guidance is read-only product copy, separate
+from editable prompt overrides and installed skill definitions. Reading it
+does not insert a draft, save settings or execute a skill.
 
 Settings > Agent > Skills edits all 26 shortcut instructions globally across
 projects, including More menu skills. Saving an empty string selects only

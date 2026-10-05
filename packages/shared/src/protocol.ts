@@ -1,14 +1,16 @@
+import forkConfig from "./fork-config.json" with { type: "json" };
+
 export const PROTOCOL_VERSION = 11 as const;
 export const SCHEMA_VERSION = 16 as const;
 export const APP_ID = "net.aiuo.pi-desktop";
 // APP_NAME 参与 Electron 配置目录命名；保留兼容名称，显示名称单独设置。
 export const APP_NAME = "PI-Desktop";
-export const APP_DISPLAY_NAME = "mattpocock-PI";
-export const APP_REPOSITORY = "yuqiangdede/mattpocock-PI";
-export const UPSTREAM_REPOSITORY = "vastsa/PI-Desktop";
-// 本应用采用手动检测与发布页升级，旧的自动更新偏好不触发安装。
-export const APP_MANUAL_UPDATES_ONLY = true;
-export const APP_VERSION = "0.16.0-beta.1";
+// 集中配置定制身份；保留协议导出以兼容已有调用方和直接执行的源码工具。
+export const APP_DISPLAY_NAME = forkConfig.displayName;
+export const APP_REPOSITORY = forkConfig.repository;
+export const UPSTREAM_REPOSITORY = forkConfig.upstreamRepository;
+export const APP_MANUAL_UPDATES_ONLY = forkConfig.manualUpdatesOnly;
+export const APP_VERSION = "0.16.1";
 
 export const APP_MENU_COMMANDS = [
   "newTask",
@@ -56,6 +58,11 @@ export type WindowControlAction = (typeof WINDOW_CONTROL_ACTIONS)[number];
 
 export const IPC = {
   invoke: {
+    storageGet: "pi-desktop/storage/get",
+    storageChoose: "pi-desktop/storage/choose",
+    storageMigrate: "pi-desktop/storage/migrate",
+    storageClearCache: "pi-desktop/storage/clearCache",
+    storageRemoveBackup: "pi-desktop/storage/removeBackup",
     appGetVersion: "pi-desktop/app/getVersion",
     appOpenFeedback: "pi-desktop/app/openFeedback",
     appHealth: "pi-desktop/app/health",
@@ -75,8 +82,11 @@ export const IPC = {
     versionSourcesOpen: "pi-desktop/versionSources/open",
     updatesCheck: "pi-desktop/updates/check",
     updatesDownload: "pi-desktop/updates/download",
+    updatesSetChannel: "pi-desktop/updates/setChannel",
     updatesInstall: "pi-desktop/updates/install",
     updatesOpenReleases: "pi-desktop/updates/openReleases",
+    /** Persist the user's decision to stop nudging about one version (#1317). */
+    updatesDismiss: "pi-desktop/updates/dismiss",
     notificationList: "pi-desktop/notification/list",
     notificationMarkRead: "pi-desktop/notification/markRead",
     notificationMarkAllRead: "pi-desktop/notification/markAllRead",
@@ -224,6 +234,7 @@ export const IPC = {
     toolResolvePermission: "pi-desktop/tool/resolvePermission",
     todosGet: "pi-desktop/todos/get",
     askToolResolve: "pi-desktop/agent/askTool/resolve",
+    pendingInteractive: "pi-desktop/agent/pendingInteractive",
     plansPending: "pi-desktop/plans/pending",
     plansResolve: "pi-desktop/plans/resolve",
     /**
@@ -333,6 +344,7 @@ export const IPC = {
     skillBundleStatus: "pi-desktop/skill/bundle/status",
     skillBundleCheck: "pi-desktop/skill/bundle/check",
     skillBundleUpdate: "pi-desktop/skill/bundle/update",
+    skillBundleRestore: "pi-desktop/skill/bundle/restore",
     skillCreate: "pi-desktop/skill/create",
     skillImport: "pi-desktop/skill/import",
     skillImportScan: "pi-desktop/skill/importScan",

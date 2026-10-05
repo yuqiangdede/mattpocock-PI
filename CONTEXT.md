@@ -5,13 +5,26 @@ This glossary records terms resolved during product discovery; it is not an impl
 
 ## Language
 
-**更新来源**:
-可独立查询版本的发布方。本应用区分 PI-Desktop 原版、Matt Pocock 技能包与 mattpocock-PI，检测结果分别属于各自的来源。
-_Avoid_: 统一应用版本、技能安装
+**Update Source**:
+An independently updatable product: the Matt Pocock skill bundle or the
+mattpocock-PI application. Upstream PI-Desktop is part of an application release,
+not a separate installed product.
+_Avoid_: upstream baseline as an install target
 
-**版本检测**:
-读取当前版本并查询更新来源的最新版本。检测本身不下载或安装更新，也不更改已安装技能。
-_Avoid_: 自动升级、安装更新
+**Version Check**:
+Reading the installed version and querying a source for newer published content.
+A check does not download or install that content.
+_Avoid_: update installation
+
+**Update Channel**:
+The user's choice of eligible application releases: stable releases only, or
+stable and prerelease versions. Neither choice authorizes a downgrade.
+_Avoid_: automatic installation policy
+
+**Skill Backup**:
+A recoverable snapshot of the installed skill bundle before an explicit update.
+Restoring it retains subsequent local customizations.
+_Avoid_: application rollback
 
 **Workflow Run**:
 A single development effort that proceeds through Discovery, Spec, Tickets, Implement, Review, and Retro. A project can retain multiple runs, with only one active run at a time.

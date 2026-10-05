@@ -177,16 +177,16 @@ test("settings writes validate the mode without changing other preferences", asy
     enterToSend: true,
     onboardingDismissed: false,
   };
-  assert.equal(validateSettingsWrite(settings), settings);
+  assert.deepEqual(validateSettingsWrite(Object.freeze(settings)), settings);
   const infiniteSettings = { ...settings, infiniteProviderRetry: true };
-  assert.equal(validateSettingsWrite(infiniteSettings), infiniteSettings);
+  assert.deepEqual(validateSettingsWrite(Object.freeze(infiniteSettings)), infiniteSettings);
   assert.throws(
     () => validateSettingsWrite({ ...settings, infiniteProviderRetry: "yes" }),
     /infiniteProviderRetry is invalid/,
   );
   for (const thinkingDisplayMode of ["detailed", "compact"]) {
     const next = { ...settings, thinkingDisplayMode };
-    assert.equal(validateSettingsWrite(next), next);
+    assert.deepEqual(validateSettingsWrite(Object.freeze(next)), next);
   }
   assert.throws(
     () => validateSettingsWrite({ ...settings, thinkingDisplayMode: "unknown" }),

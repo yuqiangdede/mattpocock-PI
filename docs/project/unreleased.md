@@ -5,11 +5,18 @@
   or creating a Workflow Run. Changed content requires renewed confirmation;
   historical decisions remain available after restart.
 
-- Coding Workbench now exposes eight compact engineering skill buttons in the
-  Composer. A click preserves the draft and adds a skill; execution requires
-  manual Send and uses ordinary chat. Engineering initialization invokes
-  `/setup-matt-pocock-skills`. Legacy task records, files and backups are retained;
-  optional formal Workflow acceptance remains unchanged.
+- Settings > Info now updates the Matt Pocock skill bundle and mattpocock-PI
+  independently, with stable/prerelease channels. The upstream comparison row
+  is removed. Skill updates snapshot the previous catalog, preserve local edits,
+  and offer Restore last backup. Running tasks block skill maintenance and app
+  restart. Windows installs explicitly download and restart; Portable/ZIP
+  downloads are checksum-verified and revealed for manual replacement.
+
+- Coding Workbench prioritizes Ask next step, Discuss requirements, Implement,
+  Diagnose bug and Review code in the first Composer row. Workflow navigation
+  and More occupy a subdued second row; More groups occasional skills, including
+  initialization and retrospective. Skill selection preserves the draft and
+  requires manual Send. Usage guidance and examples explain each skill.
 - `/compact` and automatic context compaction work again on a gateway that
   fronts a Codex backend. The summary request of a checkpoint now carries the
   conversation identity every other turn of the session sends

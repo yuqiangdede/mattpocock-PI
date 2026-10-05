@@ -87,7 +87,7 @@ pub async fn execute_write(
 
     let committed = {
         let st = state.lock().await;
-        if st.shutting_down {
+        if st.shutting_down || st.update_installing {
             return Err(rpc_err(1001, "host is shutting down", "HOST_SHUTTING_DOWN"));
         }
         todos::replace_for_turn(&st.db, &p.session_id, p.turn_id.as_deref(), &normalized)

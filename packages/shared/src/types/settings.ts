@@ -36,6 +36,7 @@ export type AppSettings = {
   defaultModelId?: string;
   /** Per-install update behavior; absent uses the package's safe default. */
   updatePreference?: UpdatePreference;
+  updateChannel?: import("./platform.js").UpdateChannel;
   /** Last manually announced release; kept local to avoid repeating notices. */
   lastNotifiedUpdateVersion?: string;
   /** Host speech bindings. Absent means voice actions stay disabled. */

@@ -2,7 +2,8 @@ import { createRoot } from "react-dom/client";
 import { I18nextProvider } from "react-i18next";
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
-import { en, flattenCatalog } from "@pi-desktop/i18n";
+import { en, zhCN, flattenCatalog } from "@pi-desktop/i18n";
+import { ENGINEERING_SHORTCUTS } from "@pi-desktop/shared";
 import { EngineeringSkillSettings } from "../../apps/desktop/src/components/settings/EngineeringSkillSettings";
 import { Composer } from "../../apps/desktop/src/components/Composer";
 import { useAppStore } from "../../apps/desktop/src/stores/app-store";
@@ -26,7 +27,7 @@ const editor = () => document.querySelector<HTMLElement>(".composer-input")!;
 async function type(value: string) { input().focus(); input().select(); await fixture("typeText", value); await until(() => input().value === value); }
 
 globalThis.codingWorkbenchProbe = async () => {
-  await i18n.use(initReactI18next).init({ lng: "en", resources: { en: { translation: flattenCatalog(en) } }, interpolation: { escapeValue: false } });
+  await i18n.use(initReactI18next).init({ lng: "en", resources: { en: { translation: flattenCatalog(en) }, "zh-CN": { translation: flattenCatalog(zhCN) } }, interpolation: { escapeValue: false } });
   const params = new URLSearchParams(location.search);
   const sessionId = params.get("sessionId")!;
   const projectPath = params.get("projectA")!;
@@ -40,6 +41,26 @@ globalThis.codingWorkbenchProbe = async () => {
   const prefill = async (text: string) => { useAppStore.setState({ composerPrefill: { sessionId, text, fileReferences: [] } }); await until(() => readEditorValue(editor()) === text); };
   await prefill("Keep existing draft");
   renderSettings(); await until(() => input());
+  for (const [locale, catalog] of [["en", en], ["zh-CN", zhCN]] as const) {
+    await i18n.changeLanguage(locale);
+    const entries = ENGINEERING_SHORTCUTS.filter(item => locale === "en" || item.action === "ask" || item.action === "review");
+    for (const { action } of entries) {
+      const trigger = await until(() => document.querySelector<HTMLButtonElement>(`button[aria-label="${catalog.settings.engineering.shortcut}"]`));
+      trigger.click();
+      await until(() => document.querySelector('[role="option"]'));
+      await click(catalog.coding[action]);
+      await until(() => {
+        const guide = document.querySelector(".engineering-skill-description");
+        return guide && ["when", "purpose", "example"].every(section => guide.textContent?.includes(catalog.coding.skillGuides[action][section as "when" | "purpose" | "example"]));
+      });
+      await until(() => document.querySelector<HTMLTextAreaElement>("textarea")?.value === catalog.coding.prompts[action]);
+    }
+  }
+  await i18n.changeLanguage("en");
+  const trigger = await until(() => document.querySelector<HTMLButtonElement>('button[aria-label="Shortcut"]'));
+  trigger.click(); await until(() => document.querySelector('[role="option"]')); await click(en.coding.ask);
+  await until(() => input()?.value === en.coding.prompts.ask);
+  check(JSON.stringify((await api.getSettings()).engineeringShortcutPrompts) === JSON.stringify(settings.engineeringShortcutPrompts), "Reading guidance saved prompt overrides");
   await type("Inspect this project's verified blockers first."); await click("Save instruction");
   await until(async () => (await api.getSettings()).engineeringShortcutPrompts?.ask === "Inspect this project's verified blockers first.");
   renderComposer(); await until(() => editor() && readEditorValue(editor()) === "Keep existing draft");
@@ -75,5 +96,5 @@ globalThis.codingWorkbenchProbe = async () => {
   await until(() => document.body.textContent?.includes("Check failed. Installed skills are retained"));
   check((await api.engineeringSkillStatus()).revision === "b".repeat(40), "Offline check changed installed skills");
   root.unmount();
-  return { ok: true, customized: true, persisted: true, empty: true, restored: true, manual: true, detected: true, updated: true, preserved: true, offline: true };
+  return { ok: true, descriptions: true, customized: true, persisted: true, empty: true, restored: true, manual: true, detected: true, updated: true, preserved: true, offline: true };
 };

@@ -10,14 +10,25 @@ import { RequirementsConfirmation } from "../requirements/RequirementsConfirmati
 import { CODING_SKILL_SHORTCUTS, CODING_MORE_SKILLS, resolveShortcutInstruction, type EngineeringShortcutAction } from "@pi-desktop/shared";
 export { CODING_SKILL_SHORTCUTS, CODING_MORE_SKILLS } from "@pi-desktop/shared";
 
+const MORE_GROUPS = [
+  { label: "exploration", actions: ["grillMe", "grilling", "research", "questionnaire", "prototype"] },
+  { label: "maintenance", actions: ["tdd", "triage", "resolveConflicts", "improveArchitecture", "codebaseDesign", "domainModeling", "wayfinder"] },
+  { label: "collaboration", actions: ["retro", "handoff", "teach", "waitWhat", "writingForAgents", "wizard"] },
+  { label: "projectSetup", actions: ["initialize"] },
+] as const;
+const moreSkills = [...CODING_SKILL_SHORTCUTS, ...CODING_MORE_SKILLS];
+
 export function CodingWorkbench({ disabled, error, onSelect }: {
   disabled: boolean;
   error: string | null;
   onSelect: (skill: string, prompt: string) => void;
 }) {
   const { t } = useTranslation();
-  const overrides = useAppStore(state => state.settings?.engineeringShortcutPrompts);
+  const skillTooltip = (action: EngineeringShortcutAction) => (["when", "purpose", "example"] as const)
+    .map(section => `${t(`settings.engineering.${section}`)}: ${t(`coding.skillGuides.${action}.${section}`)}`)
+    .join("\n\n");
   const projectPath = useAppStore(state => state.workspace?.path ?? "");
+  const overrides = useAppStore(state => state.settings?.engineeringShortcutPrompts);
   const selectShortcut = (action: EngineeringShortcutAction, skill: string) => onSelect(skill, resolveShortcutInstruction(action, t(`coding.prompts.${action}`), overrides));
   const [moreOpen, setMoreOpen] = useState(false);
   const [requirementsOpen, setRequirementsOpen] = useState(false);
@@ -27,60 +38,19 @@ export function CodingWorkbench({ disabled, error, onSelect }: {
   }, [disabled]);
 
   return <section className="coding-workbench" aria-label={t("coding.tools")}>
-    <div className="coding-shortcuts">
-      <Button disabled={disabled} title={t("coding.askHint")} onClick={() => selectShortcut("ask", "ask-matt")}>
-        {t("coding.ask")}
-      </Button>
-      <Button disabled={disabled} title={t("coding.initializeHint")} onClick={() => selectShortcut("initialize", "setup-matt-pocock-skills")}>
-        {t("coding.initialize")}
-      </Button>
-      <Button onClick={() => useAppStore.getState().openWorkPanelTab(toolWorkPanelTab("workflow"))}>
-        {t("coding.formal")}
-      </Button>
-      <AnchoredMenu
-        open={moreOpen}
-        onClose={() => setMoreOpen(false)}
-        role="menu"
-        label={t("coding.more")}
-        menuClassName="context-menu coding-more-menu"
-        trigger={(ref) => (
-          <Button
-            ref={ref}
-            type="button"
-            disabled={disabled}
-            title={t("coding.moreHint")}
-            aria-haspopup="menu"
-            aria-expanded={moreOpen}
-            onClick={() => { setRequirementsOpen(false); setMoreOpen((value) => !value); }}
-          >
-            {t("coding.more")}
-          </Button>
-        )}
-      >
-        {CODING_MORE_SKILLS.map(({ action, skill }) => (
-          <Button
-            key={skill}
-            type="button"
-            role="menuitem"
-            variant="ghost"
-            className="context-menu-item"
-            disabled={disabled}
-            onClick={() => {
-              setMoreOpen(false);
-              selectShortcut(action, skill);
-            }}
-          >
-            {t(`coding.${action}`)}
-          </Button>
-        ))}
-      </AnchoredMenu>
-    </div>
     <div className="coding-shortcuts coding-shortcuts-primary">
-      {CODING_SKILL_SHORTCUTS.filter(({ action }) => action !== "initialize" && action !== "spec" && action !== "tickets").map(({ action, skill }) => action === "discovery" ? <div className="coding-requirements-controls" key={skill}><div className="coding-requirements-split">
-        <Button className="coding-shortcut-emphasized" disabled={disabled} title={t("coding.discoveryHint")} onClick={() => {
+      <TooltipButton disabled={disabled} className="btn btn-secondary" ariaLabel={t("coding.ask")}
+        tooltip={skillTooltip("ask")} aria-description={skillTooltip("ask")} tooltipClassName="ui-tooltip-help coding-skill-tooltip"
+        onClick={() => selectShortcut("ask", "ask-matt")}>
+        {t("coding.ask")}
+      </TooltipButton>
+
+      {CODING_SKILL_SHORTCUTS.filter(({ action }) => action !== "initialize" && action !== "spec" && action !== "tickets" && action !== "retro").map(({ action, skill }) => action === "discovery" ? <div className="coding-requirements-controls" key={skill}><div className="coding-requirements-split">
+        <TooltipButton disabled={disabled} className="btn btn-secondary" ariaLabel={t("coding.discovery")}
+          tooltip={skillTooltip(action)} aria-description={skillTooltip(action)} tooltipClassName="ui-tooltip-help coding-skill-tooltip" onClick={() => {
           setRequirementsOpen(false);
           selectShortcut(action, skill);
-        }}>{t("coding.discovery")}</Button>
+        }}>{t("coding.discovery")}</TooltipButton>
         <AnchoredMenu
           open={requirementsOpen}
           onClose={() => setRequirementsOpen(false)}
@@ -100,22 +70,63 @@ export function CodingWorkbench({ disabled, error, onSelect }: {
             }}
           ><ChevronDown size={14} aria-hidden="true" /></TooltipButton>}
         >
-          {CODING_SKILL_SHORTCUTS.filter(({ action }) => action === "spec" || action === "tickets").map(({ action, skill }) => <Button
-            key={skill} type="button" role="menuitem" variant="ghost"
-            className="context-menu-item" disabled={disabled}
-            title={t(`coding.${action}Hint`)}
+          {CODING_SKILL_SHORTCUTS.filter(({ action }) => action === "spec" || action === "tickets").map(({ action, skill }) => <TooltipButton
+            key={skill} type="button" role="menuitem"
+            className="btn btn-ghost context-menu-item" disabled={disabled} ariaLabel={t(`coding.${action}`)}
+            tooltip={skillTooltip(action)} aria-description={skillTooltip(action)} tooltipClassName="ui-tooltip-help coding-skill-tooltip"
             onClick={() => {
               setRequirementsOpen(false);
               selectShortcut(action, skill);
             }}
-          >{t(`coding.${action}`)}</Button>)}
+          >{t(`coding.${action}`)}</TooltipButton>)}
         </AnchoredMenu>
         </div><RequirementsConfirmation projectPath={projectPath} disabled={disabled} />
-      </div> : <Button
-        key={skill} disabled={disabled} title={t(`coding.${action}Hint`)}
-        className={["implement", "diagnose"].includes(action) ? "coding-shortcut-emphasized" : undefined}
+      </div> : <TooltipButton
+        key={skill} disabled={disabled} className="btn btn-secondary" ariaLabel={t(`coding.${action}`)}
+        tooltip={skillTooltip(action)} aria-description={skillTooltip(action)} tooltipClassName="ui-tooltip-help coding-skill-tooltip"
         onClick={() => selectShortcut(action, skill)}
-      >{t(`coding.${action}`)}</Button>)}
+      >{t(`coding.${action}`)}</TooltipButton>)}
+    </div>
+    <div className="coding-shortcuts coding-shortcuts-secondary">
+      <Button variant="ghost" onClick={() => useAppStore.getState().openWorkPanelTab(toolWorkPanelTab("workflow"))}>
+        {t("coding.formal")}
+      </Button>
+      <AnchoredMenu
+        open={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        role="menu"
+        side="top"
+        restoreFocus={!disabled}
+        label={t("coding.more")}
+        menuClassName="context-menu coding-more-menu"
+        trigger={(ref) => (
+          <Button
+            ref={ref}
+            type="button"
+            variant="ghost"
+            disabled={disabled}
+            title={t("coding.moreHint")}
+            aria-haspopup="menu"
+            aria-expanded={moreOpen}
+            onClick={() => { setRequirementsOpen(false); setMoreOpen((value) => !value); }}
+          >
+            {t("coding.more")}
+          </Button>
+        )}
+      >
+        {MORE_GROUPS.map(({ label, actions }) => <div key={label} role="group" aria-label={t(`coding.groups.${label}`)}>
+          <div className="coding-menu-group-label" aria-hidden="true">{t(`coding.groups.${label}`)}</div>
+          {actions.map(action => moreSkills.find(entry => entry.action === action)).map(entry => entry && <TooltipButton
+            key={entry.skill} type="button" role="menuitem"
+            className="btn btn-ghost context-menu-item" disabled={disabled} ariaLabel={t(`coding.${entry.action}`)}
+            tooltip={skillTooltip(entry.action)} aria-description={skillTooltip(entry.action)} tooltipClassName="ui-tooltip-help coding-skill-tooltip"
+            onClick={() => {
+              setMoreOpen(false);
+              selectShortcut(entry.action, entry.skill);
+            }}
+          >{t(`coding.${entry.action}`)}</TooltipButton>)}
+        </div>)}
+      </AnchoredMenu>
     </div>
     {error && <div className="coding-shortcut-error" role="alert">
       <span>{error}</span>

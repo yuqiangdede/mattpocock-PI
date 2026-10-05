@@ -64,6 +64,7 @@ import { PromptEnhancementCard } from "./prompt-enhancement-card";
 import { CloseBehaviorSection, DeveloperSection } from "./developer-sections";
 import { PluginScenicThemesDestination } from "../../components/settings/PluginScenicThemesDestination";
 import { ConfigSyncPage } from "../../components/settings/ConfigSyncPage";
+import { StorageSettingsSection } from "./StorageSettingsSection";
 
 type SettingsTab = ReturnType<typeof useAppStore.getState>["settingsTab"];
 
@@ -421,6 +422,8 @@ export function SettingsPage() {
 
               <NetworkProxySection settings={settings} saveSettings={saveSettings} />
 
+              <StorageSettingsSection />
+
               <SettingsCard title={t("settings.power")}>
                 <SettingsRow
                   title={t("settings.keepAwakeWhileRunning")}
@@ -598,7 +601,7 @@ export function SettingsPage() {
                 </SettingsRow>
                 <SettingsRow
                   title={t("settings.feedback")}
-                  description="向 mattpocock-PI 仓库提交问题，并自动带上当前版本。"
+                  description={t("settings.feedbackDesc")}
                 >
                   <Button
                     variant="secondary"

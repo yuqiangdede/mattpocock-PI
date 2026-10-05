@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { ENGINEERING_SHORTCUTS, ENGINEERING_PROMPT_MAX_LENGTH, resolveShortcutInstruction, type EngineeringShortcutAction, type EngineeringSkillStatus, type EngineeringSkillUpdateMode } from "@pi-desktop/shared";
 import { Button, Field, Textarea } from "../ui";
 import { SettingsMenuSelect } from "./SettingsMenuSelect";
+import { EngineeringSkillDescription } from "./EngineeringSkillDescription";
 import { SettingsCard, SettingsRow } from "../../features/settings/primitives";
 import { useAppStore } from "../../stores/app-store";
 import { api } from "../../lib/api";
@@ -11,6 +12,7 @@ export function EngineeringSkillSettings({ onUpdated }: { onUpdated: () => Promi
   const { t } = useTranslation();
   const prompts = useAppStore(state => state.settings?.engineeringShortcutPrompts);
   const mode = useAppStore(state => state.settings?.engineeringSkillUpdateMode ?? "auto-check");
+  const tasksRunning = useAppStore(state => Object.values(state.runningSessions).some(Boolean));
   const [action, setAction] = useState<EngineeringShortcutAction>("ask");
   const defaults = t(`coding.prompts.${action}`);
   const saved = resolveShortcutInstruction(action, defaults, prompts);
@@ -74,6 +76,7 @@ export function EngineeringSkillSettings({ onUpdated }: { onUpdated: () => Promi
           onChange={value => setAction(value as EngineeringShortcutAction)} />
       </SettingsRow>
       <div className="settings-form-grid">
+        <EngineeringSkillDescription action={action} />
         <Field label={t("settings.engineering.prompt")} hint={t("settings.engineering.emptyHint")}>
           <Textarea aria-label={t("settings.engineering.prompt")} className="settings-instruction-editor" value={text} maxLength={ENGINEERING_PROMPT_MAX_LENGTH} disabled={busy} onChange={event => setText(event.target.value)} />
         </Field>
@@ -93,13 +96,14 @@ export function EngineeringSkillSettings({ onUpdated }: { onUpdated: () => Promi
         <Button disabled={Boolean(working)} onClick={() => void check()}>{t("settings.engineering.check")}</Button>
       </SettingsRow>
       <SettingsRow title={t("settings.engineering.latest")} detail={status?.latestRevision ?? t("settings.engineering.notChecked")}>
-        <Button disabled={Boolean(working)} onClick={() => void update()}>{t("settings.updateEngineeringSkills")}</Button>
+        <Button disabled={Boolean(working || tasksRunning)} onClick={() => void update()}>{t("settings.updateEngineeringSkills")}</Button>
       </SettingsRow>
       <SettingsRow title={t("settings.engineering.lastCheck")} detail={status?.checkedAt ? new Date(status.checkedAt).toLocaleString() : t("settings.engineering.notChecked")}>
         <span role="status">{working ? t("settings.engineering.working") : status?.error ? t("settings.engineering.checkFailed") : available ? t("settings.engineering.available") : status?.latestRevision ? t("settings.engineering.current") : ""}</span>
       </SettingsRow>
       {Boolean(status?.preserved?.length) && <SettingsRow title={t("settings.engineering.preserved")} detail={status!.preserved!.join(", ")}><span>{t("settings.engineering.preservedHint")}</span></SettingsRow>}
     </SettingsCard>
+    {tasksRunning && <div role="status">{t("versionUpdates.tasksRunning")}</div>}
     {error && <div role="alert">{t("coding.error")}: {error}</div>}
   </>;
 }

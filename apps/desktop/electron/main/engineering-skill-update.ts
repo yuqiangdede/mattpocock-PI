@@ -59,6 +59,8 @@ export function createEngineeringSkillUpdater({ getHost, fetchBundle, notify }: 
       if (getHost() !== owner || owner.generation !== generation) throw new Error("host changed during skill update");
     };
     pending = (async () => {
+      await owner.call("updates.assertIdle");
+      assertOwner();
       const bundle = await fetchBundle();
       assertOwner();
       const result = await owner.call<{ revision: string; updated: string[]; preserved: string[] }>("skills.updateBundled", bundle);

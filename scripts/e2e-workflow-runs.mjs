@@ -150,7 +150,7 @@ try {
   } else if (process.argv.includes("--requirements-menu")) {
     for (const field of ["requirementsMenu", "mappings", "keyboard", "disabled", "narrow", "localized"]) assert.equal(result[field], true, field);
   } else if (settingsFixture) {
-    for (const field of ["customized", "persisted", "empty", "restored", "manual", "detected", "updated", "preserved", "offline"]) assert.equal(result[field], true, field);
+    for (const field of ["descriptions", "customized", "persisted", "empty", "restored", "manual", "detected", "updated", "preserved", "offline"]) assert.equal(result[field], true, field);
   } else if (codingFixture) {
     assert.equal(result.inserted, true);
     assert.equal(result.manual, true);
