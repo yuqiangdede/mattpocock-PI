@@ -5,6 +5,9 @@ export const frEntries: ChangelogEntry[] = [
     "version": "0.16.1",
     "date": "2026-10-04",
     "highlights": [
+      "Confirmez une version de spécification dans Composer ou Workflow ; les modifications exigent une nouvelle confirmation.",
+      "Consultez les conseils et exemples directement dans les raccourcis de compétences de Composer.",
+      "Mettez à jour explicitement l’application ou les compétences, avec choix du canal et restauration de sauvegarde.",
       "Choisissez un emplacement de données personnalisé dans les paramètres, suivez une migration à froid vérifiée et ne nettoyez que les caches régénérables.",
       "Les tâches planifiées peuvent s’exécuter par intervalle : de 5 minutes à 24 heures, compté à partir du moment où la tâche a été activée.",
       "La page des tâches planifiées associe la liste des tâches à la tâche sélectionnée : dernier résultat, prochaine exécution, instruction et historique des exécutions.",

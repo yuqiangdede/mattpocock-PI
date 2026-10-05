@@ -5,6 +5,9 @@ export const deEntries: ChangelogEntry[] = [
     "version": "0.16.1",
     "date": "2026-10-04",
     "highlights": [
+      "Eine Spezifikationsversion in Composer oder Workflow manuell bestätigen; Änderungen erfordern eine neue Bestätigung.",
+      "Hinweise und Beispiele direkt an den Composer-Skill-Schaltflächen lesen.",
+      "App und Engineering-Skills ausdrücklich aktualisieren, mit Kanalauswahl und Wiederherstellung der Skill-Sicherung.",
       "Wählen Sie in den Einstellungen einen eigenen Datenspeicherort, verfolgen Sie eine geprüfte Kaltmigration und leeren Sie nur neu erzeugbare Caches.",
       "Geplante Aufgaben können im Intervall laufen: alle 5 Minuten bis zu 24 Stunden, gezählt ab dem Zeitpunkt, an dem die Aufgabe aktiviert wurde.",
       "Die Seite „Geplant“ verbindet die Aufgabenliste mit der ausgewählten Aufgabe: letztes Ergebnis, nächste Ausführung, Anweisung und Ausführungsverlauf.",

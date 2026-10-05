@@ -5,6 +5,9 @@ export const esEntries: ChangelogEntry[] = [
     "version": "0.16.1",
     "date": "2026-10-04",
     "highlights": [
+      "Confirma una versión de la especificación desde Composer o Workflow; los cambios requieren otra confirmación.",
+      "Consulta instrucciones y ejemplos en los accesos de habilidades de Composer.",
+      "Actualiza la aplicación o las habilidades explícitamente, con selección de canal y restauración de copia de seguridad.",
       "Elige una ubicación personalizada de datos en Ajustes, sigue una migración en frío verificada y limpia solo las cachés que se pueden reconstruir.",
       "Las tareas programadas pueden ejecutarse por intervalos: cada 5 minutos hasta 24 horas, contados desde que la tarea se activó.",
       "La página de tareas programadas empareja la lista de tareas con la tarea seleccionada: su último resultado, la próxima ejecución, la instrucción y el historial de ejecuciones.",
