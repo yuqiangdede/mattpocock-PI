@@ -10,7 +10,6 @@
 
 .coding-shortcuts + .coding-shortcuts { margin-top: 6px; }
 .coding-shortcuts .btn { font-weight: 400; }
-.coding-shortcuts .coding-shortcut-emphasized { font-weight: 700; }
 .coding-requirements-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
 .requirements-confirmation-dialog { width: min(680px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 20px; border: 1px solid var(--ds-border-default); border-radius: var(--radius-md); background: var(--ds-bg-primary); color: var(--ds-text-primary); }
 .requirements-confirmation-dialog::backdrop { background: var(--ds-scrim); }
