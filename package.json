@@ -61,6 +61,7 @@
     "test:e2e:workflow-stages": "node scripts/e2e-workflow-runs.mjs --stages",
     "test:e2e:workflow-reopen": "node scripts/e2e-workflow-runs.mjs --reopen",
     "test:e2e:workflow-artifacts": "node scripts/e2e-workflow-runs.mjs --artifacts",
+    "test:e2e:requirements-confirmation": "node scripts/e2e-workflow-runs.mjs --requirements-confirmation",
     "test:e2e:supervision": "node scripts/e2e-supervision.mjs",
     "test:e2e:subagents": "node scripts/e2e-subagents.mjs",
     "test:e2e:subagent-models": "node scripts/e2e-subagent-models.mjs",

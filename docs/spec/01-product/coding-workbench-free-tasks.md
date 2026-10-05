@@ -60,6 +60,15 @@ Project setup (Initialize). Every skill remains available exactly once.
 All shortcuts use regular text. At narrow widths each row wraps independently
 without horizontal overflow; order stays fixed across task states.
 
+## Requirements confirmation
+
+Confirm requirements is a native action beside Discuss requirements, rather
+than a skill shortcut. It opens the shared project specification preview and
+confirmation dialog without inserting text or sending the Composer draft.
+See [Requirements Confirmation](requirements-confirmation.md) for content-version
+approval, history and freshness rules. Existing skill shortcuts retain the
+draft-only behavior described above.
+
 ## Global instruction settings
 
 Composer skill buttons, including the requirements and More menu entries,

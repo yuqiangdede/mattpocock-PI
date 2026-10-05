@@ -1,5 +1,11 @@
 # Coding Workbench Skill Shortcuts
 
+Confirm requirements is a native action beside Discuss requirements rather
+than a skill shortcut. It opens the shared project specification preview and
+confirmation dialog without inserting text or sending the draft. See
+[Requirements Confirmation](requirements-confirmation.md) for content-version
+approval, history and freshness rules. Existing shortcuts remain draft-only.
+
 > **镜像说明：** 本页对应 [英文源规格](/spec/01-product/coding-workbench-free-tasks)。正文保留英文，以源规格为准。
 
 - Date: 2026-10-03

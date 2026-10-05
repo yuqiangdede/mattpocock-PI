@@ -10,3 +10,4 @@
 | [02-非目标.md](/zh-CN/spec/01-product/02-non-goals) | 明确的非目标 |
 | [Engineering Workflow V0](/zh-CN/spec/01-product/engineering-workflow-v0) | Accepted implementation specification; not implemented |
 | [Coding Workbench and Free Tasks](/zh-CN/spec/01-product/coding-workbench-free-tasks) | Implemented task candidate; release pending |
+| [Requirements Confirmation](/zh-CN/spec/01-product/requirements-confirmation) | Shared human confirmation of specification content; implementation candidate |

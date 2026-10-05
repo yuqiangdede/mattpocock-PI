@@ -56,7 +56,7 @@ globalThis.codingWorkbenchProbe = async (requirementsOnly = false) => {
   check(readEditorValue(editor()) === "", "Reading skill guidance changed the draft");
   implementButton.dispatchEvent(new PointerEvent("pointerout", { bubbles: true, pointerType: "mouse" }));
   await until(() => !document.querySelector('[role="tooltip"]'));
-  const primaryLabels = [...document.querySelectorAll(".coding-shortcuts-primary > button, .coding-shortcuts-primary > .coding-requirements-split > button")].map(button => button.textContent?.trim());
+  const primaryLabels = [...document.querySelectorAll(".coding-shortcuts-primary > button, .coding-shortcuts-primary > .coding-requirements-split > button, .coding-shortcuts-primary > .coding-requirements-controls > .coding-requirements-split > button")].map(button => button.textContent?.trim());
   check(JSON.stringify(primaryLabels) === JSON.stringify([i18n.t("coding.ask"), "Discuss requirements", "Implement", "Diagnose bug", "Review code"]), "Common shortcut order changed");
   const more = async () => {
     await click(i18n.t("coding.more"));

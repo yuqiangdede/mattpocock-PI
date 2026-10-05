@@ -45,6 +45,21 @@ export const zhCN = {
 },
 
   coding: {
+    requirements: {
+      action: "确认需求", title: "确认需求", hint: "检查规格并人工确认当前内容版本。",
+      description: "确认这份规格作为当前工作的依据，后续仍可调整。此操作不会自动拆分任务或开始开发。",
+      root: "项目目录", path: "需求规格文件", pathPlaceholder: "docs/requirements.md", pathHint: "填写项目内 Markdown 或 UTF-8 文本的相对路径，文件不超过 256 KiB。",
+      preview: "预览 / 刷新", loading: "正在检查需求…", summary: "规格摘要", content: "查看完整规格",
+      version: "内容版本：{{version}}", confirm: "确认当前版本", history: "确认历史（{{count}}）",
+      record: "版本 {{version}} · {{date}}", changedHint: "需求已变更，请重新确认，并检查受影响的任务。历史确认记录会保留。",
+      status: { confirmed: "当前版本已确认", changed: "需求已变更，待重新确认", unconfirmed: "待人工确认" },
+      errors: {
+        REQUIREMENTS_PROJECT_UNAVAILABLE: "请打开可用项目后确认需求。", REQUIREMENTS_PATH_DENIED: "所选文件不在项目允许访问的目录内。",
+        REQUIREMENTS_INVALID_PATH: "请填写项目内 Markdown 或文本文件的相对路径。", REQUIREMENTS_FILE_UNAVAILABLE: "文件不存在或无法读取，请选择文件并刷新。",
+        REQUIREMENTS_INVALID_FILE: "请选择非空的 UTF-8 文本文件，大小不超过 256 KiB。", REQUIREMENTS_CONFLICT: "文件或确认记录已变化，请刷新并检查后重新确认。",
+        REQUIREMENTS_HISTORY_UNAVAILABLE: "确认历史不可用，已有记录已保留。", REQUIREMENTS_UNAVAILABLE: "暂时无法检查或确认需求，请检查文件访问权限后刷新。",
+      },
+    },
     groups: {
       exploration: "需求与探索",
       maintenance: "实现与维护",

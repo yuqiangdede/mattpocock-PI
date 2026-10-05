@@ -6,6 +6,7 @@ import { IPC } from "../../packages/shared/src/protocol";
 import { WORKFLOW_STAGES } from "../../packages/shared/src/types/workflow";
 import { registerWorkflowIpc } from "../../apps/desktop/electron/main/ipc/workflow-ipc";
 import { registerWorkflowArtifactsIpc } from "../../apps/desktop/electron/main/ipc/workflow-artifacts-ipc";
+import { registerRequirementsIpc } from "../../apps/desktop/electron/main/ipc/requirements-ipc";
 import { readOpenableFile } from "../../packages/host-runtime/src/workspace-files";
 import type { IpcRegistrar } from "../../apps/desktop/electron/main/ipc/types";
 import { registerWorkflowDiscoveryFixture, crashWorkflowFixtureHost } from "./workflow-discovery-fixture.mjs";
@@ -23,6 +24,7 @@ let executionFixture: ReturnType<typeof registerWorkflowDiscoveryFixture> | unde
 let stopping = false;
 let interceptNextHistoryRead = false;
 let interceptNextArtifactOpen = false;
+let interceptNextRequirementsPreview = false;
 let markReadStarted: () => void = () => {};
 let readStarted = Promise.resolve();
 let releaseHeldRead: () => void = () => {};
@@ -50,9 +52,10 @@ const registrar: IpcRegistrar = {
     ipcMain.handle(channel, async (_event, ...args) => {
       try {
       const result = await handler(...args);
-      if ((channel === IPC.invoke.workflowHistoryRead && interceptNextHistoryRead) || (channel === IPC.invoke.workflowArtifactOpen && interceptNextArtifactOpen)) {
+      if ((channel === IPC.invoke.workflowHistoryRead && interceptNextHistoryRead) || (channel === IPC.invoke.workflowArtifactOpen && interceptNextArtifactOpen) || (channel === IPC.invoke.requirementsPreview && interceptNextRequirementsPreview)) {
         interceptNextHistoryRead = false;
         interceptNextArtifactOpen = false;
+        interceptNextRequirementsPreview = false;
         markReadStarted();
         await heldRead;
         markReadFinished();
@@ -82,6 +85,7 @@ const readFixtureFile = async (path: string) => {
   return readOpenableFile(path, workspace.path, group?.roots.map((root) => root.path) ?? []);
 };
 registerWorkflowArtifactsIpc({ registrar, getHost: () => host, readFile: readFixtureFile });
+registerRequirementsIpc({ registrar, getHost: () => host, readFile: readFixtureFile });
 registrar.handle(IPC.invoke.fsRead, async (input: { path: string }) => readFixtureFile(input.path));
 ipcMain.handle("workflow.artifacts.fixture", async (_event, name, input) => {
   if (name === "pauseOpen") {
@@ -94,6 +98,14 @@ ipcMain.handle("workflow.artifacts.fixture", async (_event, name, input) => {
   if (name === "waitOpen") return readStarted;
   if (name === "releaseOpen") { releaseHeldRead(); return readFinished; }
   if (name === "setWorkspace") return host!.call("workspace.set", { path: input });
+  if (name === "writeRequirements") return writeFile(join(projectA, "requirements.md"), String(input), "utf8");
+  if (name === "pauseRequirementsPreview") {
+    interceptNextRequirementsPreview = true;
+    readStarted = new Promise((resolve) => { markReadStarted = resolve; });
+    heldRead = new Promise((resolve) => { releaseHeldRead = resolve; });
+    readFinished = new Promise((resolve) => { markReadFinished = resolve; });
+    return;
+  }
   if (name === "removeFile") return unlink(join(projectA, "docs/glossary.md"));
   if (name === "detachRoot") {
     const destination = join(__dirname, "project-a-offline");
@@ -120,7 +132,7 @@ app.on("window-all-closed", () => { void stop(0); });
 
 async function main(): Promise<void> {
   await Promise.all([mkdir(projectA, { recursive: true }), mkdir(projectB, { recursive: true })]);
-  if (process.env.PI_WORKFLOW_ARTIFACTS === "1") {
+  if (process.env.PI_WORKFLOW_ARTIFACTS === "1" || process.env.PI_REQUIREMENTS_CONFIRMATION === "1") {
     await mkdir(join(projectA, "docs"), { recursive: true });
     await writeFile(join(projectA, "docs/glossary.md"), "# Workflow glossary\n\nA Workflow Project is a logical project group.", "utf8");
     await writeFile(join(projectB, "outside.md"), "Fixture outside content.", "utf8");
@@ -170,7 +182,14 @@ async function main(): Promise<void> {
     });
     try {
       let result;
-      if (process.env.PI_CODING_WORKBENCH === "1") {
+      if (process.env.PI_REQUIREMENTS_CONFIRMATION === "1") {
+        const checkpoint = await window.webContents.executeJavaScript("globalThis.requirementsConfirmationProbe()");
+        await host.dispose();
+        host = new HostProcess({ binaryPath, dataDir, env: { PI_DESKTOP_AGENTS_DIR: join(__dirname, "agents") }, onStderr: (text) => console.error(text.trimEnd()) });
+        await host.handshake();
+        await window.loadFile(join(__dirname, "index.html"), { query: { projectA, projectB, sessionId, otherSessionId } });
+        result = await window.webContents.executeJavaScript(`globalThis.requirementsConfirmationRestored(${JSON.stringify(checkpoint)})`);
+      } else if (process.env.PI_CODING_WORKBENCH === "1") {
         result = await window.webContents.executeJavaScript(`globalThis.codingWorkbenchProbe(${process.env.PI_REQUIREMENTS_MENU === "1"})`);
       } else if (process.env.PI_WORKFLOW_ARTIFACTS === "1") {
         const checkpoint = await window.webContents.executeJavaScript("globalThis.workflowArtifactsProbe()");

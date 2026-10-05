@@ -10,6 +10,7 @@ import { readNpmPath, writeNpmPath } from "../npm-preferences";
 import { registerAgentIpc } from "./agent-ipc";
 import { registerWorkflowIpc } from "./workflow-ipc";
 import { registerWorkflowArtifactsIpc } from "./workflow-artifacts-ipc";
+import { registerRequirementsIpc } from "./requirements-ipc";
 import { createWorkflowExecutionService } from "../services/workflow-execution";
 import { createFreeTaskService } from "../services/free-task-execution";
 import { registerFreeTaskIpc } from "./free-task-ipc";
@@ -432,11 +433,13 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
       logger,
     }),
   });
-  registerWorkflowArtifactsIpc({ registrar, getHost, readFile: async (path) => {
+  const readEngineeringFile = async (path: string) => {
     const handler = ipcHandlers.get(IPC.invoke.fsRead);
     if (!handler) throw new Error("file preview handler unavailable");
     return handler({ path });
-  } });
+  };
+  registerWorkflowArtifactsIpc({ registrar, getHost, readFile: readEngineeringFile });
+  registerRequirementsIpc({ registrar, getHost, readFile: readEngineeringFile });
   registerFreeTaskIpc(registrar, createFreeTaskService({
     getHost,
     onIdle: (sessionId) => getAgentHostBridge()?.kickQueue(sessionId),

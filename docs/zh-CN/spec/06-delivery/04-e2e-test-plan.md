@@ -67,6 +67,19 @@
 
 ## 1. 目标
 
+### E2E-REQUIREMENTS-content-confirmation
+
+- **Preconditions:** Built Renderer components and Host, isolated project roots,
+  data/profile and local Agent fixture; no live providers.
+- **Steps:** Preview through Composer, cancel and retain the draft, then confirm
+  without a run. Inspect shared approval in Workflow without unlocking Spec.
+  Edit, reject stale submission and reconfirm. Switch projects during delayed
+  preview, check Chinese labels and restart Host to inspect retained history.
+- **Expected:** One shared project history; human decisions only; changed
+  content requires reconfirmation. No Agent prompts or stage advancement.
+- **Coverage:** `pnpm test:e2e:requirements-confirmation`, Host and IPC tests.
+- **Spec:** [Requirements Confirmation](../01-product/requirements-confirmation.md).
+
 - 记录 MVP 必须验证的每个用户可见和协议可见的行为。
 - 提供映射到验收标准 (A–H) 和里程碑 (M1–M6) 的场景目录。
 - 作为可追溯性主干：场景 ID ↔ 验收标准 ↔ 规范。
@@ -9350,6 +9363,7 @@ the latest destination. These assertions measure work counts, not device FPS.
 | E2E-CODING-requirements-menu | 选择 Spec 或 Tickets 后主操作仍为讨论需求；键盘打开、Escape、外部点击和禁用状态能关闭菜单；次要操作保留在菜单中。 |
 | E2E-CODING-busy-queue | While ordinary work is active, prepare a skill draft without queuing; explicit Send uses the normal Host queue and retains task text. |
 | E2E-CODING-responsive-keyboard | Localized native buttons remain reachable with keyboard and wrap at a narrow viewport without horizontal overflow; insertion returns focus to input. |
+| E2E-CODING-requirements-menu | Main action remains Discuss requirements after selecting Spec or Tickets; keyboard opening, Escape, outside click, and disabling close the menu; secondary actions stay out of the toolbar. |
 | E2E-CODING-legacy-recovery | Existing Host tests reopen persisted waiting/running records, preserve history and allow a new ordinary turn without replay; initialization backup safety tests remain applicable. |
 
 Strict Workflow acceptance and cancellation remain covered by `--stages` and

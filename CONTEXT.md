@@ -34,6 +34,14 @@ _Avoid_: Project workflow, chat, agent turn
 The user's explicit acceptance that a stage has met its purpose. The end of a Pi reply, an error, or cancellation does not constitute stage completion.
 _Avoid_: Turn completion, skill completion
 
+**Requirements Confirmation**:
+The user's explicit approval of a particular specification content version as the basis for task breakdown, implementation and acceptance. It can originate outside a Workflow Run and remains historical when the requirements change.
+_Avoid_: Requirements freeze, specification generation, stage completion
+
+**Confirmed Requirements Version**:
+The specification content version approved by the user at a particular point in time. Later edits require renewed confirmation and do not erase the earlier decision.
+_Avoid_: Immutable requirements, permanently approved document
+
 **Stage Reopening**:
 Returning a completed stage to active work, withdrawing completion eligibility from that stage and all later stages while retaining historical artifacts.
 _Avoid_: Reset, artifact deletion

@@ -1,6 +1,7 @@
 mod config_sync_rpc;
 mod engineering_settings;
 mod free_tasks;
+mod requirements;
 mod scheduled_rpc;
 mod scheduled_tools;
 mod todos;
@@ -1760,6 +1761,10 @@ async fn handle_request(
         method if method.starts_with("workflow.") => {
             let st = state.lock().await;
             workflows::handle(&st.db, method, &params)
+        }
+        method if method.starts_with("requirements.") => {
+            let st = state.lock().await;
+            requirements::handle(&st.db, method, &params)
         }
         method if method.starts_with("session.collaboration.") => {
             let st = state.lock().await;

@@ -1,5 +1,10 @@
 # Unreleased changes
 
+- Composer and Workflow share a Confirm requirements action. Users inspect a
+  specification file and approve its content version without starting an Agent
+  or creating a Workflow Run. Changed content requires renewed confirmation;
+  historical decisions remain available after restart.
+
 - Settings > Info now updates the Matt Pocock skill bundle and mattpocock-PI
   independently, with stable/prerelease channels. The upstream comparison row
   is removed. Skill updates snapshot the previous catalog, preserve local edits,

@@ -71,3 +71,13 @@ For independent chat drafts, use **Discuss requirements** in the Composer.
 Its adjacent arrow offers **Form specification** and **Split tickets**.
 These selections only insert a skill into the draft; send it explicitly.
 The main button always stays **Discuss requirements**.
+
+Use **Confirm requirements** beside Discuss requirements, or the same action
+in Workflow, to select a project-relative specification file and preview it.
+Inspect the excerpt and full content, then **Confirm this version**. No Agent
+work starts and your unsent draft remains intact. Both entry points share the
+project's confirmation history; ordinary chat does not require a Workflow Run.
+Opening the dialog, refreshing and submitting check the current file. Changed
+content needs confirmation again; old decisions remain in history. Changes do
+not automatically reopen or advance Workflow stages: review affected tasks and
+explicitly reopen stages where needed. Files remain editable after confirmation.
