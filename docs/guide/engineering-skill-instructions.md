@@ -1,5 +1,10 @@
 # Engineering skill instructions
 
+Hover over a skill button in the Composer, or focus it with the keyboard,
+to see when to use it, its purpose and an example. This also works for
+skills in the requirements menu and More. Reading guidance does not
+modify the draft; click the button only when you want to insert its skill.
+
 Open **Settings > Agent > Skills > Engineering shortcut instructions** and
 select an entry. All 26 engineering entries, including Ask and More menu
 skills, have guidance explaining when to use them, what they do, and an

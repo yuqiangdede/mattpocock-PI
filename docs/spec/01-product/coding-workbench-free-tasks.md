@@ -62,6 +62,14 @@ without horizontal overflow; order stays fixed across task states.
 
 ## Global instruction settings
 
+Composer skill buttons, including the requirements and More menu entries,
+show the same localized usage timing, purpose and example on pointer hover
+or keyboard focus. Guidance uses the shared portal tooltip so menu clipping
+does not hide it; it wraps within the viewport. Reading a tooltip does not
+change the draft or execute a skill. Clicking dismisses it and retains the
+existing draft insertion behavior. Buttons retain short accessible names
+and expose their guidance as accessible descriptions.
+
 For every one of the 26 engineering entries, the instruction editor shows
 localized guidance before the prompt: when to use the skill, what it does,
 and one concrete example request. Selecting a different entry switches all
