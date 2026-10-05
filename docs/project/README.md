@@ -18,3 +18,4 @@
 - GitHub Projects: create after adding the `project` token scope
 
 - 官方稳定版更新与定制维护：[`upstream-updates.md`](upstream-updates.md)
+- 官方 0.16.1 升级知识与历史验收：[`upstream-0.16.1-retrospective.md`](upstream-0.16.1-retrospective.md)
