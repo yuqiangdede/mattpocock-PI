@@ -33,6 +33,9 @@ const enEntries: ChangelogEntry[] = [
     version: "0.16.1",
     date: "2026-10-04",
     highlights: [
+      "Confirm a specification content version from Composer or Workflow; changes require renewed human confirmation.",
+      "Read skill usage guidance and examples directly from Composer shortcuts.",
+      "Explicitly update the app or engineering skills in Settings, with channel selection and skill backup recovery.",
       "Choose a custom data location in Settings, follow a verified cold migration, and clean only rebuildable caches.",
       "Scheduled tasks can run on an interval cadence: every 5 minutes up to 24 hours, counted from when the task was armed.",
       "The Scheduled page pairs the task list with the selected task: its last outcome, next run, instruction and run history.",
@@ -910,6 +913,9 @@ const zhCNEntries: ChangelogEntry[] = [
     version: "0.16.1",
     date: "2026-10-04",
     highlights: [
+      "在 Composer 或 Workflow 人工确认规格内容版本；内容变化后重新确认。",
+      "直接在 Composer 技能快捷入口查看使用说明和示例。",
+      "在设置中明确更新应用或工程技能，支持通道选择与技能备份恢复。",
       "可在设置中选择自定义数据保存目录，按验证过的冷迁移流程迁移，并只清理可重新生成的缓存。",
       "计划任务新增按间隔执行的节奏：从启用时起算，最短 5 分钟、最长 24 小时。",
       "「计划任务」页面把任务列表与所选任务配对显示：最近结果、下次运行、指令与运行记录。",
@@ -1787,6 +1793,9 @@ const zhTWEntries: ChangelogEntry[] = [
     version: "0.16.1",
     date: "2026-10-04",
     highlights: [
+      "在 Composer 或 Workflow 人工確認規格內容版本；內容變更後重新確認。",
+      "直接在 Composer 技能快捷入口查看使用說明和範例。",
+      "在設定中明確更新應用程式或工程技能，支援通道選擇與技能備份還原。",
       "可在設定中選擇自訂資料儲存目錄，依驗證過的冷遷移流程遷移，並只清理可重新產生的快取。",
       "排程工作新增間隔節奏：從啟用時起算，最短 5 分鐘、最長 24 小時。",
       "「排程」頁面把工作清單與所選工作配對顯示：最近結果、下次執行、指令與執行紀錄。",

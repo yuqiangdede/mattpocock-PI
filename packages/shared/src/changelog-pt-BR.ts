@@ -5,6 +5,9 @@ export const ptBREntries: ChangelogEntry[] = [
     "version": "0.16.1",
     "date": "2026-10-04",
     "highlights": [
+      "Confirme uma versão da especificação no Composer ou Workflow; alterações exigem nova confirmação.",
+      "Leia orientações e exemplos nos atalhos de habilidades do Composer.",
+      "Atualize explicitamente o aplicativo ou as habilidades, com seleção de canal e restauração de backup.",
       "Escolha um local de dados personalizado nas Configurações, acompanhe uma migração a frio verificada e limpe apenas os caches que podem ser recriados.",
       "As tarefas agendadas podem rodar em cadência de intervalo: de 5 minutos a 24 horas, contadas a partir do momento em que a tarefa foi armada.",
       "A página Agendados combina a lista de tarefas com a tarefa selecionada: último resultado, próxima execução, instrução e histórico de execuções.",

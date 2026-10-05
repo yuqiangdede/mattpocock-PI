@@ -1,7 +1,7 @@
 # Requirements Confirmation Interaction Design
 
 Date: 2026-10-04
-Status: User-confirmed product direction; implementation candidate, release pending.
+Status: Implemented and merged through PR #29; Windows preview qualified in 0.16.1-beta.1.
 Scope: Record the decisions from the requirements discussion. This document
 does not change the shipped Workflow acceptance contract.
 
