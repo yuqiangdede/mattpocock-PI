@@ -39,9 +39,3 @@
 没有替换用户现有安装或使用用户数据库、真实模型和付费 API。Authenticode、干净虚拟机、真实 NSIS 安装/升级、自动更新安装链路、macOS/Linux 和远程 pi-host 不属于本次已验证范围。应用更新 E2E 使用模拟安装传输，不代表真实升级通过。
 
 运行方式：执行 Setup 安装器，或解压 ZIP 后运行 `PI-Desktop.exe`，或直接运行 Portable。用户运行不需要 Node/Rust。源码初始化与开发命令沿用 README；Windows 构建入口为 `pnpm --filter @pi-desktop/desktop dist:win`。
-
-
-
-
-
-

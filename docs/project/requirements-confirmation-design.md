@@ -93,4 +93,3 @@ settles these details: optional Host-owned versioned KV history, SHA256 content
 identity, explicit file selection, deterministic excerpts, open/refresh/submit
 checks and independent Workflow stage acceptance. Validation results belong in
 the delivery record; this design does not claim them merely from implementation.
-
