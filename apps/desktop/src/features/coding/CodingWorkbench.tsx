@@ -23,6 +23,9 @@ export function CodingWorkbench({ disabled, error, onSelect }: {
   onSelect: (skill: string, prompt: string) => void;
 }) {
   const { t } = useTranslation();
+  const skillTooltip = (action: EngineeringShortcutAction) => (["when", "purpose", "example"] as const)
+    .map(section => `${t(`settings.engineering.${section}`)}: ${t(`coding.skillGuides.${action}.${section}`)}`)
+    .join("\n\n");
   const overrides = useAppStore(state => state.settings?.engineeringShortcutPrompts);
   const selectShortcut = (action: EngineeringShortcutAction, skill: string) => onSelect(skill, resolveShortcutInstruction(action, t(`coding.prompts.${action}`), overrides));
   const [moreOpen, setMoreOpen] = useState(false);
@@ -34,15 +37,18 @@ export function CodingWorkbench({ disabled, error, onSelect }: {
 
   return <section className="coding-workbench" aria-label={t("coding.tools")}>
     <div className="coding-shortcuts coding-shortcuts-primary">
-      <Button disabled={disabled} title={t("coding.askHint")} onClick={() => selectShortcut("ask", "ask-matt")}>
+      <TooltipButton disabled={disabled} className="btn btn-secondary" ariaLabel={t("coding.ask")}
+        tooltip={skillTooltip("ask")} aria-description={skillTooltip("ask")} tooltipClassName="ui-tooltip-help coding-skill-tooltip"
+        onClick={() => selectShortcut("ask", "ask-matt")}>
         {t("coding.ask")}
-      </Button>
+      </TooltipButton>
 
       {CODING_SKILL_SHORTCUTS.filter(({ action }) => action !== "initialize" && action !== "spec" && action !== "tickets" && action !== "retro").map(({ action, skill }) => action === "discovery" ? <div className="coding-requirements-split" key={skill}>
-        <Button disabled={disabled} title={t("coding.discoveryHint")} onClick={() => {
+        <TooltipButton disabled={disabled} className="btn btn-secondary" ariaLabel={t("coding.discovery")}
+          tooltip={skillTooltip(action)} aria-description={skillTooltip(action)} tooltipClassName="ui-tooltip-help coding-skill-tooltip" onClick={() => {
           setRequirementsOpen(false);
           selectShortcut(action, skill);
-        }}>{t("coding.discovery")}</Button>
+        }}>{t("coding.discovery")}</TooltipButton>
         <AnchoredMenu
           open={requirementsOpen}
           onClose={() => setRequirementsOpen(false)}
@@ -62,20 +68,21 @@ export function CodingWorkbench({ disabled, error, onSelect }: {
             }}
           ><ChevronDown size={14} aria-hidden="true" /></TooltipButton>}
         >
-          {CODING_SKILL_SHORTCUTS.filter(({ action }) => action === "spec" || action === "tickets").map(({ action, skill }) => <Button
-            key={skill} type="button" role="menuitem" variant="ghost"
-            className="context-menu-item" disabled={disabled}
-            title={t(`coding.${action}Hint`)}
+          {CODING_SKILL_SHORTCUTS.filter(({ action }) => action === "spec" || action === "tickets").map(({ action, skill }) => <TooltipButton
+            key={skill} type="button" role="menuitem"
+            className="btn btn-ghost context-menu-item" disabled={disabled} ariaLabel={t(`coding.${action}`)}
+            tooltip={skillTooltip(action)} aria-description={skillTooltip(action)} tooltipClassName="ui-tooltip-help coding-skill-tooltip"
             onClick={() => {
               setRequirementsOpen(false);
               selectShortcut(action, skill);
             }}
-          >{t(`coding.${action}`)}</Button>)}
+          >{t(`coding.${action}`)}</TooltipButton>)}
         </AnchoredMenu>
-      </div> : <Button
-        key={skill} disabled={disabled} title={t(`coding.${action}Hint`)}
+      </div> : <TooltipButton
+        key={skill} disabled={disabled} className="btn btn-secondary" ariaLabel={t(`coding.${action}`)}
+        tooltip={skillTooltip(action)} aria-description={skillTooltip(action)} tooltipClassName="ui-tooltip-help coding-skill-tooltip"
         onClick={() => selectShortcut(action, skill)}
-      >{t(`coding.${action}`)}</Button>)}
+      >{t(`coding.${action}`)}</TooltipButton>)}
     </div>
     <div className="coding-shortcuts coding-shortcuts-secondary">
       <Button variant="ghost" onClick={() => useAppStore.getState().openWorkPanelTab(toolWorkPanelTab("workflow"))}>
@@ -106,14 +113,15 @@ export function CodingWorkbench({ disabled, error, onSelect }: {
       >
         {MORE_GROUPS.map(({ label, actions }) => <div key={label} role="group" aria-label={t(`coding.groups.${label}`)}>
           <div className="coding-menu-group-label" aria-hidden="true">{t(`coding.groups.${label}`)}</div>
-          {actions.map(action => moreSkills.find(entry => entry.action === action)).map(entry => entry && <Button
-            key={entry.skill} type="button" role="menuitem" variant="ghost"
-            className="context-menu-item" disabled={disabled}
+          {actions.map(action => moreSkills.find(entry => entry.action === action)).map(entry => entry && <TooltipButton
+            key={entry.skill} type="button" role="menuitem"
+            className="btn btn-ghost context-menu-item" disabled={disabled} ariaLabel={t(`coding.${entry.action}`)}
+            tooltip={skillTooltip(entry.action)} aria-description={skillTooltip(entry.action)} tooltipClassName="ui-tooltip-help coding-skill-tooltip"
             onClick={() => {
               setMoreOpen(false);
               selectShortcut(entry.action, entry.skill);
             }}
-          >{t(`coding.${entry.action}`)}</Button>)}
+          >{t(`coding.${entry.action}`)}</TooltipButton>)}
         </div>)}
       </AnchoredMenu>
     </div>

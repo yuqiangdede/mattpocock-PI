@@ -87,4 +87,17 @@ test("selected entry renders its guidance in the active language independently o
   assert.ok(html.indexOf("engineering-skill-description") < html.indexOf("<textarea"));
   assert.deepEqual(useAppStore.getState().settings.engineeringShortcutPrompts, prompts);
   assert.equal(requests, 0);
+  const { CodingWorkbench } = await server.ssrLoadModule("/src/features/coding/CodingWorkbench.tsx");
+  let selections = 0;
+  for (const [locale, catalog] of [["en", en], ["zh-CN", zhCN]]) {
+    await i18n.changeLanguage(locale);
+    const workbench = renderToStaticMarkup(createElement(I18nextProvider, { i18n }, createElement(CodingWorkbench, { disabled: false, error: null, onSelect: () => { selections++; } })));
+    for (const action of ["ask", "discovery", "implement", "diagnose", "review"]) {
+      for (const section of ["when", "purpose", "example"]) {
+        const escaped = renderToStaticMarkup(createElement("span", null, catalog.coding.skillGuides[action][section])).slice(6, -7);
+        assert.ok(workbench.includes(escaped), `${locale}.${action}.${section} missing from Composer guidance`);
+      }
+    }
+  }
+  assert.equal(selections, 0);
 });

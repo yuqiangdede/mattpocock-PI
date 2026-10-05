@@ -16585,6 +16585,7 @@ without horizontal overflow; order stays fixed across task states.
 | --- | --- |
 | E2E-CODING-insert-and-manual-send | Select all eight actions (Spec and Tickets through the requirements menu), Ask, and every More item with localized editable default instructions with empty input; preserve text/files; prove no automatic prompt or Free Task; manually send and compare with typed slash input. |
 | E2E-CODING-requirements-menu | Main action remains Discuss requirements after selecting Spec or Tickets; keyboard opening, Escape, outside click, and disabling close the menu; secondary actions stay out of the toolbar. |
+| E2E-CODING-skill-guidance | Hover a primary skill or focus a requirements/More entry; read localized timing, purpose and example without changing the draft or executing a skill. Menu closure removes its tooltip; Chinese guidance wraps inside a narrow viewport. Covered by `--requirements-menu`. |
 | E2E-CODING-engineering-setup | Insert and send `/setup-matt-pocock-skills`, read its actual body; no native initialization task or preview. |
 | E2E-CODING-catalog-recovery | Disable the installed skill, preserve input and navigate to Skills; enable and retry. Fail the catalog read, preserve input and retry without silent installation. |
 | E2E-CODING-session-ownership | Hold catalog response, switch conversations and release it; only the intended current draft changes. Preserve edits made during the catalog wait. |

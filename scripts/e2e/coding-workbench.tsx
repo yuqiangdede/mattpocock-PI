@@ -18,7 +18,7 @@ const fixture = (name: string, input?: unknown) => window.workflowFixture.action
 async function until<T>(read: () => T | false | null | Promise<T | false | null>): Promise<T> {
   const end = performance.now() + 12000;
   while (performance.now() < end) { const value = await read(); if (value) return value; await new Promise<void>(requestAnimationFrame); }
-  throw new Error(`Shortcut fixture timed out: ${document.body.textContent?.slice(-800)}`);
+  throw new Error(`Shortcut fixture timed out; focus=${document.activeElement?.getAttribute("aria-label")}; tooltip=${document.querySelector('[role="tooltip"]')?.textContent}; ${document.body.textContent?.slice(-800)}`);
 }
 const check = (value: unknown, message: string) => { if (!value) throw new Error(message); };
 const draftFor = (skill: string, body = "") => {
@@ -27,6 +27,15 @@ const draftFor = (skill: string, body = "") => {
   return `/${skill} ${prompt}` + (body ? "\n\n" + body : "");
 };
 const editor = () => document.querySelector<HTMLElement>(".composer-input")!;
+function focusForTooltip(button: HTMLButtonElement) {
+  // Hidden Electron windows can change activeElement without emitting focusin.
+  let observed = false;
+  const onFocus = () => { observed = true; };
+  button.addEventListener("focusin", onFocus);
+  button.focus();
+  button.removeEventListener("focusin", onFocus);
+  if (!observed) button.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+}
 async function click(label: string) {
   const button = await until(() => [...document.querySelectorAll<HTMLButtonElement>("button")].find((item) => item.textContent?.trim() === label && !item.disabled));
   console.info("SHORTCUT_SELECT", label);
@@ -41,6 +50,12 @@ globalThis.codingWorkbenchProbe = async (requirementsOnly = false) => {
   let root = createRoot(document.getElementById("root")!);
   root.render(<I18nextProvider i18n={i18n as I18n}><Composer variant="home" /></I18nextProvider>);
   await until(() => editor());
+  const implementButton = await until(() => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.trim() === en.coding.implement));
+  implementButton.dispatchEvent(new PointerEvent("pointerover", { bubbles: true, pointerType: "mouse" }));
+  await until(() => document.querySelector('[role="tooltip"]')?.textContent?.includes(en.coding.skillGuides.implement.example));
+  check(readEditorValue(editor()) === "", "Reading skill guidance changed the draft");
+  implementButton.dispatchEvent(new PointerEvent("pointerout", { bubbles: true, pointerType: "mouse" }));
+  await until(() => !document.querySelector('[role="tooltip"]'));
   const primaryLabels = [...document.querySelectorAll(".coding-shortcuts-primary > button, .coding-shortcuts-primary > .coding-requirements-split > button")].map(button => button.textContent?.trim());
   check(JSON.stringify(primaryLabels) === JSON.stringify([i18n.t("coding.ask"), "Discuss requirements", "Implement", "Diagnose bug", "Review code"]), "Common shortcut order changed");
   const more = async () => {
@@ -52,8 +67,14 @@ globalThis.codingWorkbenchProbe = async (requirementsOnly = false) => {
   check(groups.length === 4 && groups.every(group => group.getAttribute("aria-label")), "More groups need accessible names");
   const menuLabels = [...document.querySelectorAll(".coding-more-menu [role='menuitem']")].map(button => button.textContent?.trim());
   check(menuLabels.length === 19 && new Set(menuLabels).size === 19, "More skills missing or duplicated");
+  await until(() => document.querySelector(".coding-more-menu")?.contains(document.activeElement));
+  const prototypeButton = [...document.querySelectorAll<HTMLButtonElement>(".coding-more-menu [role='menuitem']")].find(button => button.textContent?.trim() === en.coding.prototype)!;
+  focusForTooltip(prototypeButton);
+  await until(() => document.querySelector('[role="tooltip"]')?.textContent?.includes(en.coding.skillGuides.prototype.example));
+  check(readEditorValue(editor()) === "", "Focusing menu guidance changed the draft");
   await fixture("pressKey", "Escape");
   await until(() => !document.querySelector(".coding-more-menu"));
+  await until(() => !document.querySelector('[role="tooltip"]'));
   await click("Implement");
   await until(() => readEditorValue(editor()) === draftFor("implement"));
   check((await fixture("snapshot") as { prompts: number }).prompts === 0, "Shortcut submitted automatically");
@@ -74,6 +95,11 @@ globalThis.codingWorkbenchProbe = async (requirementsOnly = false) => {
       const trigger = document.querySelector<HTMLButtonElement>(".coding-requirements-split [aria-haspopup='menu']")!;
       trigger.focus(); await fixture("pressKey", "Space");
       await until(() => document.querySelector(".coding-requirements-menu.is-open"));
+      await until(() => document.querySelector(".coding-requirements-menu")?.contains(document.activeElement));
+      const action = skill === "to-spec" ? "spec" : "tickets";
+      const button = [...document.querySelectorAll<HTMLButtonElement>(".coding-requirements-menu button")].find(button => button.textContent?.trim() === label)!;
+      focusForTooltip(button);
+      await until(() => document.querySelector('[role="tooltip"]')?.textContent?.includes(en.coding.skillGuides[action].example));
     }
     if (skill === "setup-matt-pocock-skills" || skill === "retro") await more();
     await click(label);
@@ -108,6 +134,16 @@ globalThis.codingWorkbenchProbe = async (requirementsOnly = false) => {
     await until(() => document.querySelector(".coding-requirements-menu.is-open"));
     check(document.querySelector(".coding-requirements-menu")?.textContent?.includes("需求固化"), "Localized specification item missing");
     check(document.querySelector(".coding-requirements-menu")?.textContent?.includes("拆分工单"), "Localized tickets item missing");
+    await until(() => document.querySelector(".coding-requirements-menu")?.contains(document.activeElement));
+    const specificationButton = [...document.querySelectorAll<HTMLButtonElement>(".coding-requirements-menu button")].find(button => button.textContent?.trim() === zhCN.coding.spec)!;
+    focusForTooltip(specificationButton);
+    const tooltip = await until(() => {
+      const element = document.querySelector<HTMLElement>('[role="tooltip"]');
+      return element?.textContent?.includes(zhCN.coding.skillGuides.spec.example) && element;
+    });
+    check(tooltip.textContent?.includes(zhCN.settings.engineering.when) && tooltip.textContent?.includes(zhCN.settings.engineering.purpose), "Localized tooltip headings missing");
+    const tooltipRect = tooltip.getBoundingClientRect();
+    check(tooltipRect.left >= 0 && tooltipRect.right <= innerWidth, "Skill tooltip exceeds narrow viewport");
     check((await fixture("snapshot") as { prompts: number }).prompts === 0, "Requirements menu submitted a prompt");
     root.unmount();
     return { ok: true, requirementsMenu: true, mappings: true, keyboard: true, disabled: true, narrow: true, localized: true };

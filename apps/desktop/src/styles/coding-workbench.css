@@ -1,4 +1,5 @@
 .coding-workbench { min-width: 0; }
+.coding-skill-tooltip { max-width: min(420px, calc(100vw - 16px)); white-space: pre-line; font-size: var(--text-xs); }
 .coding-shortcuts, .coding-shortcut-error { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .coding-shortcuts .btn { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .coding-requirements-split { display: inline-flex; align-items: stretch; max-width: 100%; }
