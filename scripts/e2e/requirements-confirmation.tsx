@@ -112,7 +112,6 @@ globalThis.requirementsConfirmationProbe = async () => {
   check(readEditorValue(editor()) === draft, "Approval modified the unsent draft");
 
   const runHistory = (await api.createWorkflowRun(group.id, "Shared requirements", 0)).history;
-  root.render(<I18nextProvider i18n={i18n}><WorkflowTab projectPath={projectA} projectMeta={{}} sessionId={sessionId} /></I18nextProvider>);
   await until(() => document.querySelector(".workflow-tab"), "Workflow mounted");
   await open();
   await until(() => dialog()?.innerText.includes("Current version confirmed"), "Workflow shares approval");
