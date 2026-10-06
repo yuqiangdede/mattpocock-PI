@@ -2,6 +2,7 @@ import { promises as fs, constants } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { createDefaultShortcutConfiguration, validateShortcutConfiguration, type ShortcutConfiguration } from "@pi-desktop/shared";
+import { migrateEngineeringPrompts } from "./shortcut-migration";
 
 // 同一实例串行写入，备份失败或原配置损坏时禁止覆盖。
 export class ShortcutStore {
@@ -20,11 +21,12 @@ export class ShortcutStore {
     validateShortcutConfiguration(value);
     return value;
   }
-  async load(): Promise<ShortcutConfiguration> {
+  async load(readLegacySettings?: () => Promise<unknown>): Promise<ShortcutConfiguration> {
     return this.exclusive(async () => {
       const existing = await this.readExisting();
       if (existing) return existing;
       const initial = createDefaultShortcutConfiguration();
+      if (readLegacySettings) await migrateEngineeringPrompts(this.directory, initial, await readLegacySettings());
       await this.writeAtomic(initial);
       return initial;
     });
@@ -57,4 +59,3 @@ export class ShortcutStore {
     } finally { await fs.rm(temporary, { force: true }); }
   }
 }
-

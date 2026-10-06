@@ -270,7 +270,11 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     stripWinLongPrefix,
   });
   const shortcutStore = new ShortcutStore(dataDir);
-  registrar.handle(IPC.invoke.shortcutsGet, () => shortcutStore.load());
+  registrar.handle(IPC.invoke.shortcutsGet, () => shortcutStore.load(async () => {
+    const host = getHost();
+    if (!host) throw new Error("无法读取旧快捷提示词配置：host unavailable");
+    return host.call("settings.get");
+  }));
   registrar.handle(IPC.invoke.shortcutsSave, (value: unknown) => shortcutStore.save(value));
   registerSettingsIpc({
     registrar,
