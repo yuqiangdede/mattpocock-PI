@@ -57,7 +57,7 @@ export type SettingsNavEntry = {
 };
 
 export const SETTINGS_NAV: SettingsNavEntry[] = [
-  { id: "codingActions", labelKey: "扩展设置", titleKey: "扩展设置 · Coding Actions", group: "system", keywordKeys: ["Coding Actions", "编码动作", "Skill", "提示词"] },
+  { id: "codingActions", labelKey: "codingActions.navLabel", titleKey: "codingActions.settingsTitle", group: "system", keywordKeys: ["codingActions.title", "codingActions.skillId", "codingActions.prompt", "codingActions.description"] },
   {
     id: "general",
     labelKey: "settings.nav.general",

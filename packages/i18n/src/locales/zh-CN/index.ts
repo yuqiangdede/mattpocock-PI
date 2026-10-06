@@ -3,6 +3,8 @@ import { engineeringSkillGuides } from "./engineering-skill-guides.js";
 
 export const zhCN = {
   codingActions: {
+  "navLabel": "扩展设置",
+  "settingsTitle": "扩展设置 · Coding Actions",
   "defaults": {"discuss-requirements": "需求讨论", "create-spec": "固化需求", "design": "技术设计", "create-tickets": "拆分任务", "implement": "实现", "code-review": "代码审查"},
   "sessionRequired": "请先打开一个会话",
   "contextChanged": "项目或会话已切换，请重新选择 Action",

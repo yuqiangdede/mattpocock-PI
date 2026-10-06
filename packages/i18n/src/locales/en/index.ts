@@ -2,6 +2,8 @@ import { engineeringSkillGuides } from "./engineering-skill-guides.js";
 
 export const en = {
   codingActions: {
+  "navLabel": "Extensions",
+  "settingsTitle": "Extensions · Coding Actions",
   "defaults": {"discuss-requirements": "Discuss requirements", "create-spec": "Create specification", "design": "Technical design", "create-tickets": "Create tickets", "implement": "Implement", "code-review": "Code review"},
   "sessionRequired": "Open a session first",
   "contextChanged": "The project or session changed. Select the Action again.",
