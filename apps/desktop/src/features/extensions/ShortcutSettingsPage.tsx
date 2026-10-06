@@ -11,6 +11,7 @@ import { loadShortcutConfiguration, saveShortcutConfiguration, setShortcutLeaveG
 
 import { ShortcutRecoveryControls } from "./ShortcutRecoveryControls";
 import { ShortcutPresetUpdates } from "./ShortcutPresetUpdates";
+import { ShortcutImportExportControls } from "./ShortcutImportExportControls";
 
 export function ShortcutSettingsPage() {
   const { t } = useTranslation();
@@ -93,6 +94,7 @@ export function ShortcutSettingsPage() {
       </div>}
       <ShortcutRecoveryControls draft={draft} selected={selected} busy={busy} setBusy={setBusy} setDraft={setDraft} />
       <ShortcutPresetUpdates draft={draft} busy={busy} setDraft={setDraft} />
+      <ShortcutImportExportControls configuration={configuration} draft={draft} busy={busy} setBusy={setBusy} />
     </SettingsCard>
   </div>;
 }
