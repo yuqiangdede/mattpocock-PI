@@ -1,3 +1,4 @@
+import { ShortcutStore } from "../extensions/shortcut-store";
 import { join } from "node:path";
 import { dialog, type BrowserWindow, type IpcMain, type IpcMainInvokeEvent } from "electron";
 import { err, ErrorCodes, IPC, ok, type Result } from "@pi-desktop/shared";
@@ -268,6 +269,9 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     acquireSessionOperation,
     stripWinLongPrefix,
   });
+  const shortcutStore = new ShortcutStore(dataDir);
+  registrar.handle(IPC.invoke.shortcutsGet, () => shortcutStore.load());
+  registrar.handle(IPC.invoke.shortcutsSave, (value: unknown) => shortcutStore.save(value));
   registerSettingsIpc({
     registrar,
     getHost,

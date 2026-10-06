@@ -1,3 +1,4 @@
+import { canLeaveShortcutSettings } from "../../features/extensions/shortcut-state";
 import i18n from "i18next";
 import type {
   Mode,
@@ -369,6 +370,7 @@ export function createSessionSlice({
     },
 
     selectSession: async (id, opts) => {
+      if (!canLeaveShortcutSettings()) return;
       const intent = opts?.navigationIntent ?? runtime.beginNavigationIntent();
       const selection = runtime.beginSessionSelection(id, intent);
       const stateAtStart = get();

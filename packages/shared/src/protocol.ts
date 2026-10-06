@@ -159,6 +159,8 @@ export const IPC = {
     sessionGetScratchPath: "pi-desktop/session/getScratchPath",
     sessionOpenScratchPath: "pi-desktop/session/openScratchPath",
     projectOpenFolder: "pi-desktop/project/openFolder",
+    shortcutsGet: "pi-desktop/extensions/shortcuts/get",
+    shortcutsSave: "pi-desktop/extensions/shortcuts/save",
     settingsGet: "pi-desktop/settings/get",
     settingsSet: "pi-desktop/settings/set",
     configSyncGetState: "pi-desktop/configSync/getState",

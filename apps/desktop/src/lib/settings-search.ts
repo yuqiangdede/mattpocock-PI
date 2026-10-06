@@ -6,6 +6,7 @@
  */
 
 export type SettingsTabId =
+  | "extensions"
   | "general"
   | "ai"
   | "shortcuts"
@@ -56,6 +57,7 @@ export type SettingsNavEntry = {
 };
 
 export const SETTINGS_NAV: SettingsNavEntry[] = [
+  { id: "extensions", labelKey: "扩展设置", titleKey: "扩展设置 · 快捷按钮", group: "system", keywordKeys: ["快捷按钮", "默认提示词"] },
   {
     id: "general",
     labelKey: "settings.nav.general",
