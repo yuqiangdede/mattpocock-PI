@@ -1,4 +1,4 @@
-import { canLeaveShortcutSettings } from "../../features/extensions/shortcut-state";
+import { canLeaveCodingActionSettings as canLeaveShortcutSettings } from "../../features/extensions/coding-action-state";
 import i18n from "i18next";
 import type {
   AskToolResolution,
@@ -61,8 +61,8 @@ export function createInteractionSlice({
     },
 
     setPage: (page, opts) => {
-      if (page !== get().page && !canLeaveShortcutSettings()) return;
       runtime.beginNavigationIntent();
+      if (page !== get().page && !canLeaveShortcutSettings()) return;
       const record = opts?.record !== false;
       set((state) => {
         if (!record) return { page };

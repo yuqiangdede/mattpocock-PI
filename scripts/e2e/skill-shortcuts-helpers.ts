@@ -6,7 +6,7 @@ export async function until<T>(read: () => T | false | null | undefined | Promis
     if (value) return value;
     await new Promise<void>(requestAnimationFrame);
   }
-  throw new Error(`Shortcut settings timed out: ${document.body.textContent?.slice(-1500)}`);
+  throw new Error(`Coding Actions timed out: ${document.body.textContent?.slice(-1500)}`);
 }
 
 export function check(value: unknown, message: string): asserts value {
@@ -18,12 +18,13 @@ export async function click(label: string) {
     .find(item => (item.textContent?.trim() === label || item.getAttribute("aria-label") === label) && !item.disabled));
   button.focus();
   button.click();
+  await new Promise<void>(requestAnimationFrame);
 }
 
 export async function fill(label: string, value: string, insertText: (value: string) => Promise<unknown>) {
   const input = await until(() => [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input, textarea")]
-    .find(item => item.getAttribute("aria-label") === label || [...document.querySelectorAll("label")]
-      .some(candidate => candidate.textContent?.trim() === label && (candidate.htmlFor === item.id || candidate.contains(item)))));
+    .find(item => !item.disabled && (item.getAttribute("aria-label") === label || [...document.querySelectorAll("label")]
+      .some(candidate => candidate.textContent?.trim() === label && ((candidate.htmlFor && candidate.htmlFor === item.id) || candidate.contains(item))))));
   input.focus();
   input.select();
   await insertText(value);
@@ -31,9 +32,15 @@ export async function fill(label: string, value: string, insertText: (value: str
 }
 
 export async function select(label: string, value: string, optionLabel = value) {
-  const control = await until(() => document.querySelector<HTMLSelectElement | HTMLButtonElement>(`[aria-label="${label}"]`));
+  const control = await until(() => {
+    const element = document.querySelector<HTMLSelectElement | HTMLButtonElement>(`button[aria-label="${label}"], select[aria-label="${label}"]`);
+    return element && !element.disabled && element;
+  });
   if (control instanceof HTMLButtonElement) {
+    control.focus();
+    await new Promise<void>(requestAnimationFrame);
     control.click();
+    await new Promise<void>(requestAnimationFrame);
     const option = await until(() => [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
       .find(item => item.textContent?.trim() === optionLabel && !item.disabled));
     option.click();

@@ -82,17 +82,21 @@ _Avoid_: Open project, clone repository
 A visible coding action that selects an engineering skill in the current conversation's draft. Selection is distinct from the user's explicit submission of that draft.
 _Avoid_: Task execution, automatic send
 
-**Shortcut Preset（快捷按钮预置）**:
-产品提供的初始快捷按钮定义，用户可以将其作为自己配置的起点并修改调整。
-_Avoid_: 固定按钮、不可编辑按钮
-
-**Shortcut Configuration（快捷按钮配置）**:
-决定快捷按钮展示及其 Skill 绑定、默认提示词和备注的用户配置。预置按钮与用户新增按钮使用同一配置模型。
-_Avoid_: Skill 内容、第二套快捷按钮
-
 **Extension Settings（扩展设置）**:
 mattpocock-PI 扩展功能的配置区域，与原生 PI 设置保持独立边界。
 _Avoid_: 原生设置、独立安装产品
+
+**Coding Action（编码动作）**:
+用户可独立选择的编码操作，只引用一个 Skill 并可附加请求文本；不代表阶段、完成状态或前置条件。
+_Avoid_: 页面按钮配置、Workflow Step、强制阶段
+
+**Skill Launcher**:
+将 Coding Action 交给当前项目和会话的原生 Pi Agent 执行的附加操作入口。
+_Avoid_: Workflow Engine、状态机、Recommendation Engine
+
+**Development Navigator**:
+未来用于理解项目开发状态、检查产物并提供可选建议的能力，属于第二阶段且不限制用户选择 Action。
+_Avoid_: 固定流程、自动阶段推进
 
 **Engineering Skills Setup**:
 Configuring a project's issue tracker, triage vocabulary and domain documentation conventions for engineering skills.

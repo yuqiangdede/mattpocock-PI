@@ -1,5 +1,7 @@
 # Project Tracking
 
+- 当前编码入口方向：[阶段一 Skill Launcher](skill-launcher-spec.md)。#31–#37 按 CodingAction → 原生 Skill → 当前 Session Pi Agent 重写；旧快捷按钮规格仅保留历史，Development Navigator 留待第二阶段。
+
 - Requirements Confirmation: [confirmed product direction](requirements-confirmation-design.md) and [implementation specification](../spec/01-product/requirements-confirmation.md); shared human approval of specification content, independent of Workflow stage execution; implementation candidate.
 
 - Skill Shortcuts: [confirmed simplification design](skill-shortcuts-interaction-design.md); draft insertion with manual submission, [current specification](../spec/01-product/coding-workbench-free-tasks.md) and [delivery evidence](skill-shortcuts-delivery.md).

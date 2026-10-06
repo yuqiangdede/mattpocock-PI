@@ -28,7 +28,6 @@ import {
   visionFromModelConfig,
   type UserSubagentDocument,
 } from "@pi-desktop/agent-runtime";
-import { qualifiedSkillCommands } from "../extensions/qualified-skill-runtime";
 import { builtinSkills } from "../builtin-skills";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
 import {
@@ -464,11 +463,6 @@ export function createSessionLaunchRuntime({
         description: skill.description,
       })),
     ];
-    pluginSkills.push(...qualifiedSkillCommands(
-      builtinSkills({ workspacePath: projectPath, pluginPaths: plugins.listLoaded().map(plugin => plugin.path) }),
-      userSkills,
-      plugins.getSkills().filter(skill => pluginActiveInProject(skill.pluginId, projectPath)),
-    ).map(command => ({ id: command.skillId!, name: command.title, description: command.description })));
     // Subagents (ADR 0062): definitions are re-read per launch so editing
     // `~/.agents/subagents` or the registry takes effect on the next prompt, and every
     // pinned model is resolved here because credentials and the models.dev catalog

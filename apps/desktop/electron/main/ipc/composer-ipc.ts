@@ -1,5 +1,4 @@
 import { IPC, trustedExtensionCommandId, type ComposerCommand } from "@pi-desktop/shared";
-import { qualifiedSkillCommands } from "../extensions/qualified-skill-runtime";
 import { builtinSkills } from "../builtin-skills";
 import { builtinComposerCommands } from "../builtin-commands";
 import type { AgentExtensionBridge } from "../agent-extensions";
@@ -17,7 +16,6 @@ export type ComposerIpcDependencies = {
     id: string;
     name: string;
     description?: string;
-    level?: string;
   }>>;
   pluginActiveInProject: (pluginId: string, projectPath: string | null | undefined) => boolean;
   loadComposerTemplatesCached: (root: string | null) => Promise<Array<{
@@ -53,16 +51,14 @@ export function createComposerCommandService({
         id: skill.id,
         name: skill.name,
         description: skill.description,
-        pluginId: skill.pluginId,
       }));
     const userSkills = (await activeUserSkills(root ?? undefined)).map((skill) => ({
       id: skill.id,
       name: skill.name,
       description: skill.description,
-      level: skill.level,
     }));
     const seen = new Set<string>();
-    const native = [...builtins, ...pluginSkills, ...userSkills].flatMap((skill) => {
+    return [...builtins, ...pluginSkills, ...userSkills].flatMap((skill) => {
       if (!skill.id || seen.has(skill.id)) return [];
       seen.add(skill.id);
       return [
@@ -75,9 +71,6 @@ export function createComposerCommandService({
         },
       ];
     });
-    const qualified = qualifiedSkillCommands(builtins, userSkills, pluginSkills);
-    const occupied = new Set(native.map(command => command.name));
-    return [...native, ...qualified.filter(command => !occupied.has(command.name))];
   };
 
   const buildComposerCommands = async (

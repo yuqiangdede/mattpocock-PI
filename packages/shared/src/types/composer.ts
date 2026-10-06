@@ -26,9 +26,6 @@ export type ComposerCommand = {
   id?: string;
   /** Skill id passed to the model's Skill tool. */
   skillId?: string;
-  /** 独立扩展目录，保留全部来源；不进入原生自动完成。 */
-  shortcutBinding?: import("../skill-shortcuts").ShortcutBinding;
-  shortcutOnly?: boolean;
 };
 
 /** One clipboard file transferred from the renderer to the composer bridge. */

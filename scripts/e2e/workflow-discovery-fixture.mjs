@@ -7,7 +7,6 @@ import { registerAgentIpc } from "../../apps/desktop/electron/main/ipc/agent-ipc
 import { registerWorkflowIpc } from "../../apps/desktop/electron/main/ipc/workflow-ipc";
 import { createWorkflowExecutionService } from "../../apps/desktop/electron/main/services/workflow-execution";
 import { createComposerCommandService } from "../../apps/desktop/electron/main/ipc/composer-ipc";
-import { loadQualifiedSkill } from "../../apps/desktop/electron/main/extensions/qualified-skill-runtime";
 import { createSessionCoordination } from "../../apps/desktop/electron/main/runtime/session-coordination";
 import { createAgentHostBridge } from "../../apps/desktop/electron/main/agent-host-bridge";
 import { formatSkillToolContent } from "../../apps/desktop/electron/main/skill-document";
@@ -42,7 +41,7 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
   let prompts = 0;
   let skillLoads = 0;
   const skillIds = [];
-  const loadedSkillDocuments = [];
+  const skillBodies = [];
   let catalogUnavailable = false;
   let catalogGate = Promise.resolve();
   let releaseCatalog = () => {};
@@ -104,25 +103,13 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
       const runtimeHost = {
         async call(name, params) {
           if (name === "tools.execute" && params.toolName === "Skill") {
-            const qualified = await loadQualifiedSkill(params.args.id, input.projectPath, {
-              catalog: project => catalog.buildComposerCommands(project),
-              builtin: () => null,
-              plugin: () => { throw new Error("No plugin Skill in this fixture"); },
-              readUser: (id, level, projectPath) => host.call("skills.read", { id, level, projectPath }),
-            });
-            if (qualified) {
-              skillLoads++;
-              skillIds.push(params.args.id);
-              loadedSkillDocuments.push(qualified);
-              return { ok: true, content: formatSkillToolContent(qualified) };
-            }
             const active = (await host.call("skills.active", { projectPath: input.projectPath })).skills;
             if (!active.some((skill) => skill.id === params.args.id)) throw new Error("Fixture skill is not enabled");
             const loaded = await host.call("skills.read", { id: params.args.id, projectPath: input.projectPath });
             if (!loaded.skill || !loaded.body) throw new Error("Fixture skill is missing");
             skillLoads++;
             skillIds.push(params.args.id);
-            loadedSkillDocuments.push({ ...loaded.skill, body: loaded.body });
+            skillBodies.push(loaded.body);
             return { ok: true, content: formatSkillToolContent({ ...loaded.skill, body: loaded.body, location: loaded.skill.path }) };
           }
           return host.call(name, params);
@@ -232,15 +219,6 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
       if (name === "readCustomizedSkill") return getHost().call("skills.read", { id: "retro", level: "global" });
       if (name === "updateOffline") { updateOffline = input; return; }
       if (name === "typeText") { const { BrowserWindow } = await import("electron"); await BrowserWindow.getAllWindows()[0].webContents.insertText(input); return; }
-      if (name === "captureShortcutPage") {
-        if (!["settings", "composer"].includes(input)) throw new Error("Unknown shortcut screenshot");
-        const { BrowserWindow } = await import("electron");
-        const image = await BrowserWindow.getAllWindows()[0].webContents.capturePage();
-        const directory = join(root, "cache", "shortcut-acceptance");
-        await mkdir(directory, { recursive: true });
-        await writeFile(join(directory, `${input}.png`), image.toPNG());
-        return;
-      }
       if (name === "holdCatalog") {
         catalogGate = new Promise((resolve) => { releaseCatalog = resolve; });
         catalogStarted = new Promise((resolve) => { markCatalogStarted = resolve; });
@@ -250,7 +228,6 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
       if (name === "releaseCatalog") { releaseCatalog(); return; }
       if (name === "catalogUnavailable") { catalogUnavailable = input; return; }
       if (name === "setSkillEnabled") return getHost().call("skills.setEnabled", { id: input.id, level: "project", projectPath: input.path, enabled: input.enabled });
-      if (name === "createShortcutProjectSkill") return getHost().call("skills.create", { id: "ask-matt", name: "ask-matt", body: "PROJECT_SOURCE_BODY_FOR_SHORTCUT_ACCEPTANCE", level: "project", projectPath: input.path });
       if (name === "resize") { const { BrowserWindow } = await import("electron"); BrowserWindow.getAllWindows()[0].setSize(input.width, input.height); return; }
       if (name === "blockInitialization") { const parent = join(dataDir, "..", "project-a", "scripts"); await mkdir(parent, {recursive:true}); await mkdir(join(parent, "verify.ps1")); return; }
       if (name === "unblockInitialization") { await rmdir(join(dataDir, "..", "project-a", "scripts", "verify.ps1")); await writeFile(join(dataDir, "..", "project-a", "AGENTS.md"), "Later user configuration", "utf8"); return; }
@@ -261,7 +238,10 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
       if (name === "releaseDispatch") { releaseDispatch(); return; }
       if (name === "releaseProvider") { releaseProvider(); await Promise.all([...tasks]); return; }
       if (name === "reset") { mode = input ?? "normal"; launchGate = new Promise((resolve) => { releaseLaunch = resolve; }); providerGate = new Promise((resolve) => { releaseProvider = resolve; }); return; }
-      if (name === "snapshot") return { prompts, skillLoads, transformed, skillIds, loadedSkillDocuments };
+      if (name === "snapshot") return { prompts, skillLoads, transformed, skillIds, skillBodies };
+      if (name === "updateActionSkill") return getHost().call("skills.update", { id: "code-review", name: "code-review", level: "project", projectPath: input.path, body: input.body });
+      if (name === "corruptActionConfig") return writeFile(join(dataDir, "extensions", "coding-actions.json"), "{invalid-actions", "utf8");
+      if (name === "readActionConfig") return readFile(join(dataDir, "extensions", "coding-actions.json"), "utf8");
       if (name === "hostCall") {
         if (!input.method.startsWith("workflow.") && !input.method.startsWith("session.") && !input.method.startsWith("freeTask.")) throw new Error("Fixture Host method is not allowed");
         return getHost().call(input.method, input.params);

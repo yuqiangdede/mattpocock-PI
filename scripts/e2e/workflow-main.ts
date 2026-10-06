@@ -7,7 +7,7 @@ import { WORKFLOW_STAGES } from "../../packages/shared/src/types/workflow";
 import { registerWorkflowIpc } from "../../apps/desktop/electron/main/ipc/workflow-ipc";
 import { registerWorkflowArtifactsIpc } from "../../apps/desktop/electron/main/ipc/workflow-artifacts-ipc";
 import { registerRequirementsIpc } from "../../apps/desktop/electron/main/ipc/requirements-ipc";
-import { ShortcutStore } from "../../apps/desktop/electron/main/extensions/shortcut-store";
+import { CodingActionStore } from "../../apps/desktop/electron/main/extensions/coding-action-store";
 import { readOpenableFile } from "../../packages/host-runtime/src/workspace-files";
 import type { IpcRegistrar } from "../../apps/desktop/electron/main/ipc/types";
 import { registerWorkflowDiscoveryFixture, crashWorkflowFixtureHost } from "./workflow-discovery-fixture.mjs";
@@ -73,11 +73,10 @@ const registrar: IpcRegistrar = {
 };
 
 if (process.env.PI_CODING_WORKBENCH === "1") {
-  const shortcutStore = new ShortcutStore(dataDir);
-  registrar.handle(IPC.invoke.shortcutsGet, () => shortcutStore.load(() => host!.call("settings.get")));
-  registrar.handle(IPC.invoke.shortcutsSave, (value: unknown) => shortcutStore.save(value));
-  registrar.handle(IPC.invoke.shortcutsBackups, () => shortcutStore.listBackups());
-  registrar.handle(IPC.invoke.shortcutsRestore, (backupId?: string) => shortcutStore.restore(backupId));
+  const codingActionStore = new CodingActionStore(dataDir);
+  registrar.handle(IPC.invoke.codingActionsGet, () => codingActionStore.load(() => host!.call("settings.get")));
+  registrar.handle(IPC.invoke.codingActionsSave, (value: unknown, recover?: boolean) => codingActionStore.save(value, recover === true));
+  registrar.handle(IPC.invoke.codingActionsReset, () => codingActionStore.reset());
 }
 
 if (discoveryFixture) {
@@ -156,7 +155,7 @@ async function main(): Promise<void> {
   await app.whenReady();
   try {
     await host.handshake();
-    if (process.env.PI_SKILL_SHORTCUTS === "1") {
+    if (process.env.PI_CODING_ACTIONS === "1") {
       await host.call("settings.set", { engineeringShortcutPrompts: { ask: "旧版自定义提示词", review: "", spec: null } });
     }
     if (process.env.PI_CODING_WORKBENCH === "1") await host.call("skills.ensureBundled");
@@ -194,13 +193,13 @@ async function main(): Promise<void> {
     });
     try {
       let result;
-      if (process.env.PI_SKILL_SHORTCUTS === "1") {
-        const checkpoint = await window.webContents.executeJavaScript("globalThis.shortcutSettingsProbe()");
+      if (process.env.PI_CODING_ACTIONS === "1") {
+        const checkpoint = await window.webContents.executeJavaScript("globalThis.codingActionsProbe()");
         await host.dispose();
         host = new HostProcess({ binaryPath, dataDir, env: { PI_DESKTOP_AGENTS_DIR: join(__dirname, "agents") }, onStderr: (text) => console.error(text.trimEnd()) });
         await host.handshake();
         await window.loadFile(join(__dirname, "index.html"), { query: { projectA, projectB, sessionId, otherSessionId } });
-        result = await window.webContents.executeJavaScript(`globalThis.shortcutSettingsRestored(${JSON.stringify(checkpoint)})`);
+        result = await window.webContents.executeJavaScript(`globalThis.codingActionsRestored(${JSON.stringify(checkpoint)})`);
       } else if (process.env.PI_REQUIREMENTS_CONFIRMATION === "1") {
         const checkpoint = await window.webContents.executeJavaScript("globalThis.requirementsConfirmationProbe()");
         await host.dispose();

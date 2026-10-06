@@ -56,7 +56,7 @@ import { useVoiceInput } from "../features/voice/useVoiceInput";
 import { ComposerToolbar } from "../features/chat/composer/ComposerToolbar";
 import { ComposerStatus } from "../features/chat/composer/ComposerStatus";
 import { CodingWorkbench } from "../features/coding/CodingWorkbench";
-import { useComposerSkillShortcut } from "../features/chat/composer/hooks/useComposerSkillShortcut";
+import { useCodingActionLauncher } from "../features/coding/useCodingActionLauncher";
 
 const EMPTY_QUEUED_PROMPTS: QueuedPrompt[] = [];
 
@@ -478,9 +478,9 @@ export function Composer({
     handleInput,
     invalidatePromptEnhancement,
   });
-  const skillShortcut = useComposerSkillShortcut({
-    draftKey, workspacePath, inputBlocked, composing, readLiveDraft,
-    fileReferencesRef, applyEditorDraft, invalidatePromptEnhancement, t,
+  const codingAction = useCodingActionLauncher({
+    sessionId: activeSessionId, projectPath: workspacePath, blocked: sendBlocked || composing || !modelReady,
+    draftKey, readLiveDraft, draft, invalidatePromptEnhancement,
   });
 
   // Plugin draft and attachment actions reach this composer while it takes input.
@@ -518,9 +518,9 @@ export function Composer({
     >
       <div className="composer-stack">
         <CodingWorkbench
-          disabled={inputBlocked || composing || skillShortcut.pending}
-          error={skillShortcut.error}
-          onSelect={(skill, prompt) => void skillShortcut.select(skill, prompt)}
+          disabled={sendBlocked || composing || !modelReady || !activeSessionId || codingAction.pending}
+          error={codingAction.error}
+          onExecute={actionId => void codingAction.execute(actionId)}
         />
         {activeSessionId ? <TodoDock sessionId={activeSessionId} /> : null}
         {planCheckpoint?.status === "pending" ? (

@@ -1,4 +1,4 @@
-import type { ShortcutConfiguration } from "@pi-desktop/shared";
+import type { CodingActionConfiguration, CodingActionSnapshot } from "@pi-desktop/shared";
 import type { VersionSourceId, VersionSourceState } from "../../../../packages/shared/src/version-sources";
 import { validateEngineeringSettings, engineeringSettingsForWrite, type EngineeringShortcutPrompts, type EngineeringSkillUpdateMode, type EngineeringSkillStatus } from "@pi-desktop/shared";
 import type {
@@ -543,10 +543,9 @@ function normalizePlansChangedEvent(value: unknown): PlanningStateEvent {
 }
 
 export const api = {
-  getShortcutConfiguration: () => invoke<ShortcutConfiguration>(IPC.invoke.shortcutsGet),
-  saveShortcutConfiguration: (value: ShortcutConfiguration) => invoke<ShortcutConfiguration>(IPC.invoke.shortcutsSave, value),
-  listShortcutBackups: () => invoke<string[]>(IPC.invoke.shortcutsBackups),
-  restoreShortcutConfiguration: (backupId?: string) => invoke<ShortcutConfiguration>(IPC.invoke.shortcutsRestore, backupId),
+  getCodingActions: () => invoke<CodingActionSnapshot>(IPC.invoke.codingActionsGet),
+  saveCodingActions: (value: CodingActionConfiguration, recover = false) => invoke<CodingActionConfiguration>(IPC.invoke.codingActionsSave, value, recover),
+  resetCodingActions: () => invoke<CodingActionConfiguration>(IPC.invoke.codingActionsReset),
   startFreeTask: (input: import("@pi-desktop/shared").FreeTaskRequest) => invoke<import("@pi-desktop/shared").FreeTask>(IPC.invoke.freeTaskStart, input),
   checkFreeTask: (sessionId: string) => invoke<{ busy: boolean }>(IPC.invoke.freeTaskCheck, { sessionId }),
   listFreeTasks: (projectPath: string) => invoke<{ tasks: import("@pi-desktop/shared").FreeTask[]; unavailableCount?: number }>(IPC.invoke.freeTaskList, { projectPath }),

@@ -1,5 +1,7 @@
 # 快捷按钮扩展设置工单拆分
 
+> 下文是历史拆分；#31–#37 正在按 [阶段一 Skill Launcher](skill-launcher-spec.md) 重写。旧按钮配置与 Workflow / Stage 设计不再是执行依据。
+
 状态：用户于 2026-10-06 批准拆分、依赖及测试边界；7 张工单已发布并回读核对。基于已确认需求及正式规格，不修改产品范围。
 
 项目跟踪器：yuqiangdede/mattpocock-PI，所有工单为 open 且带 ready-for-agent 标签。正式规格尚未发布为 Issue，因此未设置父 Issue。

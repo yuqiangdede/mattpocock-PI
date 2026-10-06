@@ -1,4 +1,3 @@
-import { assertQualifiedSkillMentions, QUALIFIED_SKILL_PREFIX } from "@pi-desktop/shared";
 import { IPC, ErrorCodes, compactionRecordId, findSkillMentions, isGlobalPermissionMode, isRpcTimeoutError, type AgentEventEnvelope, type AgentPromptRequest, type AgentSteerRequest, type UiMessage, type AgentQueuePushRequest, type AgentStopRequest, type AskToolResolution, type PendingInteractiveRequests, type GlobalPermissionMode, type MessageUsage, type PlanExecutionFinishStatus, type PlanResolutionResult, type PlanResolveRequest, type PromptEnhancementRequest, type SessionSummarizeTitleRequest, type VoiceOrigin, canonicalThinkingLevel, type ThinkingLevel } from "@pi-desktop/shared";
 import type { FinishTurn } from "../runtime/plans";
 import { expandSlashInvocation, enhancePromptDraft, summarizeSessionTitle, visionFromModelConfig, type ComposerTemplate, type RuntimeProviderConfig } from "@pi-desktop/agent-runtime";
@@ -520,7 +519,6 @@ export function registerAgentIpc({
         const commands = await composerCommandService.buildComposerCommands(
           launch.projectPath ?? root,
         );
-        assertQualifiedSkillMentions(submittedContent, commands);
         const command = commands.find((item) => item.name === commandName);
         const activeSkills = new Map(
           commands.flatMap((item) => item.kind === "skill" && item.skillId
@@ -563,10 +561,6 @@ export function registerAgentIpc({
       } catch (error) {
         if (workflowExecutionId || freeTaskId) {
           await finishTurn(req.sessionId, "error", "WORKFLOW_SKILL_UNAVAILABLE", { turnId: durableTurnId });
-          throw error;
-        }
-        if (submittedContent.includes(`/${QUALIFIED_SKILL_PREFIX}`)) {
-          await finishTurn(req.sessionId, "error", "SHORTCUT_SKILL_UNAVAILABLE", { turnId: durableTurnId });
           throw error;
         }
         logger.app("session", "warn", "slash expansion failed; sending literal text", {

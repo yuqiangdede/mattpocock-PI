@@ -12,9 +12,9 @@ const execFileAsync = promisify(execFile);
 const root = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
 const recoveryFixture = process.argv.includes("--recovery");
 const settingsFixture = process.argv.includes("--engineering-settings");
-const shortcutsFixture = process.argv.includes("--skill-shortcuts");
+const actionsFixture = ["--coding-actions", "--skill-shortcuts", "--coding", "--requirements-menu"].some(flag => process.argv.includes(flag));
 const requirementsFixture = process.argv.includes("--requirements-confirmation");
-const codingFixture = process.argv.includes("--coding") || process.argv.includes("--requirements-menu") || settingsFixture || requirementsFixture || shortcutsFixture;
+const codingFixture = process.argv.includes("--coding") || process.argv.includes("--requirements-menu") || settingsFixture || requirementsFixture || actionsFixture;
 const stagesFixture = process.argv.includes("--stages");
 const reopenFixture = process.argv.includes("--reopen");
 const artifactsFixture = process.argv.includes("--artifacts");
@@ -33,7 +33,7 @@ if (!tempResolved.startsWith(`${resolve(scratchRoot)}${sep}`)) {
 
 try {
   await build({
-    entryPoints: [join(root, shortcutsFixture ? "scripts/e2e/skill-shortcuts.tsx" : requirementsFixture ? "scripts/e2e/requirements-confirmation.tsx" : settingsFixture ? "scripts/e2e/engineering-settings.tsx" : codingFixture ? "scripts/e2e/coding-workbench.tsx" : artifactsFixture ? "scripts/e2e/workflow-artifacts.tsx" : reopenFixture ? "scripts/e2e/workflow-reopen.tsx" : stagesFixture ? "scripts/e2e/workflow-stages.tsx" : recoveryFixture ? "scripts/e2e/workflow-recovery.tsx" : discoveryFixture ? "scripts/e2e/workflow-discovery.tsx" : "scripts/e2e/workflow-runs.tsx")],
+    entryPoints: [join(root, actionsFixture ? "scripts/e2e/coding-actions.tsx" : requirementsFixture ? "scripts/e2e/requirements-confirmation.tsx" : settingsFixture ? "scripts/e2e/engineering-settings.tsx" : codingFixture ? "scripts/e2e/coding-workbench.tsx" : artifactsFixture ? "scripts/e2e/workflow-artifacts.tsx" : reopenFixture ? "scripts/e2e/workflow-reopen.tsx" : stagesFixture ? "scripts/e2e/workflow-stages.tsx" : recoveryFixture ? "scripts/e2e/workflow-recovery.tsx" : discoveryFixture ? "scripts/e2e/workflow-discovery.tsx" : "scripts/e2e/workflow-runs.tsx")],
     outfile: join(temp, "renderer.js"),
     bundle: true,
     platform: "browser",
@@ -117,7 +117,7 @@ try {
   env.PI_REQUIREMENTS_MENU = process.argv.includes("--requirements-menu") ? "1" : "0";
   env.PI_REQUIREMENTS_CONFIRMATION = requirementsFixture ? "1" : "0";
   env.PI_CODING_WORKBENCH = codingFixture ? "1" : "0";
-  env.PI_SKILL_SHORTCUTS = shortcutsFixture ? "1" : "0";
+  env.PI_CODING_ACTIONS = actionsFixture ? "1" : "0";
   const child = spawn(electronBinary, [join(temp, "main.mjs")], {
     cwd: root,
     env,
@@ -147,8 +147,8 @@ try {
   assert.equal(exitCode, 0, output.slice(-5000));
   const result = JSON.parse(resultLine.slice("WORKFLOW_RUNS_PROBE ".length));
   assert.equal(result.ok, true);
-  if (shortcutsFixture) {
-    for (const field of ["edited", "inserted", "attachments", "manual", "persisted", "nativeSettingsPreserved", "localized", "migrated", "layout", "recovered", "sourceBody"]) assert.equal(result[field], true, field);
+  if (actionsFixture) {
+    for (const field of ["actions", "migrated", "crud", "order", "enabled", "executed", "latestSkill", "missing", "corruptFallback", "ordinaryChat", "persisted", "nativeSettingsPreserved"]) assert.equal(result[field], true, field);
   } else if (requirementsFixture) {
     for (const field of ["confirmed", "shared", "reconfirmed", "persisted", "cancelled", "isolated", "stale", "localized", "manual"]) assert.equal(result[field], true, field);
   } else if (process.argv.includes("--requirements-menu")) {

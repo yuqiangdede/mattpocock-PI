@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { resolveShortcutBinding, type ShortcutBinding } from "@pi-desktop/shared";
 import type { TFunction } from "i18next";
 import { buildSkillShortcutDraft } from "../skill-shortcut-draft";
 import { api } from "../../../../lib/api";
@@ -29,7 +28,7 @@ export function useComposerSkillShortcut(options: {
     return () => { generation.current += 1; };
   }, [options.draftKey, options.workspacePath]);
 
-  const select = async (skill: string | ShortcutBinding, prompt: string) => {
+  const select = async (skill: string, prompt: string) => {
     const owner = latest.current;
     if (owner.inputBlocked || owner.composing || inFlight.current) return;
     const stamp = generation.current;
@@ -40,12 +39,16 @@ export function useComposerSkillShortcut(options: {
     setPending(true);
     setError(null);
     try {
-      // 使用完整来源目录；异步返回后重新检查草稿归属、IME 和附件。
+      // 复用斜杠菜单的技能目录，保留用户覆盖；异步返回后重新检查草稿归属。
       const { commands } = await api.composerCommands();
       if (!current()) return;
       const draft = latest.current;
       if (draft.inputBlocked || draft.composing) return;
-      const command = resolveShortcutBinding(typeof skill === "string" ? { skillId: skill } : skill, commands);
+      const command = commands.find((entry) => entry.kind === "skill" && entry.skillId === skill);
+      if (!command) {
+        setError(draft.t("coding.skillMissing"));
+        return;
+      }
       const text = buildSkillShortcutDraft(command.name, prompt, draft.readLiveDraft());
       draft.invalidatePromptEnhancement();
       draft.applyEditorDraft(text, draft.fileReferencesRef.current, text.length);

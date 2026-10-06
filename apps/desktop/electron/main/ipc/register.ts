@@ -1,4 +1,4 @@
-import { ShortcutStore } from "../extensions/shortcut-store";
+import { CodingActionStore } from "../extensions/coding-action-store";
 import { join } from "node:path";
 import { dialog, type BrowserWindow, type IpcMain, type IpcMainInvokeEvent } from "electron";
 import { err, ErrorCodes, IPC, ok, type Result } from "@pi-desktop/shared";
@@ -269,15 +269,17 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     acquireSessionOperation,
     stripWinLongPrefix,
   });
-  const shortcutStore = new ShortcutStore(dataDir);
-  registrar.handle(IPC.invoke.shortcutsGet, () => shortcutStore.load(async () => {
+  const codingActionStore = new CodingActionStore(dataDir);
+  registrar.handle(IPC.invoke.codingActionsGet, () => codingActionStore.load(async () => {
     const host = getHost();
     if (!host) throw new Error("无法读取旧快捷提示词配置：host unavailable");
     return host.call("settings.get");
   }));
-  registrar.handle(IPC.invoke.shortcutsSave, (value: unknown) => shortcutStore.save(value));
-  registrar.handle(IPC.invoke.shortcutsBackups, () => shortcutStore.listBackups());
-  registrar.handle(IPC.invoke.shortcutsRestore, (backupId?: string) => shortcutStore.restore(backupId));
+  registrar.handle(IPC.invoke.codingActionsSave, (value: unknown, recover?: boolean) => {
+    if (recover !== undefined && typeof recover !== "boolean") throw new Error("Action 恢复参数无效");
+    return codingActionStore.save(value, recover === true);
+  });
+  registrar.handle(IPC.invoke.codingActionsReset, () => codingActionStore.reset());
   registerSettingsIpc({
     registrar,
     getHost,
