@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { applyShortcutPresetUpdates, createDefaultShortcutConfiguration, getShortcutPresetUpdates, resolveShortcutText, type ShortcutConfiguration } from "@pi-desktop/shared";
-import { Button } from "../../components/ui";
+import { Button, Checkbox } from "../../components/ui";
 
 type Props = { draft: ShortcutConfiguration | null; busy: boolean; setDraft: (draft: ShortcutConfiguration) => void };
 export function ShortcutPresetUpdates({ draft, busy, setDraft }: Props) {
@@ -21,7 +21,7 @@ export function ShortcutPresetUpdates({ draft, busy, setDraft }: Props) {
       const text = resolveShortcutText(preset, t);
       const label = update.kind === "added" ? "新增预置" : update.kind === "deleted" ? "已删除预置有变化，明确添加后恢复" : update.kind === "untracked" ? "旧配置缺少预置基线，需要核对" : "预置内容有变化";
       return <details key={update.presetId}><summary>{text.name}：{label}</summary>
-        <label><input type="checkbox" aria-label={`采用预置 ${text.name}`} disabled={busy} checked={chosen.includes(update.presetId)} onChange={event => setSelected(value => event.target.checked ? [...value, update.presetId] : value.filter(id => id !== update.presetId))} />采用此预置内容</label>
+        <Checkbox aria-label={`采用预置 ${text.name}`} disabled={busy} checked={chosen.includes(update.presetId)} onChange={event => setSelected(value => event.target.checked ? [...value, update.presetId] : value.filter(id => id !== update.presetId))} label="采用此预置内容" />
         <div>Skill：{preset.binding.skillId}</div><pre style={{ whiteSpace: "pre-wrap" }}>{text.prompt}</pre><pre style={{ whiteSpace: "pre-wrap" }}>{text.note}</pre>
       </details>;
     })}

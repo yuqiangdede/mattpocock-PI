@@ -1,11 +1,11 @@
+import { SettingsMenuSelect } from "../../components/settings/SettingsMenuSelect";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { resolveShortcutBinding, qualifiedSkillId, resolveShortcutText, shortcutPreview, SHORTCUT_GROUPS, type ComposerCommand, type ShortcutConfiguration, type SkillShortcut } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
 import { api } from "../../lib/api";
 import { appendShortcut, copyShortcut, deleteShortcut, moveShortcut } from "./shortcut-editing";
-import { Button, Field, Textarea } from "../../components/ui";
-import { SettingsMenuSelect } from "../../components/settings/SettingsMenuSelect";
+import { Button, Checkbox, Field, Input, Textarea } from "../../components/ui";
 import { SettingsCard } from "../settings/primitives";
 import { loadShortcutConfiguration, saveShortcutConfiguration, setShortcutLeaveGuard, useShortcutConfiguration } from "./shortcut-state";
 
@@ -71,16 +71,17 @@ export function ShortcutSettingsPage() {
         <div className="coding-shortcuts"><Button disabled={busy || !skills.length} onClick={() => add()}>新建按钮</Button><Button disabled={busy || !button} onClick={() => add(true)}>复制按钮</Button></div>
         {skillsError && <div role="alert">Skill 列表读取失败：{skillsError}</div>}
         {!skills.length && !skillsError && <div role="status">暂无可明确绑定的 Skill，已有按钮仍可编辑。</div>}
-        <Field label="选择按钮"><select aria-label="选择按钮" value={selected} disabled={busy} onChange={event => setSelected(event.target.value)}>{draft.buttons.length === 0 && <option value="">暂无按钮，可新建按钮</option>}{draft.buttons.map(item => <option key={item.id} value={item.id}>{resolveShortcutText(item, t).name}{item.enabled ? "" : "（已隐藏）"}</option>)}</select></Field>
+        <Field label="选择按钮"><SettingsMenuSelect label="选择按钮" value={selected} disabled={busy || !draft.buttons.length} onChange={setSelected} options={draft.buttons.length ? draft.buttons.map(item => ({ id: item.id, label: resolveShortcutText(item, t).name + (item.enabled ? "" : "（已隐藏）") })) : [{ id: "", label: "暂无按钮，可新建按钮" }]} /></Field>
         {button && <>
-          <Field label="按钮名称"><input aria-label="按钮名称" value={resolveShortcutText(button, t).name} maxLength={128} disabled={busy} onChange={event => patchButton({ name: event.target.value })} /></Field>
+          <Field label="按钮名称"><Input aria-label="按钮名称" value={resolveShortcutText(button, t).name} maxLength={128} disabled={busy} onChange={event => patchButton({ name: event.target.value })} /></Field>
           <Field label="Skill" hint="来源绑定可跨机器使用；当前项目来源指每次打开的项目。"><SettingsMenuSelect label="Skill" value={button.binding.source ? qualifiedSkillId(button.binding) : button.binding.skillId} disabled={busy} fullWidth onChange={id => { const choice = skills.find(item => item.name === id); if (choice?.shortcutBinding) patchButton({ binding: { ...choice.shortcutBinding } }); }} options={[
             { id: button.binding.source ? qualifiedSkillId(button.binding) : button.binding.skillId, label: `${button.binding.skillId} · ${button.binding.source ?? "自动唯一匹配"}${button.binding.sourceId ? ` · ${button.binding.sourceId}` : ""}` },
             ...skills.filter(item => item.name !== (button.binding.source ? qualifiedSkillId(button.binding) : button.binding.skillId)).map(item => ({ id: item.name, label: `${item.title} (${item.shortcutBinding!.skillId})` })),
           ]} />{(() => { try { resolveShortcutBinding(button.binding, skills); return null; } catch (cause) { return <div role="status">{String(cause)}</div>; } })()}</Field>
-          <Field label="显示位置"><select aria-label="显示位置" value={button.position} disabled={busy} onChange={event => patchButton({ position: event.target.value as SkillShortcut["position"] })}><option value="primary">常用</option><option value="more">更多</option></select></Field>
-          {button.position === "more" && <Field label="更多分组"><select aria-label="更多分组" value={button.group} disabled={busy} onChange={event => patchButton({ group: event.target.value as SkillShortcut["group"] })}>{SHORTCUT_GROUPS.map(group => <option key={group} value={group}>{t(`coding.groups.${group}`)}</option>)}</select></Field>}
-          <Field label="启用"><label><input aria-label="启用" type="checkbox" checked={button.enabled} disabled={busy} onChange={event => patchButton({ enabled: event.target.checked })} />显示此按钮（关闭后保留配置）</label></Field>
+
+          <Field label="显示位置"><SettingsMenuSelect label="显示位置" value={button.position} disabled={busy} onChange={value => patchButton({ position: value as SkillShortcut["position"] })} options={[{ id: "primary", label: "常用" }, { id: "more", label: "更多" }]} /></Field>
+          {button.position === "more" && <Field label="更多分组"><SettingsMenuSelect label="更多分组" value={button.group} disabled={busy} onChange={value => patchButton({ group: value as SkillShortcut["group"] })} options={SHORTCUT_GROUPS.map(group => ({ id: group, label: t(`coding.groups.${group}`) }))} /></Field>}
+          <Field label="启用"><Checkbox aria-label="启用" checked={button.enabled} disabled={busy} onChange={event => patchButton({ enabled: event.target.checked })} label="显示此按钮（关闭后保留配置）" /></Field>
           <div className="coding-shortcuts"><Button disabled={busy || moveShortcut(draft, selected, -1) === draft} onClick={() => changeDraft(value => moveShortcut(value, selected, -1))}>上移</Button><Button disabled={busy || moveShortcut(draft, selected, 1) === draft} onClick={() => changeDraft(value => moveShortcut(value, selected, 1))}>下移</Button><Button disabled={busy} onClick={() => { if (window.confirm("删除此按钮？保存后生效。")) { changeDraft(value => deleteShortcut(value, selected)); setSelected(draft.buttons.find(item => item.id !== selected)?.id ?? ""); } }}>删除按钮</Button></div>
           <Field label="默认提示词" hint="留空时只插入 Skill 指令。"><Textarea aria-label="默认提示词" value={resolveShortcutText(button, t).prompt} maxLength={16000} disabled={busy} onChange={event => patchButton({ prompt: event.target.value })} /></Field>
           <Field label="备注" hint="仅用于按钮提示，不发送给模型。"><Textarea aria-label="备注" value={resolveShortcutText(button, t).note} maxLength={4000} disabled={busy} onChange={event => patchButton({ note: event.target.value })} /></Field>

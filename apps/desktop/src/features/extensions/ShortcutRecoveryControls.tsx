@@ -1,3 +1,4 @@
+import { SettingsMenuSelect } from "../../components/settings/SettingsMenuSelect";
 import { useState } from "react";
 import { restoreShortcutPreset, type ShortcutConfiguration } from "@pi-desktop/shared";
 import { Button, Field } from "../../components/ui";
@@ -34,7 +35,7 @@ export function ShortcutRecoveryControls({ draft, selected, busy, setBusy, setDr
       <Button disabled={busy} onClick={() => void restore()}>恢复整套默认</Button>
       <Button disabled={busy} onClick={() => void refresh()}>查看有效备份</Button>
     </div>
-    {backups.length > 0 && <Field label="选择恢复备份"><select aria-label="选择恢复备份" disabled={busy} value={backup} onChange={event => setBackup(event.target.value)}>{backups.map(id => <option key={id} value={id}>{id}</option>)}</select><Button disabled={busy || !backup} onClick={() => void restore(backup)}>恢复所选备份</Button></Field>}
+    {backups.length > 0 && <Field label="选择恢复备份"><SettingsMenuSelect label="选择恢复备份" disabled={busy} value={backup} onChange={setBackup} options={backups.map(id => ({ id, label: id }))} /><Button disabled={busy || !backup} onClick={() => void restore(backup)}>恢复所选备份</Button></Field>}
     {message && <div role="status">{message}</div>}
     {error && <div role="alert">{error}</div>}
   </div>;
