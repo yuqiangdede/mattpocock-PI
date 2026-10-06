@@ -7,7 +7,8 @@ import {
   classifySidecarCrash,
   sidecarCrashErrorCode,
 } from "@pi-desktop/agent-runtime";
-import { loadBuiltinSkillBody } from "../builtin-skills";
+import { qualifiedSkillCommands, loadQualifiedSkill } from "../extensions/qualified-skill-runtime";
+import { builtinSkills, loadBuiltinSkillBody } from "../builtin-skills";
 import { createImageGenerationTool } from "../services/image-generation-service";
 import { registerPluginDevTools } from "../plugin-dev-tools";
 import { resolveLocalFile } from "../browser-view";
@@ -581,6 +582,19 @@ export function createSidecarRuntime({
       // skill is looked up next, and only then a plugin's — the ids cannot
       // collide, since a plugin skill id always carries a `<pluginId>/` prefix.
       const skill: LoadedSkillDocument =
+        (await loadQualifiedSkill(id, projectPath, {
+          catalog: async root => qualifiedSkillCommands(
+            builtinSkills({ workspacePath: root, pluginPaths: plugins.listLoaded().map(plugin => plugin.path) }),
+            await activeUserSkills(root ?? undefined),
+            plugins.getSkills().filter(skill => pluginActiveInProject(skill.pluginId, root)),
+          ),
+          builtin: loadBuiltinSkillBody,
+          plugin: rawId => plugins.loadSkillBody(rawId),
+          readUser: async (rawId, level, root) => {
+            if (!runtimeState.host) throw new Error("host unavailable");
+            return runtimeState.host.call("skills.read", { id: rawId, level, projectPath: root });
+          },
+        })) ??
         loadBuiltinSkillBody(id) ??
         (await loadUserSkillBody(id, projectPath)) ??
         plugins.loadSkillBody(id);

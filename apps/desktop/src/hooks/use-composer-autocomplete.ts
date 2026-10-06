@@ -203,7 +203,7 @@ export function useComposerAutocomplete({
         commandsCache.key === workspaceKey &&
         now - commandsCache.at < SOURCE_TTL_MS
       ) {
-        setCommands(commandsCache.commands);
+        setCommands(commandsCache.commands.filter(command => !command.shortcutOnly));
         return;
       }
       let cancelled = false;
@@ -211,7 +211,7 @@ export function useComposerAutocomplete({
         .composerCommands()
         .then((res) => {
           commandsCache = { key: workspaceKey, at: Date.now(), commands: res.commands };
-          if (!cancelled) setCommands(res.commands);
+          if (!cancelled) setCommands(res.commands.filter(command => !command.shortcutOnly));
         })
         .catch(() => {
           if (!cancelled) setCommands([]);

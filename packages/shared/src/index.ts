@@ -83,3 +83,4 @@ export * from "./storage.js";
 export * from "./upstream.js";
 export * from "./skill-shortcuts.js";
 export * from "./shortcut-preset-updates.js";
+export * from "./qualified-skills.js";

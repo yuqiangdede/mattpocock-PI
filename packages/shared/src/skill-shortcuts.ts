@@ -1,3 +1,4 @@
+import { isShortcutBinding, qualifiedSkillId } from "./qualified-skills.js";
 import { ENGINEERING_SHORTCUTS, type EngineeringShortcutAction } from "./engineering-shortcuts.js";
 import { SHORTCUT_PRESET_SIGNATURES } from "./shortcut-preset-manifest.js";
 
@@ -39,8 +40,7 @@ export function validateShortcutConfiguration(value: unknown): asserts value is 
     if (!button || typeof button !== "object" || typeof button.id !== "string" || !button.id || button.id.length > 128 || ids.has(button.id)) fail();
     ids.add(button.id);
     if (button.presetId !== undefined && !ENGINEERING_SHORTCUTS.some(entry => entry.action === button.presetId)) fail();
-    if (!button.binding || typeof button.binding.skillId !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(button.binding.skillId)) fail();
-    for (const field of ["source", "sourceId"] as const) if (button.binding[field] !== undefined && (typeof button.binding[field] !== "string" || button.binding[field]!.length > 256 || /[\\/\0]/.test(button.binding[field]!))) fail();
+    if (!isShortcutBinding(button.binding)) fail();
     if (!["primary", "more"].includes(button.position) || !SHORTCUT_GROUPS.includes(button.group) || typeof button.enabled !== "boolean") fail();
     for (const field of ["name", "prompt", "note"] as const) if (button[field] !== undefined && (typeof button[field] !== "string" || button[field]!.length > (field === "prompt" ? 16000 : field === "note" ? 4000 : 128) || button[field]!.includes("\0"))) fail();
     if (button.name !== undefined && !button.name.trim()) fail();
@@ -52,7 +52,7 @@ export function resolveShortcutText(button: SkillShortcut, translate: (key: stri
 }
 export function shortcutPreview(button: SkillShortcut, translate: (key: string) => string): string {
   const { prompt } = resolveShortcutText(button, translate);
-  return `/${button.binding.skillId}${prompt ? ` ${prompt}` : ""}`;
+  return `/${button.binding.source ? qualifiedSkillId(button.binding) : button.binding.skillId}${prompt ? ` ${prompt}` : ""}`;
 }
 
 // 单项恢复只还原内容，保留按钮身份、布局和启用状态。

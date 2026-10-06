@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { resolveShortcutText, shortcutPreview, SHORTCUT_GROUPS, type ShortcutConfiguration, type SkillShortcut } from "@pi-desktop/shared";
+import { resolveShortcutBinding, qualifiedSkillId, resolveShortcutText, shortcutPreview, SHORTCUT_GROUPS, type ComposerCommand, type ShortcutConfiguration, type SkillShortcut } from "@pi-desktop/shared";
+import { useAppStore } from "../../stores/app-store";
 import { api } from "../../lib/api";
 import { appendShortcut, copyShortcut, deleteShortcut, moveShortcut } from "./shortcut-editing";
 import { Button, Field, Textarea } from "../../components/ui";
+import { SettingsMenuSelect } from "../../components/settings/SettingsMenuSelect";
 import { SettingsCard } from "../settings/primitives";
 import { loadShortcutConfiguration, saveShortcutConfiguration, setShortcutLeaveGuard, useShortcutConfiguration } from "./shortcut-state";
 
@@ -18,16 +20,16 @@ export function ShortcutSettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [skills, setSkills] = useState<string[]>([]);
+  const projectPath = useAppStore(state => state.workspace?.path ?? "");
+  const [skills, setSkills] = useState<ComposerCommand[]>([]);
   const [skillsError, setSkillsError] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
     void api.composerCommands().then(({ commands }) => {
-      const ids = commands.filter(item => item.kind === "skill" && item.skillId).map(item => item.skillId!);
-      if (active) setSkills([...new Set(ids)].filter(id => ids.filter(value => value === id).length === 1));
-    }).catch(cause => { if (active) setSkillsError(String(cause)); });
+      if (active) { setSkills(commands.filter(item => item.shortcutBinding)); setSkillsError(null); }
+    }).catch(cause => { if (active) { setSkills([]); setSkillsError(String(cause)); } });
     return () => { active = false; };
-  }, []);
+  }, [projectPath]);
   useEffect(() => { void loadShortcutConfiguration(); }, []);
   useEffect(() => { if (configuration) { setDraft(structuredClone(configuration)); setSelected(value => configuration.buttons.some(item => item.id === value) ? value : configuration.buttons[0]?.id || ""); } }, [configuration]);
   const dirty = Boolean(draft && configuration && JSON.stringify(draft) !== JSON.stringify(configuration));
@@ -46,7 +48,7 @@ export function ShortcutSettingsPage() {
   const add = (copy = false) => {
     const id = `custom:${crypto.randomUUID()}`;
     changeDraft(value => appendShortcut(value, copy && button ? copyShortcut(button, id, t) : {
-      id, name: "新按钮", prompt: "", note: "", binding: { skillId: skills[0]! },
+      id, name: "新按钮", prompt: "", note: "", binding: { ...skills[0]!.shortcutBinding! },
       position: "more", group: "exploration", enabled: true,
     }));
     if (draft && draft.buttons.length < 256) setSelected(id);
@@ -72,7 +74,10 @@ export function ShortcutSettingsPage() {
         <Field label="选择按钮"><select aria-label="选择按钮" value={selected} disabled={busy} onChange={event => setSelected(event.target.value)}>{draft.buttons.length === 0 && <option value="">暂无按钮，可新建按钮</option>}{draft.buttons.map(item => <option key={item.id} value={item.id}>{resolveShortcutText(item, t).name}{item.enabled ? "" : "（已隐藏）"}</option>)}</select></Field>
         {button && <>
           <Field label="按钮名称"><input aria-label="按钮名称" value={resolveShortcutText(button, t).name} maxLength={128} disabled={busy} onChange={event => patchButton({ name: event.target.value })} /></Field>
-          <Field label="Skill"><select aria-label="Skill" value={button.binding.skillId} disabled={busy} onChange={event => patchButton({ binding: { skillId: event.target.value } })}>{!skills.includes(button.binding.skillId) && <option value={button.binding.skillId}>{button.binding.skillId}（当前不可用或存在歧义）</option>}{skills.map(id => <option key={id} value={id}>{id}</option>)}</select></Field>
+          <Field label="Skill" hint="来源绑定可跨机器使用；当前项目来源指每次打开的项目。"><SettingsMenuSelect label="Skill" value={button.binding.source ? qualifiedSkillId(button.binding) : button.binding.skillId} disabled={busy} fullWidth onChange={id => { const choice = skills.find(item => item.name === id); if (choice?.shortcutBinding) patchButton({ binding: { ...choice.shortcutBinding } }); }} options={[
+            { id: button.binding.source ? qualifiedSkillId(button.binding) : button.binding.skillId, label: `${button.binding.skillId} · ${button.binding.source ?? "自动唯一匹配"}${button.binding.sourceId ? ` · ${button.binding.sourceId}` : ""}` },
+            ...skills.filter(item => item.name !== (button.binding.source ? qualifiedSkillId(button.binding) : button.binding.skillId)).map(item => ({ id: item.name, label: `${item.title} (${item.shortcutBinding!.skillId})` })),
+          ]} />{(() => { try { resolveShortcutBinding(button.binding, skills); return null; } catch (cause) { return <div role="status">{String(cause)}</div>; } })()}</Field>
           <Field label="显示位置"><select aria-label="显示位置" value={button.position} disabled={busy} onChange={event => patchButton({ position: event.target.value as SkillShortcut["position"] })}><option value="primary">常用</option><option value="more">更多</option></select></Field>
           {button.position === "more" && <Field label="更多分组"><select aria-label="更多分组" value={button.group} disabled={busy} onChange={event => patchButton({ group: event.target.value as SkillShortcut["group"] })}>{SHORTCUT_GROUPS.map(group => <option key={group} value={group}>{t(`coding.groups.${group}`)}</option>)}</select></Field>}
           <Field label="启用"><label><input aria-label="启用" type="checkbox" checked={button.enabled} disabled={busy} onChange={event => patchButton({ enabled: event.target.checked })} />显示此按钮（关闭后保留配置）</label></Field>
