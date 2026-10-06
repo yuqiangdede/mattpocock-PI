@@ -1,4 +1,4 @@
-import { ENGINEERING_SHORTCUTS, type EngineeringShortcutAction } from "./engineering-shortcuts";
+import { ENGINEERING_SHORTCUTS, type EngineeringShortcutAction } from "./engineering-shortcuts.js";
 
 export const SHORTCUT_GROUPS = ["exploration", "maintenance", "collaboration", "projectSetup"] as const;
 export type ShortcutGroup = typeof SHORTCUT_GROUPS[number];
