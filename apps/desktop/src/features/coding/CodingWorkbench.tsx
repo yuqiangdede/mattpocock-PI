@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CodingActionRegistry, resolveCodingAction, type CodingAction, type ComposerCommand } from "@pi-desktop/shared";
+import { CodingActionError, CodingActionRegistry, resolveCodingAction, type CodingAction, type ComposerCommand } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
 import { Button, TooltipButton } from "../../components/ui";
 import { AnchoredMenu } from "../../components/settings/AnchoredMenu";
@@ -31,9 +31,9 @@ export function CodingWorkbench({ disabled, error, onExecute }: {
   const registry = new CodingActionRegistry(configuration);
   const actions = registry.list(true);
   const reason = (action: CodingAction) => {
-    if (catalogError) return catalogError;
+    if (catalogError) return t("codingActions.executeFailed", { detail: catalogError });
     try { resolveCodingAction(action.id, registry, catalog); return ""; }
-    catch (cause) { return cause instanceof Error ? cause.message : String(cause); }
+    catch (cause) { return cause instanceof CodingActionError ? t(`codingActions.${cause.code === "SKILL_MISSING" ? "skillMissing" : cause.code}`, { skillId: action.skillId }) : t("codingActions.executeFailed", { detail: String(cause) }); }
   };
   const renderAction = (action: CodingAction, menu = false) => {
     const unavailable = reason(action);
@@ -43,18 +43,18 @@ export function CodingWorkbench({ disabled, error, onExecute }: {
       tooltipClassName="ui-tooltip-help coding-skill-tooltip" onClick={() => { setMoreOpen(false); onExecute(action.id); }}>{action.label}</TooltipButton>;
   };
   const configure = () => { const store = useAppStore.getState(); store.setSettingsTab("codingActions"); store.setPage("settings"); };
-  return <section className="coding-workbench" aria-label="Coding Actions">
+  return <section className="coding-workbench" aria-label={t("codingActions.title")}>
     <div className="coding-shortcuts coding-shortcuts-primary">{actions.slice(0, 6).map(action => renderAction(action))}</div>
     <div className="coding-shortcuts coding-shortcuts-secondary">
       <Button variant="ghost" onClick={() => useAppStore.getState().openWorkPanelTab(toolWorkPanelTab("workflow"))}>{t("coding.formal")}</Button>
       <RequirementsConfirmation projectPath={projectPath} disabled={disabled} />
-      {actions.length > 6 && <AnchoredMenu open={moreOpen} onClose={() => setMoreOpen(false)} role="menu" side="top" restoreFocus={!disabled} label="More Actions" menuClassName="context-menu coding-more-menu"
-        trigger={ref => <Button ref={ref} variant="ghost" disabled={disabled} aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(value => !value)}>更多 Actions</Button>}>
+      {actions.length > 6 && <AnchoredMenu open={moreOpen} onClose={() => setMoreOpen(false)} role="menu" side="top" restoreFocus={!disabled} label={t("codingActions.more")} menuClassName="context-menu coding-more-menu"
+        trigger={ref => <Button ref={ref} variant="ghost" disabled={disabled} aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(value => !value)}>{t("codingActions.more")}</Button>}>
         {actions.slice(6).map(action => renderAction(action, true))}
       </AnchoredMenu>}
-      <Button variant="ghost" onClick={configure}>配置编码 Actions</Button>
+      <Button variant="ghost" onClick={configure}>{t("codingActions.configure")}</Button>
     </div>
-    {actions.some(action => reason(action)) && <div role="status">{actions.filter(action => reason(action)).map(action => `${action.label}：${reason(action)}`).join("；")}<Button onClick={() => setCatalogVersion(value => value + 1)}>重新检测 Skill</Button></div>}
-    {(error || diagnostic) && <div className="coding-shortcut-error" role="alert"><span>{error || diagnostic}</span><Button onClick={configure}>配置编码 Actions</Button></div>}
+    {actions.some(action => reason(action)) && <div role="status">{actions.filter(action => reason(action)).map(action => `${action.label}：${reason(action)}`).join("；")}<Button onClick={() => setCatalogVersion(value => value + 1)}>{t("codingActions.recheck")}</Button></div>}
+    {(error || diagnostic) && <div className="coding-shortcut-error" role="alert"><span>{error || t("codingActions.diagnostic", { detail: diagnostic })}</span><Button onClick={configure}>{t("codingActions.configure")}</Button></div>}
   </section>;
 }

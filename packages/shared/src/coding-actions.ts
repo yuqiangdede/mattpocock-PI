@@ -19,15 +19,15 @@ export type CodingActionSnapshot = {
 };
 
 const defaults: CodingAction[] = [
-  { id: "discuss-requirements", label: "需求讨论", skillId: "grill-with-docs", order: 0 },
-  { id: "create-spec", label: "固化需求", skillId: "to-spec", order: 1 },
-  { id: "design", label: "技术设计", skillId: "codebase-design", order: 2 },
-  { id: "create-tickets", label: "拆分任务", skillId: "to-tickets", order: 3 },
-  { id: "implement", label: "实现", skillId: "implement", order: 4 },
-  { id: "code-review", label: "代码审查", skillId: "code-review", order: 5 },
+  { id: "discuss-requirements", label: "Discuss requirements", skillId: "grill-with-docs", order: 0 },
+  { id: "create-spec", label: "Create specification", skillId: "to-spec", order: 1 },
+  { id: "design", label: "Technical design", skillId: "codebase-design", order: 2 },
+  { id: "create-tickets", label: "Create tickets", skillId: "to-tickets", order: 3 },
+  { id: "implement", label: "Implement", skillId: "implement", order: 4 },
+  { id: "code-review", label: "Code review", skillId: "code-review", order: 5 },
 ];
-export function createDefaultCodingActions(): CodingActionConfiguration {
-  return { schemaVersion: 1, actions: structuredClone(defaults) };
+export function createDefaultCodingActions(labels: Readonly<Record<string, string>> = {}): CodingActionConfiguration {
+  return { schemaVersion: 1, actions: defaults.map(action => ({ ...action, label: labels[action.id] ?? action.label })) };
 }
 
 export class CodingActionError extends Error {
@@ -67,8 +67,11 @@ export class CodingActionRegistry {
     this.actions = structuredClone(configuration.actions);
   }
   list(enabledOnly = false): CodingAction[] {
-    return this.actions.map((action, index) => ({ action, index }))
-      .filter(({ action }) => !enabledOnly || action.enabled !== false)
+    return CodingActionRegistry.sort(this.actions).filter(action => !enabledOnly || action.enabled !== false);
+  }
+  // 编辑中的空名称仍可排序；仅在保存或执行时校验完整配置。
+  static sort(actions: readonly CodingAction[]): CodingAction[] {
+    return actions.map((action, index) => ({ action, index }))
       .sort((a, b) => (a.action.order ?? a.index) - (b.action.order ?? b.index) || a.index - b.index)
       .map(({ action }) => ({ ...action }));
   }
@@ -100,8 +103,8 @@ export function moveCodingAction(configuration: CodingActionConfiguration, actio
 
 const legacyIds: Record<string, string> = { discovery: "discuss-requirements", spec: "create-spec", tickets: "create-tickets", implement: "implement", review: "code-review" };
 const legacyLabels: Record<string, string> = { ask: "询问 Matt", diagnose: "排查问题", initialize: "初始化工程技能", retro: "复盘" };
-export function migrateEngineeringActions(settings: unknown): CodingActionConfiguration {
-  const config = createDefaultCodingActions();
+export function migrateEngineeringActions(settings: unknown, labels: Readonly<Record<string, string>> = {}): CodingActionConfiguration {
+  const config = createDefaultCodingActions(labels);
   if (!settings || typeof settings !== "object" || Array.isArray(settings)) throw new Error("旧工程设置无效");
   const prompts = (settings as { engineeringShortcutPrompts?: unknown }).engineeringShortcutPrompts;
   if (prompts === undefined) return config;

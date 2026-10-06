@@ -1,4 +1,5 @@
 export async function resolve(specifier, context, next) {
+  if (specifier === "@pi-desktop/i18n") return next(new URL("../../../../packages/i18n/src/index.ts", import.meta.url).href, context);
   if (specifier === "@pi-desktop/shared") return next(new URL("../../../../packages/shared/src/index.ts", import.meta.url).href, context);
   if (!specifier.startsWith("./") && !specifier.startsWith("../")) return next(specifier, context);
   try { return await next(specifier, context); }

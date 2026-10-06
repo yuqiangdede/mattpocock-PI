@@ -35,7 +35,7 @@ Skill Resolver 消费原生 Catalog 已合并的结果，不自行规定项目�
 
 ## 界面与配置
 
-复用扩展设置中的一个设置卡片，支持创建、删除、编辑 label / skillId / enabled / order / optional prompt，以及可选说明。显式保存与取消，未保存离开提示。
+复用扩展设置中的一个设置卡片，支持创建、删除、编辑 label / skillId / enabled / order / optional prompt，以及可选说明。显式保存与取消，未保存离开提示。诊断重试读取也要确认放弃未保存修改，取消确认保留草稿；读取、保存、重置和导入共用同步互斥，避免 React 尚未更新禁用状态时启动并发操作。界面文字沿用现有 i18n；用户保存的 label / prompt 原文不随语言切换改写，默认标签仅在初始化、恢复默认或损坏回退时按当前语言生成。
 
 Renderer 按 Registry 顺序将前六项显示为主要动作，其余放入 More Actions。此规则只属于视图，不持久化位置、分组或坐标。
 
@@ -61,7 +61,7 @@ Renderer 通过既有 Preload IPC 访问 Main；Main 在当前应用数据目录
 6. 旧配置安全且幂等迁移；读取和备份/写入失败不损坏原数据。
 7. 配置损坏不会阻塞启动和普通 Chat，恢复前保全原始字节。
 8. 原生 Chat、Agent、Plan、Goal、权限和队列的行为不被替换。
-9. 目标测试覆盖默认、解析、missing、迁移、排序、enabled、执行、持久化及损坏回退；运行真实 Electron / Host / Pi 的 Action 和工程 Skill 回归。
+9. 目标测试覆盖默认、解析、missing、迁移、排序、enabled、执行、持久化及损坏回退，以及诊断重试取消保留草稿、保存与重试互斥、临时空名称排序和 i18n 键集合 / 插值一致性；运行真实 Electron / Host / Pi 的 Action 和工程 Skill 回归。
 
 ## 明确不实现
 

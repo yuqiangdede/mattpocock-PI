@@ -4,10 +4,12 @@ import { randomUUID } from "node:crypto";
 import { createDefaultCodingActions, migrateEngineeringActions, migrateShortcutActions, validateCodingActions, type CodingActionConfiguration, type CodingActionSnapshot } from "@pi-desktop/shared";
 
 export class CodingActionStore {
+  private readonly defaultLabels: (settings?: unknown) => Readonly<Record<string, string>>;
   readonly directory: string;
   readonly file: string;
   private queue: Promise<unknown> = Promise.resolve();
-  constructor(dataDir: string) {
+  constructor(dataDir: string, privateDefaultLabels: (settings?: unknown) => Readonly<Record<string, string>> = () => ({})) {
+    this.defaultLabels = privateDefaultLabels;
     this.directory = path.join(dataDir, "extensions");
     this.file = path.join(this.directory, "coding-actions.json");
   }
@@ -23,7 +25,7 @@ export class CodingActionStore {
         const legacyFile = path.join(this.directory, "skill-shortcuts.json");
         const legacy = await this.read(legacyFile);
         const settings = legacy === null && readLegacySettings ? await readLegacySettings() : {};
-        const configuration = legacy === null ? migrateEngineeringActions(settings) : migrateShortcutActions(JSON.parse(legacy));
+        const configuration = legacy === null ? migrateEngineeringActions(settings, this.defaultLabels(settings)) : migrateShortcutActions(JSON.parse(legacy));
         if (legacy !== null) await this.backupFile(legacyFile, "legacy");
         else if ((settings as { engineeringShortcutPrompts?: unknown }).engineeringShortcutPrompts !== undefined) {
           await this.backup(Buffer.from(JSON.stringify({ engineeringShortcutPrompts: (settings as { engineeringShortcutPrompts: unknown }).engineeringShortcutPrompts }), "utf8"), "legacy");
@@ -32,7 +34,7 @@ export class CodingActionStore {
         return { configuration, ...(legacy !== null ? { diagnostic: "旧快捷配置已迁移为 Coding Actions；Skill 来源沿用 PI 现有优先级。" } : {}) };
       } catch (cause) {
         // 读取失败只影响附加入口：保留原文件并提供内存默认值，Chat 不受阻塞。
-        return { configuration: createDefaultCodingActions(), recoveryRequired: true, diagnostic: `编码 Action 配置不可用，已回退默认；原文件保持不变：${String(cause)}` };
+        return { configuration: createDefaultCodingActions(this.defaultLabels()), recoveryRequired: true, diagnostic: `编码 Action 配置不可用，已回退默认；原文件保持不变：${String(cause)}` };
       }
     });
   }
@@ -51,7 +53,7 @@ export class CodingActionStore {
       return snapshot;
     });
   }
-  async reset(): Promise<CodingActionConfiguration> { return this.save(createDefaultCodingActions(), true); }
+  async reset(): Promise<CodingActionConfiguration> { return this.save(createDefaultCodingActions(this.defaultLabels()), true); }
   private async read(file: string): Promise<string | null> {
     try {
       if ((await fs.stat(file)).size > 32 * 1024 * 1024) throw new Error("编码 Action 配置过大");

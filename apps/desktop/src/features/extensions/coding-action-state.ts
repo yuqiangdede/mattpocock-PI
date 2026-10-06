@@ -13,7 +13,7 @@ export function getCodingActions(): CodingActionConfiguration { return state.con
 export function loadCodingActions(force = false): Promise<void> {
   if (state.loaded && !force) return Promise.resolve();
   if (!loading) loading = api.getCodingActions().then(snapshot => publish({ ...snapshot, loaded: true }))
-    .catch(cause => publish({ ...state, loaded: true, diagnostic: `编码 Action 配置读取失败，使用默认配置：${String(cause)}` }))
+    .catch(cause => publish({ ...state, loaded: true, diagnostic: String(cause) }))
     .finally(() => { loading = null; });
   return loading;
 }

@@ -20,11 +20,11 @@ const catalog = skillId => [{ name: skillId, kind: "skill", skillId, title: skil
 
 test("默认仅配置六个独立编码 Actions，不展开整个 Skill Catalog", () => {
   const config = createDefaultCodingActions();
-  assert.deepEqual(config.actions.map(action => action.label), ["需求讨论", "固化需求", "技术设计", "拆分任务", "实现", "代码审查"]);
+  assert.deepEqual(config.actions.map(action => action.label), ["Discuss requirements", "Create specification", "Technical design", "Create tickets", "Implement", "Code review"]);
   assert.equal(new CodingActionRegistry(config).list(true).length, 6);
   assert.doesNotMatch(JSON.stringify(config), /position|layout|stage|workflow|body|artifact/i);
   config.actions[0].label = "本地修改";
-  assert.equal(createDefaultCodingActions().actions[0].label, "需求讨论");
+  assert.equal(createDefaultCodingActions().actions[0].label, "Discuss requirements");
 });
 test("Registry 排序、enabled、重复 Skill 引用与无前置阶段约束", () => {
   const config = createDefaultCodingActions();
@@ -151,4 +151,56 @@ test("失效 Action、缺失 Skill 和异步会话切换不会发送", async () 
   await assert.rejects(() => executeCodingAction("implement", context), /Skill missing/);
   await assert.rejects(() => executeCodingAction("implement", { ...context, catalog: async () => catalog("implement"), isCurrent: () => false }), /已切换/);
   assert.equal(sends, 0);
+});
+
+const { CodingActionOperationController } = await import("../src/features/extensions/coding-action-operation-controller.ts");
+test("诊断重试取消保留草稿，确认后才替换，保存期间重试互斥", async () => {
+  const controller = new CodingActionOperationController();
+  let draft = "unsaved", reads = 0, confirms = 0;
+  const busy = [];
+  const reload = async () => { reads++; draft = "loaded"; };
+  const onBusy = value => busy.push(value);
+  const onStart = () => {};
+  const onError = cause => { throw cause; };
+  await controller.retry(true, () => { confirms++; return false; }, reload, onBusy, onStart, onError);
+  assert.equal(draft, "unsaved"); assert.equal(reads, 0); assert.equal(confirms, 1);
+  let finish;
+  const save = controller.run(() => new Promise(resolve => { finish = resolve; }), onBusy, onStart, onError);
+  assert.equal(controller.busy, true);
+  await controller.retry(true, () => { confirms++; return true; }, reload, onBusy, onStart, onError);
+  assert.equal(confirms, 1); assert.equal(reads, 0); assert.equal(draft, "unsaved");
+  finish(); await save;
+  await controller.retry(true, () => true, reload, onBusy, onStart, onError);
+  assert.equal(draft, "loaded"); assert.equal(reads, 1); assert.equal(controller.busy, false);
+  assert.deepEqual(busy, [true, false, true, false, true, false]);
+});
+test("Registry 共享稳定排序允许编辑中的空名称，不修改输入", () => {
+  const actions = [{ id: "a", label: "", skillId: "implement", order: 2 }, { id: "b", label: "B", skillId: "implement", order: 0 }, { id: "c", label: "C", skillId: "implement", order: 0 }];
+  assert.deepEqual(CodingActionRegistry.sort(actions).map(action => action.id), ["b", "c", "a"]);
+  assert.equal(actions[0].id, "a");
+  assert.throws(() => new CodingActionRegistry({ schemaVersion: 1, actions }));
+});
+test("默认标签可按语言注入，已保存自定义标签不跟随语言变化", () => {
+  const config = createDefaultCodingActions({ "discuss-requirements": "需求讨论" });
+  assert.equal(config.actions[0].label, "需求讨论");
+  config.actions[0].label = "我的讨论";
+  createDefaultCodingActions();
+  assert.equal(config.actions[0].label, "我的讨论");
+});
+
+test("Main 初始标签取当前语言，重启与语言切换保留保存的用户原文", async t => {
+  const { directory } = await fixture(t);
+  const { catalogs } = await import("@pi-desktop/i18n");
+  let locale = "en";
+  const store = new CodingActionStore(directory, settings => catalogs[settings?.language ?? locale].codingActions.defaults);
+  const initial = await store.load(async () => ({ language: "zh-CN" }));
+  assert.equal(initial.configuration.actions[0].label, "需求讨论");
+  initial.configuration.actions[0].label = "我的讨论";
+  initial.configuration.actions[0].prompt = "保持我的原文";
+  await store.save(initial.configuration);
+  locale = "en";
+  const restarted = await store.load();
+  assert.equal(restarted.configuration.actions[0].label, "我的讨论");
+  assert.equal(restarted.configuration.actions[0].prompt, "保持我的原文");
+  assert.equal((await store.reset()).actions[0].label, "Discuss requirements");
 });
