@@ -8,6 +8,7 @@ import { SettingsCard } from "../settings/primitives";
 import { loadShortcutConfiguration, saveShortcutConfiguration, setShortcutLeaveGuard, useShortcutConfiguration } from "./shortcut-state";
 
 import { ShortcutRecoveryControls } from "./ShortcutRecoveryControls";
+import { ShortcutPresetUpdates } from "./ShortcutPresetUpdates";
 
 export function ShortcutSettingsPage() {
   const { t } = useTranslation();
@@ -85,6 +86,7 @@ export function ShortcutSettingsPage() {
         {error && <div role="alert">操作失败，编辑内容已保留：{error}</div>}
       </div>}
       <ShortcutRecoveryControls draft={draft} selected={selected} busy={busy} setBusy={setBusy} setDraft={setDraft} />
+      <ShortcutPresetUpdates draft={draft} busy={busy} setDraft={setDraft} />
     </SettingsCard>
   </div>;
 }

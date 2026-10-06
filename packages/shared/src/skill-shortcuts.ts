@@ -1,4 +1,5 @@
 import { ENGINEERING_SHORTCUTS, type EngineeringShortcutAction } from "./engineering-shortcuts.js";
+import { SHORTCUT_PRESET_SIGNATURES } from "./shortcut-preset-manifest.js";
 
 export const SHORTCUT_GROUPS = ["exploration", "maintenance", "collaboration", "projectSetup"] as const;
 export type ShortcutGroup = typeof SHORTCUT_GROUPS[number];
@@ -10,6 +11,7 @@ export type SkillShortcut = {
 };
 export type ShortcutConfiguration = {
   schemaVersion: 1; presetVersion: number; buttons: SkillShortcut[];
+  presetBaseline?: Record<string, string>;
   deletedPresetIds: string[]; migration?: { engineeringPrompts?: boolean };
 };
 const exploration = ["spec", "tickets", "grillMe", "grilling", "research", "questionnaire", "prototype"];
@@ -20,7 +22,7 @@ export function createDefaultShortcutConfiguration(): ShortcutConfiguration {
     const left = primary.indexOf(a.action), right = primary.indexOf(b.action);
     return (left < 0 ? 100 : left) - (right < 0 ? 100 : right);
   });
-  return { schemaVersion: 1, presetVersion: 1, deletedPresetIds: [], buttons: entries.map(({ action, skill }) => ({
+  return { schemaVersion: 1, presetVersion: 1, presetBaseline: { ...SHORTCUT_PRESET_SIGNATURES }, deletedPresetIds: [], buttons: entries.map(({ action, skill }) => ({
     id: `matt:${action}`, presetId: action, binding: { skillId: skill }, enabled: true,
     position: primary.includes(action) ? "primary" : "more",
     group: action === "initialize" ? "projectSetup" : exploration.includes(action) ? "exploration" : collaboration.includes(action) ? "collaboration" : "maintenance",
@@ -31,6 +33,7 @@ export function validateShortcutConfiguration(value: unknown): asserts value is 
   if (!value || typeof value !== "object" || Array.isArray(value)) fail();
   const config = value as ShortcutConfiguration;
   if (config.schemaVersion !== 1 || !Number.isSafeInteger(config.presetVersion) || config.presetVersion < 1 || !Array.isArray(config.buttons) || config.buttons.length > 256 || !Array.isArray(config.deletedPresetIds) || config.deletedPresetIds.some(id => typeof id !== "string" || id.length > 128)) fail();
+  if (config.presetBaseline !== undefined && (!config.presetBaseline || typeof config.presetBaseline !== "object" || Array.isArray(config.presetBaseline) || Object.keys(config.presetBaseline).length > 256 || Object.entries(config.presetBaseline).some(([id, signature]) => id.length > 128 || typeof signature !== "string" || signature.length > 16000))) fail();
   const ids = new Set<string>();
   for (const button of config.buttons) {
     if (!button || typeof button !== "object" || typeof button.id !== "string" || !button.id || button.id.length > 128 || ids.has(button.id)) fail();
