@@ -161,6 +161,8 @@ export const IPC = {
     projectOpenFolder: "pi-desktop/project/openFolder",
     shortcutsGet: "pi-desktop/extensions/shortcuts/get",
     shortcutsSave: "pi-desktop/extensions/shortcuts/save",
+    shortcutsBackups: "pi-desktop/extensions/shortcuts/backups",
+    shortcutsRestore: "pi-desktop/extensions/shortcuts/restore",
     settingsGet: "pi-desktop/settings/get",
     settingsSet: "pi-desktop/settings/set",
     configSyncGetState: "pi-desktop/configSync/getState",

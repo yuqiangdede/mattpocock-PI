@@ -276,6 +276,8 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     return host.call("settings.get");
   }));
   registrar.handle(IPC.invoke.shortcutsSave, (value: unknown) => shortcutStore.save(value));
+  registrar.handle(IPC.invoke.shortcutsBackups, () => shortcutStore.listBackups());
+  registrar.handle(IPC.invoke.shortcutsRestore, (backupId?: string) => shortcutStore.restore(backupId));
   registerSettingsIpc({
     registrar,
     getHost,

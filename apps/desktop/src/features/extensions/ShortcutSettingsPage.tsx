@@ -7,6 +7,8 @@ import { Button, Field, Textarea } from "../../components/ui";
 import { SettingsCard } from "../settings/primitives";
 import { loadShortcutConfiguration, saveShortcutConfiguration, setShortcutLeaveGuard, useShortcutConfiguration } from "./shortcut-state";
 
+import { ShortcutRecoveryControls } from "./ShortcutRecoveryControls";
+
 export function ShortcutSettingsPage() {
   const { t } = useTranslation();
   const { configuration, error: loadError } = useShortcutConfiguration();
@@ -82,6 +84,7 @@ export function ShortcutSettingsPage() {
         {saved && <div role="status">快捷按钮已保存</div>}
         {error && <div role="alert">操作失败，编辑内容已保留：{error}</div>}
       </div>}
+      <ShortcutRecoveryControls draft={draft} selected={selected} busy={busy} setBusy={setBusy} setDraft={setDraft} />
     </SettingsCard>
   </div>;
 }

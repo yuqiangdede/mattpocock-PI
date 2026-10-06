@@ -22,3 +22,9 @@ export async function saveShortcutConfiguration(configuration: ShortcutConfigura
 let leaveGuard: (() => boolean) | null = null;
 export function setShortcutLeaveGuard(guard: (() => boolean) | null) { leaveGuard = guard; }
 export function canLeaveShortcutSettings(): boolean { return !leaveGuard || leaveGuard(); }
+
+export async function restoreShortcutConfiguration(backupId?: string): Promise<ShortcutConfiguration> {
+  const restored = await api.restoreShortcutConfiguration(backupId);
+  publish({ configuration: restored, error: null });
+  return restored;
+}

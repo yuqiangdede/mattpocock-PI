@@ -545,6 +545,8 @@ function normalizePlansChangedEvent(value: unknown): PlanningStateEvent {
 export const api = {
   getShortcutConfiguration: () => invoke<ShortcutConfiguration>(IPC.invoke.shortcutsGet),
   saveShortcutConfiguration: (value: ShortcutConfiguration) => invoke<ShortcutConfiguration>(IPC.invoke.shortcutsSave, value),
+  listShortcutBackups: () => invoke<string[]>(IPC.invoke.shortcutsBackups),
+  restoreShortcutConfiguration: (backupId?: string) => invoke<ShortcutConfiguration>(IPC.invoke.shortcutsRestore, backupId),
   startFreeTask: (input: import("@pi-desktop/shared").FreeTaskRequest) => invoke<import("@pi-desktop/shared").FreeTask>(IPC.invoke.freeTaskStart, input),
   checkFreeTask: (sessionId: string) => invoke<{ busy: boolean }>(IPC.invoke.freeTaskCheck, { sessionId }),
   listFreeTasks: (projectPath: string) => invoke<{ tasks: import("@pi-desktop/shared").FreeTask[]; unavailableCount?: number }>(IPC.invoke.freeTaskList, { projectPath }),

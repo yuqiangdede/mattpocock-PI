@@ -51,3 +51,11 @@ export function shortcutPreview(button: SkillShortcut, translate: (key: string) 
   const { prompt } = resolveShortcutText(button, translate);
   return `/${button.binding.skillId}${prompt ? ` ${prompt}` : ""}`;
 }
+
+// 单项恢复只还原内容，保留按钮身份、布局和启用状态。
+export function restoreShortcutPreset(button: SkillShortcut): SkillShortcut {
+  const preset = createDefaultShortcutConfiguration().buttons.find(item => item.presetId === button.presetId);
+  if (!preset) throw new Error("只有预置按钮可以恢复默认内容");
+  const { name, prompt, note, ...rest } = button;
+  return { ...rest, binding: { ...preset.binding } };
+}
