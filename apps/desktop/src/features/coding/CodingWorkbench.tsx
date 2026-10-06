@@ -6,7 +6,6 @@ import { Button, TooltipButton } from "../../components/ui";
 import { AnchoredMenu } from "../../components/settings/AnchoredMenu";
 import { toolWorkPanelTab } from "../../lib/work-panel-tabs";
 import { useAppStore } from "../../stores/app-store";
-import { RequirementsConfirmation } from "../requirements/RequirementsConfirmation";
 import { loadCodingActions, useCodingActions } from "../extensions/coding-action-state";
 
 export function CodingWorkbench({ disabled, error, onExecute }: {
@@ -47,7 +46,6 @@ export function CodingWorkbench({ disabled, error, onExecute }: {
     <div className="coding-shortcuts coding-shortcuts-primary">{actions.slice(0, 6).map(action => renderAction(action))}</div>
     <div className="coding-shortcuts coding-shortcuts-secondary">
       <Button variant="ghost" onClick={() => useAppStore.getState().openWorkPanelTab(toolWorkPanelTab("workflow"))}>{t("coding.formal")}</Button>
-      <RequirementsConfirmation projectPath={projectPath} disabled={disabled} />
       {actions.length > 6 && <AnchoredMenu open={moreOpen} onClose={() => setMoreOpen(false)} role="menu" side="top" restoreFocus={!disabled} label={t("codingActions.more")} menuClassName="context-menu coding-more-menu"
         trigger={ref => <Button ref={ref} variant="ghost" disabled={disabled} aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(value => !value)}>{t("codingActions.more")}</Button>}>
         {actions.slice(6).map(action => renderAction(action, true))}

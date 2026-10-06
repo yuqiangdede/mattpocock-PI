@@ -6,8 +6,8 @@
 
 ## User path
 
-Composer exposes Confirm requirements beside Discuss requirements. Workflow
-exposes the same action for its available project even when there is no run.
+Coding Actions does not expose Confirm requirements. Workflow
+exposes the action for its available project even when there is no run.
 The action opens a modal; it does not insert a prompt or change a draft.
 
 Select a registered project root and enter a root-relative `.md`, `.markdown`
@@ -60,7 +60,7 @@ without erasing history. Removed roots remain historical and cannot be selected.
 
 ## Workflow compatibility
 
-Both entry points use one project confirmation service and history. Ordinary
+Workflow uses the project confirmation service and history. Ordinary
 chat confirmation does not require or create a Workflow Run. Workflow stage
 acceptance, execution prerequisites, revisions and reopening remain independent.
 Confirmation does not unlock stages, invalidate stages, register artifacts,
@@ -72,7 +72,9 @@ the user to review affected tasks; any Workflow reopening remains explicit.
 
 Project switching closes the owned dialog. Late async results cannot populate
 another project's state. Inputs are disabled while a request is pending;
-confirmation cannot overlap. Cancel/Escape restore focus after idle dismissal.
+confirmation cannot overlap. Cancel/Escape remain available while requests are
+pending and restore focus on dismissal. Closing does not cancel an already
+submitted Host write; late renderer results are discarded after unmount.
 The dialog uses application overlay ownership, native modal focus handling,
 localized labels and shared form primitives. Raw file content is rendered as
 text, never interpreted as HTML or instructions.
