@@ -217,6 +217,15 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
       if (name === "readCustomizedSkill") return getHost().call("skills.read", { id: "retro", level: "global" });
       if (name === "updateOffline") { updateOffline = input; return; }
       if (name === "typeText") { const { BrowserWindow } = await import("electron"); await BrowserWindow.getAllWindows()[0].webContents.insertText(input); return; }
+      if (name === "captureShortcutPage") {
+        if (!["settings", "composer"].includes(input)) throw new Error("Unknown shortcut screenshot");
+        const { BrowserWindow } = await import("electron");
+        const image = await BrowserWindow.getAllWindows()[0].webContents.capturePage();
+        const directory = join(root, "cache", "shortcut-acceptance");
+        await mkdir(directory, { recursive: true });
+        await writeFile(join(directory, `${input}.png`), image.toPNG());
+        return;
+      }
       if (name === "holdCatalog") {
         catalogGate = new Promise((resolve) => { releaseCatalog = resolve; });
         catalogStarted = new Promise((resolve) => { markCatalogStarted = resolve; });

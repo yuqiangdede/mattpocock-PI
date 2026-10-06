@@ -148,7 +148,7 @@ try {
   const result = JSON.parse(resultLine.slice("WORKFLOW_RUNS_PROBE ".length));
   assert.equal(result.ok, true);
   if (shortcutsFixture) {
-    for (const field of ["edited", "inserted", "attachments", "manual", "persisted", "nativeSettingsPreserved", "localized"]) assert.equal(result[field], true, field);
+    for (const field of ["edited", "inserted", "attachments", "manual", "persisted", "nativeSettingsPreserved", "localized", "migrated", "layout", "recovered"]) assert.equal(result[field], true, field);
   } else if (requirementsFixture) {
     for (const field of ["confirmed", "shared", "reconfirmed", "persisted", "cancelled", "isolated", "stale", "localized", "manual"]) assert.equal(result[field], true, field);
   } else if (process.argv.includes("--requirements-menu")) {

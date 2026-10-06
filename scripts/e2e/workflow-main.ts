@@ -74,8 +74,10 @@ const registrar: IpcRegistrar = {
 
 if (process.env.PI_CODING_WORKBENCH === "1") {
   const shortcutStore = new ShortcutStore(dataDir);
-  registrar.handle(IPC.invoke.shortcutsGet, () => shortcutStore.load());
+  registrar.handle(IPC.invoke.shortcutsGet, () => shortcutStore.load(() => host!.call("settings.get")));
   registrar.handle(IPC.invoke.shortcutsSave, (value: unknown) => shortcutStore.save(value));
+  registrar.handle(IPC.invoke.shortcutsBackups, () => shortcutStore.listBackups());
+  registrar.handle(IPC.invoke.shortcutsRestore, (backupId?: string) => shortcutStore.restore(backupId));
 }
 
 if (discoveryFixture) {
@@ -154,6 +156,9 @@ async function main(): Promise<void> {
   await app.whenReady();
   try {
     await host.handshake();
+    if (process.env.PI_SKILL_SHORTCUTS === "1") {
+      await host.call("settings.set", { engineeringShortcutPrompts: { ask: "旧版自定义提示词", review: "", spec: null } });
+    }
     if (process.env.PI_CODING_WORKBENCH === "1") await host.call("skills.ensureBundled");
     await host.call("workspace.set", { path: projectA });
     await host.call("project.group.create", { name: "Project A", folders: [projectA] });

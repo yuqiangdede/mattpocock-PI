@@ -29,3 +29,11 @@ export async function fill(label: string, value: string, insertText: (value: str
   await insertText(value);
   await until(() => input.value === value);
 }
+
+export async function select(label: string, value: string) {
+  const control = await until(() => document.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`));
+  check([...control.options].some(option => option.value === value), `${label} 没有选项 ${value}`);
+  control.value = value;
+  control.dispatchEvent(new Event("change", { bubbles: true }));
+  await until(() => control.value === value);
+}
