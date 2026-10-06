@@ -25,7 +25,8 @@ const projectPath = params.get("projectA")!;
 
 async function initialize() {
   await i18n.use(initReactI18next).init({ lng: "en", resources: { en: { translation: flattenCatalog(en) }, "zh-CN": { translation: flattenCatalog(zhCN) } }, interpolation: { escapeValue: false } });
-  useAppStore.setState({ settings: await api.getSettings(), activeSessionId: sessionId, sessions: (await api.listSessions()).sessions,
+  useAppStore.setState({ settings: await api.getSettings(), activeSessionId: sessionId, sessions: (await api.listSessions()).sessions.map(session => ({ ...session, providerId: "workflow-fixture", modelId: "fixture-model" })),
+    providers: [{ id: "workflow-fixture", name: "Fixture", vendorKey: "custom", type: "custom", protocol: "openai-completions", enabled: true, authKind: "none", hasSecret: false, models: [{ id: "fixture-model", contextWindow: 32000, maxTokens: 2048, thinkingLevels: ["off"], defaultThinkingLevel: "off" }], supportsReasoning: false, supportedThinkingLevels: ["off"] }],
     workspace: { path: projectPath, name: "Project A" }, page: "chat", isRunning: false, runningSessions: {} });
   const root = createRoot(document.getElementById("root")!);
   return { root,
@@ -35,6 +36,7 @@ async function initialize() {
 }
 
 globalThis.shortcutSettingsProbe = async () => {
+  await api.setProject(projectPath);
   const nativeSettings = await api.getSettings();
   const view = await initialize();
   const migrated = await api.getShortcutConfiguration();
@@ -48,11 +50,14 @@ globalThis.shortcutSettingsProbe = async () => {
   useAppStore.setState({ composerPrefill: { sessionId, text: body, fileReferences: [reference] } });
   await until(() => readEditorValue(editor()) === body);
   view.settings(); await until(() => input("按钮名称"));
+  const askCommand = (await api.composerCommands()).commands.find(command => command.shortcutBinding?.skillId === "ask-matt" && command.shortcutBinding.sourceId === "global");
+  check(askCommand, "完整 Skill 来源目录缺少全局 Matt Skill");
+  await select("Skill", askCommand.name, `${askCommand.title} (ask-matt)`);
   await fill("按钮名称", "定制审查入口", value => fixture("typeText", value));
   await fill("默认提示词", "检查当前项目的真实阻塞。", value => fixture("typeText", value));
   await fill("备注", "这条备注不得进入草稿。", value => fixture("typeText", value));
   const preview = document.querySelector('[aria-label="插入内容预览"]')?.textContent;
-  check(preview === "/ask-matt 检查当前项目的真实阻塞。", "预览未反映编辑后的提示词");
+  check(preview === `/${askCommand.name} 检查当前项目的真实阻塞。`, "预览未反映完整来源与编辑后的提示词");
   await click("保存");
   await until(() => document.body.textContent?.includes("快捷按钮已保存"));
   check(JSON.stringify(await api.getSettings()) === JSON.stringify(nativeSettings), "扩展保存改变原生设置");
@@ -74,10 +79,10 @@ globalThis.shortcutSettingsProbe = async () => {
   await fill("按钮名称", "第二个同 Skill 按钮", value => fixture("typeText", value));
   await fill("默认提示词", "使用第二条独立提示词。", value => fixture("typeText", value));
   await click("上移");
-  await select("选择按钮", "matt:discovery");
+  await select("选择按钮", "matt:discovery", zhCN.coding.discovery);
   input("启用").click();
-  await select("选择按钮", "matt:spec");
-  await select("更多分组", "maintenance");
+  await select("选择按钮", "matt:spec", zhCN.coding.spec);
+  await select("更多分组", "maintenance", zhCN.coding.groups.maintenance);
   await click("保存"); await until(() => document.body.textContent?.includes("快捷按钮已保存"));
   const layout = await api.getShortcutConfiguration();
   const copyIndex = layout.buttons.findIndex(button => button.name === "第二个同 Skill 按钮");
@@ -88,10 +93,10 @@ globalThis.shortcutSettingsProbe = async () => {
   check(!document.querySelector(".coding-shortcuts-primary")?.textContent?.includes(zhCN.coding.discovery), "隐藏按钮仍然展示");
   check(document.body.textContent?.includes(zhCN.coding.formal) && document.body.textContent?.includes(zhCN.coding.requirements.action), "固定操作被隐藏按钮影响");
   await click("第二个同 Skill 按钮");
-  await until(() => readEditorValue(editor()).startsWith("/ask-matt 使用第二条独立提示词。"));
+  await until(() => readEditorValue(editor()).startsWith(`/${askCommand.name} 使用第二条独立提示词。`));
   await fixture("captureShortcutPage", "composer");
   view.settings(); await until(() => input("按钮名称"));
-  await select("选择按钮", "matt:review");
+  await select("选择按钮", "matt:review", zhCN.coding.review);
   await click("恢复当前按钮内容");
   check(input("默认提示词").value === zhCN.coding.prompts.review, "单项恢复没有恢复默认内容");
   await click("取消");
@@ -108,7 +113,7 @@ globalThis.shortcutSettingsProbe = async () => {
   const afterRestore = await api.listShortcutBackups();
   const restoreBackup = afterRestore.find(id => !beforeRestore.includes(id));
   check(restoreBackup, "整套恢复没有创建可恢复备份");
-  await click("查看有效备份"); await until(() => document.querySelector('select[aria-label="选择恢复备份"]'));
+  await click("查看有效备份"); await until(() => document.querySelector('[aria-label="选择恢复备份"]'));
   await select("选择恢复备份", restoreBackup);
   await click("恢复所选备份");
   await until(async () => JSON.stringify(await api.getShortcutConfiguration()) === JSON.stringify(layout));
@@ -117,6 +122,38 @@ globalThis.shortcutSettingsProbe = async () => {
   await click("保存"); await until(async () => (await api.getShortcutConfiguration()).buttons.some(button => button.name === "新增后删除的按钮"));
   await click("删除按钮"); await click("保存");
   await until(async () => !(await api.getShortcutConfiguration()).buttons.some(button => button.name === "新增后删除的按钮"));
+  await fixture("createShortcutProjectSkill", { path: projectPath });
+  view.composer(); await until(() => editor());
+  const preserved = readEditorValue(editor());
+  const unavailable = await until(() => {
+    const button = document.querySelector<HTMLButtonElement>('button[aria-label="定制审查入口"]');
+    return button?.disabled && button.getAttribute("aria-description")?.includes("不可用") && button;
+  });
+  unavailable.click();
+  check(readEditorValue(editor()) === preserved, "全局来源被项目覆盖后仍插入错误来源");
+  view.settings(); await until(() => input("按钮名称"));
+  const projectCommand = (await api.composerCommands()).commands.find(command => command.shortcutBinding?.skillId === "ask-matt" && command.shortcutBinding.sourceId === "project");
+  check(projectCommand, "项目覆盖没有发布来源目录");
+  await select("选择按钮", "matt:ask", "定制审查入口");
+  await select("Skill", projectCommand.name, `${projectCommand.title} (ask-matt)`);
+  await click("保存"); await until(() => document.body.textContent?.includes("快捷按钮已保存"));
+  view.composer(); await until(() => editor());
+  useAppStore.setState({ composerPrefill: { sessionId, text: "", fileReferences: [] } });
+  await until(() => readEditorValue(editor()) === "");
+  await click("定制审查入口");
+  await until(() => readEditorValue(editor()) === `/${projectCommand.name} 检查当前项目的真实阻塞。`);
+  check((await fixture("snapshot") as { prompts: number }).prompts === 0, "来源重新绑定自动提交请求");
+  await fixture("releaseLaunch");
+  (await until(() => document.querySelector<HTMLButtonElement>(".send-btn:not(:disabled)"))).click();
+  await until(async () => (await fixture("snapshot") as { prompts: number }).prompts === 1);
+  await fixture("releaseProvider");
+  const executed = await until(async () => {
+    const result = await fixture("snapshot") as { loadedSkillDocuments: Array<{ id: string; body: string }> };
+    return result.loadedSkillDocuments.some(document => document.id === projectCommand.name) && result;
+  });
+  check(executed.loadedSkillDocuments.find(document => document.id === projectCommand.name)?.body === "PROJECT_SOURCE_BODY_FOR_SHORTCUT_ACCEPTANCE", "实际执行没有加载所选来源的 Skill 文档");
+  useAppStore.setState({ isRunning: false, runningSessions: {} });
+  view.settings(); await until(() => input("按钮名称"));
   window.confirm = originalConfirm;
   await fixture("captureShortcutPage", "settings");
   view.root.unmount();
@@ -131,8 +168,8 @@ globalThis.shortcutSettingsRestored = async checkpoint => {
   // Composer 草稿属于既有 renderer 内存契约；重启验证持久化的按钮配置。
   view.composer(); await until(() => editor());
   await click("定制审查入口");
-  await until(() => readEditorValue(editor()) === "/ask-matt 检查当前项目的真实阻塞。");
-  check((await fixture("snapshot") as { prompts: number }).prompts === 0, "重启自动提交草稿");
+  await until(() => readEditorValue(editor()) === "/ext-skill/user/project/ask-matt 检查当前项目的真实阻塞。");
+  check((await fixture("snapshot") as { prompts: number }).prompts === 1, "重启自动提交草稿");
   view.root.unmount();
-  return { ok: true, edited: true, inserted: true, attachments: true, manual: true, persisted: true, nativeSettingsPreserved: true, localized: true, migrated: true, layout: true, recovered: true };
+  return { ok: true, edited: true, inserted: true, attachments: true, manual: true, persisted: true, nativeSettingsPreserved: true, localized: true, migrated: true, layout: true, recovered: true, sourceBody: true };
 };

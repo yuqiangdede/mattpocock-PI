@@ -30,8 +30,16 @@ export async function fill(label: string, value: string, insertText: (value: str
   await until(() => input.value === value);
 }
 
-export async function select(label: string, value: string) {
-  const control = await until(() => document.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`));
+export async function select(label: string, value: string, optionLabel = value) {
+  const control = await until(() => document.querySelector<HTMLSelectElement | HTMLButtonElement>(`[aria-label="${label}"]`));
+  if (control instanceof HTMLButtonElement) {
+    control.click();
+    const option = await until(() => [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
+      .find(item => item.textContent?.trim() === optionLabel && !item.disabled));
+    option.click();
+    await until(() => !document.querySelector('[role="option"]'));
+    return;
+  }
   check([...control.options].some(option => option.value === value), `${label} 没有选项 ${value}`);
   control.value = value;
   control.dispatchEvent(new Event("change", { bubbles: true }));
