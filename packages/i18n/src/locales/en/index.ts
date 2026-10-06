@@ -53,7 +53,7 @@ export const en = {
   "reset": "Restore default Actions",
   "export": "Export Actions JSON",
   "import": "Import Actions JSON",
-  "validateImport": "Validate and import"
+  "validateImport": "Validate and import actions"
 },
   versionUpdates: {
   "title": "Versions and updates",

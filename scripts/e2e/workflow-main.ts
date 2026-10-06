@@ -8,6 +8,7 @@ import { registerWorkflowIpc } from "../../apps/desktop/electron/main/ipc/workfl
 import { registerWorkflowArtifactsIpc } from "../../apps/desktop/electron/main/ipc/workflow-artifacts-ipc";
 import { registerRequirementsIpc } from "../../apps/desktop/electron/main/ipc/requirements-ipc";
 import { CodingActionStore } from "../../apps/desktop/electron/main/extensions/coding-action-store";
+import { catalogs, resolveLocale } from "../../packages/i18n/src/index";
 import { readOpenableFile } from "../../packages/host-runtime/src/workspace-files";
 import type { IpcRegistrar } from "../../apps/desktop/electron/main/ipc/types";
 import { registerWorkflowDiscoveryFixture, crashWorkflowFixtureHost } from "./workflow-discovery-fixture.mjs";
@@ -73,7 +74,10 @@ const registrar: IpcRegistrar = {
 };
 
 if (process.env.PI_CODING_WORKBENCH === "1") {
-  const codingActionStore = new CodingActionStore(dataDir);
+  const codingActionStore = new CodingActionStore(dataDir, settings => {
+    const language = (settings as { language?: unknown } | undefined)?.language;
+    return catalogs[resolveLocale(typeof language === "string" ? language : "zh-CN")].codingActions.defaults;
+  });
   registrar.handle(IPC.invoke.codingActionsGet, () => codingActionStore.load(() => host!.call("settings.get")));
   registrar.handle(IPC.invoke.codingActionsSave, (value: unknown, recover?: boolean) => codingActionStore.save(value, recover === true));
   registrar.handle(IPC.invoke.codingActionsReset, () => codingActionStore.reset());
@@ -156,7 +160,7 @@ async function main(): Promise<void> {
   try {
     await host.handshake();
     if (process.env.PI_CODING_ACTIONS === "1") {
-      await host.call("settings.set", { engineeringShortcutPrompts: { ask: "旧版自定义提示词", review: "", spec: null } });
+      await host.call("settings.set", { language: "zh-CN", engineeringShortcutPrompts: { ask: "旧版自定义提示词", review: "", spec: null } });
     }
     if (process.env.PI_CODING_WORKBENCH === "1") await host.call("skills.ensureBundled");
     await host.call("workspace.set", { path: projectA });

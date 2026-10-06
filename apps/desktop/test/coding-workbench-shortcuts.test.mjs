@@ -28,8 +28,8 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
   const i18n = createInstance(); await i18n.init({ lng: "en", resources: { en: { translation: en } } });
   const html = renderToStaticMarkup(createElement(I18nextProvider, { i18n },
     createElement(CodingWorkbench, { disabled: false, error: null, onExecute: () => { executions++; } })));
-  for (const label of ["需求讨论", "固化需求", "技术设计", "拆分任务", "实现", "代码审查"]) assert.ok(html.includes(label));
-  assert.ok(html.includes("配置编码 Actions"));
+  for (const label of Object.values(en.codingActions.defaults)) assert.ok(html.includes(label));
+  assert.ok(html.includes(en.codingActions.configure));
   assert.doesNotMatch(html, /当前阶段|下一阶段|完成百分比/);
   assert.equal(requests, 0); assert.equal(executions, 0);
 });

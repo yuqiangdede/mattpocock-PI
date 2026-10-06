@@ -93,7 +93,7 @@ globalThis.codingActionsProbe = async () => {
   await fill("导入 Actions JSON", JSON.stringify({ schemaVersion: 1, actions: [{ id: "missing", label: "缺失 Skill", skillId: "missing-action-skill" }] }), type);
   await click("校验并导入");
   view.composer(); await until(() => editor());
-  await until(() => document.body.textContent?.includes("Skill missing / unavailable"));
+  await until(() => document.body.textContent?.includes(i18n.t("codingActions.skillMissing", { skillId: "missing-action-skill" })));
   const missing = [...document.querySelectorAll<HTMLButtonElement>(".coding-shortcuts-primary button")].find(button => button.textContent?.trim() === "缺失 Skill")!;
   check(missing.disabled, "缺失 Skill 没有可用性诊断"); missing.click();
   check((await fixture("snapshot") as { prompts: number }).prompts === 2, "缺失 Skill 仍然执行");
@@ -105,7 +105,13 @@ globalThis.codingActionsProbe = async () => {
   await fixture("reset"); await fixture("releaseLaunch");
   (await until(() => document.querySelector<HTMLButtonElement>(".send-btn:not(:disabled)"))).click();
   await until(async () => (await fixture("snapshot") as { prompts: number }).prompts === 3); await finishProvider();
-  view.settings(); await until(() => input("Action 名称")); await click("恢复默认 Actions");
+  view.settings(); await until(() => input("Action 名称"));
+  await fill("Action 名称", "不要丢失的编辑", type);
+  window.confirm = () => false; await click("重试读取");
+  check(input("Action 名称").value === "不要丢失的编辑", "取消重试读取丢失未保存编辑");
+  window.confirm = () => true; await click("重试读取");
+  await until(() => input("Action 名称").value === "需求讨论");
+  await click("恢复默认 Actions");
   await select("选择 Action", "code-review", "代码审查");
   await fill("Action 名称", "最终审查", type);
   await click("保存");
