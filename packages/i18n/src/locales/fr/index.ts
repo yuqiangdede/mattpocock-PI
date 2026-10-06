@@ -1,6 +1,7 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const fr = {
+  codingActions: en.codingActions,
   versionUpdates: en.versionUpdates,
   coding: en.coding,
   "app": {

@@ -1,3 +1,4 @@
+import { CodingActionSettingsPage } from "../extensions/CodingActionSettingsPage";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type {
@@ -234,6 +235,7 @@ export function SettingsPage() {
   const navItems: NavItem[] = useMemo(() => {
     const iconFor: Record<SettingsTab, ReactNode> = {
       // Semantic Lucide glyphs for the settings destinations.
+      codingActions: <IconSliders size={14} />,
       general: <IconSliders size={14} />,
       ai: <IconSparkles size={14} />,
       shortcuts: <IconKeyboard size={14} />,
@@ -565,6 +567,7 @@ export function SettingsPage() {
 
           {tab === "agent" && <ModelConfigPage />}
 
+          {tab === "codingActions" && <CodingActionSettingsPage />}
           {tab === "skills" && <AgentSkillsPage />}
 
           {tab === "mcp" && <AgentMcpPage />}

@@ -1,6 +1,7 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const ko = {
+  codingActions: en.codingActions,
   versionUpdates: en.versionUpdates,
   coding: en.coding,
   app: {

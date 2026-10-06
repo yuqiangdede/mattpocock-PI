@@ -6,6 +6,7 @@
  */
 
 export type SettingsTabId =
+  | "codingActions"
   | "general"
   | "ai"
   | "shortcuts"
@@ -56,6 +57,7 @@ export type SettingsNavEntry = {
 };
 
 export const SETTINGS_NAV: SettingsNavEntry[] = [
+  { id: "codingActions", labelKey: "codingActions.navLabel", titleKey: "codingActions.settingsTitle", group: "system", keywordKeys: ["codingActions.title", "codingActions.skillId", "codingActions.prompt", "codingActions.description"] },
   {
     id: "general",
     labelKey: "settings.nav.general",

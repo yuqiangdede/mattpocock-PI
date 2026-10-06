@@ -1,28 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ENGINEERING_SHORTCUTS, ENGINEERING_PROMPT_MAX_LENGTH, resolveShortcutInstruction, type EngineeringShortcutAction, type EngineeringSkillStatus, type EngineeringSkillUpdateMode } from "@pi-desktop/shared";
-import { Button, Field, Textarea } from "../ui";
+import { type EngineeringSkillStatus, type EngineeringSkillUpdateMode } from "@pi-desktop/shared";
+import { Button } from "../ui";
 import { SettingsMenuSelect } from "./SettingsMenuSelect";
-import { EngineeringSkillDescription } from "./EngineeringSkillDescription";
+
 import { SettingsCard, SettingsRow } from "../../features/settings/primitives";
 import { useAppStore } from "../../stores/app-store";
 import { api } from "../../lib/api";
 
 export function EngineeringSkillSettings({ onUpdated }: { onUpdated: () => Promise<void> }) {
   const { t } = useTranslation();
-  const prompts = useAppStore(state => state.settings?.engineeringShortcutPrompts);
   const mode = useAppStore(state => state.settings?.engineeringSkillUpdateMode ?? "auto-check");
   const tasksRunning = useAppStore(state => Object.values(state.runningSessions).some(Boolean));
-  const [action, setAction] = useState<EngineeringShortcutAction>("ask");
-  const defaults = t(`coding.prompts.${action}`);
-  const saved = resolveShortcutInstruction(action, defaults, prompts);
-  const [text, setText] = useState(saved);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<EngineeringSkillStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const alive = useRef(true);
   const request = useRef(0);
-  useEffect(() => { setText(saved); }, [saved, action]);
   useEffect(() => {
     alive.current = true;
     const refresh = () => {
@@ -42,12 +36,6 @@ export function EngineeringSkillSettings({ onUpdated }: { onUpdated: () => Promi
     catch (cause) { if (alive.current) setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { if (alive.current) setBusy(false); }
   };
-  const savePrompt = (restore: boolean) => perform(async () => {
-    const current = await api.getSettings();
-    const next = { ...current.engineeringShortcutPrompts, [action]: restore ? null : text };
-    await api.setEngineeringSettings({ engineeringShortcutPrompts: next });
-    useAppStore.setState(state => ({ settings: state.settings ? { ...state.settings, engineeringShortcutPrompts: next } : state.settings }));
-  });
   const saveMode = (next: EngineeringSkillUpdateMode) => perform(async () => {
     await api.setEngineeringSettings({ engineeringSkillUpdateMode: next });
     useAppStore.setState(state => ({ settings: state.settings ? { ...state.settings, engineeringSkillUpdateMode: next } : state.settings }));
@@ -69,23 +57,7 @@ export function EngineeringSkillSettings({ onUpdated }: { onUpdated: () => Promi
   const working = busy || status?.checking || status?.updating;
   const available = Boolean(status?.latestRevision && status.latestRevision !== status.revision.slice(0, 40));
   return <>
-    <SettingsCard title={t("settings.engineering.instructions")} description={t("settings.engineering.instructionsHint")}>
-      <SettingsRow title={t("settings.engineering.shortcut")}>
-        <SettingsMenuSelect label={t("settings.engineering.shortcut")} value={action} disabled={busy}
-          options={ENGINEERING_SHORTCUTS.map(item => ({ id: item.action, label: t(`coding.${item.action}`) }))}
-          onChange={value => setAction(value as EngineeringShortcutAction)} />
-      </SettingsRow>
-      <div className="settings-form-grid">
-        <EngineeringSkillDescription action={action} />
-        <Field label={t("settings.engineering.prompt")} hint={t("settings.engineering.emptyHint")}>
-          <Textarea aria-label={t("settings.engineering.prompt")} className="settings-instruction-editor" value={text} maxLength={ENGINEERING_PROMPT_MAX_LENGTH} disabled={busy} onChange={event => setText(event.target.value)} />
-        </Field>
-        <div className="coding-shortcuts">
-          <Button disabled={busy || text === saved} onClick={() => void savePrompt(false)}>{t("settings.engineering.save")}</Button>
-          <Button disabled={busy || prompts?.[action] == null} onClick={() => void savePrompt(true)}>{t("settings.engineering.restore")}</Button>
-        </div>
-      </div>
-    </SettingsCard>
+
     <SettingsCard title={t("settings.engineering.updates")} description={t("settings.engineering.updatesHint")}>
       <SettingsRow title={t("settings.engineering.mode")}>
         <SettingsMenuSelect label={t("settings.engineering.mode")} value={mode} disabled={Boolean(working)}

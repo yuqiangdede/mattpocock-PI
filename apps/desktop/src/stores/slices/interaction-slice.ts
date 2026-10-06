@@ -1,3 +1,4 @@
+import { canLeaveCodingActionSettings as canLeaveShortcutSettings } from "../../features/extensions/coding-action-state";
 import i18n from "i18next";
 import type {
   AskToolResolution,
@@ -61,6 +62,7 @@ export function createInteractionSlice({
 
     setPage: (page, opts) => {
       runtime.beginNavigationIntent();
+      if (page !== get().page && !canLeaveShortcutSettings()) return;
       const record = opts?.record !== false;
       set((state) => {
         if (!record) return { page };
@@ -82,6 +84,7 @@ export function createInteractionSlice({
     },
 
     setSettingsTab: (settingsTab) => {
+      if (settingsTab !== get().settingsTab && !canLeaveShortcutSettings()) return;
       get().setPage("settings");
       set((state) => ({
         settingsTab,
@@ -93,6 +96,7 @@ export function createInteractionSlice({
     canNavForward: () => get().navIndex < get().navStack.length - 1,
 
     navBack: () => {
+      if (!canLeaveShortcutSettings()) return;
       const intent = runtime.beginNavigationIntent();
       const state = get();
       if (state.navIndex <= 0) return;
@@ -109,6 +113,7 @@ export function createInteractionSlice({
     },
 
     navForward: () => {
+      if (!canLeaveShortcutSettings()) return;
       const intent = runtime.beginNavigationIntent();
       const state = get();
       if (state.navIndex >= state.navStack.length - 1) return;

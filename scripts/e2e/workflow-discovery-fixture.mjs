@@ -41,6 +41,7 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
   let prompts = 0;
   let skillLoads = 0;
   const skillIds = [];
+  const skillBodies = [];
   let catalogUnavailable = false;
   let catalogGate = Promise.resolve();
   let releaseCatalog = () => {};
@@ -108,6 +109,7 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
             if (!loaded.skill || !loaded.body) throw new Error("Fixture skill is missing");
             skillLoads++;
             skillIds.push(params.args.id);
+            skillBodies.push(loaded.body);
             return { ok: true, content: formatSkillToolContent({ ...loaded.skill, body: loaded.body, location: loaded.skill.path }) };
           }
           return host.call(name, params);
@@ -236,7 +238,10 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
       if (name === "releaseDispatch") { releaseDispatch(); return; }
       if (name === "releaseProvider") { releaseProvider(); await Promise.all([...tasks]); return; }
       if (name === "reset") { mode = input ?? "normal"; launchGate = new Promise((resolve) => { releaseLaunch = resolve; }); providerGate = new Promise((resolve) => { releaseProvider = resolve; }); return; }
-      if (name === "snapshot") return { prompts, skillLoads, transformed, skillIds };
+      if (name === "snapshot") return { prompts, skillLoads, transformed, skillIds, skillBodies };
+      if (name === "updateActionSkill") return getHost().call("skills.update", { id: "code-review", name: "code-review", level: "project", projectPath: input.path, body: input.body });
+      if (name === "corruptActionConfig") return writeFile(join(dataDir, "extensions", "coding-actions.json"), "{invalid-actions", "utf8");
+      if (name === "readActionConfig") return readFile(join(dataDir, "extensions", "coding-actions.json"), "utf8");
       if (name === "hostCall") {
         if (!input.method.startsWith("workflow.") && !input.method.startsWith("session.") && !input.method.startsWith("freeTask.")) throw new Error("Fixture Host method is not allowed");
         return getHost().call(input.method, input.params);

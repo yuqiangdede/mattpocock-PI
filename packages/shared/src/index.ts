@@ -81,3 +81,4 @@ export * from "./engineering-shortcuts.js";
 export * from "./storage.js";
 
 export * from "./upstream.js";
+export * from "./coding-actions.js";

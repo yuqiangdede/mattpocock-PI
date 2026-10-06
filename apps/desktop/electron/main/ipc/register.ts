@@ -1,5 +1,7 @@
+import { catalogs, resolveLocale } from "@pi-desktop/i18n";
+import { CodingActionStore } from "../extensions/coding-action-store";
 import { join } from "node:path";
-import { dialog, type BrowserWindow, type IpcMain, type IpcMainInvokeEvent } from "electron";
+import { app, dialog, type BrowserWindow, type IpcMain, type IpcMainInvokeEvent } from "electron";
 import { err, ErrorCodes, IPC, ok, type Result } from "@pi-desktop/shared";
 import type { AgentHostBridge } from "../agent-host-bridge";
 import type { AgentSidecar } from "../agent-sidecar";
@@ -268,6 +270,21 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     acquireSessionOperation,
     stripWinLongPrefix,
   });
+  const codingActionStore = new CodingActionStore(dataDir, settings => {
+    const language = (settings as { language?: unknown } | undefined)?.language;
+    const locale = typeof language === "string" ? (language === "auto" ? app.getLocale() : language) : getUpdaterLocale();
+    return catalogs[resolveLocale(locale)].codingActions.defaults;
+  });
+  registrar.handle(IPC.invoke.codingActionsGet, () => codingActionStore.load(async () => {
+    const host = getHost();
+    if (!host) throw new Error("无法读取旧快捷提示词配置：host unavailable");
+    return host.call("settings.get");
+  }));
+  registrar.handle(IPC.invoke.codingActionsSave, (value: unknown, recover?: boolean) => {
+    if (recover !== undefined && typeof recover !== "boolean") throw new Error("Action 恢复参数无效");
+    return codingActionStore.save(value, recover === true);
+  });
+  registrar.handle(IPC.invoke.codingActionsReset, () => codingActionStore.reset());
   registerSettingsIpc({
     registrar,
     getHost,

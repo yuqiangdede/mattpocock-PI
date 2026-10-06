@@ -1,85 +1,35 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { createInstance } from "i18next";
+import { I18nextProvider } from "react-i18next";
+import { createServer } from "vite";
+import { fileURLToPath } from "node:url";
 
-const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-
-const [source, zhCatalog, productSpec] = await Promise.all([
-  read("../src/features/coding/CodingWorkbench.tsx"),
-  read("../../../packages/i18n/src/locales/zh-CN/index.ts"),
-  read("../../../docs/spec/01-product/coding-workbench-free-tasks.md"),
-]);
-
-const catalogSource = await read("../../../packages/shared/src/engineering-shortcuts.ts");
-const pairs = [...catalogSource.matchAll(/\{ action: "([^"]+)", skill: "([^"]+)" \}/g)]
-  .map((match) => [match[1], match[2]]);
-
-test("coding workbench keeps the eight primary skill shortcuts", () => {
-  assert.deepEqual(pairs.slice(0, 8).map(([, skill]) => skill), [
-    "setup-matt-pocock-skills",
-    "grill-with-docs",
-    "to-spec",
-    "to-tickets",
-    "implement",
-    "diagnosing-bugs",
-    "code-review",
-    "retro",
-  ]);
-});
-
-test("coding workbench exposes ask-matt and the remaining Matt skills", () => {
-  assert.match(source, /selectShortcut\("ask", "ask-matt"\)/);
-  assert.match(source, /menuClassName="context-menu coding-more-menu"/);
-  for (const skill of [
-    "grill-me",
-    "grilling",
-    "handoff",
-    "prototype",
-    "improve-codebase-architecture",
-    "codebase-design",
-    "domain-modeling",
-    "tdd",
-    "wayfinder",
-    "triage",
-    "research",
-    "resolving-merge-conflicts",
-    "teach",
-    "to-questionnaire",
-    "wait-what",
-    "wizard",
-    "writing-for-agents",
-  ]) {
-    assert.ok(pairs.some(([, candidate]) => candidate === skill), `missing ${skill}`);
-  }
-  assert.match(zhCatalog, /"initialize": "初始化"/);
-  assert.match(zhCatalog, /"ask": "咨询下一步"/);
-  assert.match(zhCatalog, /"more": "更多"/);
-  assert.match(productSpec, /The Ask button inserts `ask-matt`/);
-});
-
-
-test("common actions precede auxiliary navigation and low-frequency menus", () => {
-  const primary = source.indexOf('coding-shortcuts coding-shortcuts-primary');
-  const secondary = source.indexOf('coding-shortcuts coding-shortcuts-secondary');
-  assert.ok(primary < secondary);
-  const primaryRow = source.slice(primary, secondary);
-  assert.ok(primaryRow.includes('selectShortcut("ask", "ask-matt")'));
-  assert.match(primaryRow, /action !== "retro"/);
-  assert.deepEqual(pairs.slice(1, 7).filter(([action]) => !["spec", "tickets"].includes(action)).map(([action]) => action), ["discovery", "implement", "diagnose", "review"]);
-  assert.ok(source.indexOf('t("coding.formal")', secondary) < source.indexOf('label={t("coding.more")}', secondary));
-  const groups = [...source.matchAll(/label: "([^"]+)", actions: \[([^\]]+)\]/g)];
-  assert.equal(groups.length, 4);
-  const actions = groups.flatMap(group => [...group[2].matchAll(/"([^"]+)"/g)].map(match => match[1]));
-  assert.equal(new Set(actions).size, 19);
-  assert.deepEqual(new Set(actions), new Set(["initialize", "retro", ...pairs.slice(8, 25).map(([action]) => action)]));
-  assert.match(source, /role="group" aria-label=/);
-});
-
-test("shortcut rows wrap independently and use consistent regular text", async () => {
-  const css = await read("../src/styles/coding-workbench.css");
-  assert.match(css, /\.coding-shortcuts[^}]*flex-wrap: wrap/);
-  assert.match(css, /\.coding-shortcuts \+ \.coding-shortcuts \{ margin-top: 6px; \}/);
-  assert.match(css, /\.coding-shortcuts \.btn \{ font-weight: 400; \}/);
-  assert.ok(!css.includes("font-weight: 700"));
-  assert.ok(!source.includes("coding-shortcut-emphasized"));
+test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", async t => {
+  const server = await createServer({
+    root: fileURLToPath(new URL("..", import.meta.url)),
+    cacheDir: fileURLToPath(new URL("../../../cache/coding-action-ssr", import.meta.url)),
+    configFile: false, logLevel: "silent", server: { middlewareMode: true, hmr: false, ws: false, watch: null },
+    esbuild: { jsx: "automatic" }, appType: "custom", optimizeDeps: { noDiscovery: true, include: [] },
+    resolve: { alias: { "@pi-desktop/shared": fileURLToPath(new URL("../../../packages/shared/src/index.ts", import.meta.url)) } },
+  });
+  t.after(() => server.close());
+  const original = Object.getOwnPropertyDescriptor(globalThis, "window");
+  let requests = 0, executions = 0;
+  Object.defineProperty(globalThis, "window", { configurable: true, value: {
+    location: { origin: "http://localhost" }, addEventListener() {}, removeEventListener() {},
+    piDesktop: { on: () => () => {}, invoke: () => { requests++; throw new Error("渲染不应调用 Host"); } },
+  } });
+  t.after(() => { if (original) Object.defineProperty(globalThis, "window", original); else delete globalThis.window; });
+  const { CodingWorkbench } = await server.ssrLoadModule("/src/features/coding/CodingWorkbench.tsx");
+  const { en } = await server.ssrLoadModule(fileURLToPath(new URL("../../../packages/i18n/src/locales/en/index.ts", import.meta.url)));
+  const i18n = createInstance(); await i18n.init({ lng: "en", resources: { en: { translation: en } } });
+  const html = renderToStaticMarkup(createElement(I18nextProvider, { i18n },
+    createElement(CodingWorkbench, { disabled: false, error: null, onExecute: () => { executions++; } })));
+  for (const label of Object.values(en.codingActions.defaults)) assert.ok(html.includes(label));
+  assert.ok(html.includes(en.codingActions.configure));
+  assert.doesNotMatch(html, /当前阶段|下一阶段|完成百分比/);
+  assert.equal(requests, 0); assert.equal(executions, 0);
 });
