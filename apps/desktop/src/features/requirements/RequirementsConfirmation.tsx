@@ -19,7 +19,7 @@ function RequirementsConfirmationDialog({ projectPath, onClose }: { projectPath:
   }, []);
   const errorCode = workflow.error?.match(/REQUIREMENTS_[A-Z_]+/)?.[0] ?? "REQUIREMENTS_UNAVAILABLE";
   return portalOverlay(<dialog ref={dialog} className="requirements-confirmation-dialog" aria-labelledby={title} aria-describedby={description}
-    onCancel={event => { event.preventDefault(); if (!workflow.busy) onClose(); }}>
+    onCancel={event => { event.preventDefault(); onClose(); }}>
     <h3 id={title}>{t("coding.requirements.title")}</h3>
     <p id={description}>{t("coding.requirements.description")}</p>
     <Field label={t("coding.requirements.root")}>
@@ -50,7 +50,7 @@ function RequirementsConfirmationDialog({ projectPath, onClose }: { projectPath:
       </li>)}</ul>
     </details> : null}
     <div className="requirements-confirmation-actions">
-      <Button type="button" onClick={onClose} disabled={workflow.busy}>{t("common.cancel")}</Button>
+      <Button type="button" onClick={onClose}>{t("common.cancel")}</Button>
       <Button type="button" variant="primary" disabled={workflow.busy || !workflow.preview || workflow.preview.status === "confirmed"} onClick={() => void workflow.confirm()}>{t("coding.requirements.confirm")}</Button>
     </div>
   </dialog>);

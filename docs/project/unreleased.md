@@ -1,6 +1,8 @@
 # Unreleased changes
 
-- Composer and Workflow share a Confirm requirements action. Users inspect a
+- Coding Actions removes the separate Confirm requirements button. Workflow
+  retains confirmation history; Cancel and Escape remain available during
+  pending requests. Users inspect a
   specification file and approve its content version without starting an Agent
   or creating a Workflow Run. Changed content requires renewed confirmation;
   historical decisions remain available after restart.

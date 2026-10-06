@@ -52,7 +52,11 @@ async function initialize() {
   renderComposer();
   await until(() => document.querySelector(".composer-input"), "Composer mounted");
 }
-function renderComposer() { root.render(<I18nextProvider i18n={i18n}><Composer variant="home" /></I18nextProvider>); }
+function RequirementsFixture() {
+  const projectPath = useAppStore(state => state.workspace?.path ?? "");
+  return <><Composer variant="home" /><WorkflowTab projectPath={projectPath} projectMeta={{}} sessionId={sessionId} /></>;
+}
+function renderComposer() { root.render(<I18nextProvider i18n={i18n}><RequirementsFixture /></I18nextProvider>); }
 async function open() {
   await click("Confirm requirements");
   await until(() => dialog()?.open && !dialog()?.querySelector('input')?.disabled, "confirmation dialog hydrated");
@@ -69,6 +73,7 @@ globalThis.requirementsConfirmationProbe = async () => {
   const draft = "Preserve this unsent draft.";
   useAppStore.setState({ composerPrefill: { sessionId, text: draft, fileReferences: [] } });
   await until(() => readEditorValue(editor()) === draft, "draft prefilled");
+  check(!document.querySelector(".coding-workbench")?.textContent?.includes("Confirm requirements"), "Composer retained confirmation action");
 
   await open();
   field("Specification file", "requirements.md");
@@ -130,6 +135,18 @@ globalThis.requirementsConfirmationProbe = async () => {
 
   renderComposer();
   await until(() => editor(), "Composer restored");
+  for (const dismissal of ["Cancel", "Escape"]) {
+    await action("pauseRequirementsPreview");
+    await click("Confirm requirements");
+    await action("waitOpen");
+    if (dismissal === "Cancel") await click("Cancel", true);
+    else await window.workflowFixture.action("pressKey", "Escape");
+    await until(() => !dialog(), `${dismissal} dismisses pending preview`);
+    check(document.activeElement === button("Confirm requirements"), "Pending dismissal did not restore focus");
+    await action("releaseOpen");
+    check(!dialog(), "Late preview reopened the dismissed dialog");
+    check((await api.readRequirementsHistory(group.id)).confirmations.length === 2, "Pending dismissal changed approval history");
+  }
   await action("pauseRequirementsPreview");
   await click("Confirm requirements");
   await action("waitOpen");

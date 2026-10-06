@@ -12,7 +12,8 @@
 
 - **Preconditions:** Built Renderer components and Host, isolated project roots,
   data/profile and local Agent fixture; no live providers.
-- **Steps:** Preview a specification through Composer; cancel and retain the
+- **Steps:** Verify Composer has no Confirm requirements action. Preview a
+  specification through Workflow; cancel while loading and retain the Composer
   draft. Confirm the selected version without a run. Inspect the same approval
   through Workflow without unlocking Spec. Edit, refresh, edit again, reject
   stale submission and reconfirm. Switch projects during delayed preview, check

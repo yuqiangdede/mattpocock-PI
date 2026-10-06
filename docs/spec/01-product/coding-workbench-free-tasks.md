@@ -62,9 +62,8 @@ without horizontal overflow; order stays fixed across task states.
 
 ## Requirements confirmation
 
-Confirm requirements is a native action beside Discuss requirements, rather
-than a skill shortcut. It opens the shared project specification preview and
-confirmation dialog without inserting text or sending the Composer draft.
+Coding Actions no longer exposes the separate Confirm requirements action.
+Workflow retains the project specification preview and confirmation dialog.
 See [Requirements Confirmation](requirements-confirmation.md) for content-version
 approval, history and freshness rules. Existing skill shortcuts retain the
 draft-only behavior described above.

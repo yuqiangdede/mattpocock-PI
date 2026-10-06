@@ -30,6 +30,7 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
     createElement(CodingWorkbench, { disabled: false, error: null, onExecute: () => { executions++; } })));
   for (const label of Object.values(en.codingActions.defaults)) assert.ok(html.includes(label));
   assert.ok(html.includes(en.codingActions.configure));
+  assert.ok(!html.includes(en.coding.requirements.action), "Composer must not expose requirements confirmation");
   assert.doesNotMatch(html, /当前阶段|下一阶段|完成百分比/);
   assert.equal(requests, 0); assert.equal(executions, 0);
 });
