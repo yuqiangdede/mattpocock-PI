@@ -8,7 +8,7 @@ const listeners = new Set<() => void>();
 let loading: Promise<void> | null = null;
 function publish(next: ShortcutState) { state = next; listeners.forEach(listener => listener()); }
 export function useShortcutConfiguration() {
-  return useSyncExternalStore(listener => { listeners.add(listener); return () => { listeners.delete(listener); }; }, () => state);
+  return useSyncExternalStore(listener => { listeners.add(listener); return () => { listeners.delete(listener); }; }, () => state, () => state);
 }
 export function loadShortcutConfiguration(): Promise<void> {
   if (!loading) loading = api.getShortcutConfiguration().then(configuration => publish({ configuration, error: null })).catch(error => publish({ ...state, error: String(error) })).finally(() => { loading = null; });

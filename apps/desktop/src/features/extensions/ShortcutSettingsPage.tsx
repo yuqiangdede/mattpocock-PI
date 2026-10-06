@@ -10,8 +10,8 @@ import { loadShortcutConfiguration, saveShortcutConfiguration, setShortcutLeaveG
 export function ShortcutSettingsPage() {
   const { t } = useTranslation();
   const { configuration, error: loadError } = useShortcutConfiguration();
-  const [draft, setDraft] = useState<ShortcutConfiguration | null>(null);
-  const [selected, setSelected] = useState<string>("");
+  const [draft, setDraft] = useState<ShortcutConfiguration | null>(() => configuration ? structuredClone(configuration) : null);
+  const [selected, setSelected] = useState<string>(configuration?.buttons[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);

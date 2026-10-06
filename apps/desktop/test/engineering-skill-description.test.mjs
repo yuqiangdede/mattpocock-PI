@@ -9,7 +9,7 @@ import { I18nextProvider } from "react-i18next";
 import { createServer } from "vite";
 
 register(new URL("./helpers/engineering-settings-imports.mjs", import.meta.url));
-const { ENGINEERING_SHORTCUTS } = await import("@pi-desktop/shared");
+const { ENGINEERING_SHORTCUTS, createDefaultShortcutConfiguration } = await import("@pi-desktop/shared");
 const { en } = await import("../../../packages/i18n/src/locales/en/index.ts");
 const { zhCN } = await import("../../../packages/i18n/src/locales/zh-CN/index.ts");
 
@@ -68,23 +68,23 @@ test("selected entry renders its guidance in the active language independently o
     if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
     else delete globalThis.window;
   });
-  const { EngineeringSkillSettings } = await server.ssrLoadModule("/src/components/settings/EngineeringSkillSettings.tsx");
+  const { ShortcutSettingsPage } = await server.ssrLoadModule("/src/features/extensions/ShortcutSettingsPage.tsx");
+  const { saveShortcutConfiguration } = await server.ssrLoadModule("/src/features/extensions/shortcut-state.ts");
   const { useAppStore } = await server.ssrLoadModule("/src/stores/app-store.ts");
   const originalSettings = useAppStore.getState().settings;
-  const initialState = useAppStore.getInitialState();
-  const originalInitialSettings = initialState.settings;
   const prompts = { ask: "My custom instruction", implement: "" };
   useAppStore.setState({ settings: { ...originalSettings, engineeringShortcutPrompts: prompts } });
-  // Zustand SSR reads the initial hydration snapshot rather than the live one.
-  initialState.settings = useAppStore.getState().settings;
-  t.after(() => {
-    initialState.settings = originalInitialSettings;
-    useAppStore.setState({ settings: originalSettings });
-  });
-  const html = renderToStaticMarkup(createElement(I18nextProvider, { i18n }, createElement(EngineeringSkillSettings, { onUpdated: async () => {} })));
+  t.after(() => useAppStore.setState({ settings: originalSettings }));
+  const configured = createDefaultShortcutConfiguration();
+  configured.buttons.find(button => button.presetId === "ask").prompt = "My custom instruction";
+  // 模拟公开保存边界，SSR 本身不得读取 Host，也不得改写原生设置。
+  window.piDesktop.invoke = async (_channel, value) => { requests++; return { ok: true, data: value }; };
+  await saveShortcutConfiguration(configured);
+  requests = 0;
+  const html = renderToStaticMarkup(createElement(I18nextProvider, { i18n }, createElement(ShortcutSettingsPage)));
   assert.ok(html.includes(zhCN.coding.skillGuides.ask.example));
   assert.ok(html.includes("My custom instruction"));
-  assert.ok(html.indexOf("engineering-skill-description") < html.indexOf("<textarea"));
+  assert.ok(html.includes("插入内容预览"));
   assert.deepEqual(useAppStore.getState().settings.engineeringShortcutPrompts, prompts);
   assert.equal(requests, 0);
   const { CodingWorkbench } = await server.ssrLoadModule("/src/features/coding/CodingWorkbench.tsx");
@@ -100,4 +100,9 @@ test("selected entry renders its guidance in the active language independently o
     }
   }
   assert.equal(selections, 0);
+  await saveShortcutConfiguration({ ...configured, buttons: [] });
+  const emptyWorkbench = renderToStaticMarkup(createElement(I18nextProvider, { i18n }, createElement(CodingWorkbench, { disabled: false, error: null, onSelect: () => { selections++; } })));
+  assert.ok(emptyWorkbench.includes(zhCN.coding.formal));
+  assert.ok(emptyWorkbench.includes(zhCN.coding.requirements.action));
+  assert.ok(!emptyWorkbench.includes(zhCN.coding.discovery));
 });
