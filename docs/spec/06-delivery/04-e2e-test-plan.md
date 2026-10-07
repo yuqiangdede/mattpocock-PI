@@ -8,6 +8,17 @@
 
 ## 1. Goals
 
+### E2E-CODING-ACTIONS-effective-settings-content
+
+- Open the default Create specification Action. Verify the complete localized
+  default instruction and built-in guidance are visible without modifying saved
+  configuration. Edit the prompt, clear it, and restore its default; verify the
+  custom, marker-only and default statuses, then save and select the Action to
+  prepare the same effective instruction in Composer. An unknown skill reports
+  that no built-in prompt exists. Existing custom prompts remain verbatim.
+- Component and selection-path coverage: `coding-action-content-fields.test.mjs`;
+  persistence coverage: `coding-actions.test.mjs`.
+
 ### E2E-CODING-ACTIONS-common-and-more
 
 - More has localized lifecycle group headings, hides empty groups and places Retrospective under Collaboration and delivery. Grouping preserves all entries and the selection-to-editable-draft path; unknown custom overflow has its own group.
