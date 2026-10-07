@@ -4,6 +4,7 @@ use crate::transcripts::MessageRecord;
 use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension, Transaction};
 use serde_json::{json, Value};
+pub mod results;
 #[cfg(test)]
 mod tests;
 
@@ -31,6 +32,11 @@ CREATE TABLE IF NOT EXISTS navigator_requests (
  requested_skills_json TEXT NOT NULL, observed_skills_json TEXT NOT NULL DEFAULT '[]', created_at INTEGER NOT NULL,
  UNIQUE(session_id, message_id)
 );
+CREATE TABLE IF NOT EXISTS navigator_results (
+ id TEXT PRIMARY KEY, activity_id TEXT NOT NULL REFERENCES navigator_activities(id) ON DELETE CASCADE,
+ kind TEXT NOT NULL, label TEXT NOT NULL, path TEXT, source_message_id TEXT, source_turn_id TEXT,
+ provenance TEXT NOT NULL, verification TEXT NOT NULL, removed INTEGER NOT NULL DEFAULT 0
+);
 "#;
 
 /// Called in the same transaction as the native message index, never at draft selection.
@@ -40,6 +46,12 @@ pub fn record_submission(
     turn: Option<&str>,
     record: &MessageRecord,
 ) -> Result<()> {
+    if record.role == "assistant" {
+        if let Some(turn) = turn {
+            results::record_reply(tx, session, turn, record)?;
+        }
+        return Ok(());
+    }
     if record.role == "tool"
         && record.tool_name.as_deref() == Some("Skill")
         && !record.is_error

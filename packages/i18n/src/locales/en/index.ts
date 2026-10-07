@@ -12,6 +12,7 @@ export const en = {
     endActivity: 'End discussion', leaveActivity: 'Leave activity for unrelated chat',
     boundaryBusy: 'Wait for the current execution and queued requests before changing activity.',
     controlFailed: 'Could not change activity: {{detail}}',
+    results: { title: 'Results and evidence', reply: 'View response', unknown: 'No attributable results identified yet.', sourceMissing: 'Response is not loaded or is no longer available in this transcript.', nonText: 'This file is not a text preview.', fileUnavailable: 'File missing or access unavailable: {{detail}}', remove: 'Remove association', add: 'Add association', kind: 'Result type', label: 'Description or validation evidence', path: 'Project-relative path', file: 'File', validation: 'Validation note', userCaution: 'User associations require verification. Removing one does not delete its source.', provenance: { native: 'Native response reference', user: 'User-associated evidence', model_reported: 'Model-reported result' }, verification: { observed: 'Reference observed; contents are not approved', unverified: 'Requires verification; no independent validation recorded' } },
     unsupported: 'Imported native Pi conversations do not provide Host-bound navigation records yet. Chat remains available.',
     actualUseObserved: 'Skill loading observed in this request.',
     title: 'Navigator', refresh: 'Refresh', loading: 'Loading activity records…',

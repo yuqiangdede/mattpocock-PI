@@ -28,6 +28,24 @@ export function navigatorControlInput(input: unknown): NavigatorControlInput {
     !("action" in input) || (input.action !== "continue" && input.action !== "end" && input.action !== "leave")) throw new Error("Invalid activity control");
   return { sessionId, activityId: input.activityId, expectedVersion: Number(input.expectedVersion), action: input.action };
 }
+export type NavigatorResult = {
+  id: string; kind: "reply" | "file" | "validation";
+  label: string; path: string | null; sourceMessageId: string | null;
+  sourceTurnId: string | null; provenance: "native" | "user" | "model_reported";
+  verification: "observed" | "unverified";
+};
+export type NavigatorResultSnapshot = { results: NavigatorResult[]; version: number };
+export type NavigatorResultInput = { sessionId: string; activityId: string; expectedVersion?: number; resultId?: string; kind?: "file" | "validation"; label?: string; path?: string };
+export function navigatorResultInput(input: unknown): NavigatorResultInput {
+  const base = navigatorSessionInput(input);
+  if (!input || typeof input !== "object") throw new Error("input required");
+  const value = input as Record<string, unknown>;
+  if (typeof value.activityId !== "string" || !value.activityId || value.activityId.length > 1024) throw new Error("activityId required");
+  for (const key of ["resultId", "label", "path"] as const) if (value[key] !== undefined && (typeof value[key] !== "string" || value[key].length > 4096 || value[key].includes("\0"))) throw new Error(`Invalid ${key}`);
+  if (value.expectedVersion !== undefined && (!Number.isSafeInteger(value.expectedVersion) || Number(value.expectedVersion) < 1)) throw new Error("Invalid version");
+  if (value.kind !== undefined && value.kind !== "file" && value.kind !== "validation") throw new Error("Invalid kind");
+  return { ...base, activityId: value.activityId, expectedVersion: value.expectedVersion as number | undefined, resultId: value.resultId as string | undefined, kind: value.kind as "file" | "validation" | undefined, label: value.label as string | undefined, path: value.path as string | undefined };
+}
 export function navigatorSessionInput(input: unknown): { sessionId: string } {
   if (!input || typeof input !== "object" || !("sessionId" in input) ||
       typeof input.sessionId !== "string" || !input.sessionId.trim() || input.sessionId.length > 256) {

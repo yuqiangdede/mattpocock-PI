@@ -7,6 +7,7 @@ import { Button, Panel } from "../../components/ui";
 import { createNavigatorReader } from "./navigator-reader";
 import { NavigatorHistoryControls } from "./NavigatorHistoryControls";
 import { NavigatorActivityControls } from "./NavigatorActivityControls";
+import { NavigatorResults } from "./NavigatorResults";
 
 export function NavigatorTab() {
   const { t } = useTranslation();
@@ -65,6 +66,7 @@ export function NavigatorView({ sessionId, snapshot, error, onRefresh, onControl
             {request.requestedSkills.map(skill => <p key={skill}>{skill}: {t(request.observedSkills.includes(skill) ? "navigator.actualUseObserved" : "navigator.actualUseUnknown")}</p>)}
             {request.errorCode && <p>{request.errorCode}</p>}
           </div>)}
+          <NavigatorResults activity={activity} onChanged={onRefresh} />
         </Panel>
       </li>)}
     </ul>

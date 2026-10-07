@@ -11,6 +11,24 @@ pub(super) fn handle(db: &Database, method: &str, params: &Value) -> Result<Valu
             .ok_or_else(|| rpc_err(1002, format!("{key} required"), "INVALID_PARAMS"))
     };
     let result = match method {
+        "navigator.results" => {
+            crate::navigator::results::list(db, text("sessionId")?, text("activityId")?)
+        }
+        "navigator.addResult" | "navigator.removeResult" => {
+            let version = params
+                .get("expectedVersion")
+                .and_then(Value::as_i64)
+                .filter(|v| *v > 0)
+                .ok_or_else(|| rpc_err(1002, "expectedVersion required", "INVALID_PARAMS"))?;
+            crate::navigator::results::mutate(
+                db,
+                text("sessionId")?,
+                text("activityId")?,
+                version,
+                params,
+                method == "navigator.removeResult",
+            )
+        }
         "navigator.list" => crate::navigator::list(db, text("sessionId")?),
         "navigator.setHidden" => crate::navigator::set_hidden(
             db,

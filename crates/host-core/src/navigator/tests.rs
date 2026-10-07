@@ -85,6 +85,82 @@ fn navigator_session_deletion_cascades_unknown_history_and_late_events_cannot_re
         );
     }
 }
+
+#[test]
+fn navigator_results_user_journey_curates_references_without_deleting_sources() {
+    let (directory, db, session) = fixture();
+    let turn = submit(&db, &session, "request-results", &["to-spec"]);
+    let reply: sessions::UiMessage = serde_json::from_value(json!({"id":"reply-results","role":"assistant","content":"Tests passed according to the model", "createdAt":"2026-10-07T00:00:01Z"})).unwrap();
+    sessions::append_message(&db, &session, &reply, Some(&turn)).unwrap();
+    let activity = format!("navigator:{session}:request-results");
+    let snapshot = results::list(&db, &session, &activity).unwrap();
+    let initial = snapshot["version"].as_i64().unwrap();
+    assert_eq!(snapshot["results"][0]["sourceMessageId"], "reply-results");
+    assert_eq!(snapshot["results"][0]["provenance"], "native");
+    assert_eq!(snapshot["results"].as_array().unwrap().len(), 1); // Never infer a passing validation from prose.
+    let file = json!({"kind":"file","label":"Specification","path":"docs/spec.md"});
+    let added = results::mutate(&db, &session, &activity, initial, &file, false).unwrap();
+    assert_eq!(added["results"][1]["verification"], "unverified");
+    assert!(results::mutate(&db, &session, &activity, initial, &file, false).is_err());
+    let other = sessions::create_session(&db, None, None, None, None, None).unwrap();
+    assert!(results::list(&db, &other.id, &activity).is_err());
+    for path in [
+        "../secret",
+        "C:\\secret",
+        "/secret",
+        "docs/../../secret",
+        "\\\\server\\file",
+    ] {
+        assert!(results::mutate(
+            &db,
+            &session,
+            &activity,
+            initial + 1,
+            &json!({"kind":"file","label":"bad","path":path}),
+            false
+        )
+        .is_err());
+    }
+    let id = added["results"][1]["id"].clone();
+    let removed = results::mutate(
+        &db,
+        &session,
+        &activity,
+        initial + 1,
+        &json!({"resultId":id}),
+        true,
+    )
+    .unwrap();
+    assert_eq!(removed["results"].as_array().unwrap().len(), 1);
+    assert_eq!(removed["version"], initial + 2);
+    drop(db);
+    let db = Database::open(&directory.path().join("navigator.sqlite")).unwrap();
+    assert_eq!(
+        results::list(&db, &session, &activity).unwrap()["results"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert!(db
+        .conn()
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM turns WHERE id=?1)",
+            [&turn],
+            |r| r.get::<_, bool>(0)
+        )
+        .unwrap());
+    db.conn()
+        .execute("DELETE FROM sessions WHERE id=?1", [&session])
+        .unwrap();
+    assert_eq!(
+        db.conn()
+            .query_row("SELECT COUNT(*) FROM navigator_results", [], |r| r
+                .get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+}
 fn submit(db: &Database, session: &str, message: &str, skills: &[&str]) -> String {
     let turn = sessions::begin_turn(db, session, None, None).unwrap();
     let mentions: Vec<Value> = skills

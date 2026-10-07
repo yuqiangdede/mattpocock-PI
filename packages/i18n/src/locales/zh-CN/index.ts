@@ -13,6 +13,7 @@ export const zhCN = {
     endActivity: '结束讨论', leaveActivity: '离开活动，进行其他聊天',
     boundaryBusy: '请等待当前执行和排队请求结束后，再更改活动。',
     controlFailed: '无法更改活动：{{detail}}',
+    results: { title: '结果与证据', reply: '查看回复', unknown: '尚未识别到可归属的结果。', sourceMissing: '回复尚未加载或已不在当前消息记录中。', nonText: '此文件无法以文本预览。', fileUnavailable: '文件缺失或无法访问：{{detail}}', remove: '移除关联', add: '添加关联', kind: '结果类型', label: '描述或验证依据', path: '项目相对路径', file: '文件', validation: '验证记录', userCaution: '用户关联仍需核实；移除关联不会删除源内容。', provenance: { native: '原生回复引用', user: '用户关联的依据', model_reported: '模型报告的结果' }, verification: { observed: '已观察到引用；不代表内容获批', unverified: '待核实；尚无独立验证记录' } },
     unsupported: '导入的原生 Pi 会话暂不提供 Host 关联的导航记录，聊天仍可正常使用。',
     actualUseObserved: '已观察到本次请求加载了 Skill。',
     title: '开发导航', refresh: '刷新', loading: '正在加载活动记录…',
