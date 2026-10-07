@@ -3,6 +3,15 @@ import { engineeringSkillGuides } from "./engineering-skill-guides.js";
 export const en = {
   navigator: {
     manageHistory: "Manage history", hide: "Hide", restore: "Restore", hideExplanation: "Hiding only changes this view. Messages, files and activity state remain intact.", historyFailed: "Could not update history: {{detail}}",
+    currentActivity: 'Current activity: {{skills}}',
+    boundaryHistory: 'Discussion boundary history',
+    activityBound: 'Ordinary replies belong to this activity until you leave or end it.',
+    activityPaused: 'Activity remains open; replies are not currently bound to it.',
+    activityEnded: 'Discussion ended. This does not approve its content.',
+    continueActivity: 'Continue this activity', reopenActivity: 'Reopen discussion',
+    endActivity: 'End discussion', leaveActivity: 'Leave activity for unrelated chat',
+    boundaryBusy: 'Wait for the current execution and queued requests before changing activity.',
+    controlFailed: 'Could not change activity: {{detail}}',
     unsupported: 'Imported native Pi conversations do not provide Host-bound navigation records yet. Chat remains available.',
     actualUseObserved: 'Skill loading observed in this request.',
     title: 'Navigator', refresh: 'Refresh', loading: 'Loading activity records…',

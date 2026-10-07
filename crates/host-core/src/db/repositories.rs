@@ -241,6 +241,8 @@ impl Database {
             })?;
         }
         let db = Self { conn, data_dir };
+        // Additive candidate-v22 table; keep existing activity/request data unchanged.
+        db.conn().execute_batch(crate::navigator::SCHEMA)?;
         crate::navigator::recover(&db)?;
         db.boot_maintenance()?;
         crate::session_collaboration::recover(&db)?;

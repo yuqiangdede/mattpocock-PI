@@ -98,6 +98,17 @@ Neither turn termination nor activity ending approves requirements or Review.
 
 ### Navigation analysis and handoff
 
+The first submitted Skill request binds a conversation to its new activity.
+Navigator displays this binding explicitly, including when the activity is hidden.
+Ordinary submitted answers join that bound activity; message proximity is never
+used to infer ownership. Leave activity clears the binding without ending it;
+Continue selects an open activity or reopens an ended discussion. End clears
+the binding and marks the discussion ended, without content approval. Each
+explicit boundary is retained in history, including prior endings after reopening.
+Boundary changes require an idle native conversation with no queued requests and
+the current activity version; stale changes fail visibly and require refreshing.
+Binding and history survive restart without dispatching work.
+
 - Navigation Analysis belongs to the selected ended activity, remains separate
   from its engineering requests, and retains generation time and input basis.
 - Invoke the installed native `ask-matt` only on explicit request while idle,

@@ -911,7 +911,7 @@ export function registerAgentIpc({
         const commands = await composerCommandService.buildComposerCommands(target.session?.projectPath ?? await optionalWorkspaceRoot());
         const skills = new Map(commands.flatMap(command => command.kind === "skill" && command.skillId ? [[command.name, command.skillId] as const] : []));
         const requestedSkills = [...new Set(findSkillMentions(req.content, skills).map(mention => mention.id))];
-        if (requestedSkills.length) await host.call("navigator.queue", { queueId: queued.id, requestedSkills });
+        await host.call("navigator.queue", { queueId: queued.id, requestedSkills });
       } catch (cause) {
         logger.app("session", "warn", "Navigator queue attribution unavailable", { sessionId: req.sessionId, data: String(cause) });
       }

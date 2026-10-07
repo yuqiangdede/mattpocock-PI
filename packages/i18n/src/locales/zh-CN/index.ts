@@ -4,6 +4,15 @@ import { engineeringSkillGuides } from "./engineering-skill-guides.js";
 export const zhCN = {
   navigator: {
     manageHistory: "管理历史", hide: "隐藏", restore: "恢复", hideExplanation: "隐藏仅改变导航显示，不删除消息、文件或改变活动状态。", historyFailed: "无法更新历史：{{detail}}",
+    currentActivity: '当前活动：{{skills}}',
+    boundaryHistory: '讨论边界历史',
+    activityBound: '普通回复归入此活动，直到你离开或结束活动。',
+    activityPaused: '活动仍未结束；当前回复不归入此活动。',
+    activityEnded: '讨论已结束，不代表内容已经批准。',
+    continueActivity: '继续此活动', reopenActivity: '重新打开讨论',
+    endActivity: '结束讨论', leaveActivity: '离开活动，进行其他聊天',
+    boundaryBusy: '请等待当前执行和排队请求结束后，再更改活动。',
+    controlFailed: '无法更改活动：{{detail}}',
     unsupported: '导入的原生 Pi 会话暂不提供 Host 关联的导航记录，聊天仍可正常使用。',
     actualUseObserved: '已观察到本次请求加载了 Skill。',
     title: '开发导航', refresh: '刷新', loading: '正在加载活动记录…',

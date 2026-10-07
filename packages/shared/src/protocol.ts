@@ -200,6 +200,7 @@ export const IPC = {
     requirementsConfirm: "pi-desktop/requirements/confirm",
     navigatorList: "pi-desktop/navigator/list",
     navigatorSetHidden: "pi-desktop/navigator/set-hidden",
+    navigatorControl: "pi-desktop/navigator/control",
     freeTaskStart: "pi-desktop/free-task/start",
     freeTaskCheck: "pi-desktop/free-task/check",
     freeTaskList: "pi-desktop/free-task/list",

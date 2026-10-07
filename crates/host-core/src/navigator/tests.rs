@@ -222,7 +222,7 @@ fn navigator_queue_waiting_binds_native_dispatch_and_cancel_is_truthful() {
 #[test]
 fn navigator_v21_upgrade_preserves_sessions_and_is_idempotent() {
     let (directory, db, session) = fixture();
-    db.conn().execute_batch("DROP TABLE navigator_requests; DROP TABLE navigator_activities; PRAGMA user_version=21;").unwrap();
+    db.conn().execute_batch("DROP TABLE navigator_boundaries; DROP TABLE navigator_bindings; DROP TABLE navigator_requests; DROP TABLE navigator_activities; PRAGMA user_version=21;").unwrap();
     drop(db);
     let db = Database::open(&directory.path().join("navigator.sqlite")).unwrap();
     assert_eq!(list(&db, &session).unwrap()["activities"], json!([]));
@@ -236,4 +236,162 @@ fn navigator_v21_upgrade_preserves_sessions_and_is_idempotent() {
             .len(),
         1
     );
+}
+
+fn boundary(db: &Database, session: &str, action: &str) -> Value {
+    let snapshot = list(db, session).unwrap();
+    let activity = &snapshot["activities"][0];
+    control(
+        db,
+        session,
+        activity["id"].as_str().unwrap(),
+        activity["version"].as_i64().unwrap(),
+        action,
+    )
+    .unwrap()
+}
+
+#[test]
+fn navigator_multi_round_discussion_public_path_ends_only_on_explicit_action() {
+    let (_dir, db, session) = fixture();
+    let first = submit(&db, &session, "requirements", &["grill-with-docs"]);
+    let original = list(&db, &session).unwrap();
+    let id = original["activeActivityId"].as_str().unwrap().to_owned();
+    assert!(control(&db, &session, &id, 2, "end").is_err());
+    sessions::end_turn(&db, &first, "completed", None, None, false).unwrap();
+    assert_eq!(
+        list(&db, &session).unwrap()["activities"][0]["endedAt"],
+        Value::Null
+    );
+    let second = submit(&db, &session, "answer-one", &[]);
+    sessions::end_turn(&db, &second, "completed", None, None, false).unwrap();
+    let third = submit(&db, &session, "answer-two", &[]);
+    sessions::end_turn(&db, &third, "completed", None, None, false).unwrap();
+    let rounds = list(&db, &session).unwrap();
+    assert_eq!(rounds["activities"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        rounds["activities"][0]["requests"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+    assert_eq!(
+        rounds["activities"][0]["requests"][1]["requestedSkills"],
+        json!([])
+    );
+    assert!(control(&db, &session, &id, 2, "end").is_err()); // stale CAS
+    let ended = boundary(&db, &session, "end");
+    assert!(ended["activities"][0]["endedAt"].is_number());
+    assert_eq!(ended["activeActivityId"], Value::Null);
+    let unrelated = submit(&db, &session, "unrelated", &[]);
+    sessions::end_turn(&db, &unrelated, "completed", None, None, false).unwrap();
+    assert_eq!(
+        list(&db, &session).unwrap()["activities"][0]["requests"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+    boundary(&db, &session, "continue");
+    let renewed = submit(&db, &session, "new-question", &[]);
+    sessions::end_turn(&db, &renewed, "completed", None, None, false).unwrap();
+    let reopened = list(&db, &session).unwrap();
+    assert_eq!(reopened["activities"][0]["endedAt"], Value::Null);
+    assert_eq!(reopened["activities"][0]["boundaries"][0]["action"], "end");
+    assert_eq!(
+        reopened["activities"][0]["boundaries"][1]["action"],
+        "continue"
+    );
+    assert_eq!(
+        reopened["activities"][0]["requests"]
+            .as_array()
+            .unwrap()
+            .len(),
+        4
+    );
+    boundary(&db, &session, "leave");
+    assert_eq!(
+        list(&db, &session).unwrap()["activeActivityId"],
+        Value::Null
+    );
+    assert_eq!(
+        list(&db, &session).unwrap()["activities"][0]["endedAt"],
+        Value::Null
+    );
+}
+
+#[test]
+fn navigator_binding_survives_v22_restart_and_never_crosses_sessions() {
+    let (directory, db, session) = fixture();
+    let turn = submit(&db, &session, "requirements", &["grill-with-docs"]);
+    let id = list(&db, &session).unwrap()["activeActivityId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    sessions::end_turn(&db, &turn, "completed", None, None, false).unwrap();
+    let other = sessions::create_session(&db, None, None, None, None, None).unwrap();
+    assert!(control(&db, &other.id, &id, 2, "continue").is_err());
+    let ordinary = submit(&db, &other.id, "other-answer", &[]);
+    sessions::end_turn(&db, &ordinary, "completed", None, None, false).unwrap();
+    assert_eq!(list(&db, &other.id).unwrap()["activities"], json!([]));
+    drop(db);
+    let db = Database::open(&directory.path().join("navigator.sqlite")).unwrap();
+    assert_eq!(list(&db, &session).unwrap()["activeActivityId"], id);
+    db.conn()
+        .execute(
+            "UPDATE navigator_activities SET hidden=1 WHERE id=?1",
+            [&id],
+        )
+        .unwrap();
+    assert_eq!(list(&db, &session).unwrap()["activeActivityId"], id);
+    boundary(&db, &session, "leave");
+    db.conn()
+        .execute_batch("DROP TABLE navigator_bindings")
+        .unwrap();
+    drop(db);
+    let db = Database::open(&directory.path().join("navigator.sqlite")).unwrap();
+    assert_eq!(
+        list(&db, &session).unwrap()["activities"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        list(&db, &session).unwrap()["activeActivityId"],
+        Value::Null
+    );
+}
+
+#[test]
+fn navigator_queued_answer_freezes_binding_and_blocks_boundaries_until_resolved() {
+    let (_dir, db, session) = fixture();
+    let first = submit(&db, &session, "requirements", &["grill-with-docs"]);
+    sessions::end_turn(&db, &first, "completed", None, None, false).unwrap();
+    let input: turn_queue::QueuedTurnInput = serde_json::from_value(json!({"sessionId":session,"principal":"desktop","inputHash":"answer","content":"ordinary answer","permissionMode":"ask","userMessageId":"queued-answer"})).unwrap();
+    let queue = turn_queue::push(&db, input).unwrap();
+    record_queue(&db, &queue.id, &[]).unwrap();
+    let before = list(&db, &session).unwrap();
+    let activity = &before["activities"][0];
+    assert!(control(
+        &db,
+        &session,
+        activity["id"].as_str().unwrap(),
+        activity["version"].as_i64().unwrap(),
+        "leave"
+    )
+    .is_err());
+    assert_eq!(activity["requests"].as_array().unwrap().len(), 2);
+    turn_queue::remove(&db, &queue.id).unwrap();
+    let dispatch = submit(&db, &session, "queued-answer", &[]);
+    sessions::end_turn(&db, &dispatch, "completed", None, None, false).unwrap();
+    assert_eq!(
+        list(&db, &session).unwrap()["activities"][0]["requests"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    boundary(&db, &session, "end");
 }

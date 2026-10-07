@@ -15,6 +15,10 @@
 - Continue requirements discussion across multiple questions/answers in one
   activity. Individual reply termination neither ends the activity nor prompts
   for suggestions. Explicit ending is distinct from content acceptance.
+- Leave the explicit current-activity binding before unrelated chat, then
+  continue or reopen the original discussion. Hide does not clear its binding;
+  the current binding remains visible and can be left. Retain earlier boundary
+  events after reopening. Reject stale-version and busy boundary changes.
 - Inspect response/file/validation references, preview selected analysis inputs,
   and explicitly request ask-matt while idle. Analysis is tool-free and scoped;
   permission, busy admission, malformed output, cancellation and retry are covered.

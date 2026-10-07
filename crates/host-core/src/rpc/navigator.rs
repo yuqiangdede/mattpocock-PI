@@ -21,6 +21,20 @@ pub(super) fn handle(db: &Database, method: &str, params: &Value) -> Result<Valu
                 .and_then(Value::as_bool)
                 .ok_or_else(|| rpc_err(1002, "hidden required", "INVALID_PARAMS"))?,
         ),
+        "navigator.control" => {
+            let version = params
+                .get("expectedVersion")
+                .and_then(Value::as_i64)
+                .filter(|v| *v > 0)
+                .ok_or_else(|| rpc_err(1002, "expectedVersion required", "INVALID_PARAMS"))?;
+            crate::navigator::control(
+                db,
+                text("sessionId")?,
+                text("activityId")?,
+                version,
+                text("action")?,
+            )
+        }
         "navigator.queue" => {
             let skills: Vec<String> = serde_json::from_value(
                 params

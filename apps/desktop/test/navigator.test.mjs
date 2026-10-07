@@ -90,7 +90,25 @@ test("导航呈现真实请求与逐个 Skill 使用证据，不把终态当作�
   assert.ok(html.includes(en.navigator.actualUseUnknown));
   assert.ok(html.includes(en.navigator.actualUseObserved));
   assert.ok(html.includes(en.navigator.explanation));
+  const bound = render({ sessionId: "a", snapshot: { ...snapshot, activeActivityId: "activity" } });
+  assert.ok(bound.includes(en.navigator.activityBound));
+  assert.ok(bound.includes(en.navigator.endActivity));
+  assert.ok(bound.includes(en.navigator.leaveActivity));
+  const hiddenBound = render({ sessionId: "a", snapshot: { ...snapshot, activeActivityId: "activity", activities: [{ ...snapshot.activities[0], hidden: true }] } });
+  assert.ok(hiddenBound.includes(en.navigator.leaveActivity));
+  const ended = render({ sessionId: "a", snapshot: { ...snapshot, activities: [{ ...snapshot.activities[0], endedAt: 1791331200100 }] } });
+  assert.ok(ended.includes(en.navigator.activityEnded));
+  assert.ok(ended.includes(en.navigator.reopenActivity));
+  const busy = render({ sessionId: "a", busy: true, snapshot: { ...snapshot, activeActivityId: "activity" } });
+  assert.ok(busy.includes(en.navigator.boundaryBusy));
   assert.ok(render({ sessionId: "a", snapshot: { activities: [], unavailableCount: 0 } }).includes(en.navigator.empty));
   assert.ok(render({ sessionId: "native-pi:imported", snapshot: null }).includes(en.navigator.unsupported));
   assert.equal(executions, 0);
+});
+
+test("工程活动控制契约拒绝缺失归属、非法版本和动作", async () => {
+  const { navigatorControlInput } = await import("@pi-desktop/shared");
+  const valid = { sessionId: "conversation-a", activityId: "activity-a", expectedVersion: 3, action: "end" };
+  assert.deepEqual(navigatorControlInput(valid), valid);
+  for (const input of [ { ...valid, action: "approve" }, { ...valid, expectedVersion: 0 }, { ...valid, expectedVersion: 1.5 }, { ...valid, activityId: "" }, { ...valid, sessionId: "" } ]) assert.throws(() => navigatorControlInput(input));
 });
