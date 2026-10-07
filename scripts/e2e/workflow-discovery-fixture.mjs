@@ -13,6 +13,9 @@ import { formatSkillToolContent } from "../../apps/desktop/electron/main/skill-d
 import { IPC } from "../../packages/shared/src/protocol";
 import { createFreeTaskService } from "../../apps/desktop/electron/main/services/free-task-execution";
 import { registerFreeTaskIpc } from "../../apps/desktop/electron/main/ipc/free-task-ipc";
+import { createEventPersistence } from "../../apps/desktop/electron/main/runtime/event-persistence";
+import { PersistenceOutbox } from "../../apps/desktop/electron/main/persistence-outbox";
+import { InflightCheckpointer } from "../../packages/host-runtime/src/inflight-checkpoint";
 
 /** The process/provider edge is deterministic; Pi, Main admission and Host stay real. */
 export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, root }) {
@@ -75,12 +78,25 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
     });
   }
   const finishTurn = async (sessionId, status, errorCode, { turnId }) => {
+    if (navigatorPersistence) await navigatorOutbox.flush(getHost);
     if (coordination.peekAbortReason(sessionId, turnId) === "aborted") { status = "aborted"; errorCode = "TURN_ABORTED"; }
     if (getHost()) await getHost().call("session.endTurn", { turnId, status, errorCode, createNotification: false });
     if (activeTurns.get(sessionId) === turnId) activeTurns.delete(sessionId);
     bridge.endTurn(sessionId, turnId, status === "completed" ? "completed" : status === "aborted" ? "canceled" : "failed");
     bridge.agentHost.kick(sessionId);
   };
+  const navigatorOutbox = new PersistenceOutbox(dataDir, (level, message, data) => logger.app("persistence", level, message, data));
+  const navigatorCheckpointer = new InflightCheckpointer(checkpoint => getHost().call("session.saveInflightMessage", checkpoint));
+  const navigatorPersistence = process.env.PI_DEVELOPMENT_NAVIGATOR === "1" ? createEventPersistence({
+    runtimeState: { get host() { return getHost(); } }, steeringReplies: new Set(), activeTurns,
+    activeToolCalls: new Map(), activeToolCallKey: (sessionId, id) => `${sessionId}:${id}`,
+    approvedExecutionIdsBySession: new Map(), approvedExecutionTurns: new Map(), pendingExecutionFinishes: new Map(),
+    planSubmissionTurnIds: new Set(), planSubmissionTurnKey: (sessionId, id) => `${sessionId}:${id}`,
+    inflightCheckpointer: navigatorCheckpointer, persistenceOutbox: navigatorOutbox,
+    addActiveTurnUsage: coordination.addActiveTurnUsage, logger, finishTurn,
+    isStaleTerminalEvent: envelope => activeTurns.get(envelope.sessionId) !== envelope.turnId,
+    finishApprovedExecution: async () => {}, emitAgentEvent: () => {},
+  }) : null;
   const sidecar = {
     setProjectInstructionRoot() {}, clearProjectInstructionRoot() {}, clearVendorAuthBindings() {},
     async call(method, input) {
@@ -115,7 +131,7 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
           return host.call(name, params);
         },
       };
-      const runtime = new DesktopAgentRuntime({ ...input, host: runtimeHost, onEvent: () => {} });
+      const runtime = new DesktopAgentRuntime({ ...input, host: runtimeHost, onEvent: envelope => navigatorPersistence?.persistAgentEvent(envelope) });
       runtimes.add(runtime);
       boundRuntimes.set(input.turnId, runtime);
       let round = 0;
@@ -255,7 +271,7 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
       if (name === "disableSkill") return getHost().call("skills.setEnabled", { id: "grill-with-docs", level: "project", projectPath: input.path, enabled: input.enabled });
       throw new Error(`Unknown Workflow fixture action: ${name}`);
     },
-    async dispose() { checks.stop(); releaseLaunch(); releaseProvider(); await Promise.all([...runtimes].map((runtime) => runtime.dispose())); await Promise.all([...tasks]); },
+    async dispose() { checks.stop(); releaseLaunch(); releaseProvider(); await Promise.all([...runtimes].map((runtime) => runtime.dispose())); await Promise.all([...tasks]); await navigatorOutbox.flush(getHost); navigatorCheckpointer.dispose(); },
   };
 }
 

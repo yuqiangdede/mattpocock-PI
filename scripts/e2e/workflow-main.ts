@@ -7,6 +7,7 @@ import { WORKFLOW_STAGES } from "../../packages/shared/src/types/workflow";
 import { registerWorkflowIpc } from "../../apps/desktop/electron/main/ipc/workflow-ipc";
 import { registerWorkflowArtifactsIpc } from "../../apps/desktop/electron/main/ipc/workflow-artifacts-ipc";
 import { registerRequirementsIpc } from "../../apps/desktop/electron/main/ipc/requirements-ipc";
+import { registerNavigatorIpc } from "../../apps/desktop/electron/main/ipc/navigator-ipc";
 import { CodingActionStore } from "../../apps/desktop/electron/main/extensions/coding-action-store";
 import { catalogs, resolveLocale } from "../../packages/i18n/src/index";
 import { readOpenableFile } from "../../packages/host-runtime/src/workspace-files";
@@ -89,6 +90,7 @@ if (discoveryFixture) {
 } else {
   registerWorkflowIpc({ registrar, getHost: () => host });
 }
+if (process.env.PI_DEVELOPMENT_NAVIGATOR === "1") registerNavigatorIpc(registrar, () => host);
 ipcMain.handle(IPC.invoke.projectGroupList, async () => host!.call("project.groups.list"));
 const readFixtureFile = async (path: string) => {
   const { workspace } = await host!.call<{ workspace: { path: string } }>("workspace.get");
@@ -163,6 +165,7 @@ async function main(): Promise<void> {
       await host.call("settings.set", { language: "zh-CN", engineeringShortcutPrompts: { ask: "旧版自定义提示词", review: "", spec: null } });
     }
     if (process.env.PI_CODING_WORKBENCH === "1") await host.call("skills.ensureBundled");
+    if (process.env.PI_DEVELOPMENT_NAVIGATOR === "1") await writeFile(join(projectA, "navigator-result.md"), "Navigator fixture evidence", "utf8");
     await host.call("workspace.set", { path: projectA });
     await host.call("project.group.create", { name: "Project A", folders: [projectA] });
     await host.call("workspace.set", { path: projectB });
@@ -197,7 +200,14 @@ async function main(): Promise<void> {
     });
     try {
       let result;
-      if (process.env.PI_CODING_ACTIONS === "1") {
+      if (process.env.PI_DEVELOPMENT_NAVIGATOR === "1") {
+        const checkpoint = await window.webContents.executeJavaScript("globalThis.navigatorProbe()");
+        await host.dispose();
+        host = new HostProcess({ binaryPath, dataDir, env: { PI_DESKTOP_AGENTS_DIR: join(__dirname, "agents") }, onStderr: (text) => console.error(text.trimEnd()) });
+        await host.handshake();
+        await window.loadFile(join(__dirname, "index.html"), { query: { projectA, projectB, sessionId, otherSessionId } });
+        result = await window.webContents.executeJavaScript(`globalThis.navigatorRestored(${JSON.stringify(checkpoint)})`);
+      } else if (process.env.PI_CODING_ACTIONS === "1") {
         const checkpoint = await window.webContents.executeJavaScript("globalThis.codingActionsProbe()");
         await host.dispose();
         host = new HostProcess({ binaryPath, dataDir, env: { PI_DESKTOP_AGENTS_DIR: join(__dirname, "agents") }, onStderr: (text) => console.error(text.trimEnd()) });
