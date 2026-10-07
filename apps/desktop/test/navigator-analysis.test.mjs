@@ -60,3 +60,22 @@ test("切换会话、卸载和迟到完成不能覆盖新会话或重新发起�
   const before = updates.length; pending[1].resolve({ analyses: [{ id: "late-b" }] }); await second;
   assert.equal(updates.length, before);
 });
+
+test("取消后立即重试，旧请求迟到的成功或错误不能覆盖新分析", async () => {
+  const pending = []; const updates = [];
+  const controller = createNavigatorAnalysisController({
+    async listNavigatorAnalyses() { return { analyses: [] }; },
+    requestNavigatorAnalysis(input) { return new Promise((resolve, reject) => pending.push({ input, resolve, reject })); },
+    async cancelNavigatorAnalysis() { return { analyses: [{ id: "cancelled", status: "cancelled" }] }; },
+  }, state => updates.push(state));
+  await controller.select({ sessionId: "s", activityId: "a" });
+  const first = controller.request(1, []);
+  await controller.cancel();
+  assert.equal(updates.at(-1).pending, false);
+  const second = controller.request(1, []);
+  pending[0].resolve({ analyses: [{ id: "obsolete", status: "completed" }] }); await first;
+  assert.equal(updates.at(-1).pending, true);
+  assert.equal(updates.at(-1).snapshot.analyses[0].id, "cancelled");
+  pending[1].resolve({ analyses: [{ id: "latest", status: "completed" }] }); await second;
+  assert.equal(updates.at(-1).snapshot.analyses[0].id, "latest");
+});
