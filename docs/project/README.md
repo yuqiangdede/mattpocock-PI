@@ -7,6 +7,7 @@
 - Development Navigator specification: [first-release product contract](../spec/01-product/development-navigator.md); synthesized from accepted discovery, with user-path acceptance and technical feasibility gates.
 
 - Development Navigator delivery backlog: [six tickets and dependencies](development-navigator-tickets.md), [specification #46](https://github.com/yuqiangdede/mattpocock-PI/issues/46) and implementation issues #47–#52; published, implementation not started.
+- Development Navigator: [implementation and validation evidence](development-navigator-delivery.md), [PR #53](https://github.com/yuqiangdede/mattpocock-PI/pull/53); locally validated candidate, not merged or released.
 
 - 当前编码入口方向：[阶段一 Skill Launcher](skill-launcher-spec.md)。#31–#37 按 CodingAction → 原生 Skill → 当前 Session Pi Agent 重写；旧快捷按钮规格仅保留历史，Development Navigator 留待第二阶段。
 

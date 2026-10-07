@@ -104,7 +104,7 @@
 
 ## Development Navigator implementation candidate
 
-- Adds planned conversation-scoped engineering activities, explicit multi-round
+- Adds conversation-scoped engineering activities, explicit multi-round
   boundaries, evidence inspection, and optional ask-matt navigation analysis.
 - Recommendations prepare editable context drafts; explicit Send remains required.
-- Candidate under development in PR #53; not released or accepted as verified.
+- Candidate implemented and locally validated in PR #53; not merged or released.

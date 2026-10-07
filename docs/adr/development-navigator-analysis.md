@@ -1,6 +1,6 @@
 # ADR: Development Navigator analysis execution
 
-- Status: Implementation direction; enforcement must pass contract tests
+- Status: Implemented candidate; enforcement covered by contract and process tests
 - Date: 2026-10-07
 - Related: Development Navigator specification and issue #50
 
