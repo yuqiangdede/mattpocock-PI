@@ -17,6 +17,12 @@ import { createWorkflowExecutionService } from "../services/workflow-execution";
 import { createFreeTaskService } from "../services/free-task-execution";
 import { registerFreeTaskIpc } from "./free-task-ipc";
 import { registerNavigatorIpc } from "./navigator-ipc";
+import { registerNavigatorAnalysisIpc } from "./navigator-analysis-ipc";
+import { createNavigatorAnalysisService } from "../services/navigator-analysis";
+import { resolveSkillDocument } from "../skill-document";
+import { loadBuiltinSkillBody } from "../builtin-skills";
+import { OAUTH_AUTH_KIND } from "../oauth";
+import { canonicalThinkingLevel, type SessionDetail } from "@pi-desktop/shared";
 import { registerAppIpc } from "./app-ipc";
 import { registerDiagnosticsIpc } from "./diagnostics-ipc";
 import { registerMarketIpc } from "./market-ipc";
@@ -459,6 +465,34 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
   registerWorkflowArtifactsIpc({ registrar, getHost, readFile: readEngineeringFile });
   registerRequirementsIpc({ registrar, getHost, readFile: readEngineeringFile });
   registerNavigatorIpc(registrar, getHost);
+  const navigatorAnalysis = createNavigatorAnalysisService({
+    getHost, acquireSessionOperation,
+    reportCleanupError: (operation) => logger.app("runtime", "warn", "navigator analysis cleanup failed", { data: operation }),
+    catalog: (path) => composerCommandService.buildComposerCommands(path),
+    loadSkill: (id, path) => resolveSkillDocument(id, path, {
+      builtin: loadBuiltinSkillBody,
+      user: dependencies.loadUserSkillBody,
+      plugin: (skillId) => plugins.loadSkillBody(skillId),
+    }),
+    provider: async (host, sessionId) => {
+      const { session } = await host.call<{ session: SessionDetail | null }>("session.get", { id: sessionId });
+      if (!session) throw new Error("Analysis session unavailable");
+      const settings = await host.call("settings.get");
+      const launch = await resolveAgentRuntimeLaunch(sessionId, session, settings, { mode: "agent" });
+      return {
+        provider: { ...launch.sidecarParams.provider, ...(launch.sidecarParams.provider.authKind === OAUTH_AUTH_KIND ? { resolveAuth: () => vendorOAuth.resolveAuth(launch.providerId) } : {}) },
+        providerId: launch.providerId, modelId: launch.modelId,
+        thinkingLevel: canonicalThinkingLevel(launch.sidecarParams.thinkingLevel),
+      };
+    },
+  });
+  registerNavigatorAnalysisIpc(registrar, getHost, navigatorAnalysis);
+  const deleteSession = ipcHandlers.get(IPC.invoke.sessionDelete);
+  if (deleteSession) ipcHandlers.set(IPC.invoke.sessionDelete, async (...args) => {
+    if (typeof args[0] === "string") await navigatorAnalysis.cancelSession(args[0]);
+    return deleteSession(...args);
+  });
+  app.once("will-quit", () => { void navigatorAnalysis.dispose(); });
   registerFreeTaskIpc(registrar, createFreeTaskService({
     getHost,
     onIdle: (sessionId) => getAgentHostBridge()?.kickQueue(sessionId),

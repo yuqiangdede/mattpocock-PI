@@ -23,7 +23,7 @@ import type { ModelsDevCatalog } from "../models-dev-catalog";
 import type { PluginRuntime } from "../plugin-runtime";
 import type { RuntimeState } from "./context";
 import type { FinishTurn } from "./plans";
-import { formatSkillToolContent, type LoadedSkillDocument } from "../skill-document";
+import { formatSkillToolContent, resolveSkillDocument, type LoadedSkillDocument } from "../skill-document";
 
 export type SidecarRuntimeDependencies = {
   runtimeState: RuntimeState;
@@ -580,10 +580,11 @@ export function createSidecarRuntime({
       // Bundled skills answer first; they are not owned by any plugin. A user
       // skill is looked up next, and only then a plugin's — the ids cannot
       // collide, since a plugin skill id always carries a `<pluginId>/` prefix.
-      const skill: LoadedSkillDocument =
-        loadBuiltinSkillBody(id) ??
-        (await loadUserSkillBody(id, projectPath)) ??
-        plugins.loadSkillBody(id);
+      const skill = await resolveSkillDocument(id, projectPath, {
+        builtin: loadBuiltinSkillBody,
+        user: loadUserSkillBody,
+        plugin: (skillId) => plugins.loadSkillBody(skillId),
+      });
       return {
         ok: true,
         content: formatSkillToolContent(skill),

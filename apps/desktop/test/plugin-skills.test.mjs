@@ -81,7 +81,7 @@ test("main forwards the skill catalog and serves the Skill tool locally", () => 
   assert.match(mainSrc, /\.\.\.plugins\s*\n?\s*\.getSkills\(\)/);
   assert.match(mainSrc, /\n\s+pluginSkills,\n/);
   assert.match(mainSrc, /setLocalTool\("Skill"/);
-  assert.match(mainSrc, /loadSkillBody\(id\)/);
+  assert.match(desktopSidecarSrc, /plugin: \(skillId\) => plugins\.loadSkillBody\(skillId\)/);
 });
 
 test("the composer lists active skills last and routes slash skills to the Skill tool", () => {
@@ -122,7 +122,7 @@ test("the built-in skill body loads through the same Skill tool", () => {
   assert.match(builtinSrc, /export function loadBuiltinSkillBody/);
   assert.match(
     mainSrc,
-    /loadBuiltinSkillBody\(id\) \?\?\s*\(await loadUserSkillBody\(id, projectPath\)\) \?\?\s*plugins\.loadSkillBody\(id\)/,
+    /resolveSkillDocument\(id, projectPath, \{\s*builtin: loadBuiltinSkillBody,\s*user: loadUserSkillBody,/,
   );
   assert.match(mainSrc, /const userIds = \(await activeUserSkills/);
   assert.match(desktopSidecarSrc, /formatSkillToolContent\(skill\)/);
