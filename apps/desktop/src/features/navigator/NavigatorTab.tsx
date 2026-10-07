@@ -9,12 +9,16 @@ import { NavigatorHistoryControls } from "./NavigatorHistoryControls";
 import { NavigatorActivityControls } from "./NavigatorActivityControls";
 import { NavigatorResults } from "./NavigatorResults";
 import { NavigatorAnalysis } from "./NavigatorAnalysis";
+import { prepareComposer } from "../coding/composer-preparation-bridge";
+import { navigatorSuggestionContext } from "./navigator-suggestion-draft";
+import type { NavigatorSuggestionSelection } from "./NavigatorAnalysis";
 
 export function NavigatorTab() {
   const { t } = useTranslation();
   const sessionId = useAppStore(s => s.activeSessionId);
   const messages = useAppStore(s => s.messages);
   const status = useAppStore(s => sessionId ? s.agentStatuses[sessionId] : undefined);
+  const projectPath = useAppStore(s => s.workspace?.path ?? "");
   const [snapshot, setSnapshot] = useState<NavigatorSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const unsupported = sessionId?.startsWith("native-pi:") ?? false;
@@ -27,16 +31,17 @@ export function NavigatorTab() {
     return () => reader.dispose();
   }, [reader, sessionId, unsupported]);
   useEffect(() => { void reader.refresh(); }, [reader, messages, status]);
-  return <NavigatorView sessionId={sessionId} snapshot={snapshot} error={error} busy={status?.isRunning ?? false} onControl={async input => { await api.controlNavigator(input); await reader.refresh(); }} onRefresh={() => void reader.refresh()} />;
+  return <NavigatorView sessionId={sessionId} snapshot={snapshot} error={error} busy={status?.isRunning ?? false} onPrepare={selection => prepareComposer({ sessionId: selection.activity.sessionId, projectPath, skillId: selection.suggestion.skillId, prompt: navigatorSuggestionContext(selection.analysis, selection.suggestion, { summary: t("navigator.draft.summary"), source: t("navigator.draft.source"), historical: t("navigator.draft.historical") }) })} onControl={async input => { await api.controlNavigator(input); await reader.refresh(); }} onRefresh={() => void reader.refresh()} />;
 }
 
-export function NavigatorView({ sessionId, snapshot, error, onRefresh, onControl, busy = false }: {
+export function NavigatorView({ sessionId, snapshot, error, onRefresh, onControl, onPrepare, busy = false }: {
   sessionId: string | undefined;
   snapshot: NavigatorSnapshot | null;
   error: string | null;
   onRefresh: () => void;
   onControl?: (input: NavigatorControlInput) => Promise<unknown>;
   busy?: boolean;
+  onPrepare?: (selection: NavigatorSuggestionSelection) => Promise<boolean>;
 }) {
   const { t } = useTranslation();
   const unsupported = sessionId?.startsWith("native-pi:") ?? false;
@@ -68,7 +73,7 @@ export function NavigatorView({ sessionId, snapshot, error, onRefresh, onControl
             {request.errorCode && <p>{request.errorCode}</p>}
           </div>)}
           <NavigatorResults activity={activity} onChanged={onRefresh} />
-          <NavigatorAnalysis activity={activity} busy={busy} />
+          <NavigatorAnalysis activity={activity} busy={busy} onPrepare={onPrepare} />
         </Panel>
       </li>)}
     </ul>

@@ -2,6 +2,7 @@ import { engineeringSkillGuides } from "./engineering-skill-guides.js";
 
 export const en = {
   navigator: {
+    draft: { summary: "Follow-up goal", source: "Historical basis", historical: "These references come from the earlier analysis; files are not claimed to be read or current. Edit or remove before sending.", failed: "Could not prepare the draft. Check the current conversation, input state and Skill availability. Your existing draft is preserved." },
     analysis: {
   "skillUnavailable": "This Skill is missing or disabled. Check Agent settings before preparing this action.",
   "skillUnknown": "Skill availability could not be verified.",

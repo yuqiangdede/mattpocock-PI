@@ -3,6 +3,7 @@ import { engineeringSkillGuides } from "./engineering-skill-guides.js";
 
 export const zhCN = {
   navigator: {
+    draft: { summary: "接续目标", source: "历史依据", historical: "这些引用来自当时的分析，不代表文件已读取或仍为最新内容。发送前可以修改或移除。", failed: "无法准备草稿。请检查当前会话、输入状态和 Skill 可用性；原草稿保持不变。" },
     analysis: {
   "skillUnavailable": "此 Skill 未安装或已禁用，请先在 Agent 设置中检查。",
   "skillUnknown": "尚无法核实 Skill 是否可用。",

@@ -10,7 +10,7 @@ import { loadNavigatorSkillAvailability } from "./navigator-skill-availability";
 export type NavigatorSuggestionSelection = { activity: EngineeringActivity; analysis: Analysis; suggestion: NavigatorSuggestion };
 export function NavigatorAnalysis({ activity, busy, onPrepare }: {
   activity: EngineeringActivity; busy: boolean;
-  onPrepare?: (selection: NavigatorSuggestionSelection) => void;
+  onPrepare?: (selection: NavigatorSuggestionSelection) => Promise<boolean>;
 }) {
   const { t } = useTranslation();
   const projectPath = useAppStore(s => s.workspace?.path);
@@ -21,6 +21,20 @@ export function NavigatorAnalysis({ activity, busy, onPrepare }: {
   const [evidenceError, setEvidenceError] = useState<string | null>(null);
   const [evidenceVersion, setEvidenceVersion] = useState<number | null>(null);
   const generation = useRef(0);
+  const [preparing, setPreparing] = useState(false);
+  const [prepareError, setPrepareError] = useState(false);
+  const preparationPending = useRef(false);
+  useEffect(() => { setPreparing(false); setPrepareError(false); preparationPending.current = false; }, [activity.sessionId, activity.id, activity.version, projectPath]);
+  const prepare = async (analysis: Analysis, suggestion: NavigatorSuggestion) => {
+    if (!onPrepare || preparationPending.current) return;
+    const token = generation.current;
+    preparationPending.current = true; setPreparing(true); setPrepareError(false);
+    try {
+      const success = await onPrepare({ activity, analysis, suggestion });
+      if (token === generation.current) setPrepareError(!success);
+    } catch { if (token === generation.current) setPrepareError(true); }
+    finally { if (token === generation.current) { preparationPending.current = false; setPreparing(false); } }
+  };
   const controller = useMemo(() => createNavigatorAnalysisController(api, setState), []);
   useEffect(() => {
     void controller.select({ sessionId: activity.sessionId, activityId: activity.id });
@@ -67,6 +81,7 @@ export function NavigatorAnalysis({ activity, busy, onPrepare }: {
     <Button disabled={running || busy || activity.endedAt === null || evidenceVersion !== activity.version} onClick={() => void controller.request(activity.version, selected)}>{t(state.error || state.snapshot.analyses.some(item => item.status === "failed" || item.status === "cancelled" || item.status === "interrupted") ? "navigator.analysis.retry" : "navigator.analysis.request")}</Button>
     {running && <><p role="status">{t("navigator.analysis.running")}</p><Button onClick={() => void controller.cancel()}>{t("navigator.analysis.cancel")}</Button></>}
     {state.error && <p role="alert">{t("navigator.analysis.failed", { detail: state.error })}</p>}
+    {prepareError && <p role="alert">{t("navigator.draft.failed")}</p>}
     {previous && <div>
       <time dateTime={new Date(previous.createdAt).toISOString()}>{new Date(previous.createdAt).toLocaleString()}</time>
       {(previous.stale || previous.activityVersion !== activity.version) && <p role="status">{t("navigator.analysis.stale")}</p>}
@@ -75,7 +90,8 @@ export function NavigatorAnalysis({ activity, busy, onPrepare }: {
         <strong>{suggestion.skillId}</strong><p>{suggestion.reason}</p>
         <ul>{suggestion.basis.map((basis, index) => <li key={index}>{basis}</li>)}</ul>
         {(!available || !available.has(suggestion.skillId)) && <p role="status">{t(available ? "navigator.analysis.skillUnavailable" : "navigator.analysis.skillUnknown")}</p>}
-        {onPrepare && <Button disabled={!available?.has(suggestion.skillId)} onClick={() => onPrepare({ activity, analysis: previous, suggestion })}>{t("navigator.analysis.prepare")}</Button>}
+        {onPrepare && <Button disabled={preparing || !available?.has(suggestion.skillId)} onClick={() => void prepare(previous, suggestion)}>{t("navigator.analysis.prepare")}</Button>}
+        {(!available?.has(suggestion.skillId) || prepareError) && <Button onClick={() => { const store = useAppStore.getState(); store.setSettingsTab("agent"); store.setPage("settings"); }}>{t("coding.configureSkills")}</Button>}
       </li>)}</ul>
     </div>}
     <details><summary>{t("navigator.analysis.history")}</summary>{state.snapshot.analyses.map(analysis => <article key={analysis.id}>
