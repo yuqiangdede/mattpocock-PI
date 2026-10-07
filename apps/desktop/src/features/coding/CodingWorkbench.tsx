@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CodingActionError, CodingActionRegistry, resolveCodingAction, type CodingAction, type ComposerCommand } from "@pi-desktop/shared";
+import { ENGINEERING_SHORTCUTS, CodingActionError, CodingActionRegistry, resolveCodingAction, type ComposerCommand } from "@pi-desktop/shared";
+import { codingShortcutTooltip } from "./coding-shortcut-tooltip";
+import { groupCodingShortcuts, codingShortcutMenu, type CodingShortcut } from "./coding-shortcut-menu";
 import { api } from "../../lib/api";
 import { Button, TooltipButton } from "../../components/ui";
 import { AnchoredMenu } from "../../components/settings/AnchoredMenu";
@@ -8,8 +10,8 @@ import { toolWorkPanelTab } from "../../lib/work-panel-tabs";
 import { useAppStore } from "../../stores/app-store";
 import { loadCodingActions, useCodingActions } from "../extensions/coding-action-state";
 
-export function CodingWorkbench({ disabled, error, onExecute }: {
-  disabled: boolean; error: string | null; onExecute: (actionId: string) => void;
+export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill }: {
+  disabled: boolean; error: string | null; onExecute: (actionId: string) => void; onSelectSkill: (skillId: string) => void;
 }) {
   const { t } = useTranslation();
   const projectPath = useAppStore(state => state.workspace?.path ?? "");
@@ -27,32 +29,37 @@ export function CodingWorkbench({ disabled, error, onExecute }: {
   }, [projectPath, sessionId, configuration, catalogVersion]);
   useEffect(() => { void loadCodingActions(); }, []);
   useEffect(() => { if (disabled) setMoreOpen(false); }, [disabled]);
-  const registry = new CodingActionRegistry(configuration);
-  const actions = registry.list(true);
-  const reason = (action: CodingAction) => {
+  const { primary, more } = codingShortcutMenu(configuration, catalog, { ask: t("codingActions.askNext"), diagnose: t("codingActions.diagnose"), skillLabels: Object.fromEntries(ENGINEERING_SHORTCUTS.map(entry => [entry.action, t(`coding.${entry.action}`)])) });
+  const actions = [...primary, ...more];
+  const reason = ({ action }: CodingShortcut) => {
     if (catalogError) return t("codingActions.executeFailed", { detail: catalogError });
-    try { resolveCodingAction(action.id, registry, catalog); return ""; }
+    try { resolveCodingAction(action.id, new CodingActionRegistry({ schemaVersion: 1, actions: [action] }), catalog); return ""; }
     catch (cause) { return cause instanceof CodingActionError ? t(`codingActions.${cause.code === "SKILL_MISSING" ? "skillMissing" : cause.code}`, { skillId: action.skillId }) : t("codingActions.executeFailed", { detail: String(cause) }); }
   };
-  const renderAction = (action: CodingAction, menu = false) => {
-    const unavailable = reason(action);
-    const note = unavailable || action.description || catalog.find(command => command.skillId === action.skillId)?.description || action.label;
+  const renderAction = (shortcut: CodingShortcut, menu = false) => {
+    const { action } = shortcut;
+    const unavailable = reason(shortcut);
+    const note = unavailable || codingShortcutTooltip(shortcut, catalog, t);
     return <TooltipButton key={action.id} disabled={disabled || Boolean(unavailable)} className={menu ? "btn btn-ghost context-menu-item" : "btn btn-secondary"}
       role={menu ? "menuitem" : undefined} ariaLabel={action.label} tooltip={note} aria-description={note}
-      tooltipClassName="ui-tooltip-help coding-skill-tooltip" onClick={() => { setMoreOpen(false); onExecute(action.id); }}>{action.label}</TooltipButton>;
+      tooltipClassName="ui-tooltip-help coding-skill-tooltip" onClick={() => { setMoreOpen(false); if (shortcut.configured) onExecute(action.id); else onSelectSkill(action.skillId); }}>{action.label}</TooltipButton>;
   };
   const configure = () => { const store = useAppStore.getState(); store.setSettingsTab("codingActions"); store.setPage("settings"); };
   return <section className="coding-workbench" aria-label={t("codingActions.title")}>
-    <div className="coding-shortcuts coding-shortcuts-primary">{actions.slice(0, 6).map(action => renderAction(action))}</div>
+    <div className="coding-shortcuts coding-shortcuts-primary">{primary.map(action => renderAction(action))}</div>
     <div className="coding-shortcuts coding-shortcuts-secondary">
       <Button variant="ghost" onClick={() => useAppStore.getState().openWorkPanelTab(toolWorkPanelTab("workflow"))}>{t("coding.formal")}</Button>
-      {actions.length > 6 && <AnchoredMenu open={moreOpen} onClose={() => setMoreOpen(false)} role="menu" side="top" restoreFocus={!disabled} label={t("codingActions.more")} menuClassName="context-menu coding-more-menu"
+      <AnchoredMenu open={moreOpen} onClose={() => setMoreOpen(false)} role="menu" side="top" restoreFocus={!disabled} label={t("codingActions.more")} menuClassName="context-menu coding-more-menu"
         trigger={ref => <Button ref={ref} variant="ghost" disabled={disabled} aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(value => !value)}>{t("codingActions.more")}</Button>}>
-        {actions.slice(6).map(action => renderAction(action, true))}
-      </AnchoredMenu>}
+        {groupCodingShortcuts(more).map(group => <div key={group.id} role="group" aria-label={t(`codingActions.groups.${group.id}`)}>
+          <div className="coding-menu-group-label" aria-hidden="true">{t(`codingActions.groups.${group.id}`)}</div>
+          {group.shortcuts.map(action => renderAction(action, true))}
+        </div>)}
+        {!more.length && <div role="status">{t("codingActions.noOtherSkills")}</div>}
+      </AnchoredMenu>
       <Button variant="ghost" onClick={configure}>{t("codingActions.configure")}</Button>
     </div>
-    {actions.some(action => reason(action)) && <div role="status">{actions.filter(action => reason(action)).map(action => `${action.label}：${reason(action)}`).join("；")}<Button onClick={() => setCatalogVersion(value => value + 1)}>{t("codingActions.recheck")}</Button></div>}
+    {actions.some(action => reason(action)) && <div role="status">{actions.filter(action => reason(action)).map(shortcut => `${shortcut.action.label}：${reason(shortcut)}`).join("；")}<Button onClick={() => setCatalogVersion(value => value + 1)}>{t("codingActions.recheck")}</Button></div>}
     {(error || diagnostic) && <div className="coding-shortcut-error" role="alert"><span>{error || t("codingActions.diagnostic", { detail: diagnostic })}</span><Button onClick={configure}>{t("codingActions.configure")}</Button></div>}
   </section>;
 }

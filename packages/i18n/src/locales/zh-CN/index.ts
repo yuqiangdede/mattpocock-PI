@@ -3,6 +3,9 @@ import { engineeringSkillGuides } from "./engineering-skill-guides.js";
 
 export const zhCN = {
   codingActions: {
+    groups: { exploration: "需求与探索", design: "设计与规划", development: "开发与测试", maintenance: "审查与维护", delivery: "协作与交付", custom: "自定义动作" },
+  noOtherSkills: "暂无其他可用 Skill",
+  askNext: "咨询下一步", diagnose: "Bug 排查",
   "navLabel": "扩展设置",
   "settingsTitle": "扩展设置 · Coding Actions",
   "defaults": {"discuss-requirements": "需求讨论", "create-spec": "固化需求", "design": "技术设计", "create-tickets": "拆分任务", "implement": "实现", "code-review": "代码审查"},
@@ -14,7 +17,7 @@ export const zhCN = {
   "limit": "最多支持 256 个 Coding Actions",
   "newLabel": "新 Action",
   "importTooLarge": "导入文件过大",
-  "description": "独立编码动作只引用 Skill，彼此没有阶段、顺序约束或完成状态。点击动作通过当前会话的 Pi Agent 执行。",
+  "description": "独立编码动作只引用 Skill，彼此没有阶段、顺序约束或完成状态。点击动作填入可编辑的 Skill 提示词，手动发送后通过 Pi Agent 执行。",
   "retry": "重试读取",
   "add": "新建 Action",
   "select": "选择 Action",
@@ -25,7 +28,7 @@ export const zhCN = {
   "descriptionLabel": "说明",
   "descriptionAria": "Action 说明",
   "prompt": "可选提示词",
-  "promptHint": "留空时只调用 Skill；方法论由当前 SKILL.md 提供。",
+  "promptHint": "显式留空时只填入 Skill 标记；手动发送后才加载当前 SKILL.md。",
   "enabled": "启用此 Action",
   "enabledAria": "启用 Action",
   "moveUp": "上移",
@@ -48,7 +51,7 @@ export const zhCN = {
   "unavailableSkill": "{{skillId}}（不可用）",
   "skillMissing": "Skill 缺失或不可用：{{skillId}}",
   "diagnostic": "Coding Actions 配置：{{detail}}",
-  "more": "更多 Actions",
+  "more": "更多",
   "configure": "配置编码 Actions",
   "recheck": "重新检测 Skill",
   "notAccepted": "当前会话未接收 Action；请检查模型、权限或现有会话状态。",

@@ -133,26 +133,28 @@ test("Actions JSON 跨数据目录保留顺序、停用、空值和 Skill 引用
   await first.store.save(config); await second.store.save(JSON.parse(JSON.stringify((await first.store.load()).configuration)));
   assert.deepEqual((await new CodingActionStore(second.directory).load()).configuration, config);
 });
-test("executeCodingAction 通过当前会话正常提交 Skill，保留用户请求和附件上下文", async () => {
-  const calls = [];
-  const accepted = await executeCodingAction("code-review", {
+test("Action selection fills a localized editable draft without sending", async () => {
+  let text = "检查当前改动", sends = 0;
+  const context = {
     sessionId: "session-a", projectPath: "project-a", configuration: createDefaultCodingActions(),
     catalog: async () => catalog("code-review"), isCurrent: () => true,
-    draft: { text: "检查当前改动", fileReferences: [] },
-    send: async (...args) => { calls.push(args); return true; },
-  });
-  assert.equal(accepted, true); assert.equal(calls[0][0], "/code-review\n\n检查当前改动");
-  assert.equal(calls[0][2], "session-a");
-});
-test("失效 Action、缺失 Skill 和异步会话切换不会发送", async () => {
-  let sends = 0;
-  const context = { sessionId: "a", projectPath: "p", configuration: createDefaultCodingActions(), catalog: async () => [], isCurrent: () => true, send: async () => { sends++; return true; } };
-  await assert.rejects(() => executeCodingAction("invalid", context), /不存在/);
-  await assert.rejects(() => executeCodingAction("implement", context), /Skill missing/);
-  await assert.rejects(() => executeCodingAction("implement", { ...context, catalog: async () => catalog("implement"), isCurrent: () => false }), /已切换/);
+    defaultPrompt: () => "审查当前代码", readLiveDraft: () => text,
+    applyDraft: value => { text = value; }, send: async () => { sends++; return true; },
+  };
+  await executeCodingAction("code-review", context);
+  assert.equal(text, "/code-review 审查当前代码\n\n检查当前改动");
   assert.equal(sends, 0);
 });
 
+test("Missing skills and stale selection preserve the draft", async () => {
+  let applies = 0;
+  const context = { sessionId: "a", projectPath: "p", configuration: createDefaultCodingActions(), catalog: async () => [], isCurrent: () => true,
+    defaultPrompt: () => "默认提示", readLiveDraft: () => "draft", applyDraft: () => { applies++; } };
+  await assert.rejects(() => executeCodingAction("invalid", context), /不存在/);
+  await assert.rejects(() => executeCodingAction("implement", context), /Skill missing/);
+  await assert.rejects(() => executeCodingAction("implement", { ...context, catalog: async () => catalog("implement"), isCurrent: () => false }), /已切换/);
+  assert.equal(applies, 0);
+});
 const { CodingActionOperationController } = await import("../src/features/extensions/coding-action-operation-controller.ts");
 test("诊断重试取消保留草稿，确认后才替换，保存期间重试互斥", async () => {
   const controller = new CodingActionOperationController();
@@ -203,4 +205,36 @@ test("Main 初始标签取当前语言，重启与语言切换保留保存的用
   assert.equal(restarted.configuration.actions[0].label, "我的讨论");
   assert.equal(restarted.configuration.actions[0].prompt, "保持我的原文");
   assert.equal((await store.reset()).actions[0].label, "Discuss requirements");
+});
+
+
+test("Every default action prepares a localized instruction without a session", async () => {
+  const { ENGINEERING_SHORTCUTS } = await import("@pi-desktop/shared");
+  const { catalogs } = await import("@pi-desktop/i18n");
+  for (const locale of ["en", "zh-CN"]) for (const action of createDefaultCodingActions().actions) {
+    const entry = ENGINEERING_SHORTCUTS.find(entry => entry.skill === action.skillId);
+    const prompt = catalogs[locale].coding.prompts[entry.action];
+    assert.ok(prompt.trim());
+    let text = "";
+    await executeCodingAction(action.id, { sessionId: "", projectPath: "p", configuration: createDefaultCodingActions(),
+      catalog: async () => [{ ...catalog(action.skillId)[0], name: "resolved-alias" }], isCurrent: () => true,
+      defaultPrompt: () => prompt, readLiveDraft: () => "", applyDraft: value => { text = value; } });
+    assert.equal(text, `/resolved-alias ${prompt}`);
+  }
+});
+
+test("Custom, empty and restored instructions preserve live edits and file tokens", async () => {
+  for (const prompt of [undefined, null, "", "自定义指令"]) {
+    const configuration = createDefaultCodingActions();
+    configuration.actions[5].prompt = prompt;
+    let text = "old", resolveCatalog;
+    const selection = executeCodingAction("code-review", { sessionId: "a", projectPath: "p", configuration,
+      catalog: () => new Promise(resolve => { resolveCatalog = resolve; }), isCurrent: () => true,
+      defaultPrompt: () => "默认指令", readLiveDraft: () => text, applyDraft: value => { text = value; } });
+    text = "  newer \uFFFC\n ";
+    resolveCatalog(catalog("code-review"));
+    await selection;
+    const instruction = prompt ?? "默认指令";
+    assert.equal(text, `/code-review ${instruction}${instruction ? "\n\n" : ""}  newer \uFFFC\n `);
+  }
 });

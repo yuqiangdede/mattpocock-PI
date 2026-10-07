@@ -1,5 +1,5 @@
-import { CodingActionRegistry, resolveCodingAction, serializeInlineComposerFileReferences, type CodingActionConfiguration, type ComposerCommand } from "@pi-desktop/shared";
-import type { ComposerDraftSnapshot } from "../../lib/composer-smart-stop";
+import { CodingActionRegistry, resolveCodingAction, type CodingActionConfiguration, type ComposerCommand } from "@pi-desktop/shared";
+import { buildSkillShortcutDraft } from "../chat/composer/skill-shortcut-draft";
 export class CodingActionContextError extends Error {
   readonly code: "sessionRequired" | "contextChanged";
   constructor(code: "sessionRequired" | "contextChanged", message: string) { super(message); this.code = code; }
@@ -7,17 +7,17 @@ export class CodingActionContextError extends Error {
 export type CodingActionContext = {
   sessionId: string; projectPath: string; configuration: CodingActionConfiguration;
   catalog: () => Promise<ComposerCommand[]>; isCurrent: () => boolean;
-  draft?: ComposerDraftSnapshot;
-  send: (content: string, draft: ComposerDraftSnapshot | undefined, sessionId: string) => Promise<boolean>;
+  defaultPrompt: (skillId: string) => string;
+  readLiveDraft: () => string;
+  applyDraft: (text: string) => void;
 };
-// 扩展入口只做 Action → 原生 Skill 目录 → 原生会话提交；不定义流程或执行引擎。
-export async function executeCodingAction(actionId: string, context: CodingActionContext): Promise<boolean> {
-  if (!context.sessionId) throw new CodingActionContextError("sessionRequired", "请先打开一个会话");
+// Selection prepares an ordinary editable slash draft; only Composer Send submits it.
+export async function executeCodingAction(actionId: string, context: CodingActionContext): Promise<void> {
   const registry = new CodingActionRegistry(context.configuration);
   registry.get(actionId);
   const commands = await context.catalog();
   if (!context.isCurrent()) throw new CodingActionContextError("contextChanged", "项目或会话已切换，请重新选择 Action");
-  const resolved = resolveCodingAction(actionId, registry, commands);
-  const request = context.draft?.text ? serializeInlineComposerFileReferences(context.draft.text, context.draft.fileReferences) : "";
-  return context.send(resolved.content + (request ? `\n\n${request}` : ""), context.draft, context.sessionId);
+  const { action, command } = resolveCodingAction(actionId, registry, commands);
+  const prompt = action.prompt ?? context.defaultPrompt(action.skillId);
+  context.applyDraft(buildSkillShortcutDraft(command.name, prompt, context.readLiveDraft()));
 }

@@ -49,6 +49,41 @@ globalThis.codingActionsProbe = async () => {
   check(initial.actions.find(action => action.id === "create-spec")?.prompt === null, "旧 null 提示词迁移丢失");
   check(initial.actions.some(action => action.prompt === "旧版自定义提示词"), "旧自定义提示词迁移丢失");
   const originalConfirm = window.confirm; window.confirm = () => true;
+  view.composer(); await until(() => editor());
+  const originalConfiguration = JSON.stringify((await api.getCodingActions()).configuration);
+  for (const [label, marker, prompt] of [
+    [initial.actions.find(action => action.skillId === "ask-matt")?.label ?? i18n.t("codingActions.askNext"), "/ask-matt ", initial.actions.find(action => action.skillId === "ask-matt")?.prompt ?? i18n.t("coding.prompts.ask")],
+    [initial.actions.find(action => action.skillId === "diagnosing-bugs")?.label ?? i18n.t("codingActions.diagnose"), "/diagnosing-bugs ", initial.actions.find(action => action.skillId === "diagnosing-bugs")?.prompt ?? i18n.t("coding.prompts.diagnose")],
+  ]) {
+    const commonButton = await until(() => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.trim() === label && !button.disabled));
+    const guide = i18n.t(`coding.skillGuides.${marker.includes("ask-matt") ? "ask" : "diagnose"}.when`);
+    check(commonButton.getAttribute("aria-description")?.includes(guide), "常用按钮丢失中文使用提示");
+    const bounds = commonButton.getBoundingClientRect();
+    await fixture("movePointer", { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 });
+    await until(() => document.querySelector('[role="tooltip"]')?.textContent?.includes(guide));
+    check((await fixture("snapshot") as { prompts: number }).prompts === 0, "阅读提示触发执行");
+    await click(label);
+    await until(() => readEditorValue(editor()).startsWith(marker + prompt));
+    check((await fixture("snapshot") as { prompts: number }).prompts === 0, "常用入口自动发送");
+    useAppStore.setState({ composerPrefill: { sessionId: view.sessionId, text: "", fileReferences: [] } });
+    await until(() => readEditorValue(editor()) === "");
+  }
+  await click(i18n.t("codingActions.more"));
+  await until(() => document.querySelector('[role="menuitem"]'));
+  const commands = (await api.composerCommands()).commands;
+  const extra = commands.find(command => command.kind === "skill" && command.skillId === "retro")!;
+  check(Boolean(extra), "其他 Skill 未进入目录");
+  const moreButton = await until(() => [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(button => button.textContent?.trim() === i18n.t("coding.retro")));
+  check(moreButton.getAttribute("aria-description")?.includes(i18n.t("coding.skillGuides.retro.when")), "更多 Skill 丢失中文使用提示");
+  check(moreButton.closest('[role="group"]')?.getAttribute("aria-label") === i18n.t("codingActions.groups.delivery"), "Retrospective is not grouped under collaboration and delivery");
+  for (const group of ["exploration", "design", "development", "maintenance", "delivery"]) check(document.querySelector(`[role="menu"] [role="group"][aria-label="${i18n.t(`codingActions.groups.${group}`)}"]`), `Missing lifecycle group: ${group}`);
+  await click(i18n.t("coding.retro"));
+  await until(() => readEditorValue(editor()).startsWith(`/${extra.name} ${i18n.t("coding.prompts.retro")}`));
+  check((await fixture("snapshot") as { prompts: number }).prompts === 0, "更多 Skill 自动发送");
+  check(!document.querySelector('.coding-workbench [role="status"]')?.textContent?.includes("imagegen"), "imagegen diagnostic appeared");
+  check(JSON.stringify((await api.getCodingActions()).configuration) === originalConfiguration, "恢复入口改写用户配置");
+  useAppStore.setState({ composerPrefill: { sessionId: view.sessionId, text: "", fileReferences: [] } });
+  await until(() => readEditorValue(editor()) === "");
   view.settings(); await until(() => input("Action 名称") && !input("Action 名称").disabled);
   await select("选择 Action", "code-review", "代码审查");
   await fill("Action 名称", "快速审查", type);
@@ -66,7 +101,7 @@ globalThis.codingActionsProbe = async () => {
   await click("新建 Action"); await fill("Action 名称", "临时审查", type); await fill("Skill id", "code-review", type); await click("保存");
   await until(async () => (await api.getCodingActions()).configuration.actions.some(action => action.label === "临时审查"));
   view.composer(); await until(() => editor());
-  await click("更多 Actions"); await until(() => document.querySelector('[role="menuitem"]'));
+  await click(i18n.t("codingActions.more")); await until(() => document.querySelector('[role="menuitem"]'));
   check(document.body.textContent?.includes("临时审查"), "More Actions 没有消费 Registry");
   await fixture("pressKey", "Escape"); await until(() => !document.querySelector('[role="menuitem"]'));
   const before = await fixture("snapshot") as { prompts: number };
@@ -74,6 +109,9 @@ globalThis.codingActionsProbe = async () => {
   useAppStore.setState({ composerPrefill: { sessionId: view.sessionId, text: "检验 Action 当前会话请求", fileReferences: [] } });
   await until(() => readEditorValue(editor()) === "检验 Action 当前会话请求");
   await fixture("releaseLaunch"); await click("快速审查");
+  await until(() => readEditorValue(editor()).startsWith("/code-review 检查当前项目改动。"));
+  check((await fixture("snapshot") as { prompts: number }).prompts === before.prompts, "选择 Action 自动发送了请求");
+  await fixture("pressKey", "Enter");
   await until(async () => (await fixture("snapshot") as { prompts: number }).prompts === 1);
   await finishProvider();
   let executed = await fixture("snapshot") as { transformed: string; skillIds: string[]; skillBodies: string[] };
@@ -82,7 +120,10 @@ globalThis.codingActionsProbe = async () => {
   check(executed.skillIds.includes("code-review"), "Pi Runtime 未加载 Skill");
   await fixture("updateActionSkill", { path: view.projectPath, body: "UPDATED_ACTION_SKILL_BODY" });
   const configBeforeUpdate = JSON.stringify((await api.getCodingActions()).configuration);
-  await fixture("reset"); await fixture("releaseLaunch"); await click("快速审查");
+  await fixture("reset"); const beforeSecond = await fixture("snapshot") as { prompts: number }; await fixture("releaseLaunch"); await click("快速审查");
+  await until(() => readEditorValue(editor()).startsWith("/code-review 检查当前项目改动。"));
+  check((await fixture("snapshot") as { prompts: number }).prompts === beforeSecond.prompts, "选择 Action 自动发送了请求");
+  await fixture("pressKey", "Enter");
   await until(async () => (await fixture("snapshot") as { prompts: number }).prompts === 2);
   await finishProvider();
   executed = await fixture("snapshot") as typeof executed;

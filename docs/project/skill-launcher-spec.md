@@ -24,20 +24,23 @@ CodingActionRegistry 负责默认动作、查询、排序与启用状态。它�
   → executeCodingAction(actionId, 当前 Project / Session Context)
   → CodingActionRegistry 查询与 enabled 检查
   → 原生 Composer Skill Catalog 的有效条目
-  → 原生 sendPrompt / Prompt IPC
+  → Composer editable draft (skill marker + localized or custom instruction)
+  → Explicit manual Send → native sendPrompt / Prompt IPC
   → 原生 Skill Loader 获取最新 SKILL.md
   → 当前 Session 的 Pi Agent / Skill Tool
 ```
 
-点击动作提交可选提示词与当前输入框中的请求及附件；使用正常发送、队列、模型、权限和 Plan/Goal 控制。接受提交后沿用原生草稿清理，失败保留草稿。异步解析期间切换项目或会话时取消本次提交，避免投递到错误会话。
+Selecting an Action only fills the Composer draft. Undefined/null prompt uses the current localized engineering instruction; an explicit empty string inserts only the skill marker. Custom prompts remain verbatim. Existing text, file references and images are preserved. No session/model is required to prepare a draft. Only manual Send invokes the native queue, model, permission and Plan/Goal controls. Delayed selection reads the latest draft and cannot cross session/project ownership, unmount or blocked input.
 
 Skill Resolver 消费原生 Catalog 已合并的结果，不自行规定项目、用户、内置或插件优先级，不引入来源限定别名。Skill 更新无需保存 Action。
 
 ## 界面与配置
 
+More groups available Matt skills by Requirements and exploration, Design and planning, Development and testing, Review and maintenance, and Collaboration and delivery. Unknown configured overflow appears under Custom actions. Empty groups are hidden. Grouping is presentation only: no stage prerequisites, execution order, or persisted configuration changes.
+
 复用扩展设置中的一个设置卡片，支持创建、删除、编辑 label / skillId / enabled / order / optional prompt，以及可选说明。显式保存与取消，未保存离开提示。诊断重试读取也要确认放弃未保存修改，取消确认保留草稿；读取、保存、重置和导入共用同步互斥，避免 React 尚未更新禁用状态时启动并发操作。界面文字沿用现有 i18n；用户保存的 label / prompt 原文不随语言切换改写，默认标签仅在初始化、恢复默认或损坏回退时按当前语言生成。
 
-Renderer 按 Registry 顺序将前六项显示为主要动作，其余放入 More Actions。此规则只属于视图，不持久化位置、分组或坐标。
+Renderer keeps Ask next step and Diagnose bug visible alongside the first six other enabled configured Actions. More is always visible and lists enabled configured overflow and installed Matt skills from ENGINEERING_SHORTCUTS. Generated entries use localized labels and guides; imagegen and unrelated catalog skills are excluded, and configured disabled skills are not reintroduced. Saved custom labels remain verbatim. Existing configured common entries retain custom labels/prompts and disabled state; catalog entries are not persisted as Actions. No settings reset or profile migration is needed.
 
 Renderer 通过既有 Preload IPC 访问 Main；Main 在当前应用数据目录独立持久化扩展配置。配置写入先备份再原子替换。配置损坏时回退内存默认值并显示诊断，原文件保留，普通 Chat / Agent 仍可使用。覆盖损坏数据和重置需要用户明确确认。
 
@@ -55,7 +58,7 @@ Renderer 通过既有 Preload IPC 访问 Main；Main 在当前应用数据目录
 
 1. 默认六项动作可见，各自独立，可先审查再讨论或实现。
 2. 配置仅保存 Skill 引用和用户附加文本，不保存 SKILL.md 正文、页面位置或流程状态。
-3. 执行入口按当前会话调用原生 Agent；缺失、停用或无效 Action 有诊断且不投递。
+3. Selection fills an editable instruction and skill marker without submission; explicit Send invokes the native Agent. Missing/disabled/invalid Actions preserve the draft.
 4. Skill 更新后执行加载最新正文，Action 配置不变。
 5. 配置 CRUD、顺序、启用、持久化和重启有效。
 6. 旧配置安全且幂等迁移；读取和备份/写入失败不损坏原数据。
