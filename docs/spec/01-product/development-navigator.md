@@ -104,6 +104,10 @@ Neither turn termination nor activity ending approves requirements or Review.
   using the current model and permission system. Do not open hidden sessions,
   steer active work, or silently queue analysis. Duplicate admission and busy
   races must be guarded at the authoritative boundary.
+- Apply the installed Skill's method through the existing tool-free one-shot
+  analysis capability, resolving the same effective Skill source and current
+  conversation model. This is Navigation Analysis, not an ordinary slash turn;
+  it does not append an engineering request or load unselected session resources.
 - Enforce analysis-only capabilities and selected read scope. Prompt wording
   alone is insufficient proof. No write, build/test, commit, or recommended
   action execution is allowed. Broader reading requires explicit selection.
