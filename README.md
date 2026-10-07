@@ -614,7 +614,7 @@ Linux x64 需要 **glibc 2.35+**。
 
 检查当前版本：
 
-`	ext
+```text
 ldd --version
 ```
 
