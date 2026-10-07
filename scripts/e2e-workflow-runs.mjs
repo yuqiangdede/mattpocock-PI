@@ -153,7 +153,7 @@ try {
   const result = JSON.parse(resultLine.slice("WORKFLOW_RUNS_PROBE ".length));
   assert.equal(result.ok, true);
   if (navigatorFixture) {
-    for (const field of ["multiRound", "boundaries", "results", "history", "persisted", "noReplay", "analysis"]) assert.equal(result[field], true, field);
+    for (const field of ["multiRound", "boundaries", "results", "history", "persisted", "noReplay", "analysis", "manualDraft"]) assert.equal(result[field], true, field);
   } else if (actionsFixture) {
     for (const field of ["actions", "migrated", "crud", "order", "enabled", "executed", "latestSkill", "missing", "corruptFallback", "ordinaryChat", "persisted", "nativeSettingsPreserved"]) assert.equal(result[field], true, field);
   } else if (requirementsFixture) {

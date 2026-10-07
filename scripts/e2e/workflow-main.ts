@@ -165,7 +165,10 @@ async function main(): Promise<void> {
       await host.call("settings.set", { language: "zh-CN", engineeringShortcutPrompts: { ask: "旧版自定义提示词", review: "", spec: null } });
     }
     if (process.env.PI_CODING_WORKBENCH === "1") await host.call("skills.ensureBundled");
-    if (process.env.PI_DEVELOPMENT_NAVIGATOR === "1") await writeFile(join(projectA, "navigator-result.md"), "Navigator fixture evidence", "utf8");
+    if (process.env.PI_DEVELOPMENT_NAVIGATOR === "1") {
+      await writeFile(join(projectA, "navigator-result.md"), "Navigator fixture evidence", "utf8");
+      await writeFile(join(projectA, "fixture.png"), Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==", "base64"));
+    }
     await host.call("workspace.set", { path: projectA });
     await host.call("project.group.create", { name: "Project A", folders: [projectA] });
     await host.call("workspace.set", { path: projectB });

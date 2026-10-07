@@ -125,8 +125,10 @@ globalThis.navigatorProbe = async () => {
   const token = nextChipToken();
   const existing = `Keep this draft and file ${token}`;
   const reference = { path: `${new URLSearchParams(location.search).get("projectA")}/navigator-result.md`, name: "navigator-result.md", kind: "file" as const, token };
-  useAppStore.setState({ composerPrefill: { sessionId, text: existing, fileReferences: [reference] } });
-  await until(() => readEditorValue(editor()) === existing);
+  const image = { path: `${new URLSearchParams(location.search).get("projectA")}/fixture.png`, name: "fixture.png", kind: "image" as const, token: nextChipToken() };
+  useAppStore.setState({ composerPrefill: { sessionId, text: `${existing} ${image.token}`, fileReferences: [reference, image] } });
+  await until(() => readEditorValue(editor()).startsWith(existing));
+  await until(() => document.querySelectorAll(".composer-image-attachment").length === 1);
   await fixture("holdCatalog");
   const prepare = await until(() => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.trim() === i18n.t("navigator.analysis.prepare") && !button.disabled));
   prepare.click(); prepare.click();
@@ -136,7 +138,8 @@ globalThis.navigatorProbe = async () => {
   await until(() => readEditorValue(editor()).startsWith("/to-spec") && readEditorValue(editor()).includes("Historical basis") && readEditorValue(editor()).includes("Typed while loading."));
   check(readEditorValue(editor()).includes("Keep this draft"), "Recommendation overwrote the draft");
   const draft = await until(() => readComposerDraft(sessionId)?.fileReferences.some(item => item.path === reference.path) && readComposerDraft(sessionId));
-  check(draft?.fileReferences.length === 1, "Recommendation duplicated the attachment");
+  check(draft?.fileReferences.length === 2 && draft.fileReferences.some(item => item.kind === "image" && item.path === image.path), "Recommendation changed file or image attachments");
+  check(document.querySelectorAll(".composer-image-attachment").length === 1, "Recommendation lost the image control");
   check(readEditorValue(editor()).split("Follow-up goal").length === 2, "Double click inserted duplicate recommendation");
   check((await fixture("snapshot") as { prompts: number }).prompts === 2, "Preparing a recommendation sent automatically");
   await send(); await completed(sessionId, 3);
