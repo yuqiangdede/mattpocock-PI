@@ -292,6 +292,23 @@ impl AppState {
         self.pending_bash_aborts.remove(&key);
     }
 
+    pub fn cancel_navigation_reads(&mut self, session_id: &str, analysis_id: Option<&str>) {
+        let prefix = analysis_id.map_or_else(
+            || "navigator-analysis:".to_owned(),
+            |id| format!("navigator-analysis:{id}:"),
+        );
+        let calls: Vec<String> = self
+            .active_bash_cancellations
+            .keys()
+            .filter(|(owner, call)| owner == session_id && call.starts_with(&prefix))
+            .map(|(_, call)| call.clone())
+            .collect();
+        for call in calls {
+            self.abort_or_queue_bash(session_id, &call);
+            self.cancel_pending_permission(session_id, &call);
+        }
+    }
+
     pub fn shutdown(&mut self) {
         self.shutting_down = true;
         for sender in self.active_bash_cancellations.values() {

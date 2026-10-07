@@ -4,6 +4,7 @@ use crate::transcripts::MessageRecord;
 use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension, Transaction};
 use serde_json::{json, Value};
+pub mod analysis;
 pub mod results;
 #[cfg(test)]
 mod tests;
@@ -176,6 +177,7 @@ pub fn cancel_queue(db: &Database, queue: &str) -> Result<()> {
 }
 
 pub fn recover(db: &Database) -> Result<()> {
+    analysis::recover(db)?;
     db.conn().execute("UPDATE navigator_requests SET recovered=1 WHERE turn_id IN (SELECT id FROM turns WHERE status='running')", [])?;
     Ok(())
 }
@@ -284,7 +286,7 @@ pub fn control(
     }
     let tx = db.conn().unchecked_transaction()?;
     let busy: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM turns WHERE session_id=?1 AND status='running') OR EXISTS(SELECT 1 FROM turn_queue WHERE session_id=?1)", [session], |r| r.get(0))?;
-    if busy {
+    if busy || analysis::reserved(db, session)? {
         return Err(anyhow!("conversation busy; wait before changing activity"));
     }
     let changed = tx.execute("UPDATE navigator_activities SET version=version+1, ended_at=CASE WHEN ?4='end' THEN ?5 WHEN ?4='continue' THEN NULL ELSE ended_at END WHERE session_id=?1 AND id=?2 AND version=?3 AND schema_version=1", params![session,activity,version,action,now_ms()])?;

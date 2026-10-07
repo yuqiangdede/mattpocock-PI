@@ -136,6 +136,7 @@ impl Database {
                 tx.execute_batch(PLAN_APPROVALS_SCHEMA)?;
                 tx.execute_batch(crate::session_collaboration::SCHEMA)?;
                 tx.execute_batch(crate::navigator::SCHEMA)?;
+                tx.execute_batch(crate::navigator::analysis::SCHEMA)?;
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
                 tx.commit()?;
             }
@@ -232,6 +233,7 @@ impl Database {
             let backup = create_migration_backup(&conn, path, 21)?;
             let tx = conn.unchecked_transaction()?;
             tx.execute_batch(crate::navigator::SCHEMA)?;
+            tx.execute_batch(crate::navigator::analysis::SCHEMA)?;
             tx.pragma_update(None, "user_version", 22i64)?;
             tx.commit().with_context(|| {
                 format!(
@@ -243,6 +245,8 @@ impl Database {
         let db = Self { conn, data_dir };
         // Additive candidate-v22 table; keep existing activity/request data unchanged.
         db.conn().execute_batch(crate::navigator::SCHEMA)?;
+        db.conn()
+            .execute_batch(crate::navigator::analysis::SCHEMA)?;
         crate::navigator::recover(&db)?;
         db.boot_maintenance()?;
         crate::session_collaboration::recover(&db)?;

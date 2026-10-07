@@ -53,6 +53,9 @@ pub fn mutate(
     input: &Value,
     remove: bool,
 ) -> Result<Value> {
+    if super::analysis::reserved(db, session)? {
+        return Err(anyhow!("AGENT_BUSY"));
+    }
     let tx = db.conn().unchecked_transaction()?;
     let changed = tx.execute("UPDATE navigator_activities SET version=version+1 WHERE id=?1 AND session_id=?2 AND version=?3 AND schema_version=1",params![activity,session,expected])?;
     if changed != 1 {

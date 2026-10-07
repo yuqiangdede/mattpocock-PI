@@ -2620,10 +2620,11 @@ async fn handle_request(
                 .get("id")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
-            let st = state.lock().await;
+            let mut st = state.lock().await;
             let ok = sessions::delete_session(&st.db, id)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             if ok {
+                st.cancel_navigation_reads(id, None);
                 drop_session_side_data(&st, id);
             }
             Ok(json!({ "ok": ok }))
@@ -2645,8 +2646,19 @@ async fn handle_request(
             Ok(json!({ "ok": ok }))
         }
         method if method.starts_with("navigator.") => {
-            let st = state.lock().await;
-            navigator::handle(&st.db, method, &params)
+            let mut st = state.lock().await;
+            let result = navigator::handle(&st.db, method, &params)?;
+            if matches!(
+                method,
+                "navigator.analysis.cancel" | "navigator.analysis.finish"
+            ) && result["ok"] == true
+            {
+                st.cancel_navigation_reads(
+                    params["sessionId"].as_str().unwrap_or_default(),
+                    params["analysisId"].as_str(),
+                );
+            }
+            Ok(result)
         }
         "session.appendMessage" => {
             let session_id = params
@@ -3616,8 +3628,53 @@ async fn handle_request(
         }
         "tools.execute" => {
             let call_started = std::time::Instant::now();
+            let analysis_id = match params.get("navigationAnalysisId") {
+                None => None,
+                Some(Value::String(id)) if !id.is_empty() => Some(id.clone()),
+                Some(_) => {
+                    return Err(rpc_err(
+                        1002,
+                        "navigationAnalysisId must be a nonempty string",
+                        "INVALID_PARAMS",
+                    ))
+                }
+            };
             let p: ToolsExecuteParams = serde_json::from_value(params.clone())
                 .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
+            let check_analysis = |db: &crate::db::Database| -> Result<(), JsonRpcError> {
+                if let Some(id) = analysis_id.as_deref() {
+                    if !p
+                        .tool_call_id
+                        .starts_with(&format!("navigator-analysis:{id}:"))
+                    {
+                        return Err(rpc_err(
+                            1002,
+                            "navigation Read requires an analysis cancellation marker",
+                            "INVALID_PARAMS",
+                        ));
+                    }
+                    if p.tool_name != "Read" || p.turn_id.is_some() || p.permission_scope.is_some()
+                    {
+                        return Err(rpc_err(
+                            1002,
+                            "navigation evidence permits only session-authorized Read",
+                            "INVALID_PARAMS",
+                        ));
+                    }
+                    let path = p
+                        .args
+                        .get("path")
+                        .and_then(Value::as_str)
+                        .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
+                    crate::navigator::analysis::assert_read(db, &p.session_id, id, path)
+                        .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
+                }
+                Ok(())
+            };
+            {
+                let st = state.lock().await;
+                check_analysis(&st.db)?;
+            }
             let execution_timeout_ms = tools::effective_timeout_ms(&p.tool_name, p.timeout_ms);
 
             let command_shell_id = if p.tool_name == "Bash" {
@@ -3683,8 +3740,10 @@ async fn handle_request(
             // Register before permission evaluation so tools.abort can cancel
             // an approval wait as well as an already-spawned process.
             let cancellation_receiver = if matches!(p.tool_name.as_str(), "Bash" | "GenerateImages")
+                || analysis_id.is_some()
             {
                 let mut st = state.lock().await;
+                check_analysis(&st.db)?;
                 match st.register_bash_cancellation(&p.session_id, &p.tool_call_id) {
                     Ok(receiver) => Some(receiver),
                     Err(error_code) => {
@@ -3714,6 +3773,7 @@ async fn handle_request(
                     permission_shell_id,
                 ) = {
                     let mut st = state.lock().await;
+                    check_analysis(&st.db)?;
                     if st.shutting_down || st.update_installing {
                         return Err(rpc_err(1001, "host is shutting down", "HOST_SHUTTING_DOWN"));
                     }
@@ -4093,6 +4153,10 @@ async fn handle_request(
                     });
                 }
 
+                {
+                    let st = state.lock().await;
+                    check_analysis(&st.db)?;
+                }
                 let mut result = if p.tool_name == "TodoWrite" {
                     // The checklist body owns its own trusted-transport checks,
                     // the atomic write, and the after-commit notification.
@@ -4213,6 +4277,12 @@ async fn handle_request(
             }
             .await;
             clear_bash_cancellation(&state, &p).await;
+            if analysis_id.is_some() {
+                state
+                    .lock()
+                    .await
+                    .clear_bash_cancellation(&p.session_id, &p.tool_call_id);
+            }
             outcome
         }
 
@@ -5084,6 +5154,75 @@ async fn handle_request(
 
 #[cfg(test)]
 mod tests {
+    #[tokio::test]
+    async fn navigator_analysis_public_rpc_cancellation_fences_reads_and_native_turns() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("project");
+        fs::create_dir_all(&project).unwrap();
+        fs::write(project.join("spec.md"), "selected requirements").unwrap();
+        let mut app = AppState::open(dir.path()).unwrap();
+        app.handshook = true;
+        let session = sessions::create_session(
+            &app.db,
+            None,
+            None,
+            None,
+            None,
+            Some(project.to_string_lossy().into_owned()),
+        )
+        .unwrap();
+        let turn = sessions::begin_turn(&app.db, &session.id, None, None).unwrap();
+        let message: sessions::UiMessage = serde_json::from_value(json!({"id":"requirements","role":"user","content":"Discuss requirements","command":"/to-spec","createdAt":"2026-10-08T00:00:00Z","skillMentions":[{"id":"to-spec","start":0,"end":8}]})).unwrap();
+        sessions::append_message(&app.db, &session.id, &message, Some(&turn)).unwrap();
+        sessions::end_turn(&app.db, &turn, "completed", None, None, false).unwrap();
+        let activity = format!("navigator:{}:requirements", session.id);
+        let version = crate::navigator::list(&app.db, &session.id).unwrap()["activities"][0]
+            ["version"]
+            .as_i64()
+            .unwrap();
+        let results = crate::navigator::results::mutate(
+            &app.db,
+            &session.id,
+            &activity,
+            version,
+            &json!({"kind":"file","label":"spec","path":"spec.md"}),
+            false,
+        )
+        .unwrap();
+        let result_id = results["results"][0]["id"].as_str().unwrap();
+        crate::navigator::control(&app.db, &session.id, &activity, version + 1, "end").unwrap();
+        let state = Arc::new(Mutex::new(app));
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let snapshot = handle_request(state.clone(), "navigator.analysis.begin", json!({"sessionId":session.id,"activityId":activity,"requestId":"analysis-request","expectedVersion":version+2,"selectedResultIds":[result_id]}), tx.clone()).await.unwrap();
+        let id = snapshot["analysisId"].as_str().unwrap();
+        let call = format!("navigator-analysis:{id}:selected");
+        let read = handle_request(state.clone(), "tools.execute", json!({"sessionId":session.id,"toolCallId":call,"navigationAnalysisId":id,"toolName":"Read","args":{"path":"spec.md"},"mode":"agent"}), tx.clone()).await.unwrap();
+        assert_eq!(read["ok"], true);
+        assert!(state.lock().await.active_bash_cancellations.is_empty());
+        for tool in ["Write", "Bash"] {
+            assert!(handle_request(state.clone(), "tools.execute", json!({"sessionId":session.id,"toolCallId":call,"navigationAnalysisId":id,"toolName":tool,"args":{"path":"spec.md"},"mode":"agent"}), tx.clone()).await.is_err());
+        }
+        let mut cancellation = state
+            .lock()
+            .await
+            .register_bash_cancellation(&session.id, &call)
+            .unwrap();
+        let wrong = handle_request(state.clone(), "navigator.analysis.cancel", json!({"sessionId":session.id,"activityId":activity,"requestId":"old-request","analysisId":id}), tx.clone()).await.unwrap();
+        assert_eq!(wrong["ok"], false);
+        assert!(!*cancellation.borrow());
+        assert!(sessions::begin_turn(&state.lock().await.db, &session.id, None, None).is_err());
+        let cancelled = handle_request(state.clone(), "navigator.analysis.cancel", json!({"sessionId":session.id,"activityId":activity,"requestId":"analysis-request","analysisId":id}), tx.clone()).await.unwrap();
+        assert_eq!(cancelled["ok"], true);
+        cancellation.changed().await.unwrap();
+        assert!(*cancellation.borrow());
+        for marker in [json!(id), json!(5), Value::Null] {
+            let read = handle_request(state.clone(), "tools.execute", json!({"sessionId":session.id,"toolCallId":call,"navigationAnalysisId":marker,"toolName":"Read","args":{"path":"unselected.md"},"mode":"agent"}), tx.clone()).await;
+            assert!(read.is_err());
+        }
+        let completed = handle_request(state.clone(), "navigator.analysis.finish", json!({"sessionId":session.id,"activityId":activity,"requestId":"analysis-request","analysisId":id,"status":"completed"}), tx).await.unwrap();
+        assert_eq!(completed["ok"], false);
+        assert!(sessions::begin_turn(&state.lock().await.db, &session.id, None, None).is_ok());
+    }
     use std::fs;
     use std::io::{self, Write};
     use std::path::{Path, PathBuf};

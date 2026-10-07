@@ -10,6 +10,133 @@ fn fixture() -> (tempfile::TempDir, Database, String) {
 }
 
 #[test]
+fn navigation_analysis_reserves_activity_and_cancellation_fences_late_results() {
+    let (_dir, db, session) = fixture();
+    let turn = submit(&db, &session, "analysis-request", &["to-spec"]);
+    sessions::end_turn(&db, &turn, "completed", None, None, false).unwrap();
+    let activity = format!("navigator:{session}:analysis-request");
+    let version = list(&db, &session).unwrap()["activities"][0]["version"]
+        .as_i64()
+        .unwrap();
+    assert!(analysis::begin(&db, &session, &activity, "a", version, &[]).is_err());
+    control(&db, &session, &activity, version, "end").unwrap();
+    let version = version + 1;
+    let snapshot = analysis::begin(&db, &session, &activity, "a", version, &[]).unwrap();
+    assert_eq!(
+        snapshot["requests"][0]["content"],
+        "actual submitted intent"
+    );
+    assert!(sessions::begin_turn(&db, &session, None, None).is_err());
+    let queue: turn_queue::QueuedTurnInput = serde_json::from_value(json!({"sessionId":session,"principal":"desktop","inputHash":"navigation-busy","content":"answer","permissionMode":"ask","userMessageId":"navigation-queued"})).unwrap();
+    assert!(turn_queue::push(&db, queue).is_err());
+    assert!(control(&db, &session, &activity, version, "continue").is_err());
+    assert!(analysis::begin(&db, &session, &activity, "b", version, &[]).is_err());
+    assert!(analysis::assert_read(
+        &db,
+        &session,
+        snapshot["analysisId"].as_str().unwrap(),
+        "unselected.md"
+    )
+    .is_err());
+    let mut finish = json!({"requestId":"a","status":"cancelled","suggestions":[]});
+    let id = snapshot["analysisId"].as_str().unwrap();
+    assert_eq!(
+        analysis::finish(&db, &session, &activity, id, &finish).unwrap()["ok"],
+        true
+    );
+    finish["status"] = json!("completed");
+    assert_eq!(
+        analysis::finish(&db, &session, &activity, id, &finish).unwrap()["ok"],
+        false
+    );
+    assert_eq!(
+        analysis::list(&db, &session, &activity).unwrap()["analyses"][0]["status"],
+        "cancelled"
+    );
+    assert!(analysis::begin(&db, &session, &activity, "a", version, &[]).is_err());
+    assert!(sessions::begin_turn(&db, &session, None, None).is_ok());
+}
+
+#[test]
+fn navigation_analysis_snapshots_selected_evidence_and_recovers_without_replay() {
+    let (dir, db, session) = fixture();
+    let turn = submit(&db, &session, "snapshot-request", &["to-spec"]);
+    sessions::end_turn(&db, &turn, "completed", None, None, false).unwrap();
+    let activity = format!("navigator:{session}:snapshot-request");
+    let version = list(&db, &session).unwrap()["activities"][0]["version"]
+        .as_i64()
+        .unwrap();
+    let result = results::mutate(
+        &db,
+        &session,
+        &activity,
+        version,
+        &json!({"kind":"file","label":"spec","path":"docs/spec.md"}),
+        false,
+    )
+    .unwrap();
+    let result_id = result["results"][0]["id"].as_str().unwrap().to_owned();
+    control(&db, &session, &activity, version + 1, "end").unwrap();
+    assert!(analysis::begin(
+        &db,
+        &session,
+        &activity,
+        "bad",
+        version + 2,
+        &["foreign".into()]
+    )
+    .is_err());
+    let snapshot = analysis::begin(
+        &db,
+        &session,
+        &activity,
+        "recover",
+        version + 2,
+        &[result_id],
+    )
+    .unwrap();
+    analysis::assert_read(
+        &db,
+        &session,
+        snapshot["analysisId"].as_str().unwrap(),
+        "docs/spec.md",
+    )
+    .unwrap();
+    assert!(results::mutate(
+        &db,
+        &session,
+        &activity,
+        version + 2,
+        &json!({"kind":"validation","label":"test"}),
+        false
+    )
+    .is_err());
+    drop(db);
+    let db = Database::open(&dir.path().join("navigator.sqlite")).unwrap();
+    let rows = analysis::list(&db, &session, &activity).unwrap();
+    assert_eq!(rows["analyses"][0]["status"], "interrupted");
+    assert_eq!(rows["analyses"][0]["snapshot"], snapshot);
+    assert_eq!(rows["analyses"][0]["requestId"], "recover");
+    assert_eq!(rows["analyses"][0]["sessionId"], session);
+    assert_eq!(rows["analyses"][0]["activityId"], activity);
+    assert!(!analysis::reserved(&db, &session).unwrap());
+    db.conn()
+        .execute("DELETE FROM sessions WHERE id=?1", [&session])
+        .unwrap();
+    assert_eq!(
+        analysis::finish(
+            &db,
+            &session,
+            &activity,
+            snapshot["analysisId"].as_str().unwrap(),
+            &json!({"requestId":"recover","status":"completed"})
+        )
+        .unwrap()["ok"],
+        false
+    );
+}
+
+#[test]
 fn navigator_hide_restore_restart_preserves_source_and_activity_state() {
     let (directory, db, session) = fixture();
     let turn = submit(&db, &session, "history", &["to-spec"]);
