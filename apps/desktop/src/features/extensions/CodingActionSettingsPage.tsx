@@ -7,6 +7,7 @@ import { useAppStore } from "../../stores/app-store";
 import { Button, Checkbox, Field, Input, Textarea } from "../../components/ui";
 import { SettingsMenuSelect } from "../../components/settings/SettingsMenuSelect";
 import { SettingsCard } from "../settings/primitives";
+import { CodingActionContentFields } from "./CodingActionContentFields";
 import { loadCodingActions, resetCodingActions, saveCodingActions, setCodingActionLeaveGuard, useCodingActions } from "./coding-action-state";
 
 export function CodingActionSettingsPage() {
@@ -85,8 +86,7 @@ export function CodingActionSettingsPage() {
         <Field label={t("codingActions.skillId")} hint={t("codingActions.skillHint")}><Input aria-label={t("codingActions.skillId")} value={action.skillId} disabled={disabled} maxLength={128} onChange={event => patchAction({ skillId: event.target.value })} /></Field>
         {catalog.length > 0 && <Field label={t("codingActions.selectSkill")}><SettingsMenuSelect label={t("codingActions.selectSkill")} value={action.skillId} disabled={disabled} onChange={skillId => patchAction({ skillId })} options={[...(!catalog.some(item => item.skillId === action.skillId) ? [{ id: action.skillId, label: t("codingActions.unavailableSkill", { skillId: action.skillId }) }] : []), ...catalog.filter(item => item.skillId).map(item => ({ id: item.skillId!, label: `${item.title} (${item.skillId})` }))]} /></Field>}
         {!catalog.some(item => item.skillId === action.skillId) && <div role="status">{t("codingActions.skillMissing", { skillId: action.skillId })}{catalogError && `；${catalogError}`}</div>}
-        <Field label={t("codingActions.descriptionLabel")}><Textarea aria-label={t("codingActions.descriptionAria")} value={action.description ?? ""} disabled={disabled} maxLength={4000} onChange={event => patchAction({ description: event.target.value })} /></Field>
-        <Field label={t("codingActions.prompt")} hint={t("codingActions.promptHint")}><Textarea aria-label={t("codingActions.prompt")} value={action.prompt ?? ""} disabled={disabled} maxLength={16000} onChange={event => patchAction({ prompt: event.target.value })} /></Field>
+        <CodingActionContentFields action={action} catalog={catalog} disabled={disabled} onChange={patchAction} />
         <Checkbox label={t("codingActions.enabled")} aria-label={t("codingActions.enabledAria")} disabled={disabled} checked={action.enabled !== false} onChange={event => patchAction({ enabled: event.target.checked })} />
         <div className="coding-shortcuts"><Button disabled={disabled} onClick={() => move(-1)}>{t("codingActions.moveUp")}</Button><Button disabled={disabled} onClick={() => move(1)}>{t("codingActions.moveDown")}</Button><Button disabled={disabled} onClick={() => { if (!operations.busy && window.confirm(t("codingActions.deleteConfirm"))) { setDraft(value => ({ ...value, actions: value.actions.filter(item => item.id !== selected) })); setSelected(draft.actions.find(item => item.id !== selected)?.id ?? ""); } }}>{t("codingActions.delete")}</Button></div>
       </>}

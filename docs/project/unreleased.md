@@ -1,5 +1,10 @@
 # Unreleased changes
 
+- Extension Settings shows effective localized Coding Action prompts and the
+  same guidance used by button tooltips. Prompt status distinguishes defaults,
+  custom instructions and explicit marker-only requests. Restore default prompt
+  affects only the selected Action and is applied when saved.
+
 - Stage-one Skill Launcher provides six independent Coding Actions using the
   current session's native Pi Skills. Extension Settings edits names, prompts,
   order and enabled state, with Actions JSON import/export. Existing shortcut

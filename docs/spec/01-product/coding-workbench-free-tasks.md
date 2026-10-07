@@ -28,6 +28,16 @@ by skill id; explicit empty instructions retain marker-only insertion. Custom
 instructions remain verbatim. Unknown custom skills have no built-in instruction.
 Existing text and attachments survive. Manual Send uses the native skill path.
 
+Extension settings show the effective localized instruction in the prompt editor,
+with an explicit default, custom, marker-only, or no-built-in-prompt status.
+Viewing defaults does not persist overrides. Editing creates an explicit custom
+instruction, including an empty string for marker-only insertion. Restore default
+prompt sets only the selected Action's instruction to null and takes effect on
+Save; it does not reset other Action properties. Skill changes resolve defaults
+by the new skill id while preserving explicit custom instructions. The description
+editor displays the same built-in guidance or catalog fallback as the launcher
+unless an explicit nonempty Action description is configured.
+
 ## Interaction contract
 
 The Composer presents compact engineering skill buttons on both home and
