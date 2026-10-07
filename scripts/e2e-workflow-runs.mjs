@@ -10,11 +10,12 @@ import { resolveElectronBinary } from "./e2e/boot.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
+const navigatorFixture = process.argv.includes("--navigator");
 const recoveryFixture = process.argv.includes("--recovery");
 const settingsFixture = process.argv.includes("--engineering-settings");
 const actionsFixture = ["--coding-actions", "--skill-shortcuts", "--coding", "--requirements-menu"].some(flag => process.argv.includes(flag));
 const requirementsFixture = process.argv.includes("--requirements-confirmation");
-const codingFixture = process.argv.includes("--coding") || process.argv.includes("--requirements-menu") || settingsFixture || requirementsFixture || actionsFixture;
+const codingFixture = navigatorFixture || process.argv.includes("--coding") || process.argv.includes("--requirements-menu") || settingsFixture || requirementsFixture || actionsFixture;
 const stagesFixture = process.argv.includes("--stages");
 const reopenFixture = process.argv.includes("--reopen");
 const artifactsFixture = process.argv.includes("--artifacts");
@@ -32,8 +33,9 @@ if (!tempResolved.startsWith(`${resolve(scratchRoot)}${sep}`)) {
 }
 
 try {
+  if (navigatorFixture) console.log("Navigator E2E: compiling production Renderer journey");
   await build({
-    entryPoints: [join(root, actionsFixture ? "scripts/e2e/coding-actions.tsx" : requirementsFixture ? "scripts/e2e/requirements-confirmation.tsx" : settingsFixture ? "scripts/e2e/engineering-settings.tsx" : codingFixture ? "scripts/e2e/coding-workbench.tsx" : artifactsFixture ? "scripts/e2e/workflow-artifacts.tsx" : reopenFixture ? "scripts/e2e/workflow-reopen.tsx" : stagesFixture ? "scripts/e2e/workflow-stages.tsx" : recoveryFixture ? "scripts/e2e/workflow-recovery.tsx" : discoveryFixture ? "scripts/e2e/workflow-discovery.tsx" : "scripts/e2e/workflow-runs.tsx")],
+    entryPoints: [join(root, navigatorFixture ? "scripts/e2e/development-navigator.tsx" : actionsFixture ? "scripts/e2e/coding-actions.tsx" : requirementsFixture ? "scripts/e2e/requirements-confirmation.tsx" : settingsFixture ? "scripts/e2e/engineering-settings.tsx" : codingFixture ? "scripts/e2e/coding-workbench.tsx" : artifactsFixture ? "scripts/e2e/workflow-artifacts.tsx" : reopenFixture ? "scripts/e2e/workflow-reopen.tsx" : stagesFixture ? "scripts/e2e/workflow-stages.tsx" : recoveryFixture ? "scripts/e2e/workflow-recovery.tsx" : discoveryFixture ? "scripts/e2e/workflow-discovery.tsx" : "scripts/e2e/workflow-runs.tsx")],
     outfile: join(temp, "renderer.js"),
     bundle: true,
     platform: "browser",
@@ -54,6 +56,7 @@ try {
     nodePaths: [join(root, "apps/desktop/node_modules")],
   });
 
+  if (navigatorFixture) console.log("Navigator E2E: compiling Electron Main fixture");
   await build({
     entryPoints: [join(root, "scripts/e2e/workflow-main.ts")],
     outfile: join(temp, "main.mjs"),
@@ -114,10 +117,12 @@ try {
 
   const env = { ...process.env, PI_DESKTOP_HOST_BIN: hostBinary, PI_WORKFLOW_ARTIFACTS: artifactsFixture ? "1" : "0", PI_WORKFLOW_DISCOVERY: discoveryFixture ? "1" : "0", PI_WORKFLOW_REOPEN: reopenFixture ? "1" : "0", PI_WORKFLOW_STAGES: stagesFixture ? "1" : "0", PI_WORKFLOW_RECOVERY: recoveryFixture ? "1" : "0", PI_WORKFLOW_REPO_ROOT: root };
   delete env.ELECTRON_RUN_AS_NODE;
+  env.PI_DEVELOPMENT_NAVIGATOR = navigatorFixture ? "1" : "0";
   env.PI_REQUIREMENTS_MENU = process.argv.includes("--requirements-menu") ? "1" : "0";
   env.PI_REQUIREMENTS_CONFIRMATION = requirementsFixture ? "1" : "0";
   env.PI_CODING_WORKBENCH = codingFixture ? "1" : "0";
   env.PI_CODING_ACTIONS = actionsFixture ? "1" : "0";
+  if (navigatorFixture) console.log("Navigator E2E: running isolated Electron and Host");
   const child = spawn(electronBinary, [join(temp, "main.mjs")], {
     cwd: root,
     env,
@@ -147,7 +152,9 @@ try {
   assert.equal(exitCode, 0, output.slice(-5000));
   const result = JSON.parse(resultLine.slice("WORKFLOW_RUNS_PROBE ".length));
   assert.equal(result.ok, true);
-  if (actionsFixture) {
+  if (navigatorFixture) {
+    for (const field of ["multiRound", "boundaries", "results", "history", "persisted", "noReplay", "analysis", "manualDraft"]) assert.equal(result[field], true, field);
+  } else if (actionsFixture) {
     for (const field of ["actions", "migrated", "crud", "order", "enabled", "executed", "latestSkill", "missing", "corruptFallback", "ordinaryChat", "persisted", "nativeSettingsPreserved"]) assert.equal(result[field], true, field);
   } else if (requirementsFixture) {
     for (const field of ["confirmed", "shared", "reconfirmed", "persisted", "cancelled", "isolated", "stale", "localized", "manual"]) assert.equal(result[field], true, field);

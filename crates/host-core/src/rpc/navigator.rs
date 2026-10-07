@@ -1,0 +1,116 @@
+use super::{rpc_err, JsonRpcError};
+use crate::db::Database;
+use serde_json::{json, Value};
+
+pub(super) fn handle(db: &Database, method: &str, params: &Value) -> Result<Value, JsonRpcError> {
+    let text = |key: &str| {
+        params
+            .get(key)
+            .and_then(Value::as_str)
+            .filter(|id| !id.trim().is_empty() && id.len() <= 256 && !id.contains('\0'))
+            .ok_or_else(|| rpc_err(1002, format!("{key} required"), "INVALID_PARAMS"))
+    };
+    let result = match method {
+        "navigator.analysis.begin" => {
+            let selected: Vec<String> = serde_json::from_value(
+                params
+                    .get("selectedResultIds")
+                    .cloned()
+                    .unwrap_or(json!([])),
+            )
+            .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
+            let version = params["expectedVersion"]
+                .as_i64()
+                .filter(|v| *v > 0)
+                .ok_or_else(|| rpc_err(1002, "expectedVersion required", "INVALID_PARAMS"))?;
+            crate::navigator::analysis::begin(
+                db,
+                text("sessionId")?,
+                text("activityId")?,
+                text("requestId")?,
+                version,
+                &selected,
+            )
+        }
+        "navigator.analysis.finish" | "navigator.analysis.cancel" => {
+            let mut input = params.clone();
+            if method.ends_with("cancel") {
+                input["status"] = json!("cancelled");
+            }
+            crate::navigator::analysis::finish(
+                db,
+                text("sessionId")?,
+                text("activityId")?,
+                text("analysisId")?,
+                &input,
+            )
+        }
+        "navigator.analysis.list" => {
+            crate::navigator::analysis::list(db, text("sessionId")?, text("activityId")?)
+        }
+        "navigator.results" => {
+            crate::navigator::results::list(db, text("sessionId")?, text("activityId")?)
+        }
+        "navigator.addResult" | "navigator.removeResult" => {
+            let version = params
+                .get("expectedVersion")
+                .and_then(Value::as_i64)
+                .filter(|v| *v > 0)
+                .ok_or_else(|| rpc_err(1002, "expectedVersion required", "INVALID_PARAMS"))?;
+            crate::navigator::results::mutate(
+                db,
+                text("sessionId")?,
+                text("activityId")?,
+                version,
+                params,
+                method == "navigator.removeResult",
+            )
+        }
+        "navigator.list" => crate::navigator::list(db, text("sessionId")?),
+        "navigator.setHidden" => crate::navigator::set_hidden(
+            db,
+            text("sessionId")?,
+            text("activityId")?,
+            params
+                .get("hidden")
+                .and_then(Value::as_bool)
+                .ok_or_else(|| rpc_err(1002, "hidden required", "INVALID_PARAMS"))?,
+        ),
+        "navigator.control" => {
+            let version = params
+                .get("expectedVersion")
+                .and_then(Value::as_i64)
+                .filter(|v| *v > 0)
+                .ok_or_else(|| rpc_err(1002, "expectedVersion required", "INVALID_PARAMS"))?;
+            crate::navigator::control(
+                db,
+                text("sessionId")?,
+                text("activityId")?,
+                version,
+                text("action")?,
+            )
+        }
+        "navigator.queue" => {
+            let skills: Vec<String> = serde_json::from_value(
+                params
+                    .get("requestedSkills")
+                    .cloned()
+                    .unwrap_or(Value::Null),
+            )
+            .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
+            crate::navigator::record_queue(db, text("queueId")?, &skills)
+                .map(|_| json!({"ok":true}))
+        }
+        "navigator.cancelQueue" => {
+            crate::navigator::cancel_queue(db, text("queueId")?).map(|_| json!({"ok":true}))
+        }
+        _ => {
+            return Err(rpc_err(
+                -32601,
+                "Unknown Navigator method",
+                "METHOD_NOT_FOUND",
+            ))
+        }
+    };
+    result.map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))
+}

@@ -1907,7 +1907,7 @@ pub fn move_session_project(
     if get_session(db, id)?.is_none() {
         return Ok(MoveSessionProjectResult::NotFound);
     }
-    if session_has_running_turn(db, id)? {
+    if session_has_running_turn(db, id)? || crate::navigator::analysis::reserved(db, id)? {
         return Ok(MoveSessionProjectResult::Busy);
     }
     let project_id = db.ensure_project(project_path, false)?;
@@ -2237,6 +2237,7 @@ fn append_record(
         return Err(anyhow!("session not found: {session_id}"));
     };
     insert_index_row(&tx, session_id, seq - 1, turn_id, record, text)?;
+    crate::navigator::record_submission(&tx, session_id, turn_id, record)?;
     tx.commit()?;
     Ok(())
 }
@@ -3462,6 +3463,9 @@ pub(crate) fn begin_turn_inner(
     model_id: Option<&str>,
     workflow_execution_id: Option<&str>,
 ) -> Result<String> {
+    if crate::navigator::analysis::reserved(db, session_id)? {
+        return Err(anyhow!("AGENT_BUSY"));
+    }
     if db.workflow_session_reserved(session_id, workflow_execution_id)? {
         return Err(anyhow!("AGENT_BUSY"));
     }

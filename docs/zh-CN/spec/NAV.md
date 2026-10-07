@@ -17,6 +17,7 @@
 - [engineering-workflow-v0.md](/zh-CN/spec/01-product/engineering-workflow-v0)
 - [coding-workbench-free-tasks.md](/zh-CN/spec/01-product/coding-workbench-free-tasks)
 - [requirements-confirmation.md](/zh-CN/spec/01-product/requirements-confirmation)
+- [development-navigator.md](/zh-CN/spec/01-product/development-navigator)
 - [executable-updates.md](/zh-CN/spec/01-product/executable-updates)
 
 ## 2. 架构

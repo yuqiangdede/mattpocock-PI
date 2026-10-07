@@ -8,6 +8,19 @@ export type LoadedSkillDocument = {
   location: string;
 };
 
+/** One resolution order shared by ordinary Skill execution and navigation. */
+export async function resolveSkillDocument(
+  id: string,
+  projectPath: string | null,
+  sources: {
+    builtin: (id: string) => LoadedSkillDocument | null;
+    user: (id: string, projectPath: string | null) => Promise<LoadedSkillDocument | null>;
+    plugin: (id: string) => LoadedSkillDocument;
+  },
+): Promise<LoadedSkillDocument> {
+  return sources.builtin(id) ?? (await sources.user(id, projectPath)) ?? sources.plugin(id);
+}
+
 /** Add path metadata only when a skill is loaded, not to the catalog prompt. */
 export function formatSkillToolContent(skill: LoadedSkillDocument): string {
   return [

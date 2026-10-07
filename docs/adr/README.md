@@ -20,6 +20,7 @@ Each ADR includes:
 
 | ID | Title | Status |
 |---|---|---|
+| development-navigator-analysis | [Development Navigator analysis execution](development-navigator-analysis.md) | Implementation direction |
 | 0314 | [Engineering Workflow ownership and acceptance](0314-engineering-workflow-ownership-and-acceptance.md) | Accepted; implemented V0 candidate |
 | 0315 | [Profile-managed engineering skill fallback](0315-bundled-engineering-skill-fallback.md) | Implemented candidate |
 | 0316 | [Free Task Host ownership](0316-free-task-host-ownership.md) | Implementation candidate |

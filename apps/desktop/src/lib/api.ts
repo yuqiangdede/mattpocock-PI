@@ -543,9 +543,19 @@ function normalizePlansChangedEvent(value: unknown): PlanningStateEvent {
 }
 
 export const api = {
+  listNavigatorAnalyses: (input: import("@pi-desktop/shared").NavigatorAnalysisTarget) => invoke<import("@pi-desktop/shared").NavigatorAnalysisSnapshot>(IPC.invoke.navigatorAnalysisList, input),
+  requestNavigatorAnalysis: (input: import("@pi-desktop/shared").NavigatorAnalysisInput) => invoke<import("@pi-desktop/shared").NavigatorAnalysisSnapshot>(IPC.invoke.navigatorAnalysisRequest, input),
+  cancelNavigatorAnalysis: (input: import("@pi-desktop/shared").NavigatorAnalysisCancelInput) => invoke<import("@pi-desktop/shared").NavigatorAnalysisSnapshot>(IPC.invoke.navigatorAnalysisCancel, input),
   getCodingActions: () => invoke<CodingActionSnapshot>(IPC.invoke.codingActionsGet),
   saveCodingActions: (value: CodingActionConfiguration, recover = false) => invoke<CodingActionConfiguration>(IPC.invoke.codingActionsSave, value, recover),
   resetCodingActions: () => invoke<CodingActionConfiguration>(IPC.invoke.codingActionsReset),
+  listNavigator: (sessionId: string) => invoke<import("@pi-desktop/shared").NavigatorSnapshot>(IPC.invoke.navigatorList, { sessionId }),
+  setNavigatorHidden: (sessionId: string, activityId: string, hidden: boolean) => invoke<{ ok: boolean }>(IPC.invoke.navigatorSetHidden, { sessionId, activityId, hidden }),
+  controlNavigator: (input: import("@pi-desktop/shared").NavigatorControlInput) => invoke<import("@pi-desktop/shared").NavigatorSnapshot>(IPC.invoke.navigatorControl, input),
+  listNavigatorResults: (input: import("@pi-desktop/shared").NavigatorResultInput) => invoke<import("@pi-desktop/shared").NavigatorResultSnapshot>(IPC.invoke.navigatorResults, input),
+  readNavigatorResult: (input: import("@pi-desktop/shared").NavigatorResultInput) => invoke<import("@pi-desktop/shared").FsReadResult>(IPC.invoke.navigatorReadResult, input),
+  addNavigatorResult: (input: import("@pi-desktop/shared").NavigatorResultInput) => invoke<import("@pi-desktop/shared").NavigatorResultSnapshot>(IPC.invoke.navigatorAddResult, input),
+  removeNavigatorResult: (input: import("@pi-desktop/shared").NavigatorResultInput) => invoke<import("@pi-desktop/shared").NavigatorResultSnapshot>(IPC.invoke.navigatorRemoveResult, input),
   startFreeTask: (input: import("@pi-desktop/shared").FreeTaskRequest) => invoke<import("@pi-desktop/shared").FreeTask>(IPC.invoke.freeTaskStart, input),
   checkFreeTask: (sessionId: string) => invoke<{ busy: boolean }>(IPC.invoke.freeTaskCheck, { sessionId }),
   listFreeTasks: (projectPath: string) => invoke<{ tasks: import("@pi-desktop/shared").FreeTask[]; unavailableCount?: number }>(IPC.invoke.freeTaskList, { projectPath }),

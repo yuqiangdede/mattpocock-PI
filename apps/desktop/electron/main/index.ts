@@ -883,6 +883,7 @@ function registerIpc() {
     agentExtensions,
     activeUserSkills,
     pluginActiveInProject,
+    loadUserSkillBody,
     getWorkPanelReservationWidth: () => mainState.requestedWorkPanelReservation,
     setWorkPanelReservationWidth: (width: number) => {
       mainState.requestedWorkPanelReservation = width;

@@ -1020,3 +1020,11 @@
 .workflow-reopen-dialog::backdrop {
   background: var(--ds-scrim);
 }
+
+.navigator-tab { padding: 16px; overflow: auto; height: 100%; }
+.navigator-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.navigator-toolbar h2 { margin: 0; font-size: var(--text-md); }
+.navigator-tab p { overflow-wrap: anywhere; }
+.navigator-activities { padding: 0; list-style: none; display: grid; gap: 12px; }
+.navigator-activities h3 { margin: 0 0 8px; font-size: var(--text-base); overflow-wrap: anywhere; }
+.navigator-activities time { font-size: var(--text-sm); color: var(--ds-text-secondary); }

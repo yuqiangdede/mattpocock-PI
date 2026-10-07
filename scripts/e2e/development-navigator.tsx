@@ -1,0 +1,222 @@
+import { createRoot } from "react-dom/client";
+import { I18nextProvider, initReactI18next } from "react-i18next";
+import i18n from "i18next";
+import { en, flattenCatalog } from "@pi-desktop/i18n";
+import type { NavigatorSnapshot } from "@pi-desktop/shared";
+import { NavigatorTab } from "../../apps/desktop/src/features/navigator/NavigatorTab";
+import { Composer } from "../../apps/desktop/src/components/Composer";
+import { useAppStore } from "../../apps/desktop/src/stores/app-store";
+import { api } from "../../apps/desktop/src/lib/api";
+import { loadCodingActions } from "../../apps/desktop/src/features/extensions/coding-action-state";
+import { nextChipToken, readEditorValue } from "../../apps/desktop/src/features/chat/composer/editor";
+import { readComposerDraft } from "../../apps/desktop/src/lib/composer-draft-cache";
+import { until, check, click, fill } from "./skill-shortcuts-helpers";
+
+declare global {
+  var navigatorProbe: () => Promise<{ activityId: string; prompts: number }>;
+  var navigatorRestored: (checkpoint: { activityId: string; prompts: number }) => Promise<unknown>;
+  interface Window { workflowFixture: { action: (name: string, input?: unknown) => Promise<unknown> } }
+}
+const fixture = (name: string, input?: unknown) => window.workflowFixture.action(name, input);
+const editor = () => document.querySelector<HTMLElement>(".composer-input")!;
+const refresh = () => click(i18n.t("navigator.refresh"));
+const visibleCount = () => document.querySelectorAll(".navigator-activities > li").length;
+async function initialize() {
+  await i18n.use(initReactI18next).init({ lng: "en", resources: { en: { translation: flattenCatalog(en) } }, interpolation: { escapeValue: false } });
+  const params = new URLSearchParams(location.search);
+  const sessionId = params.get("sessionId")!, projectPath = params.get("projectA")!;
+  await api.setProject(projectPath);
+  const settings = await api.getSettings();
+  const sessions = (await api.listSessions()).sessions;
+  useAppStore.setState({ settings, activeSessionId: sessionId, sessions: sessions.map(session => ({ ...session, providerId: "workflow-fixture", modelId: "fixture-model" })),
+    providers: [{ id: "workflow-fixture", name: "Fixture", vendorKey: "custom", type: "custom", protocol: "openai-completions", enabled: true, authKind: "none", hasSecret: false, models: [{ id: "fixture-model", contextWindow: 32000, maxTokens: 2048, thinkingLevels: ["off"], defaultThinkingLevel: "off" }], supportsReasoning: false, supportedThinkingLevels: ["off"] }],
+    workspace: { path: projectPath, name: "Project A" }, page: "chat", isRunning: false, runningSessions: {} });
+  await loadCodingActions();
+  createRoot(document.getElementById("root")!).render(<I18nextProvider i18n={i18n}><NavigatorTab /><Composer variant="home" /></I18nextProvider>);
+  await until(() => editor() && document.querySelector(".navigator-tab"));
+  const records = () => api.listNavigator(sessionId);
+  return { sessionId, records };
+}
+async function send(text?: string) {
+  editor().focus();
+  if (text) await fixture("typeText", text);
+  await fixture("pressKey", "Enter");
+}
+async function completed(sessionId: string, expectedPrompts: number) {
+  await until(async () => (await fixture("snapshot") as { prompts: number }).prompts === expectedPrompts);
+  await fixture("releaseProvider");
+  await until(async () => {
+    const value = await api.listNavigator(sessionId);
+    const requests = value.activities.flatMap(activity => activity.requests);
+    return requests.length >= expectedPrompts && requests.every(request => request.outcome === "normal");
+  });
+  // The fixture's external stream is not the production UI event transport.
+  // Reload the authoritative transcript, rather than inventing activity state.
+  const { session } = await api.getSession(sessionId);
+  useAppStore.setState({ messages: session?.messages ?? [], isRunning: false, runningSessions: {}, agentStatuses: {} });
+  await refresh();
+}
+async function currentActivity(records: () => Promise<NavigatorSnapshot>, requests: number) {
+  return until(async () => { const snapshot = await records(); return snapshot.activities.length === 1 && snapshot.activities[0].requests.length === requests ? snapshot.activities[0] : false; });
+}
+globalThis.navigatorProbe = async () => {
+  const { sessionId, records } = await initialize();
+  check((await records()).activities.length === 0, "Empty conversation contains invented activities");
+  const actions = (await api.getCodingActions()).configuration.actions;
+  const requirements = actions.find(action => action.skillId === "grill-with-docs")!;
+  await click(requirements.label);
+  await until(() => readEditorValue(editor()).startsWith("/grill-with-docs"));
+  check((await records()).activities.length === 0, "Unsent button draft created an activity");
+  await fixture("releaseLaunch");
+  await send(); await completed(sessionId, 1);
+  let activity = await currentActivity(records, 1);
+  check(activity.endedAt === null, "Individual reply ended the discussion");
+  await send("My ordinary answer continues the same requirements discussion.");
+  await until(async () => (await fixture("snapshot") as { prompts: number }).prompts === 2);
+  await fixture("releaseProvider");
+  await until(async () => (await records()).activities[0].requests.length === 2 && (await records()).activities[0].requests.every(request => request.outcome === "normal"));
+  const { session } = await api.getSession(sessionId);
+  useAppStore.setState({ messages: session?.messages ?? [], isRunning: false, runningSessions: {}, agentStatuses: {} });
+  await refresh();
+  activity = await currentActivity(records, 2);
+  check(activity.endedAt === null, "Ordinary answer ended the activity");
+  check((await fixture("snapshot") as { prompts: number }).prompts === 2, "Reply termination requested navigation automatically");
+  check((await fixture("snapshot") as { analysisRequests: number }).analysisRequests === 0, "Individual replies automatically requested analysis");
+  await click(i18n.t("navigator.leaveActivity"));
+  await until(async () => !(await records()).activeActivityId);
+  await until(() => [...document.querySelectorAll<HTMLButtonElement>("button")].some(button => button.textContent === i18n.t("navigator.continueActivity")));
+  await click(i18n.t("navigator.continueActivity"));
+  await until(async () => (await records()).activeActivityId === activity.id);
+  await click(i18n.t("navigator.endActivity"));
+  await until(async () => (await records()).activities[0].endedAt !== null);
+  await until(() => document.body.textContent?.includes(i18n.t("navigator.activityEnded")));
+  activity = (await records()).activities[0];
+  check(activity.boundaries?.map(event => event.action).join(",") === "leave,continue,end", "Boundary history lost an event");
+  const summary = await until(() => [...document.querySelectorAll<HTMLElement>("summary")].find(item => item.textContent === i18n.t("navigator.results.title")));
+  summary.click();
+  await click(i18n.t("navigator.results.reply"));
+  await until(() => document.querySelector(".navigator-result-preview")?.textContent?.includes("Requirements clarified"));
+  await fill(i18n.t("navigator.results.label"), "Fixture file", value => fixture("typeText", value));
+  await fill(i18n.t("navigator.results.path"), "navigator-result.md", value => fixture("typeText", value));
+  await click(i18n.t("navigator.results.add"));
+  await click("Fixture file");
+  await until(() => document.querySelector(".navigator-result-preview")?.textContent === "Navigator fixture evidence");
+  await fill(i18n.t("navigator.results.label"), "Second fixture file", value => fixture("typeText", value));
+  await click(i18n.t("navigator.results.add"));
+  await until(async () => (await api.listNavigatorResults({ sessionId, activityId: activity.id })).results.filter(result => result.kind === "file").length === 2);
+  const readResult = api.readNavigatorResult;
+  const reads: Array<{ resolve: (value: Awaited<ReturnType<typeof readResult>>) => void; reject: (cause: Error) => void }> = [];
+  api.readNavigatorResult = () => new Promise((resolve, reject) => reads.push({ resolve, reject }));
+  try {
+    await click("Fixture file"); await click("Second fixture file");
+    reads[1].resolve({ kind: "text", content: "Latest selected B" });
+    await until(() => document.querySelector(".navigator-result-preview")?.textContent === "Latest selected B");
+    reads[0].resolve({ kind: "text", content: "Late selected A" });
+    await fixture("snapshot");
+    check(document.querySelector(".navigator-result-preview")?.textContent === "Latest selected B", "Late file A replaced B preview");
+    await click("Fixture file"); await click("Second fixture file");
+    reads[3].resolve({ kind: "text", content: "Latest selected B again" });
+    await until(() => document.querySelector(".navigator-result-preview")?.textContent === "Latest selected B again");
+    reads[2].reject(new Error("Late A error")); await fixture("snapshot");
+    check(!document.body.textContent?.includes("Late A error"), "Late file error replaced the current preview status");
+    await click("Fixture file"); await click(i18n.t("navigator.results.reply"));
+    await until(() => document.querySelector(".navigator-result-preview")?.textContent?.includes("Requirements clarified"));
+    reads[4].resolve({ kind: "text", content: "Late file after reply" }); await fixture("snapshot");
+    check(document.querySelector(".navigator-result-preview")?.textContent?.includes("Requirements clarified"), "Late file replaced synchronous reply");
+  } finally { api.readNavigatorResult = readResult; }
+  const analysisBasis = await until(() => [...document.querySelectorAll<HTMLElement>("summary")].find(item => item.textContent === i18n.t("navigator.analysis.basis")));
+  analysisBasis.click();
+  const checkedFiles = await until(() => document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked').length === 2 && [...document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked')]);
+  checkedFiles.forEach(input => input.click());
+  const sourceMessages = useAppStore.getState().messages;
+  const getSource = api.getSearchContext; const sourceReads: string[] = [];
+  api.getSearchContext = input => { sourceReads.push(input.messageId); return getSource(input); };
+  useAppStore.setState({ messages: [] });
+  const sources = [...document.querySelectorAll<HTMLDetailsElement>('section[aria-label="' + i18n.t("navigator.analysis.title") + '"] details details')];
+  sources.forEach(source => { source.open = true; });
+  await until(() => document.body.textContent?.includes("My ordinary answer continues the same requirements discussion.") && document.body.textContent?.includes("Requirements clarified"));
+  check(sources.length >= 4, "Input preview omitted multi-round request or reply sources");
+  check(sourceReads.includes(activity.requests[0].messageId) && sourceReads.includes(activity.requests[1].messageId), "Missing transcript messages were not read from their Host sources");
+  api.getSearchContext = getSource; useAppStore.setState({ messages: sourceMessages });
+  const beforeAnalysis = (await api.getSession(sessionId)).session?.messages.length;
+  const requestAnalysis = await until(() => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.trim() === i18n.t("navigator.analysis.request") && !button.disabled));
+  requestAnalysis.click(); requestAnalysis.click();
+  await until(async () => (await fixture("snapshot") as { analysisRequests: number }).analysisRequests === 1);
+  check((await fixture("snapshot") as { prompts: number }).prompts === 2, "Navigation submitted an agent prompt");
+  await fixture("releaseAnalysis");
+  await until(() => document.body.textContent?.includes("Preserve the agreed requirements"));
+  const analyses = await api.listNavigatorAnalyses({ sessionId, activityId: activity.id });
+  check(analyses.analyses[0].status === "completed" && analyses.analyses[0].suggestions.length === 2, "Analysis did not retain structured suggestions");
+  check((await api.getSession(sessionId)).session?.messages.length === beforeAnalysis, "Navigation wrote conversation messages");
+  check((await records()).activities.length === 1, "Navigation created a recursive activity");
+  await send("Ordinary work outside the ended activity.");
+  await until(async () => (await fixture("snapshot") as { prompts: number }).prompts === 3);
+  await fixture("releaseProvider");
+  await until(async () => (await api.getSession(sessionId)).session?.messages.some(message => message.content.includes("Ordinary work outside the ended activity.")));
+  const refreshedTranscript = (await api.getSession(sessionId)).session?.messages ?? [];
+  useAppStore.setState({ messages: refreshedTranscript, isRunning: false, runningSessions: {}, agentStatuses: {} });
+  await refresh();
+  await until(() => document.body.textContent?.includes(i18n.t("navigator.analysis.stale")));
+  check((await fixture("snapshot") as { analysisRequests: number }).analysisRequests === 1, "Ordinary chat reran analysis");
+  await click(i18n.t("navigator.manageHistory"));
+  await click(i18n.t("navigator.hide"));
+  await until(() => visibleCount() === 0);
+  check((await api.getSession(sessionId)).session?.messages.length === refreshedTranscript.length, "Hiding deleted source messages");
+  await click(i18n.t("navigator.restore"));
+  await until(() => visibleCount() === 1);
+  const token = nextChipToken();
+  const existing = `Keep this draft and file ${token}`;
+  const reference = { path: `${new URLSearchParams(location.search).get("projectA")}/navigator-result.md`, name: "navigator-result.md", kind: "file" as const, token };
+  const image = { path: `${new URLSearchParams(location.search).get("projectA")}/fixture.png`, name: "fixture.png", kind: "image" as const, token: nextChipToken() };
+  useAppStore.setState({ composerPrefill: { sessionId, text: `${existing} ${image.token}`, fileReferences: [reference, image] } });
+  await until(() => readEditorValue(editor()).startsWith(existing));
+  await until(() => document.querySelectorAll(".composer-image-attachment").length === 1);
+  await fixture("holdCatalog");
+  const prepare = await until(() => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.trim() === i18n.t("navigator.analysis.prepare") && !button.disabled));
+  prepare.click(); prepare.click();
+  await fixture("waitForCatalog");
+  editor().focus(); await fixture("typeText", " Typed while loading.");
+  await fixture("releaseCatalog");
+  await until(() => readEditorValue(editor()).startsWith("/to-spec") && readEditorValue(editor()).includes("Historical basis") && readEditorValue(editor()).includes("Typed while loading."));
+  check(readEditorValue(editor()).includes("Keep this draft"), "Recommendation overwrote the draft");
+  const draft = await until(() => readComposerDraft(sessionId)?.fileReferences.some(item => item.path === reference.path) && readComposerDraft(sessionId));
+  check(draft?.fileReferences.length === 2 && draft.fileReferences.some(item => item.kind === "image" && item.path === image.path), "Recommendation changed file or image attachments");
+  check(document.querySelectorAll(".composer-image-attachment").length === 1, "Recommendation lost the image control");
+  check(readEditorValue(editor()).split("Follow-up goal").length === 2, "Double click inserted duplicate recommendation");
+  check((await fixture("snapshot") as { prompts: number }).prompts === 3, "Preparing a recommendation sent automatically");
+  await send();
+  await until(async () => (await fixture("snapshot") as { prompts: number }).prompts === 4);
+  await fixture("releaseProvider");
+  await until(async () => (await records()).activities.length === 2 && (await records()).activities.flatMap(item => item.requests).every(request => request.outcome === "normal"));
+  await refresh();
+  check(document.querySelectorAll('section[aria-label="' + i18n.t("navigator.analysis.title") + '"]').length === 1, "History rendered multiple detail forms");
+  check(document.querySelector('.navigator-activities button[aria-pressed="true"]')?.textContent?.includes("grill-with-docs"), "New history stole the selected activity");
+  check((await records()).activities.length === 2, "Manual follow-up did not create a new activity");
+  const nextActivity = (await records()).activities.find(item => item.id !== activity.id)!;
+  await api.setNavigatorHidden(sessionId, nextActivity.id, true); await refresh();
+  await until(() => visibleCount() === 1);
+  check([...document.querySelectorAll("button")].some(button => button.textContent === i18n.t("navigator.leaveActivity")), "Hiding the bound activity removed its ownership toolbar");
+  await api.setNavigatorHidden(sessionId, nextActivity.id, false); await refresh();
+  await until(() => visibleCount() === 2);
+  return { activityId: activity.id, prompts: (await fixture("snapshot") as { prompts: number }).prompts };
+};
+globalThis.navigatorRestored = async checkpoint => {
+  const { records } = await initialize();
+  const activity = await until(async () => (await records()).activities.find(item => item.id === checkpoint.activityId));
+  check(activity.requests.length === 2 && activity.endedAt !== null && !activity.hidden, "Restart changed activity history");
+  await until(() => visibleCount() === 2);
+  check(document.querySelector('.navigator-activities button[aria-pressed="true"]')?.textContent?.includes("to-spec"), "Restart did not select the latest activity");
+  check(document.querySelectorAll('section[aria-label="' + i18n.t("navigator.analysis.title") + '"]').length === 1, "Restart rendered multiple activity details");
+  const historical = document.querySelector<HTMLButtonElement>('.navigator-activities button[aria-pressed="false"]');
+  check(historical, "History has no selectable earlier activity"); historical!.click();
+  await until(() => document.body.textContent?.includes("Preserve the agreed requirements"));
+  check((await fixture("snapshot") as { prompts: number }).prompts === checkpoint.prompts, "Restart replayed execution");
+  const analyses = await api.listNavigatorAnalyses({ sessionId: activity.sessionId, activityId: activity.id });
+  check(analyses.analyses[0]?.status === "completed" && analyses.analyses[0]?.suggestions.length === 2, "Restart lost navigation suggestions");
+  check((await fixture("snapshot") as { analysisRequests: number }).analysisRequests === 1, "Restart replayed navigation analysis");
+  useAppStore.setState({ activeSessionId: undefined });
+  await until(() => !document.querySelector('.navigator-activities button[aria-pressed="true"]'));
+  useAppStore.setState({ activeSessionId: activity.sessionId });
+  await until(() => document.querySelector('.navigator-activities button[aria-pressed="true"]')?.textContent?.includes("to-spec"));
+  return { ok: true, multiRound: true, boundaries: true, results: true, history: true, persisted: true, noReplay: true, analysis: true, manualDraft: true };
+};

@@ -1,0 +1,93 @@
+import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { NavigatorSnapshot, NavigatorControlInput } from "@pi-desktop/shared";
+import { api } from "../../lib/api";
+import { useAppStore } from "../../stores/app-store";
+import { Button, Panel } from "../../components/ui";
+import { createNavigatorReader } from "./navigator-reader";
+import { NavigatorHistoryControls } from "./NavigatorHistoryControls";
+import { NavigatorActivityControls } from "./NavigatorActivityControls";
+import { NavigatorResults } from "./NavigatorResults";
+import { NavigatorAnalysis } from "./NavigatorAnalysis";
+import { prepareComposer } from "../coding/composer-preparation-bridge";
+import { navigatorSuggestionContext } from "./navigator-suggestion-draft";
+import type { NavigatorSuggestionSelection } from "./NavigatorAnalysis";
+
+export function NavigatorTab() {
+  const { t } = useTranslation();
+  const sessionId = useAppStore(s => s.activeSessionId);
+  const messageRevision = useAppStore(s => `${s.messages.length}:${s.messages.at(-1)?.id ?? ""}`);
+  const status = useAppStore(s => sessionId ? s.agentStatuses[sessionId] : undefined);
+  const projectPath = useAppStore(s => s.workspace?.path ?? "");
+  const [snapshot, setSnapshot] = useState<NavigatorSnapshot | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const unsupported = sessionId?.startsWith("native-pi:") ?? false;
+  const reader = useMemo(() => createNavigatorReader(api.listNavigator, (value, failure) => {
+    setSnapshot(value); setError(failure);
+  }), []);
+  useEffect(() => {
+    reader.select(unsupported ? undefined : sessionId);
+    void reader.refresh();
+    return () => reader.dispose();
+  }, [reader, sessionId, unsupported, projectPath]);
+  useEffect(() => { void reader.refresh(); }, [reader, messageRevision, status?.isRunning]);
+  return <NavigatorView sessionId={sessionId} snapshot={snapshot} error={error} busy={status?.isRunning ?? false} onPrepare={selection => prepareComposer({ sessionId: selection.activity.sessionId, projectPath, skillId: selection.suggestion.skillId, prompt: navigatorSuggestionContext(selection.analysis, selection.suggestion, { summary: t("navigator.draft.summary"), source: t("navigator.draft.source"), historical: t("navigator.draft.historical") }) })} onControl={async input => { await api.controlNavigator(input); await reader.refresh(); }} onRefresh={() => void reader.refresh()} />;
+}
+
+export function NavigatorView({ sessionId, snapshot, error, onRefresh, onControl, onPrepare, busy = false }: {
+  sessionId: string | undefined;
+  snapshot: NavigatorSnapshot | null;
+  error: string | null;
+  onRefresh: () => void;
+  onControl?: (input: NavigatorControlInput) => Promise<unknown>;
+  busy?: boolean;
+  onPrepare?: (selection: NavigatorSuggestionSelection) => Promise<boolean>;
+}) {
+  const { t } = useTranslation();
+  const unsupported = sessionId?.startsWith("native-pi:") ?? false;
+  const projectPath = useAppStore(s => s.workspace?.path);
+  const activities = snapshot?.activities.filter(activity => !activity.hidden && activity.sessionId === sessionId) ?? [];
+  const bound = snapshot?.activities.find(activity => activity.id === snapshot.activeActivityId);
+  const [selection, setSelection] = useState<{ sessionId: string | undefined; projectPath: string | undefined; id: string } | null>(null);
+  const latest = activities.reduce<typeof activities[number] | undefined>((newest, activity) => !newest || activity.createdAt > newest.createdAt ? activity : newest, undefined);
+  const selected = activities.find(activity => selection?.sessionId === sessionId && selection?.projectPath === projectPath && activity.id === selection?.id) ?? latest;
+  useEffect(() => {
+    if (selected && (selection?.sessionId !== sessionId || selection?.projectPath !== projectPath || selection?.id !== selected.id)) setSelection({ sessionId, projectPath, id: selected.id });
+    else if (!selected && selection) setSelection(null);
+  }, [sessionId, projectPath, selected?.id, selection]);
+  return <section className="navigator-tab" aria-label={t("navigator.title")}>
+    <div className="navigator-toolbar"><h2>{t("navigator.title")}</h2>
+      <Button disabled={!sessionId || unsupported} onClick={onRefresh}>{t("navigator.refresh")}</Button>
+    </div>
+    <p>{t("navigator.explanation")}</p>
+    {sessionId && !unsupported && snapshot && <NavigatorHistoryControls key={sessionId} sessionId={sessionId} activities={snapshot.activities} onChanged={onRefresh} />}
+    {bound && <div role="status"><h3>{t("navigator.currentActivity", { skills: bound.requests.flatMap(request => request.requestedSkills).join(", ") })}</h3>
+      <NavigatorActivityControls key={bound.id} activity={bound} active busy={busy} onControl={onControl} />
+    </div>}
+    {unsupported && <p role="status">{t("navigator.unsupported")}</p>}
+    {error && <p role="alert">{t("navigator.loadFailed", { detail: error })}</p>}
+    {!sessionId ? <p>{t("navigator.sessionRequired")}</p> : !unsupported && !snapshot && !error ? <p role="status">{t("navigator.loading")}</p> : null}
+    {snapshot?.unavailableCount ? <p role="status">{t("navigator.unavailable", { count: snapshot.unavailableCount })}</p> : null}
+    {snapshot && activities.length === 0 && !bound && <p>{t("navigator.empty")}</p>}
+    <ul className="navigator-activities">
+      {activities.map(activity => <li key={activity.id}>
+        <Panel>
+          <h3><Button aria-pressed={selected?.id === activity.id} onClick={() => setSelection({ sessionId, projectPath, id: activity.id })}>{activity.requests.flatMap(request => request.requestedSkills).join(", ")}</Button></h3>
+          <time dateTime={new Date(activity.createdAt).toISOString()}>{new Date(activity.createdAt).toLocaleString()}</time>
+          {activity.id !== bound?.id && <NavigatorActivityControls activity={activity} active={false} busy={busy} onControl={onControl} />}
+          {activity.requests.map(request => <div key={request.id}>
+            <p>{t(`navigator.outcomes.${request.outcome}`)}</p>
+            {request.requestedSkills.map(skill => <p key={skill}>{skill}: {t(request.observedSkills.includes(skill) ? "navigator.actualUseObserved" : "navigator.actualUseUnknown")}</p>)}
+            {request.errorCode && <p>{request.errorCode}</p>}
+          </div>)}
+
+        </Panel>
+      </li>)}
+    </ul>
+    {selected && <Panel key={`${projectPath}:${sessionId}:${selected.id}`}>
+      <h3>{selected.requests.flatMap(request => request.requestedSkills).join(", ")}</h3>
+      <NavigatorResults activity={selected} onChanged={onRefresh} />
+      <NavigatorAnalysis activity={selected} busy={busy} onPrepare={onPrepare} />
+    </Panel>}
+  </section>;
+}

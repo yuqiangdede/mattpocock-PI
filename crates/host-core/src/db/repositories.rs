@@ -135,6 +135,8 @@ impl Database {
                 tx.execute_batch(SCHEMA_LATEST)?;
                 tx.execute_batch(PLAN_APPROVALS_SCHEMA)?;
                 tx.execute_batch(crate::session_collaboration::SCHEMA)?;
+                tx.execute_batch(crate::navigator::SCHEMA)?;
+                tx.execute_batch(crate::navigator::analysis::SCHEMA)?;
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
                 tx.commit()?;
             }
@@ -186,6 +188,7 @@ impl Database {
             20 => {
                 migrate_v20_to_v21(&conn, path)?;
             }
+            21 => {}
             legacy @ 1..=6 => {
                 let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
                 drop(conn);
@@ -225,7 +228,26 @@ impl Database {
         if migrated_version == 20 {
             migrate_v20_to_v21(&conn, path)?;
         }
+        let navigator_version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+        if navigator_version == 21 {
+            let backup = create_migration_backup(&conn, path, 21)?;
+            let tx = conn.unchecked_transaction()?;
+            tx.execute_batch(crate::navigator::SCHEMA)?;
+            tx.execute_batch(crate::navigator::analysis::SCHEMA)?;
+            tx.pragma_update(None, "user_version", 22i64)?;
+            tx.commit().with_context(|| {
+                format!(
+                    "commit schema v21 to v22 migration; backup {} remains",
+                    backup.display()
+                )
+            })?;
+        }
         let db = Self { conn, data_dir };
+        // Additive candidate-v22 table; keep existing activity/request data unchanged.
+        db.conn().execute_batch(crate::navigator::SCHEMA)?;
+        db.conn()
+            .execute_batch(crate::navigator::analysis::SCHEMA)?;
+        crate::navigator::recover(&db)?;
         db.boot_maintenance()?;
         crate::session_collaboration::recover(&db)?;
         db.recover_workflow_executions()?;

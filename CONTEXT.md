@@ -95,8 +95,20 @@ _Avoid_: 页面按钮配置、Workflow Step、强制阶段
 _Avoid_: Workflow Engine、状态机、Recommendation Engine
 
 **Development Navigator**:
-未来用于理解项目开发状态、检查产物并提供可选建议的能力，属于第二阶段且不限制用户选择 Action。
-_Avoid_: 固定流程、自动阶段推进
+A lightweight view of recent user-initiated engineering Skill work in the current conversation, its associated results, and optional follow-up actions. It helps users continue work without enforcing stage order or claiming engineering completion from execution outcomes.
+_Avoid_: Workflow Engine, stage gate, automatic advancement
+
+**Engineering Request Record**:
+A record of one user submission explicitly requesting one or more engineering Skills, with its execution outcome and associated results. A requested Skill is not proof of actual Skill use or engineering completion.
+_Avoid_: Stage Execution, accepted stage, button click history
+
+**Engineering Activity**:
+A user-initiated engineering effort in one conversation that can include multiple requests, answers, and Agent responses, with associated results. The user marks its navigation boundary explicitly; an Agent reply ending does not end the activity or approve its outputs.
+_Avoid_: Agent turn, Workflow Run, accepted stage
+
+**Navigation Analysis**:
+A user-requested analysis of an ended Engineering Activity and selected evidence that offers optional follow-up actions. It does not execute those actions or accept engineering results.
+_Avoid_: Automatic next step, workflow transition
 
 **Engineering Skills Setup**:
 Configuring a project's issue tracker, triage vocabulary and domain documentation conventions for engineering skills.

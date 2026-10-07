@@ -904,7 +904,19 @@ export function registerAgentIpc({
   handle(IPC.invoke.agentQueuePush, async (req: AgentQueuePushRequest) => {
     rejectNativeAgentOperation(req.sessionId);
     if (!agentHostBridge) throw new Error("agent host unavailable");
-    return agentHostBridge.queue.push(req);
+    const queued = await agentHostBridge.queue.push(req);
+    if (host) {
+      try {
+        const target = await host.call<{ session?: { projectPath?: string } }>("session.get", { id: req.sessionId, messageLimit: 1 });
+        const commands = await composerCommandService.buildComposerCommands(target.session?.projectPath ?? await optionalWorkspaceRoot());
+        const skills = new Map(commands.flatMap(command => command.kind === "skill" && command.skillId ? [[command.name, command.skillId] as const] : []));
+        const requestedSkills = [...new Set(findSkillMentions(req.content, skills).map(mention => mention.id))];
+        await host.call("navigator.queue", { queueId: queued.id, requestedSkills });
+      } catch (cause) {
+        logger.app("session", "warn", "Navigator queue attribution unavailable", { sessionId: req.sessionId, data: String(cause) });
+      }
+    }
+    return queued;
   });
   handle(IPC.invoke.agentQueueList, async (req: { sessionId: string }) => {
     rejectNativeAgentOperation(req.sessionId);
@@ -914,6 +926,10 @@ export function registerAgentIpc({
   handle(IPC.invoke.agentQueueRemove, async (req: { turnId: string }) => {
     if (!agentHostBridge) throw new Error("agent host unavailable");
     await agentHostBridge.queue.remove(req.turnId);
+    if (host) {
+      try { await host.call("navigator.cancelQueue", { queueId: req.turnId }); }
+      catch (cause) { logger.app("session", "warn", "Navigator cancelled queue attribution unavailable", { data: String(cause) }); }
+    }
     return { ok: true };
   });
   handle(IPC.invoke.agentQueuePrioritize, async (req: { turnId: string }) => {

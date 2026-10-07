@@ -8,6 +8,30 @@
 
 ## 1. Goals
 
+### E2E-NAVIGATOR-multi-round-handoff
+
+- Submit an engineering Skill from a button and from manual slash input. Draft
+  preparation alone creates no activity; edited-away markers are not attributed.
+- Continue requirements discussion across multiple questions/answers in one
+  activity. Individual reply termination neither ends the activity nor prompts
+  for suggestions. Explicit ending is distinct from content acceptance.
+- Leave the explicit current-activity binding before unrelated chat, then
+  continue or reopen the original discussion. Hide does not clear its binding;
+  the current binding remains visible and can be left. Retain earlier boundary
+  events after reopening. Reject stale-version and busy boundary changes.
+- Inspect response/file/validation references, preview selected analysis inputs,
+  and explicitly request ask-matt while idle. Analysis is tool-free and scoped;
+  permission, busy admission, malformed output, cancellation and retry are covered.
+- Prepare a recommended follow-up while preserving draft text and attachments;
+  only Send executes it. Missing Skills and evidence produce explicit outcomes.
+- Switch conversations/projects and restart during pending operations; preserve
+  ownership, history, unresolved status and suggestions without replay. New work
+  marks advice potentially outdated. Hide/restore and conversation deletion obey
+  source-data retention boundaries.
+- Implementation coverage is added per #47–#52. Use external model fixtures and
+  isolated mutable profiles; do not attach to the user's live Desktop or call
+  real paid providers. This scenario does not authorize `verify:ui:*`.
+
 ### E2E-CODING-ACTIONS-withdraw-workflow-entry
 
 - Composer and the work-panel launcher expose no native Workflow entry. Restore

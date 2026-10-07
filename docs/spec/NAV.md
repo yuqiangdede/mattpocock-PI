@@ -14,6 +14,7 @@
 - [engineering-workflow-v0.md](01-product/engineering-workflow-v0.md)
 - [coding-workbench-free-tasks.md](01-product/coding-workbench-free-tasks.md)
 - [requirements-confirmation.md](01-product/requirements-confirmation.md)
+- [development-navigator.md](01-product/development-navigator.md)
 - [executable-updates.md](01-product/executable-updates.md)
 
 ## 2. Architecture

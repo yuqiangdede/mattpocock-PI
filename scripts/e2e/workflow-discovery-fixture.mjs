@@ -13,6 +13,12 @@ import { formatSkillToolContent } from "../../apps/desktop/electron/main/skill-d
 import { IPC } from "../../packages/shared/src/protocol";
 import { createFreeTaskService } from "../../apps/desktop/electron/main/services/free-task-execution";
 import { registerFreeTaskIpc } from "../../apps/desktop/electron/main/ipc/free-task-ipc";
+import { createEventPersistence } from "../../apps/desktop/electron/main/runtime/event-persistence";
+import { PersistenceOutbox } from "../../apps/desktop/electron/main/persistence-outbox";
+import { InflightCheckpointer } from "../../packages/host-runtime/src/inflight-checkpoint";
+import { createNavigatorAnalysisService } from "../../apps/desktop/electron/main/services/navigator-analysis";
+import { registerNavigatorAnalysisIpc } from "../../apps/desktop/electron/main/ipc/navigator-analysis-ipc";
+import { resolveSkillDocument } from "../../apps/desktop/electron/main/skill-document";
 
 /** The process/provider edge is deterministic; Pi, Main admission and Host stay real. */
 export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, root }) {
@@ -39,6 +45,10 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
   let providerGate = new Promise((resolve) => { releaseProvider = resolve; });
   let mode = "normal";
   let prompts = 0;
+  let analysisRequests = 0;
+  let createAnalysisStream;
+  let releaseAnalysis = () => {};
+  const analysisGate = new Promise(resolve => { releaseAnalysis = resolve; });
   let skillLoads = 0;
   const skillIds = [];
   const skillBodies = [];
@@ -58,6 +68,33 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
     pluginActiveInProject: () => false,
     loadComposerTemplatesCached: async () => [],
   });
+  const analysisService = process.env.PI_DEVELOPMENT_NAVIGATOR === "1" ? createNavigatorAnalysisService({
+    getHost, acquireSessionOperation: coordination.acquireSessionOperation,
+    reportCleanupError: operation => logger.app("runtime", "warn", "analysis cleanup failed", { operation }),
+    catalog: path => catalog.buildComposerCommands(path),
+    loadSkill: (id, path) => resolveSkillDocument(id, path, {
+      builtin: () => null,
+      user: async (skillId, projectPath) => { const loaded = await getHost().call("skills.read", { id: skillId, projectPath }); return loaded.skill && loaded.body ? { ...loaded.skill, body: loaded.body, location: loaded.skill.path } : null; },
+      plugin: () => { throw new Error("Fixture has no plugin skills"); },
+    }),
+    provider: async (host, sessionId) => {
+      const { session } = await host.call("session.get", { id: sessionId });
+      if (!session) throw new Error("Fixture analysis session unavailable");
+      return { provider: { id: "workflow-fixture", name: "Fixture", baseUrl: "http://127.0.0.1:1/v1", modelId: "fixture-model", apiKey: "", authKind: "none", supportsReasoning: false, supportedThinkingLevels: ["off"] }, providerId: "workflow-fixture", modelId: "fixture-model", thinkingLevel: "off" };
+    },
+    stream: (_model, context) => {
+      analysisRequests++;
+      if (context.tools?.length) throw new Error("Navigation exposed model tools");
+      const evidence = JSON.parse(context.messages[0].content[0].text);
+      if (evidence.evidence.some(result => result.path === "navigator-result.md")) throw new Error("Navigation included an unchecked file");
+      if (!createAnalysisStream) throw new Error("Complete the fixture activity before navigation");
+      const stream = createAnalysisStream();
+      const message = { role: "assistant", api: "openai-completions", provider: "workflow-fixture", model: "fixture-model", content: [{ type: "text", text: JSON.stringify({ suggestions: [{ skillId: "to-spec", reason: "Preserve the agreed requirements", basis: ["Requirements discussion"] }, { skillId: "code-review", reason: "Review the recorded outcome", basis: ["Activity reply"] }] }) }], usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: "stop", timestamp: 1 };
+      void analysisGate.then(() => { stream.push({ type: "start", partial: message }); stream.push({ type: "done", reason: "stop", message }); stream.end(message); });
+      return stream;
+    },
+  }) : null;
+  if (analysisService) registerNavigatorAnalysisIpc(registrar, getHost, analysisService);
   if (process.env.PI_CODING_WORKBENCH === "1") {
     registrar.handle(IPC.invoke.settingsSet, settings => getHost().call("settings.set", settings));
     registrar.handle(IPC.invoke.skillBundleStatus, checks.status);
@@ -75,12 +112,25 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
     });
   }
   const finishTurn = async (sessionId, status, errorCode, { turnId }) => {
+    if (navigatorPersistence) await navigatorOutbox.flush(getHost);
     if (coordination.peekAbortReason(sessionId, turnId) === "aborted") { status = "aborted"; errorCode = "TURN_ABORTED"; }
     if (getHost()) await getHost().call("session.endTurn", { turnId, status, errorCode, createNotification: false });
     if (activeTurns.get(sessionId) === turnId) activeTurns.delete(sessionId);
     bridge.endTurn(sessionId, turnId, status === "completed" ? "completed" : status === "aborted" ? "canceled" : "failed");
     bridge.agentHost.kick(sessionId);
   };
+  const navigatorOutbox = process.env.PI_DEVELOPMENT_NAVIGATOR === "1" ? new PersistenceOutbox(dataDir, (level, message, data) => logger.app("persistence", level, message, data)) : null;
+  const navigatorCheckpointer = process.env.PI_DEVELOPMENT_NAVIGATOR === "1" ? new InflightCheckpointer(checkpoint => getHost().call("session.saveInflightMessage", checkpoint)) : null;
+  const navigatorPersistence = process.env.PI_DEVELOPMENT_NAVIGATOR === "1" ? createEventPersistence({
+    runtimeState: { get host() { return getHost(); } }, steeringReplies: new Set(), activeTurns,
+    activeToolCalls: new Map(), activeToolCallKey: (sessionId, id) => `${sessionId}:${id}`,
+    approvedExecutionIdsBySession: new Map(), approvedExecutionTurns: new Map(), pendingExecutionFinishes: new Map(),
+    planSubmissionTurnIds: new Set(), planSubmissionTurnKey: (sessionId, id) => `${sessionId}:${id}`,
+    inflightCheckpointer: navigatorCheckpointer, persistenceOutbox: navigatorOutbox,
+    addActiveTurnUsage: coordination.addActiveTurnUsage, logger, finishTurn,
+    isStaleTerminalEvent: envelope => activeTurns.get(envelope.sessionId) !== envelope.turnId,
+    finishApprovedExecution: async () => {}, emitAgentEvent: () => {},
+  }) : null;
   const sidecar = {
     setProjectInstructionRoot() {}, clearProjectInstructionRoot() {}, clearVendorAuthBindings() {},
     async call(method, input) {
@@ -99,6 +149,7 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
       transformed = input.content;
       const { DesktopAgentRuntime } = await import(pathToFileURL(join(root, "packages/agent-runtime/dist/index.js")).href);
       const { createAssistantMessageEventStream } = await import(pathToFileURL(join(root, "packages/agent-runtime/node_modules/@earendil-works/pi-ai/dist/index.js")).href);
+      createAnalysisStream = createAssistantMessageEventStream;
       const host = getHost();
       const runtimeHost = {
         async call(name, params) {
@@ -115,7 +166,7 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
           return host.call(name, params);
         },
       };
-      const runtime = new DesktopAgentRuntime({ ...input, host: runtimeHost, onEvent: () => {} });
+      const runtime = new DesktopAgentRuntime({ ...input, host: runtimeHost, onEvent: envelope => navigatorPersistence?.persistAgentEvent(envelope) });
       runtimes.add(runtime);
       boundRuntimes.set(input.turnId, runtime);
       let round = 0;
@@ -243,7 +294,8 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
       if (name === "releaseDispatch") { releaseDispatch(); return; }
       if (name === "releaseProvider") { releaseProvider(); await Promise.all([...tasks]); return; }
       if (name === "reset") { mode = input ?? "normal"; launchGate = new Promise((resolve) => { releaseLaunch = resolve; }); providerGate = new Promise((resolve) => { releaseProvider = resolve; }); return; }
-      if (name === "snapshot") return { prompts, skillLoads, transformed, skillIds, skillBodies };
+      if (name === "releaseAnalysis") { releaseAnalysis(); return; }
+      if (name === "snapshot") return { prompts, analysisRequests, skillLoads, transformed, skillIds, skillBodies };
       if (name === "updateActionSkill") return getHost().call("skills.update", { id: "code-review", name: "code-review", level: "project", projectPath: input.path, body: input.body });
       if (name === "corruptActionConfig") return writeFile(join(dataDir, "extensions", "coding-actions.json"), "{invalid-actions", "utf8");
       if (name === "readActionConfig") return readFile(join(dataDir, "extensions", "coding-actions.json"), "utf8");
@@ -255,7 +307,7 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
       if (name === "disableSkill") return getHost().call("skills.setEnabled", { id: "grill-with-docs", level: "project", projectPath: input.path, enabled: input.enabled });
       throw new Error(`Unknown Workflow fixture action: ${name}`);
     },
-    async dispose() { checks.stop(); releaseLaunch(); releaseProvider(); await Promise.all([...runtimes].map((runtime) => runtime.dispose())); await Promise.all([...tasks]); },
+    async dispose() { checks.stop(); releaseLaunch(); releaseProvider(); releaseAnalysis(); await analysisService?.dispose(); await Promise.all([...runtimes].map((runtime) => runtime.dispose())); await Promise.all([...tasks]); await navigatorOutbox?.flush(getHost); navigatorCheckpointer?.dispose(); },
   };
 }
 

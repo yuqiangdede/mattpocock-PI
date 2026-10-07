@@ -114,6 +114,9 @@ const ORDER_BY: &str = "ORDER BY (priority IS NULL) ASC, priority ASC, position 
 /// the existing entry when the input hash matches and fails with
 /// `IDEMPOTENCY_CONFLICT` otherwise; a full queue fails with `QUEUE_FULL`.
 pub fn push(db: &Database, input: QueuedTurnInput) -> Result<QueuedTurn> {
+    if crate::navigator::analysis::reserved(db, &input.session_id)? {
+        return Err(anyhow!("AGENT_BUSY"));
+    }
     if let Some(origin) = &input.voice_origin {
         if origin.call_id.trim().is_empty()
             || origin.call_id.len() > 128
@@ -532,7 +535,11 @@ mod tests {
         assert_eq!(entries[0].content, "existing");
         assert!(entries[0].user_message_id.is_none());
         assert!(entries[0].voice_origin.is_none());
-        assert_eq!(crate::db::SCHEMA_VERSION, 21);
+        let version: i64 = db
+            .conn()
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, crate::db::SCHEMA_VERSION);
     }
 
     #[test]
