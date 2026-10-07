@@ -5,6 +5,7 @@ import { Button, Checkbox } from "../../components/ui";
 import { api } from "../../lib/api";
 import { useAppStore } from "../../stores/app-store";
 import { createNavigatorAnalysisController } from "./navigator-analysis-controller";
+import { loadNavigatorSkillAvailability } from "./navigator-skill-availability";
 
 export type NavigatorSuggestionSelection = { activity: EngineeringActivity; analysis: Analysis; suggestion: NavigatorSuggestion };
 export function NavigatorAnalysis({ activity, busy, onPrepare }: {
@@ -28,13 +29,9 @@ export function NavigatorAnalysis({ activity, busy, onPrepare }: {
   useEffect(() => {
     let current = true;
     setAvailable(null);
-    void Promise.all([
-      api.listUserSkills({ level: "global", projectPath }),
-      projectPath ? api.listUserSkills({ level: "project", projectPath }) : Promise.resolve({ skills: [] }),
-    ]).then(([global, project]) => {
+    void loadNavigatorSkillAvailability(api.composerCommands).then(skills => {
       if (!current) return;
-      const skills = new Map([...global.skills, ...project.skills].map(skill => [skill.id, skill]));
-      setAvailable(new Set([...skills.values()].filter(skill => skill.enabled).map(skill => skill.id)));
+      setAvailable(skills);
     }).catch(() => { if (current) setAvailable(null); });
     return () => { current = false; };
   }, [activity.sessionId, projectPath, state.snapshot]);

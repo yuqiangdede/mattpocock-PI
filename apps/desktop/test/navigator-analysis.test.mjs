@@ -5,6 +5,21 @@ register(new URL("./helpers/engineering-settings-imports.mjs", import.meta.url))
 const { navigatorAnalysisInput, navigatorAnalysisCancelInput, parseNavigatorSuggestions } = await import("@pi-desktop/shared");
 const { createNavigatorAnalysisController } = await import("../src/features/navigator/navigator-analysis-controller.ts");
 const { catalogs } = await import("@pi-desktop/i18n");
+const { loadNavigatorSkillAvailability } = await import("../src/features/navigator/navigator-skill-availability.ts");
+
+test("导航消费Launcher有效catalog，保留plugin与bundled Skill并尊重禁用及遮蔽结果", async () => {
+  const available = await loadNavigatorSkillAvailability(async () => ({ commands: [
+    { name: "plugin-review", title: "Plugin review", kind: "skill", skillId: "plugin-review" },
+    { name: "ask-matt", title: "Ask Matt", kind: "skill", skillId: "ask-matt" },
+    { name: "shared-name", title: "Winning project Skill", kind: "skill", skillId: "project-winner" },
+    { name: "disabled-skill", title: "Template shadows disabled Skill", kind: "template" },
+    { name: "plugin-command", title: "Plugin command", kind: "plugin", skillId: "not-a-skill" },
+  ] }));
+  assert.deepEqual([...available], ["plugin-review", "ask-matt", "project-winner"]);
+  assert.equal(available.has("disabled-skill"), false);
+  assert.equal(available.has("global-shadowed"), false);
+  await assert.rejects(loadNavigatorSkillAvailability(async () => { throw new Error("catalog unavailable"); }), /catalog unavailable/);
+});
 
 test("九个locale均具有一致的分析文案键与状态键", () => {
   const expected = Object.keys(catalogs.en.navigator.analysis).sort();
