@@ -8,7 +8,8 @@ import { Composer } from "../../apps/desktop/src/components/Composer";
 import { useAppStore } from "../../apps/desktop/src/stores/app-store";
 import { api } from "../../apps/desktop/src/lib/api";
 import { loadCodingActions } from "../../apps/desktop/src/features/extensions/coding-action-state";
-import { readEditorValue } from "../../apps/desktop/src/features/chat/composer/editor";
+import { nextChipToken, readEditorValue } from "../../apps/desktop/src/features/chat/composer/editor";
+import { readComposerDraft } from "../../apps/desktop/src/lib/composer-draft-cache";
 import { until, check, click, fill } from "./skill-shortcuts-helpers";
 
 declare global {
@@ -121,16 +122,35 @@ globalThis.navigatorProbe = async () => {
   check((await api.getSession(sessionId)).session?.messages.length === session?.messages.length, "Hiding deleted source messages");
   await click(i18n.t("navigator.restore"));
   await until(() => visibleCount() === 1);
+  const token = nextChipToken();
+  const existing = `Keep this draft and file ${token}`;
+  const reference = { path: `${new URLSearchParams(location.search).get("projectA")}/navigator-result.md`, name: "navigator-result.md", kind: "file" as const, token };
+  useAppStore.setState({ composerPrefill: { sessionId, text: existing, fileReferences: [reference] } });
+  await until(() => readEditorValue(editor()) === existing);
+  await fixture("holdCatalog");
+  const prepare = await until(() => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.trim() === i18n.t("navigator.analysis.prepare") && !button.disabled));
+  prepare.click(); prepare.click();
+  await fixture("waitForCatalog");
+  editor().focus(); await fixture("typeText", " Typed while loading.");
+  await fixture("releaseCatalog");
+  await until(() => readEditorValue(editor()).startsWith("/to-spec") && readEditorValue(editor()).includes("Historical basis") && readEditorValue(editor()).includes("Typed while loading."));
+  check(readEditorValue(editor()).includes("Keep this draft"), "Recommendation overwrote the draft");
+  const draft = await until(() => readComposerDraft(sessionId)?.fileReferences.some(item => item.path === reference.path) && readComposerDraft(sessionId));
+  check(draft?.fileReferences.length === 1, "Recommendation duplicated the attachment");
+  check(readEditorValue(editor()).split("Follow-up goal").length === 2, "Double click inserted duplicate recommendation");
+  check((await fixture("snapshot") as { prompts: number }).prompts === 2, "Preparing a recommendation sent automatically");
+  await send(); await completed(sessionId, 3);
+  check((await records()).activities.length === 2, "Manual follow-up did not create a new activity");
   return { activityId: activity.id, prompts: (await fixture("snapshot") as { prompts: number }).prompts };
 };
 globalThis.navigatorRestored = async checkpoint => {
   const { records } = await initialize();
   const activity = await until(async () => (await records()).activities.find(item => item.id === checkpoint.activityId));
   check(activity.requests.length === 2 && activity.endedAt !== null && !activity.hidden, "Restart changed activity history");
-  await until(() => visibleCount() === 1);
+  await until(() => visibleCount() === 2);
   check((await fixture("snapshot") as { prompts: number }).prompts === checkpoint.prompts, "Restart replayed execution");
   const analyses = await api.listNavigatorAnalyses({ sessionId: activity.sessionId, activityId: activity.id });
   check(analyses.analyses[0]?.status === "completed" && analyses.analyses[0]?.suggestions.length === 2, "Restart lost navigation suggestions");
   check((await fixture("snapshot") as { analysisRequests: number }).analysisRequests === 1, "Restart replayed navigation analysis");
-  return { ok: true, multiRound: true, boundaries: true, results: true, history: true, persisted: true, noReplay: true, analysis: true };
+  return { ok: true, multiRound: true, boundaries: true, results: true, history: true, persisted: true, noReplay: true, analysis: true, manualDraft: true };
 };
