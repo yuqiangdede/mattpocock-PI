@@ -46,8 +46,7 @@
 
 - **Matt Pocock 工程技能集**：内置来自 [mattpocock/skills](https://github.com/mattpocock/skills) 的工程技能及配套资源，支持需求讨论、技术设计、开发、测试、代码审查与复盘；可通过原生 Skills 入口管理和调用。
 - **Coding Actions（Skill Launcher）**：提供需求讨论、固化需求、技术设计、拆分任务、实现和代码审查六个默认动作，以及询问下一步、诊断 Bug 和更多技能入口。选择动作后填入可编辑的聊天草稿，由用户手动发送；支持编辑名称、提示词、顺序、启用状态，以及 Actions JSON 导入导出。
-- **工程 Workflow**：按项目管理从需求探索、规格、任务拆分到实现、审查和复盘的流程，支持显式阶段验收、重新打开阶段、执行历史和产物引用。Workflow 与 Coding Actions 独立使用。
-- **需求版本确认**：在 Workflow 中预览并确认需求文件的当前内容版本，保留确认历史；文件仍可编辑，内容变更后可重新确认。
+- **阶段一边界**：原生 Workflow 与需求确认界面入口已撤下，保留历史数据和 Host API；Coding Actions 不依赖阶段、验收或自动推进。
 - **独立更新控制**：分别查看应用与工程技能的版本和更新状态，由用户显式安装更新；技能维护支持备份、恢复并保留本地修改。
 
 了解更多：[工程 Workflow](docs/user/engineering-workflow.md) · [Coding Actions](docs/project/skill-launcher-spec.md) · [工程技能分发](docs/project/engineering-skills-distribution.md) · [更新机制](docs/spec/01-product/executable-updates.md)。
@@ -786,7 +785,7 @@ PI-Desktop 使用 **GNU Lesser General Public License v3.0**。
 
 ### 阶段一 Skill Launcher
 
-0.16.1-beta.2 候选提供六个独立 Coding Actions，通过当前会话的原生 Pi Skills
+0.16.2 正式版提供六个独立 Coding Actions，通过当前会话的原生 Pi Skills
 执行。在扩展设置中编辑名称、提示词、顺序和启用状态，并导入导出 Actions JSON。
 旧快捷提示词迁移后保留原数据；损坏配置回退不阻塞 Chat，显式重置前备份原文件。
 Development Navigator 留作独立的第二阶段需求。

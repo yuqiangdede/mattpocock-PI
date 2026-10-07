@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const ptBREntries: ChangelogEntry[] = [
   {
+    "version": "0.16.2",
+    "date": "2026-10-07",
+    "highlights": [
+      "Coding Actions independentes preparam rascunhos editáveis de Skills nativas; somente o envio manual inicia o agente.",
+      "Consulte e restaure descrições e instruções padrão localizadas, preservando nomes, instruções, ordem e ativação personalizados.",
+      "Mantenha o próximo passo, diagnóstico de erros e mais Skills agrupadas; as entradas nativas de Workflow são retiradas e os dados históricos e APIs do Host são preservados."
+    ]
+  },
+
+  {
     "version": "0.16.1",
     "date": "2026-10-06",
     "highlights": [
