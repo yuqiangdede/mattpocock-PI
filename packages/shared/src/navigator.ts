@@ -26,3 +26,12 @@ export function navigatorSessionInput(input: unknown): { sessionId: string } {
   }
   return { sessionId: input.sessionId };
 }
+export function navigatorVisibilityInput(input: unknown): { sessionId: string; activityId: string; hidden: boolean } {
+  const session = navigatorSessionInput(input);
+  if (!input || typeof input !== "object" || !("activityId" in input) ||
+      typeof input.activityId !== "string" || !input.activityId.trim() || input.activityId.length > 256 ||
+      input.activityId.includes("\0") || !("hidden" in input) || typeof input.hidden !== "boolean" || session.sessionId.includes("\0")) {
+    throw new Error("activityId and hidden required");
+  }
+  return { ...session, activityId: input.activityId, hidden: input.hidden };
+}

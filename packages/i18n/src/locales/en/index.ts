@@ -2,6 +2,7 @@ import { engineeringSkillGuides } from "./engineering-skill-guides.js";
 
 export const en = {
   navigator: {
+    manageHistory: "Manage history", hide: "Hide", restore: "Restore", hideExplanation: "Hiding only changes this view. Messages, files and activity state remain intact.", historyFailed: "Could not update history: {{detail}}",
     unsupported: 'Imported native Pi conversations do not provide Host-bound navigation records yet. Chat remains available.',
     actualUseObserved: 'Skill loading observed in this request.',
     title: 'Navigator', refresh: 'Refresh', loading: 'Loading activity records…',

@@ -212,3 +212,26 @@ pub fn list(db: &Database, session: &str) -> Result<Value> {
     }
     Ok(json!({"activities":activities,"unavailableCount":unavailable_count}))
 }
+
+/// Presentation-only change. Unknown formats and foreign activity identities are immutable.
+pub fn set_hidden(db: &Database, session: &str, activity: &str, hidden: bool) -> Result<Value> {
+    let tx = db.conn().unchecked_transaction()?;
+    let schema: Option<i64> = tx
+        .query_row(
+            "SELECT schema_version FROM navigator_activities WHERE id=?1 AND session_id=?2",
+            params![activity, session],
+            |r| r.get(0),
+        )
+        .optional()?;
+    match schema {
+        Some(1) => {}
+        Some(_) => return Err(anyhow!("unsupported activity format")),
+        None => return Err(anyhow!("activity not found")),
+    }
+    tx.execute(
+        "UPDATE navigator_activities SET hidden=?3 WHERE id=?1 AND session_id=?2",
+        params![activity, session, hidden],
+    )?;
+    tx.commit()?;
+    Ok(json!({"ok":true}))
+}

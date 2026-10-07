@@ -8,6 +8,82 @@ fn fixture() -> (tempfile::TempDir, Database, String) {
     let session = sessions::create_session(&db, None, None, None, None, None).unwrap();
     (directory, db, session.id)
 }
+
+#[test]
+fn navigator_hide_restore_restart_preserves_source_and_activity_state() {
+    let (directory, db, session) = fixture();
+    let turn = submit(&db, &session, "history", &["to-spec"]);
+    let id = format!("navigator:{session}:history");
+    db.conn()
+        .execute("UPDATE navigator_activities SET ended_at=123", [])
+        .unwrap();
+    set_hidden(&db, &session, &id, true).unwrap();
+    set_hidden(&db, &session, &id, true).unwrap();
+    assert_eq!(
+        list(&db, &session).unwrap()["activities"][0]["hidden"],
+        true
+    );
+    assert_eq!(
+        list(&db, &session).unwrap()["activities"][0]["endedAt"],
+        123
+    );
+    assert_eq!(list(&db, &session).unwrap()["activities"][0]["version"], 1);
+    sessions::end_turn(&db, &turn, "completed", None, None, false).unwrap();
+    drop(db);
+    let db = Database::open(&directory.path().join("navigator.sqlite")).unwrap();
+    assert_eq!(
+        list(&db, &session).unwrap()["activities"][0]["hidden"],
+        true
+    );
+    set_hidden(&db, &session, &id, false).unwrap();
+    assert_eq!(
+        list(&db, &session).unwrap()["activities"][0]["requests"][0]["outcome"],
+        "normal"
+    );
+    let messages: i64 = db
+        .conn()
+        .query_row(
+            "SELECT COUNT(*) FROM messages WHERE session_id=?1",
+            [&session],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(messages, 1);
+    let other = sessions::create_session(&db, None, None, None, None, None).unwrap();
+    assert!(set_hidden(&db, &other.id, &id, true).is_err());
+    db.conn()
+        .execute("UPDATE navigator_activities SET schema_version=99", [])
+        .unwrap();
+    assert!(set_hidden(&db, &session, &id, true).is_err());
+    assert_eq!(list(&db, &session).unwrap()["unavailableCount"], 1);
+}
+
+#[test]
+fn navigator_session_deletion_cascades_unknown_history_and_late_events_cannot_restore_it() {
+    let (_directory, db, session) = fixture();
+    let turn = submit(&db, &session, "delete", &["to-spec"]);
+    db.conn()
+        .execute(
+            "UPDATE navigator_activities SET schema_version=99, hidden=1",
+            [],
+        )
+        .unwrap();
+    assert!(sessions::delete_session(&db, &session).unwrap());
+    assert!(!sessions::delete_session(&db, &session).unwrap());
+    mark_unresolved(&db, &turn).unwrap();
+    cancel_queue(&db, "late-queue").unwrap();
+    record_queue(&db, "late-queue", &["to-spec".into()]).unwrap();
+    assert!(set_hidden(&db, &session, &format!("navigator:{session}:delete"), false).is_err());
+    for table in ["navigator_activities", "navigator_requests"] {
+        assert_eq!(
+            db.conn()
+                .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r
+                    .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+    }
+}
 fn submit(db: &Database, session: &str, message: &str, skills: &[&str]) -> String {
     let turn = sessions::begin_turn(db, session, None, None).unwrap();
     let mentions: Vec<Value> = skills

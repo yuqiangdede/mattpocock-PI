@@ -12,6 +12,15 @@ pub(super) fn handle(db: &Database, method: &str, params: &Value) -> Result<Valu
     };
     let result = match method {
         "navigator.list" => crate::navigator::list(db, text("sessionId")?),
+        "navigator.setHidden" => crate::navigator::set_hidden(
+            db,
+            text("sessionId")?,
+            text("activityId")?,
+            params
+                .get("hidden")
+                .and_then(Value::as_bool)
+                .ok_or_else(|| rpc_err(1002, "hidden required", "INVALID_PARAMS"))?,
+        ),
         "navigator.queue" => {
             let skills: Vec<String> = serde_json::from_value(
                 params

@@ -5,6 +5,7 @@ import { api } from "../../lib/api";
 import { useAppStore } from "../../stores/app-store";
 import { Button, Panel } from "../../components/ui";
 import { createNavigatorReader } from "./navigator-reader";
+import { NavigatorHistoryControls } from "./NavigatorHistoryControls";
 
 export function NavigatorTab() {
   const { t } = useTranslation();
@@ -40,6 +41,7 @@ export function NavigatorView({ sessionId, snapshot, error, onRefresh }: {
       <Button disabled={!sessionId || unsupported} onClick={onRefresh}>{t("navigator.refresh")}</Button>
     </div>
     <p>{t("navigator.explanation")}</p>
+    {sessionId && !unsupported && snapshot && <NavigatorHistoryControls key={sessionId} sessionId={sessionId} activities={snapshot.activities} onChanged={onRefresh} />}
     {unsupported && <p role="status">{t("navigator.unsupported")}</p>}
     {error && <p role="alert">{t("navigator.loadFailed", { detail: error })}</p>}
     {!sessionId ? <p>{t("navigator.sessionRequired")}</p> : !unsupported && !snapshot && !error ? <p role="status">{t("navigator.loading")}</p> : null}

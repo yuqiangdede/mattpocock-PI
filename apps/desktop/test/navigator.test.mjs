@@ -10,6 +10,40 @@ import { register } from "node:module";
 register(new URL("./helpers/engineering-settings-imports.mjs", import.meta.url));
 const { findSkillMentions } = await import("@pi-desktop/shared");
 const { createNavigatorReader } = await import("../src/features/navigator/navigator-reader.ts");
+const { createNavigatorHistory } = await import("../src/features/navigator/navigator-history.ts");
+const { navigatorVisibilityInput } = await import("@pi-desktop/shared");
+const { registerNavigatorIpc } = await import("../electron/main/ipc/navigator-ipc.ts");
+const { IPC } = await import("@pi-desktop/shared");
+
+test("隐藏恢复通过公共 IPC 转发 Host，非法输入不能触及存储", async () => {
+  const handlers = new Map(); const calls = [];
+  registerNavigatorIpc({ handle(channel, fn) { handlers.set(channel, fn); } }, () => ({ call(method, input) { calls.push({ method, input }); return Promise.resolve({ ok: true }); } }));
+  const hide = handlers.get(IPC.invoke.navigatorSetHidden);
+  await hide({ sessionId: "a", activityId: "one", hidden: true });
+  await hide({ sessionId: "a", activityId: "one", hidden: false });
+  assert.deepEqual(calls.map(call => call.input.hidden), [true, false]);
+  assert.ok(calls.every(call => call.method === "navigator.setHidden"));
+  await assert.rejects(hide({ sessionId: "a", activityId: "one", hidden: "yes" }));
+  assert.equal(calls.length, 2);
+});
+
+test("历史入口隐藏与恢复同一活动，重复点击、切换和删除后的失败不串会话", async () => {
+  const activities = [{ id: "one", hidden: false, endedAt: null, version: 1 }];
+  const writes = []; let refreshed = 0; const failures = [];
+  const history = createNavigatorHistory((session, id, hidden) => new Promise((resolve, reject) => writes.push({ session, id, hidden, resolve, reject })), () => refreshed++, error => failures.push(error));
+  history.select("a"); const hide = history.setHidden("one", true);
+  await history.setHidden("one", true); assert.equal(writes.length, 1);
+  activities[0].hidden = writes[0].hidden; writes[0].resolve({ ok: true }); await hide;
+  assert.equal(refreshed, 1); assert.equal(activities.filter(item => !item.hidden).length, 0);
+  const restore = history.setHidden("one", false); activities[0].hidden = writes[1].hidden; writes[1].resolve({ ok: true }); await restore;
+  assert.equal(activities.filter(item => !item.hidden).length, 1); assert.equal(activities[0].endedAt, null); assert.equal(activities[0].version, 1);
+  const stale = history.setHidden("one", true); history.select("b"); writes[2].reject(new Error("activity not found")); await stale;
+  assert.equal(refreshed, 2); assert.deepEqual(failures, []);
+  const deleted = history.setHidden("deleted", false); writes[3].reject(new Error("activity not found")); await deleted;
+  assert.match(failures[0], /activity not found/); history.dispose();
+  assert.deepEqual(navigatorVisibilityInput({ sessionId: "a", activityId: "one", hidden: false }), { sessionId: "a", activityId: "one", hidden: false });
+  assert.throws(() => navigatorVisibilityInput({ sessionId: "a", activityId: "one", hidden: "false" }));
+});
 
 test("实际发送的按钮草稿与手动 slash 共用 Skill 解析，删除 marker 后不创建请求", () => {
   const installed = new Map([["to-spec", "to-spec"], ["code-review", "code-review"]]);

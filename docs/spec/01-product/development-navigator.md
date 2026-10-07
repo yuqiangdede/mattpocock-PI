@@ -139,6 +139,13 @@ Neither turn termination nor activity ending approves requirements or Review.
   until native reconciliation establishes their status.
 - Hiding is reversible presentation metadata; association removal never removes
   source files. Do not preserve navigation-only copies after conversation deletion.
+- `navigator.setHidden` accepts conversation/activity identity and a boolean;
+  it changes only visibility, never activity ending, continuation ownership,
+  outcome, or content version. Unknown formats cannot be edited. History controls
+  expose both visible and hidden activities for reversible organization.
+- Navigation tables belong to their session/activity through `ON DELETE CASCADE`.
+  Later result/analysis tables must use this same lifecycle, with no independent
+  retention or recreation from late events after session deletion.
 - All visible copy and accessible labels use existing i18n conventions. Keyboard
   interaction and narrow-panel usability are part of acceptance.
 
