@@ -4,6 +4,15 @@ import { register } from "node:module";
 register(new URL("./helpers/engineering-settings-imports.mjs", import.meta.url));
 const { navigatorAnalysisInput, navigatorAnalysisCancelInput, parseNavigatorSuggestions } = await import("@pi-desktop/shared");
 const { createNavigatorAnalysisController } = await import("../src/features/navigator/navigator-analysis-controller.ts");
+const { catalogs } = await import("@pi-desktop/i18n");
+
+test("九个locale均具有一致的分析文案键与状态键", () => {
+  const expected = Object.keys(catalogs.en.navigator.analysis).sort();
+  for (const catalog of Object.values(catalogs)) {
+    assert.deepEqual(Object.keys(catalog.navigator.analysis).sort(), expected);
+    assert.deepEqual(Object.keys(catalog.navigator.analysis.status).sort(), Object.keys(catalogs.en.navigator.analysis.status).sort());
+  }
+});
 
 test("分析合同只接受唯一证据 ID 和当前版本，生成内容只允许可用 Skill 建议", () => {
   const input = { sessionId: "s", activityId: "a", expectedVersion: 2, requestId: "r", selectedResultIds: ["f"] };
