@@ -101,10 +101,10 @@
 - OpenAI Codex OAuth models can now opt into provider-hosted native web search.
   The feature remains off by default and search history is replayed only for
   the same Codex model.
-# Development Navigator implementation candidate
+
+## Development Navigator implementation candidate
 
 - Adds planned conversation-scoped engineering activities, explicit multi-round
   boundaries, evidence inspection, and optional ask-matt navigation analysis.
 - Recommendations prepare editable context drafts; explicit Send remains required.
 - Candidate under development in PR #53; not released or accepted as verified.
-
