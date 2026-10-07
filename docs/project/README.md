@@ -1,5 +1,13 @@
 # Project Tracking
 
+- Engineering product direction: [three-stage design](engineering-three-stage-design.md) — Skill Launcher → Development Navigator → Engineering Control Surface; stage boundaries, acceptance outcomes, and the first navigation loop.
+
+- Development Navigator: [first-release requirements](development-navigator-requirements.md) — Q1–Q24 and multi-turn engineering activities accepted; no implementation authorization.
+
+- Development Navigator specification: [first-release product contract](../spec/01-product/development-navigator.md); synthesized from accepted discovery, with user-path acceptance and technical feasibility gates.
+
+- Development Navigator delivery backlog: [six tickets and dependencies](development-navigator-tickets.md), [specification #46](https://github.com/yuqiangdede/mattpocock-PI/issues/46) and implementation issues #47–#52; published, implementation not started.
+
 - 当前编码入口方向：[阶段一 Skill Launcher](skill-launcher-spec.md)。#31–#37 按 CodingAction → 原生 Skill → 当前 Session Pi Agent 重写；旧快捷按钮规格仅保留历史，Development Navigator 留待第二阶段。
 
 - Windows 0.16.1-beta.2：[发布说明](windows-release-notes-0.16.1-beta.2.md)、[最新主分支打包验收](windows-release-acceptance-2026-10-07-beta2.md) 与 [GitHub Release](https://github.com/yuqiangdede/mattpocock-PI/releases/tag/v0.16.1-beta.2)。
