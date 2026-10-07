@@ -31,8 +31,10 @@ export type ChangelogEntry = {
 const enEntries: ChangelogEntry[] = [
   {
     version: "0.16.1",
-    date: "2026-10-04",
+    date: "2026-10-06",
     highlights: [
+      "Run six independent Coding Actions through the current session’s native Pi Skills; edit names, prompts, order and enabled state in Extension Settings.",
+      "Keep existing shortcut prompts when upgrading; import or export Actions JSON, and safely reset damaged configuration while backing up the original file.",
       "Confirm a specification content version from Composer or Workflow; changes require renewed human confirmation.",
       "Read skill usage guidance and examples directly from Composer shortcuts.",
       "Explicitly update the app or engineering skills in Settings, with channel selection and skill backup recovery.",
@@ -911,8 +913,10 @@ const enEntries: ChangelogEntry[] = [
 const zhCNEntries: ChangelogEntry[] = [
   {
     version: "0.16.1",
-    date: "2026-10-04",
+    date: "2026-10-06",
     highlights: [
+      "通过当前会话的原生 Pi Skills 执行六个独立编码动作；在扩展设置中编辑名称、提示词、顺序和启用状态。",
+      "升级保留旧快捷提示词；支持 Actions JSON 导入导出，损坏配置可安全恢复并保留原文件备份。",
       "在 Composer 或 Workflow 人工确认规格内容版本；内容变化后重新确认。",
       "直接在 Composer 技能快捷入口查看使用说明和示例。",
       "在设置中明确更新应用或工程技能，支持通道选择与技能备份恢复。",
@@ -1791,8 +1795,10 @@ const zhCNEntries: ChangelogEntry[] = [
 const zhTWEntries: ChangelogEntry[] = [
   {
     version: "0.16.1",
-    date: "2026-10-04",
+    date: "2026-10-06",
     highlights: [
+      "透過目前工作階段的原生 Pi Skills 執行六個獨立編碼動作；在擴充設定中編輯名稱、提示詞、順序與啟用狀態。",
+      "升級保留舊快捷提示詞；支援 Actions JSON 匯入匯出，損壞設定可安全還原並保留原檔備份。",
       "在 Composer 或 Workflow 人工確認規格內容版本；內容變更後重新確認。",
       "直接在 Composer 技能快捷入口查看使用說明和範例。",
       "在設定中明確更新應用程式或工程技能，支援通道選擇與技能備份還原。",

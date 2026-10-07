@@ -3,8 +3,10 @@ import type { ChangelogEntry } from "./changelog.js";
 export const ptBREntries: ChangelogEntry[] = [
   {
     "version": "0.16.1",
-    "date": "2026-10-04",
+    "date": "2026-10-06",
     "highlights": [
+      "Execute seis Coding Actions independentes com os Pi Skills nativos da sessão; edite nomes, instruções, ordem e ativação nas configurações de extensões.",
+      "Preserve as instruções existentes ao atualizar; importe ou exporte Actions em JSON e recupere configurações danificadas mantendo uma cópia do arquivo original.",
       "Confirme uma versão da especificação no Composer ou Workflow; alterações exigem nova confirmação.",
       "Leia orientações e exemplos nos atalhos de habilidades do Composer.",
       "Atualize explicitamente o aplicativo ou as habilidades, com seleção de canal e restauração de backup.",

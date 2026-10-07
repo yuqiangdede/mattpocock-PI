@@ -3,8 +3,10 @@ import type { ChangelogEntry } from "./changelog.js";
 export const deEntries: ChangelogEntry[] = [
   {
     "version": "0.16.1",
-    "date": "2026-10-04",
+    "date": "2026-10-06",
     "highlights": [
+      "Sechs unabhängige Coding Actions über native Pi Skills der aktuellen Sitzung ausführen; Namen, Prompts, Reihenfolge und Aktivierung in den Erweiterungseinstellungen bearbeiten.",
+      "Vorhandene Shortcut-Prompts beim Upgrade behalten; Actions als JSON importieren oder exportieren und beschädigte Konfiguration mit Sicherung der Originaldatei wiederherstellen.",
       "Eine Spezifikationsversion in Composer oder Workflow manuell bestätigen; Änderungen erfordern eine neue Bestätigung.",
       "Hinweise und Beispiele direkt an den Composer-Skill-Schaltflächen lesen.",
       "App und Engineering-Skills ausdrücklich aktualisieren, mit Kanalauswahl und Wiederherstellung der Skill-Sicherung.",

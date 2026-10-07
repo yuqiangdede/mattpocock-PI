@@ -3,8 +3,10 @@ import type { ChangelogEntry } from "./changelog.js";
 export const esEntries: ChangelogEntry[] = [
   {
     "version": "0.16.1",
-    "date": "2026-10-04",
+    "date": "2026-10-06",
     "highlights": [
+      "Ejecuta seis Coding Actions independientes mediante los Pi Skills nativos de la sesión; edita nombres, instrucciones, orden y activación en los ajustes de extensiones.",
+      "Conserva las instrucciones existentes al actualizar; importa o exporta Actions en JSON y recupera la configuración dañada conservando una copia del archivo original.",
       "Confirma una versión de la especificación desde Composer o Workflow; los cambios requieren otra confirmación.",
       "Consulta instrucciones y ejemplos en los accesos de habilidades de Composer.",
       "Actualiza la aplicación o las habilidades explícitamente, con selección de canal y restauración de copia de seguridad.",

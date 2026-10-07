@@ -63,6 +63,6 @@ node scripts/e2e-electron-boot.mjs
 
 Development Navigator、ProjectState、Artifact Tracking / Freshness、Recommendation、Next Step、流程百分比、强制阶段跳转与自动推进均未实现。本次不做 Workflow 模板升级引擎。
 
-#31–#36 保留编号并重写为轻量动作能力；#37 改为阶段一验收与原生交互回归。建议后续导航能力另行提出需求与工单，不将强流程回填到这七张工单中。工单保留 open，等待 PR 合并后关闭。
+#31–#36 保留编号并重写为轻量动作能力；#37 改为阶段一验收与原生交互回归。PR #38 已于 2026-10-06 合并，#31–#37 已关闭。建议后续导航能力另行提出需求与工单，不将强流程回填到这七张工单中。
 
-本次未做安装包、签名、发布、干净机器或跨平台验收。
+实现交付时未做安装包验收。后续 Windows 候选包验收见 [2026-10-06 验收记录](windows-skill-launcher-acceptance-2026-10-06.md)；0.16.1-beta.2 正在做发布准备，尚未发布。签名、干净机器及跨平台验收仍未覆盖。
