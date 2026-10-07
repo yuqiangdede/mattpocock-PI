@@ -479,8 +479,8 @@ export function Composer({
     invalidatePromptEnhancement,
   });
   const codingAction = useCodingActionLauncher({
-    sessionId: activeSessionId, projectPath: workspacePath, blocked: sendBlocked || composing || !modelReady,
-    draftKey, readLiveDraft, draft, invalidatePromptEnhancement,
+    sessionId: activeSessionId, projectPath: workspacePath, blocked: inputBlocked || composing,
+    draftKey, readLiveDraft, fileReferencesRef, applyEditorDraft, invalidatePromptEnhancement,
   });
 
   // Plugin draft and attachment actions reach this composer while it takes input.
@@ -518,9 +518,10 @@ export function Composer({
     >
       <div className="composer-stack">
         <CodingWorkbench
-          disabled={sendBlocked || composing || !modelReady || !activeSessionId || codingAction.pending}
+          disabled={inputBlocked || composing || codingAction.pending}
           error={codingAction.error}
           onExecute={actionId => void codingAction.execute(actionId)}
+          onSelectSkill={skillId => void codingAction.selectSkill(skillId)}
         />
         {activeSessionId ? <TodoDock sessionId={activeSessionId} /> : null}
         {planCheckpoint?.status === "pending" ? (

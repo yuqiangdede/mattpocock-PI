@@ -5,6 +5,29 @@
 - Authority: User-confirmed [interaction design](../../project/skill-shortcuts-interaction-design.md).
 - Audience: Developers using PI-Desktop for coding work.
 
+## Current Coding Actions contract
+
+More groups available Matt skills by Requirements and exploration, Design and planning, Development and testing, Review and maintenance, and Collaboration and delivery. Unknown configured overflow appears under Custom actions. Empty groups are hidden. Grouping is presentation only: no stage prerequisites, execution order, or persisted configuration changes.
+
+The configurable Registry presents six default actions: Discuss requirements,
+Create specification, Technical design, Create tickets, Implement and Code review.
+Ask next step (`ask-matt`) and Diagnose bug (`diagnosing-bugs`) remain visible
+alongside the first six other enabled configured actions. More is always visible
+and exposes remaining enabled configured actions plus installed Matt skills from
+the shared engineering shortcut list, excluding skills already configured (including
+disabled entries). Matt labels and guidance are localized; imagegen and unrelated
+catalog skills are excluded. Existing configured common
+entries retain their labels, prompts and enabled state; no profile rewrite is
+required to restore the entry points. Missing skills remain visibly unavailable. Known engineering skills use localized
+timing, purpose and example tooltips on both primary and More entries; raw catalog
+descriptions are fallback only for unknown skills. Explicit configured descriptions
+remain verbatim.
+Selecting any action prepares an editable Composer draft and never
+submits. Undefined/null instructions use the localized engineering prompt matched
+by skill id; explicit empty instructions retain marker-only insertion. Custom
+instructions remain verbatim. Unknown custom skills have no built-in instruction.
+Existing text and attachments survive. Manual Send uses the native skill path.
+
 ## Interaction contract
 
 The Composer presents compact engineering skill buttons on both home and
@@ -62,9 +85,8 @@ without horizontal overflow; order stays fixed across task states.
 
 ## Requirements confirmation
 
-Confirm requirements is a native action beside Discuss requirements, rather
-than a skill shortcut. It opens the shared project specification preview and
-confirmation dialog without inserting text or sending the Composer draft.
+Coding Actions no longer exposes the separate Confirm requirements action.
+Workflow retains the project specification preview and confirmation dialog.
 See [Requirements Confirmation](requirements-confirmation.md) for content-version
 approval, history and freshness rules. Existing skill shortcuts retain the
 draft-only behavior described above.

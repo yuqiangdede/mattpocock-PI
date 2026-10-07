@@ -203,6 +203,11 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
   }
   return {
     async action(name, input) {
+      if (name === "movePointer") {
+        const { BrowserWindow } = await import("electron");
+        BrowserWindow.getAllWindows()[0].webContents.sendInputEvent({ type: "mouseMove", x: Math.round(input.x), y: Math.round(input.y) });
+        return;
+      }
       if (name === "pressKey") {
         const { BrowserWindow } = await import("electron");
         const contents = BrowserWindow.getAllWindows()[0].webContents;
