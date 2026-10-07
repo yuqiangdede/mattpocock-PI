@@ -109,6 +109,13 @@ Boundary changes require an idle native conversation with no queued requests and
 the current activity version; stale changes fail visibly and require refreshing.
 Binding and history survive restart without dispatching work.
 
+- Select the latest visible activity by default on conversation entry. History
+  remains selectable; new records do not replace an existing selection. Render
+  only the selected activity's results and analysis, retaining the bound-activity
+  controls even when that activity is hidden.
+- Preview every bound request and selected reply through its actual transcript
+  source, including unloaded messages. File preview shows paths and verification
+  status without reading contents or expanding the model's selected scope.
 - Navigation Analysis belongs to the selected ended activity, remains separate
   from its engineering requests, and retains generation time and input basis.
 - Invoke the installed native `ask-matt` only on explicit request while idle,
@@ -130,7 +137,10 @@ Binding and history survive restart without dispatching work.
   preparation. Explain missing/disabled Skills with existing settings access,
   without automatic installation, enablement, or substitution.
 - Preserve old suggestions on failure/cancellation and flag potential staleness
-  after new work. Historical file references do not establish current contents.
+  after new work, including ordinary chat outside the ended activity. Refresh
+  this authoritative status on new message identities, execution transitions, or
+  explicit refresh without automatic model calls or resetting pending ownership.
+  Historical file references do not establish current contents.
 - Prepare concise editable summaries and selected references through existing
   Composer insertion seams. Preserve text and attachments; Send remains explicit.
 
@@ -181,11 +191,11 @@ Assert visible results and stable contracts, not private calls or DOM structure.
 | --- | --- |
 | NAV-01 | Submitted button/slash intent initiates activities; unsent/removed markers do not. Ordinary answers continue explicitly bound activities. |
 | NAV-02 | Underlying execution outcomes and actual-use evidence are truthful; normal termination never approves work. |
-| NAV-03 | Full user journey preserves existing drafts/attachments and requires Send; analysis inputs and handoff context are editable. |
+| NAV-03 | Full user journey preserves existing drafts/attachments and requires Send; analysis inputs and handoff context are editable, and every multi-round request/reply source is inspectable. |
 | NAV-04 | Multiple Skills, missing results/files, failure/cancellation, and unavailable Skills remain explicit without fabricated success. |
 | NAV-05 | Busy races, duplicate clicks, analysis cancellation/failure/retry never duplicate admission or erase prior suggestions. |
 | NAV-06 | Project/conversation/activity switching and restart preserve ownership, history, and unresolved states without replay. |
-| NAV-07 | New work flags old recommendations; analyses retain their basis and do not recursively create activities. |
+| NAV-07 | Ordinary chat outside an ended activity flags old recommendations without rerunning analysis; analyses retain their basis and do not recursively create activities. |
 | NAV-08 | Hide/restore, association removal, and conversation deletion obey source-data and retention boundaries. |
 | NAV-09 | Permission/contract tests prove read-only analysis and selected scope; malicious or malformed suggestions cannot execute. |
 | NAV-10 | Multiple discussion rounds remain one activity. Ending is explicit, continued discussion remains possible, and each reply produces no next-step prompt or automatic analysis. |

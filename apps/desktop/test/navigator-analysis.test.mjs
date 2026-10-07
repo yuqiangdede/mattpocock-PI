@@ -103,3 +103,28 @@ test("取消后立即重试，旧请求迟到的成功或错误不能覆盖新�
   pending[1].resolve({ analyses: [{ id: "latest", status: "completed" }] }); await second;
   assert.equal(updates.at(-1).snapshot.analyses[0].id, "latest");
 });
+
+test("new ordinary work refreshes stale evidence without resetting pending analysis or cancel identity", async () => {
+  const reads = []; const pending = []; const updates = []; const cancels = [];
+  const controller = createNavigatorAnalysisController({
+    listNavigatorAnalyses(input) { return new Promise(resolve => reads.push({ input, resolve })); },
+    requestNavigatorAnalysis(input) { return new Promise(resolve => pending.push({ input, resolve })); },
+    async cancelNavigatorAnalysis(input) { cancels.push(input); return { analyses: [{ id: "old", status: "completed", stale: true }] }; },
+  }, state => updates.push(state));
+  const select = controller.select({ sessionId: "s", activityId: "a" });
+  reads[0].resolve({ analyses: [{ id: "old", status: "completed", stale: false }] }); await select;
+  const refresh = controller.refresh();
+  reads[1].resolve({ analyses: [{ id: "old", status: "completed", stale: true }] }); await refresh;
+  assert.equal(updates.at(-1).snapshot.analyses[0].stale, true);
+  const late = controller.refresh();
+  const request = controller.request(1, []);
+  reads[2].resolve({ analyses: [] }); await late;
+  assert.equal(updates.at(-1).pending, true);
+  assert.equal(updates.at(-1).requestId, pending[0].input.requestId);
+  await controller.refresh(); assert.equal(reads.length, 3);
+  await controller.cancel();
+  assert.equal(cancels[0].requestId, pending[0].input.requestId);
+  pending[0].resolve({ analyses: [{ id: "late", status: "completed" }] }); await request;
+  assert.equal(updates.at(-1).snapshot.analyses[0].id, "old");
+  assert.equal(updates.at(-1).snapshot.analyses[0].stale, true);
+});

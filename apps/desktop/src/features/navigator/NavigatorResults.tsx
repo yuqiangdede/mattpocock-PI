@@ -18,14 +18,16 @@ export function NavigatorResults({ activity, onChanged }: { activity: Engineerin
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const generation = useRef(0);
+  const previewRevision = useRef(0);
   const input = { sessionId: activity.sessionId, activityId: activity.id };
   useEffect(() => {
     const token = ++generation.current;
+    previewRevision.current++;
     setSnapshot(null); setPreview(null); setError(null); setBusy(false); busyRef.current = false;
     void api.listNavigatorResults({ sessionId: activity.sessionId, activityId: activity.id }).then(value => {
       if (token === generation.current) setSnapshot(value);
     }).catch(cause => { if (token === generation.current) setError(String(cause)); });
-    return () => { generation.current++; };
+    return () => { generation.current++; previewRevision.current++; };
   }, [activity.id, activity.sessionId, activity.version, messages]);
   const act = async (operation: () => Promise<NavigatorResultSnapshot>) => {
     if (busyRef.current) return;
@@ -36,7 +38,7 @@ export function NavigatorResults({ activity, onChanged }: { activity: Engineerin
     finally { if (token === generation.current) { busyRef.current = false; setBusy(false); } }
   };
   const open = async (result: NavigatorResult) => {
-    const token = generation.current;
+    const token = ++previewRevision.current;
     setPreview(null); setError(null);
     if (result.kind === "reply") {
       const message = messages.find(item => item.id === result.sourceMessageId);
@@ -44,15 +46,15 @@ export function NavigatorResults({ activity, onChanged }: { activity: Engineerin
       if (!result.sourceMessageId) { setPreview(t("navigator.results.sourceMissing")); return; }
       try {
         const context = await api.getSearchContext({ sessionId: activity.sessionId, messageId: result.sourceMessageId, query: "", direction: "around" });
-        if (token === generation.current) setPreview(context.messages.find(item => item.id === result.sourceMessageId)?.content ?? t("navigator.results.sourceMissing"));
-      } catch (cause) { if (token === generation.current) setError(`${t("navigator.results.sourceMissing")} ${String(cause)}`); }
+        if (token === previewRevision.current) setPreview(context.messages.find(item => item.id === result.sourceMessageId)?.content ?? t("navigator.results.sourceMissing"));
+      } catch (cause) { if (token === previewRevision.current) setError(`${t("navigator.results.sourceMissing")} ${String(cause)}`); }
       return;
     }
     if (result.kind === "validation") { setPreview(result.label); return; }
     try {
       const file = await api.readNavigatorResult({ ...input, resultId: result.id });
-      if (token === generation.current) setPreview(file.kind === "text" ? file.content ?? "" : t("navigator.results.nonText"));
-    } catch (cause) { if (token === generation.current) setError(t("navigator.results.fileUnavailable", { detail: String(cause) })); }
+      if (token === previewRevision.current) setPreview(file.kind === "text" ? file.content ?? "" : t("navigator.results.nonText"));
+    } catch (cause) { if (token === previewRevision.current) setError(t("navigator.results.fileUnavailable", { detail: String(cause) })); }
   };
   return <details><summary>{t("navigator.results.title")}</summary>
     {error && <p role="alert">{error}</p>}

@@ -100,7 +100,7 @@ export function createNavigatorAnalysisService(deps: NavigatorAnalysisDependenci
           work.toolIds.delete(toolCallId);
           if (!read.ok || typeof read.content !== "string") throw new Error(read.denied ? "Selected evidence read denied" : "Selected evidence unavailable");
           if (read.content.length > 65536) throw new Error("Selected evidence exceeds analysis limit");
-          evidence.push({ id: result.id, path: result.path, content: read.content, hash: hash(read.content), limit: 200 });
+          evidence.push({ ...result, content: read.content, hash: hash(read.content), limit: 200 });
         }
         const binding = await deps.provider(host, input.sessionId);
         check(work);

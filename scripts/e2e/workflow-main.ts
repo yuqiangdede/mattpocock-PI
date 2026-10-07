@@ -90,7 +90,10 @@ if (discoveryFixture) {
 } else {
   registerWorkflowIpc({ registrar, getHost: () => host });
 }
-if (process.env.PI_DEVELOPMENT_NAVIGATOR === "1") registerNavigatorIpc(registrar, () => host);
+if (process.env.PI_DEVELOPMENT_NAVIGATOR === "1") {
+  registerNavigatorIpc(registrar, () => host);
+  registrar.handle(IPC.invoke.sessionSearchContext, input => host!.call("search.context", input));
+}
 ipcMain.handle(IPC.invoke.projectGroupList, async () => host!.call("project.groups.list"));
 const readFixtureFile = async (path: string) => {
   const { workspace } = await host!.call<{ workspace: { path: string } }>("workspace.get");

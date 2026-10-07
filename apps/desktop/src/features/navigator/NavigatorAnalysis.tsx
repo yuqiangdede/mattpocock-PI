@@ -6,6 +6,7 @@ import { api } from "../../lib/api";
 import { useAppStore } from "../../stores/app-store";
 import { createNavigatorAnalysisController } from "./navigator-analysis-controller";
 import { loadNavigatorSkillAvailability } from "./navigator-skill-availability";
+import { NavigatorSourcePreview } from "./NavigatorSourcePreview";
 
 export type NavigatorSuggestionSelection = { activity: EngineeringActivity; analysis: Analysis; suggestion: NavigatorSuggestion };
 export function NavigatorAnalysis({ activity, busy, onPrepare }: {
@@ -14,6 +15,7 @@ export function NavigatorAnalysis({ activity, busy, onPrepare }: {
 }) {
   const { t } = useTranslation();
   const projectPath = useAppStore(s => s.workspace?.path);
+  const messageRevision = useAppStore(s => `${s.messages.length}:${s.messages.at(-1)?.id ?? ""}`);
   const [available, setAvailable] = useState<Set<string> | null>(null);
   const [state, setState] = useState<{ snapshot: NavigatorAnalysisSnapshot; pending: boolean; error: string | null }>({ snapshot: { analyses: [] }, pending: false, error: null });
   const [results, setResults] = useState<NavigatorResult[]>([]);
@@ -40,6 +42,7 @@ export function NavigatorAnalysis({ activity, busy, onPrepare }: {
     void controller.select({ sessionId: activity.sessionId, activityId: activity.id });
     return () => controller.dispose();
   }, [controller, activity.sessionId, activity.id, projectPath]);
+  useEffect(() => { void controller.refresh(); }, [controller, activity, messageRevision, busy]);
   useEffect(() => {
     let current = true;
     setAvailable(null);
@@ -68,9 +71,10 @@ export function NavigatorAnalysis({ activity, busy, onPrepare }: {
     <details><summary>{t("navigator.analysis.basis")}</summary>
       <p>{t("navigator.analysis.requestBasis", { skills: activity.requests.flatMap(item => item.requestedSkills).join(", ") })}</p>
       <p>{t("navigator.analysis.scope")}</p>
+      {activity.requests.map(request => <NavigatorSourcePreview key={request.id} sessionId={activity.sessionId} messageId={request.messageId} label={t("navigator.analysis.requestBasis", { skills: request.requestedSkills.join(", ") })} />)}
       <ul>{results.map(result => <li key={result.id}>{result.kind === "file" ?
         <Checkbox label={`${result.label} (${result.path ?? ""})`} checked={selectedFiles.includes(result.id)} disabled={running} onChange={event => setSelectedFiles(files => event.target.checked ? [...files, result.id] : files.filter(id => id !== result.id))} /> :
-        <span>{result.label || t("navigator.results.reply")}</span>}
+        result.kind === "reply" ? <NavigatorSourcePreview sessionId={activity.sessionId} messageId={result.sourceMessageId} label={result.label || t("navigator.results.reply")} /> : <span>{result.label || t("navigator.results.validation")}</span>}
         <p>{t(`navigator.results.verification.${result.verification}`)}</p>
       </li>)}</ul>
       {!results.length && <p>{t("navigator.results.unknown")}</p>}

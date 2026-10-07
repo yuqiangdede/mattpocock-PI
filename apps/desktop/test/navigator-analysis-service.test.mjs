@@ -150,3 +150,14 @@ test("a known suggestion survives Skill withdrawal during analysis", async () =>
   assert.equal(finish.suggestions[0].reason, "preserve this reason");
   assert.equal(f.completed(), 1);
 });
+
+test("real Main evidence snapshot retains selected file references through draft preparation", async () => {
+  const { navigatorSuggestionContext } = await import("../src/features/navigator/navigator-suggestion-draft.ts");
+  const f = fixture();
+  await f.service.request(input);
+  const finish = f.calls.find(([method, params]) => method === "navigator.analysis.finish" && params.status === "completed")[1];
+  assert.equal(finish.provenance.evidence[0].kind, "file");
+  const draft = navigatorSuggestionContext({ id: "analysis", activityId: "a", provenance: finish.provenance }, finish.suggestions[0], { summary: "Summary", source: "Source", historical: "Historical basis" });
+  assert.match(draft, /spec\.md/);
+  assert.doesNotMatch(draft, /selected evidence/);
+});
