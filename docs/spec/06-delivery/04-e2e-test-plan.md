@@ -8,6 +8,16 @@
 
 ## 1. Goals
 
+### E2E-CODING-ACTIONS-withdraw-workflow-entry
+
+- Composer and the work-panel launcher expose no native Workflow entry. Restore
+  a legacy Workflow tab alongside Review; retain Review and select it when the
+  removed Workflow tab was active. A Workflow-only context restores empty.
+- Independent Coding Actions still prepare editable drafts and run only on Send.
+  Existing Host Workflow records and APIs remain unchanged.
+- Coverage: `coding-workbench-shortcuts.test.mjs`, `work-panel-tabs.test.mjs`,
+  `work-panel.test.mjs` and `test:e2e:coding-actions`.
+
 ### E2E-CODING-ACTIONS-effective-settings-content
 
 - Open the default Create specification Action. Verify the complete localized

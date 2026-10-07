@@ -53,8 +53,8 @@ cannot accidentally become an argument to a leading builtin command.
 Every skill shortcut, including Ask and every More menu item, inserts its
 localized editable default instruction after the resolved slash marker.
 Existing draft text is preserved verbatim after a blank line; attachments and
-manual Send behavior remain unchanged. Workflow navigation and opening More
-do not insert instructions. Ask inspects current project evidence and proposes
+manual Send behavior remain unchanged. Opening More
+does not insert instructions. Ask inspects current project evidence and proposes
 a concrete next action before implementation; the remaining prompts follow
 the corresponding Matt skill methodology. Prompts do not authorize Git delivery.
 
@@ -86,7 +86,7 @@ or `writing-for-agents`.
 The shortcuts use two separate wrapping rows. The first row is Ask next step,
 Discuss requirements (with Form specification and Split tickets in its
 split-button menu), Implement, Diagnose bug, and Review code, in that order.
-The second row contains the subdued Engineering Workflow panel and More.
+The second row contains More and Coding Actions configuration. The Engineering Workflow entry is no longer exposed.
 More groups skills into Requirements and exploration, Implementation and
 maintenance, Collaboration and reflection (including Retrospective), and
 Project setup (Initialize). Every skill remains available exactly once.

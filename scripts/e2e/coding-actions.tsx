@@ -50,6 +50,7 @@ globalThis.codingActionsProbe = async () => {
   check(initial.actions.some(action => action.prompt === "旧版自定义提示词"), "旧自定义提示词迁移丢失");
   const originalConfirm = window.confirm; window.confirm = () => true;
   view.composer(); await until(() => editor());
+  check(![...document.querySelectorAll("button")].some(button => button.textContent?.trim() === i18n.t("coding.formal")), "Composer 仍显示工程流程入口");
   const originalConfiguration = JSON.stringify((await api.getCodingActions()).configuration);
   for (const [label, marker, prompt] of [
     [initial.actions.find(action => action.skillId === "ask-matt")?.label ?? i18n.t("codingActions.askNext"), "/ask-matt ", initial.actions.find(action => action.skillId === "ask-matt")?.prompt ?? i18n.t("coding.prompts.ask")],

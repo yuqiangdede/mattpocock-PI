@@ -1,5 +1,11 @@
 # Unreleased changes
 
+- Remove native Workflow navigation and the work-panel surface. Legacy Workflow
+  tabs are filtered while other session resources survive; Host history and APIs
+  remain intact. Coding Actions continue as independent Skill shortcuts.
+- Add project-relative PowerShell startup and verification wrappers plus a short
+  engineering-skill reference under `.agents/README.md`.
+
 - Extension Settings shows effective localized Coding Action prompts and the
   same guidance used by button tooltips. Prompt status distinguishes defaults,
   custom instructions and explicit marker-only requests. Restore default prompt

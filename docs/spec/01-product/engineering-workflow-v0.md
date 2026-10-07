@@ -1,5 +1,15 @@
 # Engineering Workflow V0
 
+## Current UI availability (2026-10-07)
+
+The native Workflow launcher, Composer navigation entry and Workflow work-panel
+surface are withdrawn. Legacy `workflow` tabs are filtered during context
+restoration, preserving remaining review, file, plugin and subagent resources.
+The contracts below document retained Host capabilities and historical UI
+acceptance; they do not require the withdrawn panel to remain visible. This
+change does not delete Workflow Runs, confirmations, artifacts or Host APIs.
+Coding Actions remain independent Skill shortcuts with manual submission.
+
 - Status: Project-owned runs, six-stage execution, recovery, explicit acceptance, reopening and artifact references implemented (#5-#10)
 - Date: 2026-10-01
 - Scope: First productization phase of mattpocock-PI

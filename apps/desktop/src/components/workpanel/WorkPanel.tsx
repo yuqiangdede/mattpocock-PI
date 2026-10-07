@@ -44,7 +44,6 @@ import { ReviewTab } from "./ReviewTab";
 import { FilesTab } from "./FilesTab";
 import { PluginViewTab } from "./PluginViewTab";
 import { SubagentTranscriptTab } from "./SubagentTranscriptTab";
-import { WorkflowTab } from "./WorkflowTab";
 import {
   MAIN_PANE_MIN_WIDTH,
   WORK_PANEL_COMPACT_MIN_WIDTH,
@@ -125,15 +124,8 @@ function workPanelTools(
   t: (key: string) => string,
   pluginViews: PluginViewMeta[],
 ): WorkPanelTool[] {
-  // Native workflow and review views stay host-owned; other tools are
-  // plugin-contributed and remain data-driven.
+  // Review is host-owned; other tools are contributed by plugins.
   return [
-    {
-      id: "workflow",
-      tab: toolWorkPanelTab("workflow"),
-      label: t("panel.tabs.workflow"),
-      icon: IconWorkflow,
-    },
     {
       id: "review",
       tab: toolWorkPanelTab("review"),
@@ -204,8 +196,6 @@ export function WorkPanel({
   const tabs = rawTabs.filter(isKnownWorkPanelTab);
   const activeTabId = useAppStore((s) => s.activeWorkPanelTabId);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
-  const activeProjectPath = useAppStore((s) => s.activeProjectPath);
-  const projectMeta = useAppStore((s) => s.projectMeta);
   const pluginViews = useAppStore((s) => s.pluginViews);
   const width = useAppStore((s) => s.workPanelWidth);
   const activateTab = useAppStore((s) => s.activateWorkPanelTab);
@@ -933,17 +923,6 @@ export function WorkPanel({
               aria-labelledby={`work-panel-tab-${activeTab.id}`}
             >
               <ReviewTab />
-            </div>
-          )}
-          {activeTab?.kind === "workflow" && (
-            <div
-              key={activeTab.id}
-              id={`work-panel-surface-${activeTab.id}`}
-              role="tabpanel"
-              aria-labelledby={`work-panel-tab-${activeTab.id}`}
-              className="work-panel-tabpane"
-            >
-              <WorkflowTab projectPath={activeProjectPath} projectMeta={projectMeta} sessionId={activeSessionId} />
             </div>
           )}
           {activeTab?.kind === "file" && (
