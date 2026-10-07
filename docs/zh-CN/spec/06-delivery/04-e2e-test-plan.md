@@ -9,6 +9,15 @@
 
 ---
 
+### E2E-NAVIGATOR-multi-round-handoff
+
+- 通过按钮和手动 slash 提交工程 Skill；仅准备草稿不创建活动，移除标记后不得误归因。
+- 多轮需求问答属于同一工程活动。单轮回复结束不触发建议，用户显式结束活动不代表批准需求或 Review。
+- 查看结果与验证依据，预览所选分析输入，在会话空闲时主动请求 ask-matt；验证只读、权限、重复请求、取消及重试。
+- 推荐动作只准备可编辑草稿，保留已有文字和附件，手动 Send 才执行；缺失 Skill 或依据显示明确结果。
+- 切换会话或项目、重启、隐藏与恢复、删除会话时保持归属和数据边界，不自动重放；新工作提示旧建议可能过时。
+- 覆盖随 #47–#52 实现加入。使用隔离数据及本地模型 fixture，不调用真实付费 Provider，不授权 `verify:ui:*`。
+
 ### E2E-LIVE-VOICE-public-settings-and-reconnect
 
 - **前提：** 生产 Renderer 构建、真实 Electron/Main/Host、隔离数据和测试项目、关闭开发者模式、本地 TLS Realtime fixture 及合成麦克风。仅在测试子进程中信任 fixture CA，不关闭 TLS、sender、沙盒或麦克风权限校验。
