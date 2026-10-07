@@ -34,6 +34,7 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
   assert.ok(html.includes(en.codingActions.diagnose));
   assert.ok(html.includes(en.codingActions.more));
   assert.ok(!html.includes(en.coding.requirements.action), "Composer must not expose requirements confirmation");
+  assert.ok(!html.includes(en.coding.formal), "不再显示工程流程面板入口");
   assert.doesNotMatch(html, /当前阶段|下一阶段|完成百分比/);
   assert.equal(requests, 0); assert.equal(executions, 0);
 });

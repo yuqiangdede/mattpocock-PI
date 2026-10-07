@@ -672,3 +672,6 @@ test("preview mode keeps shell actions and restores routes before navigation", (
   assert.match(globalStyles, /\.work-panel-header \{[^}]*app-region:\s*drag;/);
   assert.match(globalStyles, /\.app-shell\.work-panel-maximized \.work-panel-main \{[^}]*var\(--ds-bg-dock-raised\) 0 var\(--ds-toolbar-height\)/);
 });
+test("the native Workflow launcher and surface are withdrawn", () => {
+  assert.doesNotMatch(panelSource, /id: "workflow"|<WorkflowTab/);
+});

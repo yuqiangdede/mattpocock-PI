@@ -26,6 +26,18 @@ const {
   toolWorkPanelTab,
 } = await import("../src/lib/work-panel-tabs.ts");
 
+test("旧工程流程标签被移除，保留其他已打开资源", () => {
+  const review = toolWorkPanelTab("review");
+  const workflow = toolWorkPanelTab("workflow");
+  assert.equal(isKnownWorkPanelTab(workflow), false);
+  assert.deepEqual(sanitizeWorkPanelTabsState({ tabs: [workflow, review], activeTabId: workflow.id }), {
+    tabs: [review], activeTabId: review.id,
+  });
+  assert.deepEqual(sanitizeWorkPanelTabsState({ tabs: [workflow], activeTabId: workflow.id }), {
+    tabs: [], activeTabId: null,
+  });
+});
+
 test("work panel tabs open on demand and deduplicate by resource", () => {
   const empty = { tabs: [], activeTabId: null };
   const review = openWorkPanelTabState(empty, toolWorkPanelTab("review"));

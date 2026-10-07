@@ -1,7 +1,7 @@
 export type WorkPanelTabKind =
   | "new"
   | "review"
-  | "workflow"
+  | "workflow" // Retained only for decoding legacy tabs; no Workflow panel is exposed.
   | "file"
   | "plugin"
   | "subagent";
@@ -232,7 +232,7 @@ export function parsePluginViewRef(
 export function isKnownWorkPanelTab(tab: WorkPanelTab): boolean {
   return (
     Boolean(tab) &&
-    (tab.kind === "new" || tab.kind === "review" || tab.kind === "workflow" ||
+    (tab.kind === "new" || tab.kind === "review" ||
       tab.kind === "file" || tab.kind === "plugin" ||
       tab.kind === "subagent")
   );

@@ -6,7 +6,6 @@ import { groupCodingShortcuts, codingShortcutMenu, type CodingShortcut } from ".
 import { api } from "../../lib/api";
 import { Button, TooltipButton } from "../../components/ui";
 import { AnchoredMenu } from "../../components/settings/AnchoredMenu";
-import { toolWorkPanelTab } from "../../lib/work-panel-tabs";
 import { useAppStore } from "../../stores/app-store";
 import { loadCodingActions, useCodingActions } from "../extensions/coding-action-state";
 
@@ -48,7 +47,6 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill }: {
   return <section className="coding-workbench" aria-label={t("codingActions.title")}>
     <div className="coding-shortcuts coding-shortcuts-primary">{primary.map(action => renderAction(action))}</div>
     <div className="coding-shortcuts coding-shortcuts-secondary">
-      <Button variant="ghost" onClick={() => useAppStore.getState().openWorkPanelTab(toolWorkPanelTab("workflow"))}>{t("coding.formal")}</Button>
       <AnchoredMenu open={moreOpen} onClose={() => setMoreOpen(false)} role="menu" side="top" restoreFocus={!disabled} label={t("codingActions.more")} menuClassName="context-menu coding-more-menu"
         trigger={ref => <Button ref={ref} variant="ghost" disabled={disabled} aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(value => !value)}>{t("codingActions.more")}</Button>}>
         {groupCodingShortcuts(more).map(group => <div key={group.id} role="group" aria-label={t(`codingActions.groups.${group.id}`)}>
