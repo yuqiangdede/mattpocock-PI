@@ -17,6 +17,7 @@ fn navigator_hide_restore_restart_preserves_source_and_activity_state() {
     db.conn()
         .execute("UPDATE navigator_activities SET ended_at=123", [])
         .unwrap();
+    let version = list(&db, &session).unwrap()["activities"][0]["version"].clone();
     set_hidden(&db, &session, &id, true).unwrap();
     set_hidden(&db, &session, &id, true).unwrap();
     assert_eq!(
@@ -27,7 +28,7 @@ fn navigator_hide_restore_restart_preserves_source_and_activity_state() {
         list(&db, &session).unwrap()["activities"][0]["endedAt"],
         123
     );
-    assert_eq!(list(&db, &session).unwrap()["activities"][0]["version"], 1);
+    assert_eq!(list(&db, &session).unwrap()["activities"][0]["version"], version);
     sessions::end_turn(&db, &turn, "completed", None, None, false).unwrap();
     drop(db);
     let db = Database::open(&directory.path().join("navigator.sqlite")).unwrap();
