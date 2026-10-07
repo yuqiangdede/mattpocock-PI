@@ -2,7 +2,7 @@
 
 <img src="docs/image/readme/logo.png" alt="PI-Desktop" width="108" />
 
-# PI-Desktop
+# mattpocock-PI
 
 ### 可拆卸的 AI Agent 桌面工作台
 
@@ -12,21 +12,21 @@
 
 <br />
 
-[![Release](https://img.shields.io/github/v/release/vastsa/PI-Desktop?label=release)](https://github.com/vastsa/PI-Desktop/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/vastsa/PI-Desktop/total?label=downloads)](https://github.com/vastsa/PI-Desktop/releases)
-[![Stars](https://img.shields.io/github/stars/vastsa/PI-Desktop?style=flat\&label=stars)](https://github.com/vastsa/PI-Desktop/stargazers)
-[![CI](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/vastsa/PI-Desktop)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/yuqiangdede/mattpocock-PI?label=release)](https://github.com/yuqiangdede/mattpocock-PI/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/yuqiangdede/mattpocock-PI/total?label=downloads)](https://github.com/yuqiangdede/mattpocock-PI/releases)
+[![Stars](https://img.shields.io/github/stars/yuqiangdede/mattpocock-PI?style=flat\&label=stars)](https://github.com/yuqiangdede/mattpocock-PI/stargazers)
+[![CI](https://github.com/yuqiangdede/mattpocock-PI/actions/workflows/ci.yml/badge.svg)](https://github.com/yuqiangdede/mattpocock-PI/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/yuqiangdede/mattpocock-PI)](LICENSE)
 [![Reddit](https://img.shields.io/badge/Reddit-r%2FAIUO-FF4500?logo=reddit\&logoColor=white)](https://www.reddit.com/r/AIUO/)
 [![QQ 群：点击加入 PI-Desktop 开发者交流群](https://img.shields.io/badge/QQ-%E5%8A%A0%E5%85%A5%E5%BC%80%E5%8F%91%E8%80%85%E4%BA%A4%E6%B5%81%E7%BE%A4-12B7F5?logo=tencentqq&logoColor=white)](https://qm.qq.com/q/iWP8i0XxIc)
 
 <br />
 
-**[立即下载](https://github.com/vastsa/PI-Desktop/releases/latest)** ·
+**[立即下载](https://github.com/yuqiangdede/mattpocock-PI/releases/latest)** ·
 [使用文档](https://pi-docs.aiuo.net/) ·
 [插件开发](docs/plugin-development.md) ·
 [界面预览](docs/guide/screenshots.md) ·
-[English](README.md)
+[English](README.en.md)
 
 <br />
 
@@ -37,6 +37,22 @@
 **你的项目留在本地 · 你的模型由你选择 · 你的工作台由你组装**
 
 </div>
+
+---
+
+## 项目来源与扩展功能
+
+**mattpocock-PI 基于 [PI-Desktop](https://github.com/vastsa/PI-Desktop) 扩展而成。** PI-Desktop 提供本地优先的 AI Agent 桌面工作台，包括项目与会话管理、模型接入、插件系统、权限控制和 Agent 编排。本项目在此基础上增加面向软件工程的技能与操作入口。
+
+- **Matt Pocock 工程技能集**：内置来自 [mattpocock/skills](https://github.com/mattpocock/skills) 的工程技能及配套资源，支持需求讨论、技术设计、开发、测试、代码审查与复盘；可通过原生 Skills 入口管理和调用。
+- **Coding Actions（Skill Launcher）**：提供需求讨论、固化需求、技术设计、拆分任务、实现和代码审查六个默认动作，以及询问下一步、诊断 Bug 和更多技能入口。选择动作后填入可编辑的聊天草稿，由用户手动发送；支持编辑名称、提示词、顺序、启用状态，以及 Actions JSON 导入导出。
+- **工程 Workflow**：按项目管理从需求探索、规格、任务拆分到实现、审查和复盘的流程，支持显式阶段验收、重新打开阶段、执行历史和产物引用。Workflow 与 Coding Actions 独立使用。
+- **需求版本确认**：在 Workflow 中预览并确认需求文件的当前内容版本，保留确认历史；文件仍可编辑，内容变更后可重新确认。
+- **独立更新控制**：分别查看应用与工程技能的版本和更新状态，由用户显式安装更新；技能维护支持备份、恢复并保留本地修改。
+
+了解更多：[工程 Workflow](docs/user/engineering-workflow.md) · [Coding Actions](docs/project/skill-launcher-spec.md) · [工程技能分发](docs/project/engineering-skills-distribution.md) · [更新机制](docs/spec/01-product/executable-updates.md)。
+
+以下介绍中的桌面底座能力来自 PI-Desktop；感谢上游项目及技能作者的贡献。
 
 ---
 
@@ -472,7 +488,7 @@ PI-Desktop 可以导入本地 Session：
 
 ---
 
-## Local-first
+## 本地优先
 
 PI-Desktop 不要求你把开发环境搬到我们的云端。
 
@@ -566,7 +582,7 @@ Agent / Plan / Goal
 
 <div align="center">
 
-### [下载 PI-Desktop →](https://github.com/vastsa/PI-Desktop/releases/latest)
+### [下载 PI-Desktop →](https://github.com/yuqiangdede/mattpocock-PI/releases/latest)
 
 **macOS · Windows · Linux**
 
@@ -584,7 +600,7 @@ Agent / Plan / Goal
 macOS Release 使用 Developer ID 签名并经过 Apple Notarization。
 
 <details>
-<summary><strong>Linux Compatibility</strong></summary>
+<summary><strong>Linux 兼容性</strong></summary>
 
 <br />
 
@@ -598,7 +614,7 @@ Linux x64 需要 **glibc 2.35+**。
 
 检查当前版本：
 
-```bash
+`	ext
 ldd --version
 ```
 
@@ -606,7 +622,7 @@ ldd --version
 
 ---
 
-## Built on Pi
+## 基于 Pi
 
 PI-Desktop 构建在 [pi](https://github.com/badlogic/pi-mono) 生态之上。
 
@@ -644,21 +660,21 @@ PI-Desktop 也可以作为开发者构建 Agent 产品的宿主平台。
 ### 从源码运行
 
 <details>
-<summary><strong>Development Setup</strong></summary>
+<summary><strong>开发环境配置</strong></summary>
 
 <br />
 
-#### Requirements
+#### 环境要求
 
 * Node.js `>=22.19`
 * pnpm `>=10`
 * Stable Rust Toolchain
 
-#### Start
+#### 初始化与启动
 
-```bash
-git clone https://github.com/vastsa/PI-Desktop.git
-cd PI-Desktop
+```powershell
+git clone https://github.com/yuqiangdede/mattpocock-PI.git
+cd mattpocock-PI
 
 pnpm install
 
@@ -668,9 +684,9 @@ pnpm build:js
 pnpm dev
 ```
 
-#### Validate
+#### 验证
 
-```bash
+```powershell
 pnpm typecheck
 pnpm lint
 pnpm test
@@ -690,7 +706,7 @@ pnpm test
 
 ---
 
-## Contributing
+## 参与贡献
 
 欢迎：
 
@@ -702,8 +718,8 @@ pnpm test
 
 让 Core 保持克制，让生态持续生长。
 
-**[提交 Issue](https://github.com/vastsa/PI-Desktop/issues/new/choose)** ·
-[查看 Issues](https://github.com/vastsa/PI-Desktop/issues) ·
+**[提交 Issue](https://github.com/yuqiangdede/mattpocock-PI/issues/new/choose)** ·
+[查看 Issues](https://github.com/yuqiangdede/mattpocock-PI/issues) ·
 [开发插件](docs/plugin-development.md)
 
 ---
@@ -726,7 +742,7 @@ pnpm test
 
 ---
 
-## Model Acknowledgements
+## 模型致谢
 
 > **Not by a lone genius, but by a token-powered construction crew.**
 
@@ -738,7 +754,7 @@ PI-Desktop 的开发过程中使用了来自多个 Provider 的模型。
 
 ---
 
-## License
+## 许可证
 
 PI-Desktop 使用 **GNU Lesser General Public License v3.0**。
 
@@ -750,15 +766,15 @@ PI-Desktop 使用 **GNU Lesser General Public License v3.0**。
 
 <img src="docs/image/readme/logo.png" alt="PI-Desktop" width="72" />
 
-## PI-Desktop
+## mattpocock-PI
 
-### Build your own Agent workspace.
+### 构建你自己的 Agent 工作台。
 
 **你的模型 · 你的 Agent · 你的插件 · 你的工作台**
 
 <br />
 
-**[立即下载](https://github.com/vastsa/PI-Desktop/releases/latest)** ·
+**[立即下载](https://github.com/yuqiangdede/mattpocock-PI/releases/latest)** ·
 [Documentation](https://pi-docs.aiuo.net/) ·
 [Build a Plugin](docs/plugin-development.md)
 

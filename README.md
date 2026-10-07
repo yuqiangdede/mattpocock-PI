@@ -2,30 +2,31 @@
 
 <img src="docs/image/readme/logo.png" alt="PI-Desktop" width="108" />
 
-# PI-Desktop
+# mattpocock-PI
 
-### A modular desktop workspace for AI agents
+### 可拆卸的 AI Agent 桌面工作台
 
-**Bring projects, agents, models, plugins, and workflows into one persistent desktop environment.**
+**把项目、Agent、模型、插件和工作流，装进一个长期可用的桌面环境。**
 
-Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
+本地优先 · 模型自由 · 插件驱动 · macOS / Windows / Linux
 
 <br />
 
-[![Release](https://img.shields.io/github/v/release/vastsa/PI-Desktop?label=release)](https://github.com/vastsa/PI-Desktop/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/vastsa/PI-Desktop/total?label=downloads)](https://github.com/vastsa/PI-Desktop/releases)
-[![Stars](https://img.shields.io/github/stars/vastsa/PI-Desktop?style=flat\&label=stars)](https://github.com/vastsa/PI-Desktop/stargazers)
-[![CI](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/vastsa/PI-Desktop)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/yuqiangdede/mattpocock-PI?label=release)](https://github.com/yuqiangdede/mattpocock-PI/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/yuqiangdede/mattpocock-PI/total?label=downloads)](https://github.com/yuqiangdede/mattpocock-PI/releases)
+[![Stars](https://img.shields.io/github/stars/yuqiangdede/mattpocock-PI?style=flat\&label=stars)](https://github.com/yuqiangdede/mattpocock-PI/stargazers)
+[![CI](https://github.com/yuqiangdede/mattpocock-PI/actions/workflows/ci.yml/badge.svg)](https://github.com/yuqiangdede/mattpocock-PI/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/yuqiangdede/mattpocock-PI)](LICENSE)
 [![Reddit](https://img.shields.io/badge/Reddit-r%2FAIUO-FF4500?logo=reddit\&logoColor=white)](https://www.reddit.com/r/AIUO/)
+[![QQ 群：点击加入 PI-Desktop 开发者交流群](https://img.shields.io/badge/QQ-%E5%8A%A0%E5%85%A5%E5%BC%80%E5%8F%91%E8%80%85%E4%BA%A4%E6%B5%81%E7%BE%A4-12B7F5?logo=tencentqq&logoColor=white)](https://qm.qq.com/q/iWP8i0XxIc)
 
 <br />
 
-**[Download](https://github.com/vastsa/PI-Desktop/releases/latest)** ·
-[Documentation](https://pi-docs.aiuo.net/) ·
-[Build a Plugin](docs/plugin-development.md) ·
-[Screenshots](docs/guide/screenshots.md) ·
-[简体中文](README.zh-CN.md)
+**[立即下载](https://github.com/yuqiangdede/mattpocock-PI/releases/latest)** ·
+[使用文档](https://pi-docs.aiuo.net/) ·
+[插件开发](docs/plugin-development.md) ·
+[界面预览](docs/guide/screenshots.md) ·
+[English](README.en.md)
 
 <br />
 
@@ -33,62 +34,76 @@ Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
 
 <br />
 
-**Your projects stay local · Your models stay replaceable · Your workspace stays yours**
+**你的项目留在本地 · 你的模型由你选择 · 你的工作台由你组装**
 
 </div>
 
-> **Current release line: 0.16.x (Early Preview).**
+---
+
+## 项目来源与扩展功能
+
+**mattpocock-PI 基于 [PI-Desktop](https://github.com/vastsa/PI-Desktop) 扩展而成。** PI-Desktop 提供本地优先的 AI Agent 桌面工作台，包括项目与会话管理、模型接入、插件系统、权限控制和 Agent 编排。本项目在此基础上增加面向软件工程的技能与操作入口。
+
+- **Matt Pocock 工程技能集**：内置来自 [mattpocock/skills](https://github.com/mattpocock/skills) 的工程技能及配套资源，支持需求讨论、技术设计、开发、测试、代码审查与复盘；可通过原生 Skills 入口管理和调用。
+- **Coding Actions（Skill Launcher）**：提供需求讨论、固化需求、技术设计、拆分任务、实现和代码审查六个默认动作，以及询问下一步、诊断 Bug 和更多技能入口。选择动作后填入可编辑的聊天草稿，由用户手动发送；支持编辑名称、提示词、顺序、启用状态，以及 Actions JSON 导入导出。
+- **工程 Workflow**：按项目管理从需求探索、规格、任务拆分到实现、审查和复盘的流程，支持显式阶段验收、重新打开阶段、执行历史和产物引用。Workflow 与 Coding Actions 独立使用。
+- **需求版本确认**：在 Workflow 中预览并确认需求文件的当前内容版本，保留确认历史；文件仍可编辑，内容变更后可重新确认。
+- **独立更新控制**：分别查看应用与工程技能的版本和更新状态，由用户显式安装更新；技能维护支持备份、恢复并保留本地修改。
+
+了解更多：[工程 Workflow](docs/user/engineering-workflow.md) · [Coding Actions](docs/project/skill-launcher-spec.md) · [工程技能分发](docs/project/engineering-skills-distribution.md) · [更新机制](docs/spec/01-product/executable-updates.md)。
+
+以下介绍中的桌面底座能力来自 PI-Desktop；感谢上游项目及技能作者的贡献。
 
 ---
 
-## Why PI-Desktop?
+## 为什么是 PI-Desktop？
 
-Terminal agents are great at execution. IDE agents are great at living inside an editor.
+终端 Agent 擅长执行，IDE Agent 擅长嵌入编辑器。
 
-PI-Desktop goes one step further:
+PI-Desktop 想做得更进一步：
 
-> **Give AI agents a persistent, independent, and extensible desktop workspace of their own.**
+> **给 AI Agent 一个独立、长期、可扩展的桌面工作空间。**
 
 <table>
 <tr>
 
 <td width="25%" valign="top">
 
-### Independent Workspace
+### 独立工作台
 
-No dependency on a specific IDE or terminal.
+不依附某个 IDE 或 Terminal。
 
-Projects, sessions, reviews, previews, and agents all live in their own workspace.
-
-</td>
-
-<td width="25%" valign="top">
-
-### Plugin-Powered
-
-Plugins extend more than the agent.
-
-Add panels, views, widgets, tools, MCP servers, themes, and background services.
+Project、Session、Review、Preview 与 Agent 都有自己的空间。
 
 </td>
 
 <td width="25%" valign="top">
 
-### Agent Orchestration
+### 插件驱动
 
-One agent is not always enough.
+插件扩展的不只是 Agent。
 
-Delegate to Subagents or coordinate full Worker Sessions in parallel.
+面板、视图、Widget、Tool、MCP、主题与后台服务都可以插件化。
 
 </td>
 
 <td width="25%" valign="top">
 
-### Model Freedom
+### Agent 编排
 
-Cloud models, local models, custom gateways, compatible APIs.
+一个 Agent 不够，就拆开做。
 
-Switch models without rebuilding your workflow.
+Subagent 与 Worker Session 可以承担独立任务并行工作。
+
+</td>
+
+<td width="25%" valign="top">
+
+### 模型自由
+
+云端、本地、自建网关、Compatible API。
+
+模型随时换，工作流不用换。
 
 </td>
 
@@ -97,19 +112,24 @@ Switch models without rebuilding your workflow.
 
 <div align="center">
 
-**It is not a wrapper around one model. It is not another IDE extension.**
+**它不是某个模型的壳，也不是某个 IDE 的插件。**
 
-### It is a desktop platform for agent workflows.
+### 它是承载 Agent 工作流的桌面平台。
 
 </div>
 
+> [!NOTE]
+> **PI-Desktop 目前仍处于 Early Preview。** 已可用于真实开发工作流，部分 API、插件接口与桌面能力仍在持续演进。
+
+> **当前发布线：0.16.x（Early Preview）。**
+
 ---
 
-## Plugins are part of the workspace, not an afterthought
+## 插件不是附加功能，而是工作台的一部分
 
-PI-Desktop keeps the Core focused.
+PI-Desktop 的 Core 负责提供稳定底座。
 
-**Your actual workflow is assembled through extensions.**
+**真正属于你的工作流，由插件组合出来。**
 
 <table>
 <tr>
@@ -118,7 +138,7 @@ PI-Desktop keeps the Core focused.
 
 ### Agent
 
-Extend what the agent can do
+扩展 Agent 能力
 
 **Agent Tools**
 **Skills**
@@ -131,7 +151,7 @@ Extend what the agent can do
 
 ### Workspace
 
-Extend the desktop itself
+扩展整个桌面
 
 **Commands**
 **Panels**
@@ -145,7 +165,7 @@ Extend the desktop itself
 
 ### Platform
 
-Extend the runtime
+扩展运行平台
 
 **MCP Servers**
 **Resident Services**
@@ -156,9 +176,9 @@ Extend the runtime
 </tr>
 </table>
 
-A plugin does not have to be “just another tool.”
+插件不必只是“给 Agent 多加一个 Tool”。
 
-It can be an entire product:
+它可以是一整个产品：
 
 ```text
 Voice Agent
@@ -179,33 +199,33 @@ Session Analytics
 └── Workspace View
 ```
 
-### What can a plugin add?
+### 插件能做什么？
 
-| Capability          | What it enables                                                |
-| ------------------- | -------------------------------------------------------------- |
-| **Command**         | Add actions to the global command system                       |
-| **Panel**           | Open a standalone plugin interface                             |
-| **Floating Widget** | Build voice orbs, status lights, timers, and other floating UI |
-| **Work Panel View** | Add new views to the right-side workspace                      |
-| **Agent Tool**      | Register tools callable by the agent                           |
-| **Completion**      | Use the models already configured by the user                  |
-| **Skill**           | Add reusable agent capabilities and workflows                  |
-| **Theme**           | Customize workspace appearance                                 |
-| **MCP Server**      | Connect local or remote MCP servers                            |
-| **Service**         | Run persistent background work                                 |
-| **Message Bus**     | Let plugins communicate with each other                        |
+| 能力                  | 用途                  |
+| ------------------- | ------------------- |
+| **Command**         | 向全局命令系统添加操作         |
+| **Panel**           | 创建独立插件界面            |
+| **Floating Widget** | 创建语音球、状态窗、计时器等悬浮界面  |
+| **Work Panel View** | 向右侧工作区加入新视图         |
+| **Agent Tool**      | 注册 Agent 可调用工具      |
+| **Completion**      | 调用用户已经配置的模型         |
+| **Skill**           | 为 Agent 提供可复用能力与工作流 |
+| **Theme**           | 修改工作台视觉             |
+| **MCP Server**      | 接入本地或远程 MCP         |
+| **Service**         | 运行常驻后台任务            |
+| **Message Bus**     | 在插件之间传递消息           |
 
-Plugins can be distributed as `.piplug` packages or installed through the marketplace.
+插件可以通过 `.piplug` 分发，也可以从插件市场安装。
 
 <div align="center">
 
-### [Build your first plugin →](docs/plugin-development.md)
+### [开发一个插件 →](docs/plugin-development.md)
 
 </div>
 
 ---
 
-## One foundation, many workflows
+## 一个底座，组装不同的工作流
 
 ```text
                          PI-Desktop
@@ -224,17 +244,17 @@ Plugins can be distributed as `.piplug` packages or installed through the market
                        Your Workflow
 ```
 
-PI-Desktop can simply be your coding agent.
+PI-Desktop 可以只是一个 Coding Agent。
 
-Or you can turn it into:
+也可以被组装成：
 
-**AI Development Workspace · Voice Agent · DevOps Console · GitHub Workspace · Data Assistant · Multi-Agent Control Center · Automation Platform**
+**AI 开发工作台 · Voice Agent · DevOps Console · GitHub Workspace · 数据分析助手 · 多 Agent 调度中心 · 自动化平台**
 
-> **The Core provides the foundation. Plugins decide what your workspace becomes.**
+> **Core 提供底座，插件决定它最终长什么样。**
 
 ---
 
-## Three ways to work
+## 三种工作方式
 
 <table>
 <tr>
@@ -243,11 +263,11 @@ Or you can turn it into:
 
 ### Agent
 
-**Give it a task. Let it work.**
+**你给任务，它直接做。**
 
-Read code, edit files, run commands, test, and iterate.
+读代码、改文件、跑命令、测试、持续迭代。
 
-Best for day-to-day development.
+适合日常开发。
 
 </td>
 
@@ -255,11 +275,11 @@ Best for day-to-day development.
 
 ### Plan
 
-**Review the approach before execution.**
+**它先给方案，你确认后再执行。**
 
-The agent studies the project first and produces an implementation plan.
+先研究项目，再生成实施计划。
 
-Best for refactors and high-risk changes.
+适合重构与高风险修改。
 
 </td>
 
@@ -267,38 +287,38 @@ Best for refactors and high-risk changes.
 
 ### Goal
 
-**Define the outcome. Let the agent choose the path.**
+**你定义结果，它决定路径。**
 
-Lock the objective and acceptance criteria, then let the agent drive execution.
+锁定目标与验收条件，其余交给 Agent。
 
-Best for complex and long-running tasks.
+适合复杂与长期任务。
 
 </td>
 
 </tr>
 </table>
 
-Privileged operations still pass through PI-Desktop's permission layer.
+高权限操作始终经过 PI-Desktop 的 Permission Layer。
 
 ---
 
-## When one agent is not enough
+## 一个 Agent 不够，就拆开做
 
-Complex work should not be forced into one context window.
+复杂任务不应该全部挤在一个 Context 里。
 
-PI-Desktop provides two levels of delegation.
+PI-Desktop 提供两层任务拆分能力。
 
 ### Subagents
 
-Delegate independent work to background agents:
+把独立工作交给后台 Agent：
 
-**Code exploration · Implementation · Test analysis · Research · Review**
+**代码调查 · 独立实现 · 测试分析 · Research · Review**
 
-Each Subagent gets its own context and reports the result back to the parent agent.
+每个 Subagent 拥有独立 Context，完成后将结果返回主 Agent。
 
 ### Session Orchestrator
 
-For longer-lived work, delegate to full Worker Sessions.
+需要更完整、更长期的并行任务时，可以继续拆成多个 Worker Session。
 
 ```text
 Main Session
@@ -316,9 +336,9 @@ Main Session
     └── Review
 ```
 
-Workers are full PI-Desktop sessions:
+Worker 是完整的 PI-Desktop Session：
 
-**Independent context · Independent execution · Directly inspectable · Reusable · Full transcript**
+**独立 Context · 独立运行 · 可直接查看 · 可持续接受任务 · 保留完整 Transcript**
 
 <table>
 <tr>
@@ -327,7 +347,7 @@ Workers are full PI-Desktop sessions:
 
 <img src="docs/image/readme/session-orchestrator-overview.png" alt="Session Orchestrator" />
 
-<p align="center"><sub>Coordinate multiple Worker Sessions from one parent Session</sub></p>
+<p align="center"><sub>一个 Session 编排多个 Worker</sub></p>
 
 </td>
 
@@ -335,7 +355,7 @@ Workers are full PI-Desktop sessions:
 
 <img src="docs/image/readme/session-orchestrator-worker.png" alt="Worker Session" />
 
-<p align="center"><sub>Each Worker remains a full, inspectable Session</sub></p>
+<p align="center"><sub>每个 Worker 都是完整、可查看的 Session</sub></p>
 
 </td>
 
@@ -344,15 +364,15 @@ Workers are full PI-Desktop sessions:
 
 <div align="center">
 
-**Move from “one agent helps me code” to “multiple agents divide and complete the work.”**
+**从「一个 Agent 帮我写代码」，走向「多个 Agent 分工完成任务」。**
 
 </div>
 
 ---
 
-## Built for work that lasts
+## 为持续工作而设计
 
-PI-Desktop is organized around:
+PI-Desktop 围绕：
 
 <div align="center">
 
@@ -360,26 +380,26 @@ PI-Desktop is organized around:
 
 </div>
 
-—not around disposable chat threads.
+而不是围绕一次性聊天窗口设计。
 
-You can:
+支持：
 
-* Manage multiple projects and sessions
-* Pin, archive, branch, and search sessions
-* Queue prompts while an agent is already running
-* Reference project files with `@`
-* Use slash commands
-* Review diffs
-* Inspect command output
-* Work with the right-side Work Panel
-* Keep streaming checkpoints
-* Recover interrupted work whenever possible
+* 多 Project / 多 Session
+* Pin / Archive / Branch / Search
+* Agent 运行时继续 Queue Prompt
+* 使用 `@` 引用项目文件
+* Slash Commands
+* Diff Review
+* Command Output
+* Work Panel
+* Streaming Checkpoint
+* 异常后尽可能恢复任务现场
 
-**A Session can continue across multiple app launches.**
+**Session 可以跨多次启动持续工作。**
 
 ---
 
-## See what the agent is doing
+## 看见 Agent 在做什么
 
 <table>
 <tr>
@@ -388,7 +408,7 @@ You can:
 
 <img src="docs/image/readme/chat_en.png" alt="PI-Desktop Session" />
 
-<p align="center"><sub>Persistent Sessions instead of disposable chats</sub></p>
+<p align="center"><sub>长期 Session，而不是一次性对话</sub></p>
 
 </td>
 
@@ -396,7 +416,7 @@ You can:
 
 <img src="docs/image/readme/model_en.png" alt="PI-Desktop Model" />
 
-<p align="center"><sub>Switch models and reasoning levels inside the Session</sub></p>
+<p align="center"><sub>在 Session 中直接切换模型与推理等级</sub></p>
 
 </td>
 
@@ -408,7 +428,7 @@ You can:
 
 <img src="docs/image/readme/plugins_en.png" alt="PI-Desktop Plugins" />
 
-<p align="center"><sub>A plugin marketplace that extends both the agent and the desktop</sub></p>
+<p align="center"><sub>插件市场：扩展 Agent，也扩展整个桌面</sub></p>
 
 </td>
 
@@ -416,7 +436,7 @@ You can:
 
 <img src="docs/image/readme/addmodel_en.png" alt="PI-Desktop Providers" />
 
-<p align="center"><sub>Connect your own provider, gateway, or local model</sub></p>
+<p align="center"><sub>连接 Provider、Gateway 或本地模型</sub></p>
 
 </td>
 
@@ -425,27 +445,27 @@ You can:
 
 <div align="center">
 
-**[Explore more screenshots →](docs/guide/screenshots.md)**
+**[查看更多界面 →](docs/guide/screenshots.md)**
 
 </div>
 
 ---
 
-## Swap the model, keep the workflow
+## 模型可以换，工作流不用换
 
-PI-Desktop does not tie your workflow to a single model vendor.
+PI-Desktop 不把 Agent 工作流绑定到某一家模型厂商。
 
-Use:
+支持：
 
-**OpenAI · Anthropic · OpenAI-Compatible APIs · Custom Gateways · Ollama · LM Studio · Local Models**
+**OpenAI · Anthropic · OpenAI Compatible API · 自建 Gateway · Ollama · LM Studio · Local Model**
 
-Configure each model independently:
+每个模型都可以独立配置：
 
-**Provider · Model ID · Context Window · Output Limit · Reasoning / Thinking · Temperature · OAuth · API Key · Endpoint**
+**Provider · Model ID · Context Window · 最大输出 · Reasoning / Thinking · Temperature · OAuth · API Key · Endpoint**
 
-Different Sessions can use different models.
+不同 Session 可以使用不同模型。
 
-The same Session can switch models at any time.
+同一个 Session 也可以随时切换。
 
 ```text
 Planning     → Model A
@@ -454,47 +474,47 @@ Review       → Model C
 Private Task → Local Model
 ```
 
-> **The model is a replaceable component of the workflow — not the workflow itself.**
+> **模型是可以替换的组件，而不是工作流本身。**
 
 ---
 
-## Already using another coding agent?
+## 已经在用其他 Coding Agent？
 
-Keep your existing work.
+已有工作不需要从零开始。
 
-PI-Desktop can import local sessions from:
+PI-Desktop 可以导入本地 Session：
 
 **Claude Code · Codex · OpenCode · Pi**
 
 ---
 
-## Local-first
+## 本地优先
 
-PI-Desktop does not require you to move your development environment into our cloud.
+PI-Desktop 不要求你把开发环境搬到我们的云端。
 
-| Data                 | Default behavior                          |
-| -------------------- | ----------------------------------------- |
-| Projects             | Local                                     |
-| Sessions             | Local                                     |
-| Settings             | Local                                     |
-| Logs                 | Local                                     |
-| API credentials      | OS Keychain                               |
-| PI-Desktop telemetry | None                                      |
-| Model requests       | Sent directly to your configured provider |
+| 数据                   | 默认行为               |
+| -------------------- | ------------------ |
+| Project              | 本地                 |
+| Session              | 本地                 |
+| Settings             | 本地                 |
+| Logs                 | 本地                 |
+| API Credentials      | OS Keychain        |
+| PI-Desktop Telemetry | 无                  |
+| Model Request        | 直接发送到你配置的 Provider |
 
-**No mandatory PI-Desktop account.**
+**无需 PI-Desktop 账号。**
 
-**No mandatory PI-Desktop relay.**
+**无需经过 PI-Desktop 云端 Relay。**
 
-When using a remote model, the context required for the request is sent directly to that provider.
+使用远程模型时，请求所需 Context 会直接发送给对应 Provider。
 
 ---
 
-## You control the permissions
+## 权限属于你
 
-Agents can read files, edit code, run commands, call tools, use extensions, and delegate work.
+Agent 可以读取文件、修改代码、运行命令、调用 Tool、使用扩展和委派任务。
 
-Privileged operations still pass through the permission layer:
+高权限操作仍然经过 Permission Layer：
 
 ```text
 Agent
@@ -508,11 +528,11 @@ Allow / Ask / Deny
 Execution
 ```
 
-**You decide how much autonomy each Session gets.**
+**你决定每个 Session 拥有多少自主权。**
 
 ---
 
-## Get started
+## 开始使用
 
 <table>
 <tr>
@@ -521,9 +541,9 @@ Execution
 
 ### 01
 
-**Download**
+**下载**
 
-Install PI-Desktop
+安装 PI-Desktop
 
 </td>
 
@@ -531,9 +551,9 @@ Install PI-Desktop
 
 ### 02
 
-**Connect a model**
+**连接模型**
 
-Configure a Provider
+配置 Provider
 
 </td>
 
@@ -541,9 +561,9 @@ Configure a Provider
 
 ### 03
 
-**Open a project**
+**打开项目**
 
-Choose a local repository
+选择本地 Repository
 
 </td>
 
@@ -551,7 +571,7 @@ Choose a local repository
 
 ### 04
 
-**Start working**
+**开始工作**
 
 Agent / Plan / Goal
 
@@ -562,39 +582,39 @@ Agent / Plan / Goal
 
 <div align="center">
 
-### [Download PI-Desktop →](https://github.com/vastsa/PI-Desktop/releases/latest)
+### [下载 PI-Desktop →](https://github.com/yuqiangdede/mattpocock-PI/releases/latest)
 
 **macOS · Windows · Linux**
 
 </div>
 
-### Packages
+### 安装包
 
 | Platform | Architecture  | Package                                 |
 | -------- | ------------- | --------------------------------------- |
 | macOS    | Apple Silicon | `.dmg` / `.zip`                         |
 | macOS    | Intel         | `.dmg` / `.zip`                         |
-| Windows  | x64           | Installer / `.zip`                      |
+| Windows  | x64           | 安装程序 / `.zip`                       |
 | Linux    | x64           | `.AppImage` / `.deb` / `.rpm` / `.asar` |
 
-macOS releases are signed with a Developer ID certificate and notarized by Apple.
+macOS Release 使用 Developer ID 签名并经过 Apple Notarization。
 
 <details>
-<summary><strong>Linux Compatibility</strong></summary>
+<summary><strong>Linux 兼容性</strong></summary>
 
 <br />
 
-Linux x64 packages require **glibc 2.35+**.
+Linux x64 需要 **glibc 2.35+**。
 
-Common supported distributions include:
+常见支持版本：
 
 * Ubuntu 22.04+
 * Debian 12+
 * Fedora 36+
 
-Check your current version with:
+检查当前版本：
 
-```bash
+`	ext
 ldd --version
 ```
 
@@ -602,59 +622,59 @@ ldd --version
 
 ---
 
-## Built on Pi
+## 基于 Pi
 
-PI-Desktop is built on the [pi](https://github.com/badlogic/pi-mono) ecosystem.
+PI-Desktop 构建在 [pi](https://github.com/badlogic/pi-mono) 生态之上。
 
-The Agent Runtime uses:
+Agent Runtime 使用：
 
 * `pi-ai`
 * `pi-agent-core`
 * `pi-coding-agent`
 
-> **Pi provides the Agent Engine. PI-Desktop builds the persistent desktop workspace, sessions, permissions, plugins, and agent orchestration around it.**
+> **Pi 提供 Agent Engine，PI-Desktop 在其上构建 Desktop Workspace、Session、权限、插件与 Agent 编排。**
 
 ---
 
-## For Developers
+## 开发者
 
-PI-Desktop can also serve as a host platform for building agent products.
+PI-Desktop 也可以作为开发者构建 Agent 产品的宿主平台。
 
-You can build:
+你可以开发：
 
-**Plugins · MCP Servers · Skills · Agent Tools · pi Extensions · Themes · Panels · Floating Widgets · Background Services**
+**Plugin · MCP Server · Skill · Agent Tool · pi Extension · Theme · Panel · Floating Widget · Background Service**
 
-### Plugin quick start
+### 插件快速开始
 
-Built-in templates include:
+内置模板：
 
 * `panel-basic`
 * `agent-tool-basic`
 * `skill-pack`
 * `full-demo`
 
-Plugins can be created and loaded directly as Development Plugins.
+创建完成后即可作为 Development Plugin 加载。
 
 **[Plugin Development Guide →](docs/plugin-development.md)**
 
-### Run from source
+### 从源码运行
 
 <details>
-<summary><strong>Development Setup</strong></summary>
+<summary><strong>开发环境配置</strong></summary>
 
 <br />
 
-#### Requirements
+#### 环境要求
 
 * Node.js `>=22.19`
 * pnpm `>=10`
 * Stable Rust Toolchain
 
-#### Start
+#### 初始化与启动
 
-```bash
-git clone https://github.com/vastsa/PI-Desktop.git
-cd PI-Desktop
+```powershell
+git clone https://github.com/yuqiangdede/mattpocock-PI.git
+cd mattpocock-PI
 
 pnpm install
 
@@ -664,9 +684,9 @@ pnpm build:js
 pnpm dev
 ```
 
-#### Validate
+#### 验证
 
-```bash
+```powershell
 pnpm typecheck
 pnpm lint
 pnpm test
@@ -674,7 +694,7 @@ pnpm test
 
 </details>
 
-### Documentation
+### 文档
 
 [Documentation](https://pi-docs.aiuo.net/) ·
 [Architecture](docs/spec/02-architecture/01-architecture.md) ·
@@ -686,25 +706,25 @@ pnpm test
 
 ---
 
-## Contributing
+## 参与贡献
 
-Contributions are welcome:
+欢迎：
 
 **Issues · Pull Requests · Plugins · Skills · MCP Integrations · Documentation · Translations**
 
-For standalone capabilities, consider one question first:
+对于相对独立的新能力，优先考虑一个问题：
 
-> **Would this be better as a Plugin?**
+> **它是否更适合作为一个 Plugin？**
 
-Keep the Core focused. Let the ecosystem grow.
+让 Core 保持克制，让生态持续生长。
 
-**[Report an Issue](https://github.com/vastsa/PI-Desktop/issues/new/choose)** ·
-[Open Issues](https://github.com/vastsa/PI-Desktop/issues) ·
-[Build a Plugin](docs/plugin-development.md)
+**[提交 Issue](https://github.com/yuqiangdede/mattpocock-PI/issues/new/choose)** ·
+[查看 Issues](https://github.com/yuqiangdede/mattpocock-PI/issues) ·
+[开发插件](docs/plugin-development.md)
 
 ---
 
-## Project Trend
+## 项目趋势
 
 <div align="center">
 
@@ -716,29 +736,29 @@ Keep the Core focused. Let the ecosystem grow.
 
 ---
 
-## Friends
+## 友情链接
 
-[Linux.Do](https://linux.do/) — A new ideal community
+[Linux.Do](https://linux.do/) — 新的理想型社区
 
 ---
 
-## Model Acknowledgements
+## 模型致谢
 
 > **Not by a lone genius, but by a token-powered construction crew.**
 
-PI-Desktop has been built with the help of models from multiple providers.
+PI-Desktop 的开发过程中使用了来自多个 Provider 的模型。
 
-More than **27 billion tokens** have been used across development, refactoring, review, design, and debugging.
+累计模型使用量已超过 **27 Billion Tokens**。
 
-Thanks to every human contributor — and every model that helped us build it.
+感谢参与构建 PI-Desktop 的每一位贡献者，以及陪我们一起写下这些代码的模型。
 
 ---
 
-## License
+## 许可证
 
-PI-Desktop is licensed under the **GNU Lesser General Public License v3.0**.
+PI-Desktop 使用 **GNU Lesser General Public License v3.0**。
 
-See [LICENSE](LICENSE) for details.
+详见 [LICENSE](LICENSE)。
 
 ---
 
@@ -746,15 +766,15 @@ See [LICENSE](LICENSE) for details.
 
 <img src="docs/image/readme/logo.png" alt="PI-Desktop" width="72" />
 
-## PI-Desktop
+## mattpocock-PI
 
-### Build your own Agent workspace.
+### 构建你自己的 Agent 工作台。
 
-**Your models · Your agents · Your plugins · Your workspace**
+**你的模型 · 你的 Agent · 你的插件 · 你的工作台**
 
 <br />
 
-**[Download](https://github.com/vastsa/PI-Desktop/releases/latest)** ·
+**[立即下载](https://github.com/yuqiangdede/mattpocock-PI/releases/latest)** ·
 [Documentation](https://pi-docs.aiuo.net/) ·
 [Build a Plugin](docs/plugin-development.md)
 
@@ -764,25 +784,9 @@ See [LICENSE](LICENSE) for details.
 
 </div>
 
-### mattpocock-PI update controls
+### 阶段一 Skill Launcher
 
-Settings > Info exposes independent updates for the application and the Matt
-Pocock skill bundle. Checking never installs anything. Skill updates back up
-the current bundle and preserve local edits; Restore last backup retains edits
-made afterwards. Running tasks must finish before skill maintenance or restart.
-Installed Windows builds download then offer Restart and update. Portable/ZIP
-builds download a verified artifact and reveal it for manual replacement after
-exiting. Stable/prerelease channels never downgrade the installed application.
-
-See [update behavior and compatibility](docs/spec/01-product/executable-updates.md).
-Validate the feature with `node scripts/e2e-executable-updates.mjs` after the
-workspace packages, Desktop and Host have been built.
-
-### Stage-one Skill Launcher
-
-The 0.16.1-beta.2 candidate adds six independent Coding Actions backed by the
-current session's native Pi Skills. Extension Settings lets you edit labels,
-prompts, order and enabled state, and import or export Actions JSON. Existing
-shortcut prompts migrate without deletion; damaged configuration falls back
-without blocking Chat and can be explicitly reset with an original-file backup.
-Development Navigator remains a separate second-stage proposal.
+0.16.1-beta.2 候选提供六个独立 Coding Actions，通过当前会话的原生 Pi Skills
+执行。在扩展设置中编辑名称、提示词、顺序和启用状态，并导入导出 Actions JSON。
+旧快捷提示词迁移后保留原数据；损坏配置回退不阻塞 Chat，显式重置前备份原文件。
+Development Navigator 留作独立的第二阶段需求。
