@@ -8,6 +8,31 @@
 
 ## 1. Goals
 
+### E2E-CODING-ACTIONS-common-and-more
+
+- More has localized lifecycle group headings, hides empty groups and places Retrospective under Collaboration and delivery. Grouping preserves all entries and the selection-to-editable-draft path; unknown custom overflow has its own group.
+
+- An existing six-action profile shows Ask next step, Diagnose bug and More.
+  Click each common entry and an installed Matt skill in More. Verify
+  localized tooltip on native pointer hover, localized instruction insertion, no
+  automatic prompt, and unchanged saved
+  configuration. Preserve custom common prompts and explicit disabled actions.
+- More includes installed unrepresented Matt skills with localized labels and excludes imagegen and unrelated catalog skills; configured
+  overflow remains available. The empty menu displays an explicit status.
+- Coverage: `coding-shortcut-menu.test.mjs`, `coding-workbench-shortcuts.test.mjs`
+  and `pnpm test:e2e:coding-actions`.
+
+### E2E-CODING-ACTIONS-draft-and-manual-send
+
+- Select a configured action with existing draft text. Verify the resolved skill
+  marker and editable instruction appear while the provider prompt count remains
+  unchanged. Explicitly Send, then verify native skill loading and request text.
+- Repeat after updating the skill; selection still does not submit and manual
+  Send loads the updated body without resaving the Action.
+- Cover null/default, custom and explicitly empty instructions; preserve file
+  tokens, live edits during catalog lookup, and stale-context rejection.
+- Coverage: `pnpm test:e2e:coding-actions` and Desktop `coding-actions.test.mjs`.
+
 ### E2E-REQUIREMENTS-content-confirmation
 
 - **Preconditions:** Built Renderer components and Host, isolated project roots,

@@ -27,9 +27,12 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
   const { en } = await server.ssrLoadModule(fileURLToPath(new URL("../../../packages/i18n/src/locales/en/index.ts", import.meta.url)));
   const i18n = createInstance(); await i18n.init({ lng: "en", resources: { en: { translation: en } } });
   const html = renderToStaticMarkup(createElement(I18nextProvider, { i18n },
-    createElement(CodingWorkbench, { disabled: false, error: null, onExecute: () => { executions++; } })));
+    createElement(CodingWorkbench, { disabled: false, error: null, onExecute: () => { executions++; }, onSelectSkill: () => { executions++; } })));
   for (const label of Object.values(en.codingActions.defaults)) assert.ok(html.includes(label));
   assert.ok(html.includes(en.codingActions.configure));
+  assert.ok(html.includes(en.codingActions.askNext));
+  assert.ok(html.includes(en.codingActions.diagnose));
+  assert.ok(html.includes(en.codingActions.more));
   assert.ok(!html.includes(en.coding.requirements.action), "Composer must not expose requirements confirmation");
   assert.doesNotMatch(html, /当前阶段|下一阶段|完成百分比/);
   assert.equal(requests, 0); assert.equal(executions, 0);

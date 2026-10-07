@@ -2,6 +2,9 @@ import { engineeringSkillGuides } from "./engineering-skill-guides.js";
 
 export const en = {
   codingActions: {
+    groups: { exploration: "Requirements and exploration", design: "Design and planning", development: "Development and testing", maintenance: "Review and maintenance", delivery: "Collaboration and delivery", custom: "Custom actions" },
+  noOtherSkills: "No other available skills",
+  askNext: "Ask next step", diagnose: "Diagnose bug",
   "navLabel": "Extensions",
   "settingsTitle": "Extensions · Coding Actions",
   "defaults": {"discuss-requirements": "Discuss requirements", "create-spec": "Create specification", "design": "Technical design", "create-tickets": "Create tickets", "implement": "Implement", "code-review": "Code review"},
@@ -15,7 +18,7 @@ export const en = {
   "unavailableSkill": "{{skillId}} (unavailable)",
   "skillMissing": "Skill missing / unavailable: {{skillId}}",
   "diagnostic": "Coding Actions configuration: {{detail}}",
-  "more": "More Actions",
+  "more": "More skills",
   "configure": "Configure Coding Actions",
   "recheck": "Check skills again",
   "notAccepted": "The current session did not accept the Action. Check the model, permissions, or session state.",
@@ -28,7 +31,7 @@ export const en = {
   "limit": "Up to 256 Coding Actions are supported",
   "newLabel": "New Action",
   "importTooLarge": "The import file is too large",
-  "description": "Independent coding actions reference skills, without stages, ordering constraints, or completion state. Actions run through the current session’s Pi Agent.",
+  "description": "Independent coding actions reference skills, without stages, ordering constraints, or completion state. Selecting an action prepares an editable skill prompt; manual Send runs it through Pi Agent.",
   "retry": "Retry reading",
   "add": "Add Action",
   "select": "Select Action",
@@ -39,7 +42,7 @@ export const en = {
   "descriptionLabel": "Description",
   "descriptionAria": "Action description",
   "prompt": "Optional prompt",
-  "promptHint": "Leave empty to invoke only the skill; the current SKILL.md provides the methodology.",
+  "promptHint": "Explicitly leave empty to insert only the skill marker; manual Send loads the current SKILL.md.",
   "enabled": "Enable this Action",
   "enabledAria": "Enable Action",
   "moveUp": "Move up",
