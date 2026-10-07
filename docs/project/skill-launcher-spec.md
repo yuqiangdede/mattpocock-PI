@@ -1,5 +1,7 @@
 # 阶段一：Skill Launcher
 
+> 0.16.2 release boundary: native Workflow and requirements-confirmation UI entry points are withdrawn. Historical data and Host APIs remain preserved; statements below about retaining the independent Workflow refer to compatibility, not current UI availability.
+
 状态：2026-10-06 用户的新需求为当前基准，替代旧快捷按钮规格和 #31–#37 的 Workflow / Stage 设计。
 
 ## 当前实现差异

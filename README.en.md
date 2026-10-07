@@ -43,7 +43,7 @@ Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
 
 ## About this fork
 
-**mattpocock-PI is based on [PI-Desktop](https://github.com/vastsa/PI-Desktop).** It adds bundled Matt Pocock engineering skills, configurable Coding Actions, project engineering Workflows, requirements version confirmation, and independent application and skill update controls. See the [Chinese README](README.md) for the extension overview and this fork's download and source links.
+**mattpocock-PI is based on [PI-Desktop](https://github.com/vastsa/PI-Desktop).** It adds bundled Matt Pocock engineering skills, configurable Coding Actions, editable native Skill drafts and independent application and skill update controls. See the [Chinese README](README.md) for the extension overview and this fork's download and source links.
 
 ## Why PI-Desktop?
 
@@ -784,9 +784,11 @@ workspace packages, Desktop and Host have been built.
 
 ### Stage-one Skill Launcher
 
-The 0.16.1-beta.2 candidate adds six independent Coding Actions backed by the
+The 0.16.2 stable release provides six independent Coding Actions backed by the
 current session's native Pi Skills. Extension Settings lets you edit labels,
 prompts, order and enabled state, and import or export Actions JSON. Existing
 shortcut prompts migrate without deletion; damaged configuration falls back
 without blocking Chat and can be explicitly reset with an original-file backup.
 Development Navigator remains a separate second-stage proposal.
+
+Native Workflow and specification-confirmation entry points are withdrawn. Historical data and Host APIs remain intact; Coding Actions have no stage prerequisites or automatic advancement.

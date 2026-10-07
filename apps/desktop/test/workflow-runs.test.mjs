@@ -75,14 +75,13 @@ test("workflow mutations reject blank identity, blank title, and nonnumeric revi
   assert.deepEqual(calls, []);
 });
 
-test("the native panel exposes project history and delegates stage interaction to its execution controls", async () => {
-  const [panel, workflow, tabs] = await Promise.all([
+test("the withdrawn native panel preserves historical workflow controls without mounting them", async () => {
+  const [panel, workflow] = await Promise.all([
     readFile(new URL("../src/components/workpanel/WorkPanel.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/components/workpanel/WorkflowTab.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../src/lib/work-panel-tabs.ts", import.meta.url), "utf8"),
   ]);
-  assert.match(panel, /id: "workflow"[\s\S]*?toolWorkPanelTab\("workflow"\)/);
-  assert.match(panel, /activeTab\?\.kind === "workflow"[\s\S]*?<WorkflowTab projectPath=\{activeProjectPath\} projectMeta=\{projectMeta\} sessionId=\{activeSessionId\} \/>/);
+  assert.doesNotMatch(panel, /id: "workflow"|<WorkflowTab/);
+
   assert.match(workflow, /api\.createWorkflowRun\(/);
   assert.match(workflow, /api\.readWorkflowHistory\(/);
   assert.match(workflow, /selectUnavailableRun/);
@@ -93,5 +92,4 @@ test("the native panel exposes project history and delegates stage interaction t
   assert.match(workflow, /aria-label=\{t\("panel\.workflow\.history"\)\}/);
   assert.match(workflow, /WorkflowExecutionControls[^\n]*workflow=\{workflow\} run=\{selectedRun\}/);
   assert.doesNotMatch(workflow, /runSkill/);
-  assert.match(tabs, /tab\.kind === "workflow"/);
 });

@@ -1,5 +1,11 @@
 # Engineering Workflow
 
+> Historical capability reference. Since 0.16.2, the native Workflow launcher,
+> Composer entry and work-panel surface are withdrawn. The instructions below
+> describe retained historical behavior, not a currently available UI. Existing
+> runs, confirmations, artifacts and Host APIs remain preserved. Use independent
+> [Coding Actions](../project/skill-launcher-spec.md) for current engineering work.
+
 Open **Workflow** from the coding Work Panel and create a named run for the
 current project. Runs belong to the logical project, across its chats and roots.
 Only one run is active at a time. Archived and completed runs remain inspectable.

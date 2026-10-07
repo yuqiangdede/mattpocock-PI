@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const koEntries: ChangelogEntry[] = [
   {
+    "version": "0.16.2",
+    "date": "2026-10-07",
+    "highlights": [
+      "독립적인 Coding Actions로 편집 가능한 기본 Skill 초안을 준비하며, 수동 전송만 현재 세션의 에이전트를 시작합니다.",
+      "현지화된 기본 설명과 프롬프트를 확인하고 복원하며 사용자 지정 이름, 프롬프트, 순서 및 활성화 상태를 유지합니다.",
+      "다음 단계 질문, 버그 진단 및 그룹별 추가 Skill은 유지하며 기본 Workflow 진입점은 제거하고 기록 데이터와 Host API는 보존합니다."
+    ]
+  },
+
+  {
     "version": "0.16.1",
     "date": "2026-10-06",
     "highlights": [

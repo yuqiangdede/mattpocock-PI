@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const trEntries: ChangelogEntry[] = [
   {
+    "version": "0.16.2",
+    "date": "2026-10-07",
+    "highlights": [
+      "Bağımsız Coding Actions düzenlenebilir yerel Skill taslakları hazırlar; ajanı yalnızca elle gönderme başlatır.",
+      "Yerelleştirilmiş varsayılan açıklama ve istemleri görüntüleyip geri yükleyin; özel adlar, istemler, sıra ve etkinlik durumu korunur.",
+      "Sonraki adım, hata tanılama ve gruplanmış ek Skill girişleri korunur; yerel Workflow girişleri kaldırılırken geçmiş veriler ve Host API’leri saklanır."
+    ]
+  },
+
+  {
     "version": "0.16.1",
     "date": "2026-10-06",
     "highlights": [

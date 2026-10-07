@@ -1,7 +1,7 @@
 # Coding Workbench Skill Shortcuts
 
 - Date: 2026-10-03
-- Status: Implementation candidate; release pending.
+- Status: 0.16.2 release candidate.
 - Authority: User-confirmed [interaction design](../../project/skill-shortcuts-interaction-design.md).
 - Audience: Developers using PI-Desktop for coding work.
 
@@ -96,7 +96,7 @@ without horizontal overflow; order stays fixed across task states.
 ## Requirements confirmation
 
 Coding Actions no longer exposes the separate Confirm requirements action.
-Workflow retains the project specification preview and confirmation dialog.
+Historical Workflow confirmations remain stored, but their native UI entry points are withdrawn.
 See [Requirements Confirmation](requirements-confirmation.md) for content-version
 approval, history and freshness rules. Existing skill shortcuts retain the
 draft-only behavior described above.
@@ -161,8 +161,8 @@ previews.
 ## Compatibility and presentation
 
 Replace task cards, intake panels, independent task results and automatic
-waiting-task dispatch with ordinary chat. Retain Full Engineering Workflow in
-its Work Panel, with existing acceptance and prerequisite rules. No Host schema,
+waiting-task dispatch with ordinary chat. Retain historical Engineering Workflow data and Host contracts without exposing
+the withdrawn native Work Panel. No Host schema,
 protocol or permission boundary changes are required.
 
 Legacy Free Task/initialization APIs and storage remain compatibility surfaces;

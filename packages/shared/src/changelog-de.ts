@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const deEntries: ChangelogEntry[] = [
   {
+    "version": "0.16.2",
+    "date": "2026-10-07",
+    "highlights": [
+      "Unabhängige Coding Actions erstellen bearbeitbare native Skill-Entwürfe; erst manuelles Senden startet den Agenten.",
+      "Lokalisierte Standardbeschreibungen und Prompts anzeigen und wiederherstellen; eigene Namen, Prompts, Reihenfolge und Aktivierung bleiben erhalten.",
+      "Nächster Schritt, Fehlerdiagnose und gruppierte weitere Skills bleiben verfügbar; native Workflow-Einstiege entfallen, historische Daten und Host-APIs bleiben erhalten."
+    ]
+  },
+
+  {
     "version": "0.16.1",
     "date": "2026-10-06",
     "highlights": [

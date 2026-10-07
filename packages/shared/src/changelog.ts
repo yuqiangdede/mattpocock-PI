@@ -30,6 +30,16 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    "version": "0.16.2",
+    "date": "2026-10-07",
+    "highlights": [
+      "Use independent Coding Actions to prepare editable native Skill drafts; only manual Send starts the current session’s agent.",
+      "Inspect localized default descriptions and prompts, restore defaults, and preserve custom labels, prompts, ordering and enabled state.",
+      "Keep Ask next step, Diagnose bug and grouped More skills available; withdraw native Workflow entry points while retaining historical data and Host APIs."
+    ]
+  },
+
+  {
     version: "0.16.1",
     date: "2026-10-06",
     highlights: [
@@ -912,6 +922,16 @@ const enEntries: ChangelogEntry[] = [
 
 const zhCNEntries: ChangelogEntry[] = [
   {
+    "version": "0.16.2",
+    "date": "2026-10-07",
+    "highlights": [
+      "使用独立 Coding Actions 准备可编辑的原生 Skill 草稿，仅手动发送才启动当前会话的 Agent。",
+      "查看本地化默认说明与提示词，恢复默认，并保留自定义名称、提示词、顺序和启用状态。",
+      "保留询问下一步、诊断 Bug 和分组更多技能入口；撤下原生 Workflow 入口，同时保留历史数据和 Host API。"
+    ]
+  },
+
+  {
     version: "0.16.1",
     date: "2026-10-06",
     highlights: [
@@ -1793,6 +1813,16 @@ const zhCNEntries: ChangelogEntry[] = [
 ];
 
 const zhTWEntries: ChangelogEntry[] = [
+  {
+    "version": "0.16.2",
+    "date": "2026-10-07",
+    "highlights": [
+      "使用獨立 Coding Actions 準備可編輯的原生 Skill 草稿，僅手動傳送才啟動目前對話的 Agent。",
+      "檢視本地化預設說明與提示詞、還原預設，並保留自訂名稱、提示詞、順序和啟用狀態。",
+      "保留詢問下一步、診斷 Bug 與分組更多技能入口；撤下原生 Workflow 入口，同時保留歷史資料與 Host API。"
+    ]
+  },
+
   {
     version: "0.16.1",
     date: "2026-10-06",

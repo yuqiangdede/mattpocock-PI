@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const frEntries: ChangelogEntry[] = [
   {
+    "version": "0.16.2",
+    "date": "2026-10-07",
+    "highlights": [
+      "Les Coding Actions indépendantes préparent des brouillons modifiables de Skills natives ; seul un envoi manuel lance l’agent.",
+      "Consultez et restaurez les descriptions et instructions localisées par défaut, en conservant vos noms, instructions, ordre et activation.",
+      "Les prochaines étapes, le diagnostic et les Skills supplémentaires regroupées restent disponibles ; les entrées natives Workflow sont retirées, les données historiques et API Host sont conservées."
+    ]
+  },
+
+  {
     "version": "0.16.1",
     "date": "2026-10-06",
     "highlights": [

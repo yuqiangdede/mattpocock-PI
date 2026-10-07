@@ -1,6 +1,6 @@
 {
   "name": "@pi-desktop/desktop",
-  "version": "0.16.1-beta.2",
+  "version": "0.16.2",
   "desktopName": "pi-desktop.desktop",
   "private": true,
   "description": "mattpocock-PI Electron application based on PI-Desktop",
