@@ -2,7 +2,7 @@
 
 - 当前编码入口方向：[阶段一 Skill Launcher](skill-launcher-spec.md)。#31–#37 按 CodingAction → 原生 Skill → 当前 Session Pi Agent 重写；旧快捷按钮规格仅保留历史，Development Navigator 留待第二阶段。
 
-- 阶段一 Windows 发布准备：[0.16.1-beta.2 发布说明草稿](windows-release-notes-0.16.1-beta.2.md) 与 [实际打包验收](windows-release-acceptance-2026-10-06-beta2.md)；尚未公开发布。
+- Windows 0.16.1-beta.2：[发布说明](windows-release-notes-0.16.1-beta.2.md)、[最新主分支打包验收](windows-release-acceptance-2026-10-07-beta2.md) 与 [GitHub Release](https://github.com/yuqiangdede/mattpocock-PI/releases/tag/v0.16.1-beta.2)。
 
 - Requirements Confirmation: [confirmed product direction](requirements-confirmation-design.md) and [implementation specification](../spec/01-product/requirements-confirmation.md); shared human approval of specification content, independent of Workflow stage execution; implementation candidate.
 
