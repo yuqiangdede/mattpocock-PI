@@ -2,6 +2,26 @@
 
 ## 1. Goal
 
+### Additive Navigator RPC surface
+
+`navigator.list`, `navigator.control`, `navigator.setHidden`, result list/add/remove,
+and analysis begin/list/cancel/finish are conversation-owned additions. Inputs
+carry the originating conversation/activity IDs; mutating semantic state requires
+the expected activity version. Queue recording retains the native queue/message
+identity, and actual Skill-use evidence comes from native tool outcomes.
+
+Analysis begin requires an ended activity and an idle conversation, captures
+selected evidence, and reserves admission atomically. Cancel binds the exact
+request identity. Finish cannot upsert deleted or cancelled state. Native turn
+and queue admission reciprocally reject a running analysis.
+
+For model evidence, `tools.execute` accepts `navigationAnalysisId` only for
+the admitted analysis's selected `Read` paths. It retains the existing tool
+permission policy and registers an analysis-owned cancellation marker. Analysis
+finish/cancel and conversation deletion revoke reads; late reads are rejected.
+The model itself has no tools. User-clicked result previews continue to use the
+existing bounded GUI file-reader path, not a substitute for model read approval.
+
 Define the local protocol between:
 
 - Electron main (orchestrator)

@@ -1,5 +1,11 @@
 # 06. 主机 RPC 协议
 
+## Navigator 增量协议
+
+会话拥有 `navigator.list/control/setHidden`、结果列表/增删与分析 begin/list/cancel/finish。语义修改携带活动版本；队列、消息和 turn 身份沿原生路径绑定。分析开始要求活动已结束、会话空闲，以原子预留保存所选快照；取消绑定准确的 request，完成不能重建已取消或已删除状态。普通 turn 和入队反向遵守预留。
+
+模型依据通过 Host `tools.execute` 的 `Read` 获取，`navigationAnalysisId` 必须对应准入分析及所选路径，保留原工具权限并注册取消标记。结束、取消和删除撤销读取，晚到读取拒绝；模型无工具。用户点击预览继续使用有界 GUI reader，不作为模型读取审批的替代。
+
 > **翻译说明：** 本页是与 [英文源规格](/spec/03-runtime/06-host-rpc-protocol) 一一对应的机器辅助翻译。代码、协议字段和标识符保持原文；如翻译与英文源事实有歧义，以英文版本为准。
 
 

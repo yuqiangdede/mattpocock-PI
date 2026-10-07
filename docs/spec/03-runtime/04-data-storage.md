@@ -1,6 +1,31 @@
-# 04. Data Storage (Schema v17)
+# 04. Data Storage (Schema v22)
 
 ## 0. Ownership decision
+
+### Conversation navigation — schema v22
+
+Schema v21 upgrades additively to v22 after a migration backup. Host owns
+`navigator_activities`, `navigator_requests`, `navigator_bindings`,
+`navigator_boundaries`, `navigator_results`, and `navigator_analyses`.
+Existing conversations, native turns, queues, Workflow histories, and files remain
+intact. Candidate v22 opens idempotently initialize additive navigation tables.
+
+Activities contain native request/turn references and explicit continuation/end
+boundaries. Native outcomes and observed Skill use are distinct from engineering
+acceptance. Host recovery marks unsettled records rather than replaying execution.
+Version checks protect boundary and result mutations; hiding changes presentation
+metadata without changing activity version or its continuation binding.
+
+Analysis admission persists a selected evidence snapshot and a single running
+reservation per conversation. Ordinary turns, queues, activity controls, and
+result changes observe that reservation. Analysis completion is conditional on
+its captured request/activity/session identity and state; cancellation, recovery,
+or deletion cannot be undone by a late response. Restart marks running analyses
+interrupted and never regenerates them automatically.
+
+Navigation metadata follows existing conversation deletion/cascade semantics.
+Removing an association or hiding an activity never deletes source messages or
+files. Unknown activity formats remain preserved and are not edited implicitly.
 
 **Rust host-core owns SQLite exclusively (D002), and the transcript file
 store with it (D119). Plan/Goal artifacts and queue records are also host-owned
