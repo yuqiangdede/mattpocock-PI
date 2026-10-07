@@ -543,6 +543,9 @@ function normalizePlansChangedEvent(value: unknown): PlanningStateEvent {
 }
 
 export const api = {
+  listNavigatorAnalyses: (input: import("@pi-desktop/shared").NavigatorAnalysisTarget) => invoke<import("@pi-desktop/shared").NavigatorAnalysisSnapshot>(IPC.invoke.navigatorAnalysisList, input),
+  requestNavigatorAnalysis: (input: import("@pi-desktop/shared").NavigatorAnalysisInput) => invoke<import("@pi-desktop/shared").NavigatorAnalysisSnapshot>(IPC.invoke.navigatorAnalysisRequest, input),
+  cancelNavigatorAnalysis: (input: import("@pi-desktop/shared").NavigatorAnalysisCancelInput) => invoke<import("@pi-desktop/shared").NavigatorAnalysisSnapshot>(IPC.invoke.navigatorAnalysisCancel, input),
   getCodingActions: () => invoke<CodingActionSnapshot>(IPC.invoke.codingActionsGet),
   saveCodingActions: (value: CodingActionConfiguration, recover = false) => invoke<CodingActionConfiguration>(IPC.invoke.codingActionsSave, value, recover),
   resetCodingActions: () => invoke<CodingActionConfiguration>(IPC.invoke.codingActionsReset),

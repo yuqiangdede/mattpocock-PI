@@ -83,3 +83,4 @@ export * from "./storage.js";
 export * from "./upstream.js";
 export * from "./coding-actions.js";
 export * from "./navigator.js";
+export * from "./navigator-analysis.js";

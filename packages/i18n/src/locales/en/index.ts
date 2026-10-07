@@ -2,6 +2,33 @@ import { engineeringSkillGuides } from "./engineering-skill-guides.js";
 
 export const en = {
   navigator: {
+    analysis: {
+  "skillUnavailable": "This Skill is missing or disabled. Check Agent settings before preparing this action.",
+  "skillUnknown": "Skill availability could not be verified.",
+  "basis": "Analysis inputs",
+  "request": "Suggest next steps",
+  "failed": "Analysis unavailable: {{detail}}",
+  "endRequired": "End this discussion before requesting suggestions.",
+  "running": "Generating suggestions…",
+  "cancel": "Cancel analysis",
+  "stale": "New work or activity changes occurred after this analysis. Suggestions may need updating.",
+  "history": "Full analysis and history",
+  "status": {
+    "completed": "Completed",
+    "failed": "Failed",
+    "interrupted": "Interrupted; request again manually",
+    "cancelled": "Cancelled",
+    "running": "Running"
+  },
+  "idleRequired": "Wait until this conversation is idle.",
+  "title": "Next-step analysis",
+  "prepare": "Prepare draft",
+  "scope": "Includes these requests and selected results. File contents are current snapshots, not historical versions. File selection does not bypass normal permission checks.",
+  "noSuggestions": "No next steps could be established from the selected evidence.",
+  "requestBasis": "Activity requests: {{skills}}",
+  "method": "Uses the installed ask-matt method with the current model and selected evidence only. No tools are available to the model.",
+  "retry": "Retry analysis"
+},
     manageHistory: "Manage history", hide: "Hide", restore: "Restore", hideExplanation: "Hiding only changes this view. Messages, files and activity state remain intact.", historyFailed: "Could not update history: {{detail}}",
     currentActivity: 'Current activity: {{skills}}',
     boundaryHistory: 'Discussion boundary history',

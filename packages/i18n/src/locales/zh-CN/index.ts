@@ -3,6 +3,33 @@ import { engineeringSkillGuides } from "./engineering-skill-guides.js";
 
 export const zhCN = {
   navigator: {
+    analysis: {
+  "skillUnavailable": "此 Skill 未安装或已禁用，请先在 Agent 设置中检查。",
+  "skillUnknown": "尚无法核实 Skill 是否可用。",
+  "basis": "分析依据",
+  "request": "建议下一步",
+  "failed": "分析不可用：{{detail}}",
+  "endRequired": "请先结束本次讨论，再请求建议。",
+  "running": "正在生成建议…",
+  "cancel": "取消分析",
+  "stale": "生成分析后已有新工作或活动变化，建议可能需要更新。",
+  "history": "完整分析与历史",
+  "status": {
+    "completed": "已完成",
+    "failed": "失败",
+    "interrupted": "已中断，请手动重新请求",
+    "cancelled": "已取消",
+    "running": "分析中"
+  },
+  "idleRequired": "请等待当前会话空闲。",
+  "title": "下一步分析",
+  "prepare": "准备草稿",
+  "scope": "包含这些请求和所选结果。文件内容是当前快照，并非历史版本；选择文件不绕过原有权限检查。",
+  "noSuggestions": "根据所选依据暂时无法确定下一步。",
+  "requestBasis": "活动请求：{{skills}}",
+  "method": "使用已安装的 ask-matt 方法、当前模型及所选依据。模型不具备工具执行权限。",
+  "retry": "重新请求分析"
+},
     manageHistory: "管理历史", hide: "隐藏", restore: "恢复", hideExplanation: "隐藏仅改变导航显示，不删除消息、文件或改变活动状态。", historyFailed: "无法更新历史：{{detail}}",
     currentActivity: '当前活动：{{skills}}',
     boundaryHistory: '讨论边界历史',

@@ -8,6 +8,7 @@ import { createNavigatorReader } from "./navigator-reader";
 import { NavigatorHistoryControls } from "./NavigatorHistoryControls";
 import { NavigatorActivityControls } from "./NavigatorActivityControls";
 import { NavigatorResults } from "./NavigatorResults";
+import { NavigatorAnalysis } from "./NavigatorAnalysis";
 
 export function NavigatorTab() {
   const { t } = useTranslation();
@@ -67,6 +68,7 @@ export function NavigatorView({ sessionId, snapshot, error, onRefresh, onControl
             {request.errorCode && <p>{request.errorCode}</p>}
           </div>)}
           <NavigatorResults activity={activity} onChanged={onRefresh} />
+          <NavigatorAnalysis activity={activity} busy={busy} />
         </Panel>
       </li>)}
     </ul>
