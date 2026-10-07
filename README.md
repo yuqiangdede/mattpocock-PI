@@ -777,3 +777,12 @@ exiting. Stable/prerelease channels never downgrade the installed application.
 See [update behavior and compatibility](docs/spec/01-product/executable-updates.md).
 Validate the feature with `node scripts/e2e-executable-updates.mjs` after the
 workspace packages, Desktop and Host have been built.
+
+### Stage-one Skill Launcher
+
+The 0.16.1-beta.2 candidate adds six independent Coding Actions backed by the
+current session's native Pi Skills. Extension Settings lets you edit labels,
+prompts, order and enabled state, and import or export Actions JSON. Existing
+shortcut prompts migrate without deletion; damaged configuration falls back
+without blocking Chat and can be explicitly reset with an original-file backup.
+Development Navigator remains a separate second-stage proposal.

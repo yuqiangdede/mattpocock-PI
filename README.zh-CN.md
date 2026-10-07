@@ -767,3 +767,10 @@ PI-Desktop 使用 **GNU Lesser General Public License v3.0**。
 <sub>Local-first · Model-agnostic · Plugin-powered</sub>
 
 </div>
+
+### 阶段一 Skill Launcher
+
+0.16.1-beta.2 候选提供六个独立 Coding Actions，通过当前会话的原生 Pi Skills
+执行。在扩展设置中编辑名称、提示词、顺序和启用状态，并导入导出 Actions JSON。
+旧快捷提示词迁移后保留原数据；损坏配置回退不阻塞 Chat，显式重置前备份原文件。
+Development Navigator 留作独立的第二阶段需求。

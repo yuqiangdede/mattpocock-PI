@@ -1,5 +1,12 @@
 # Unreleased changes
 
+- Stage-one Skill Launcher provides six independent Coding Actions using the
+  current session's native Pi Skills. Extension Settings edits names, prompts,
+  order and enabled state, with Actions JSON import/export. Existing shortcut
+  prompts migrate safely; damaged configuration preserves the original file,
+  keeps Chat usable and offers an explicit reset with backup.
+
+
 - Coding Actions removes the separate Confirm requirements button. Workflow
   retains confirmation history; Cancel and Escape remain available during
   pending requests. Users inspect a

@@ -362,3 +362,4 @@ Each ADR includes:
 
 | 0317 | [Preserve Windows resizing without the native frameless rim](0317-windows-borderless-window-resize.md) | Accepted (D637) |
 | 0318 | [Publish native Linux arm64 artifacts](0318-linux-arm64-release-lane.md) | Accepted (D638) |
+| 0319 | [快捷按钮扩展设置与原生 PI 设置分离](0319-separate-extension-shortcut-settings.md) | Accepted |

@@ -3,8 +3,10 @@ import type { ChangelogEntry } from "./changelog.js";
 export const koEntries: ChangelogEntry[] = [
   {
     "version": "0.16.1",
-    "date": "2026-10-04",
+    "date": "2026-10-06",
     "highlights": [
+      "현재 세션의 기본 Pi Skills로 여섯 개의 독립 Coding Actions를 실행하고 확장 설정에서 이름, 프롬프트, 순서와 활성화 상태를 편집합니다.",
+      "업그레이드 시 기존 바로가기 프롬프트를 유지하고 Actions JSON을 가져오거나 내보낼 수 있으며 손상된 설정은 원본 파일을 백업하여 안전하게 복구합니다.",
       "Composer 또는 Workflow에서 사양 버전을 직접 확인하며 내용이 바뀌면 다시 확인합니다.",
       "Composer 스킬 바로가기에서 사용 안내와 예제를 확인합니다.",
       "설정에서 앱 또는 스킬을 직접 업데이트하고 채널 선택 및 스킬 백업 복원을 사용합니다.",

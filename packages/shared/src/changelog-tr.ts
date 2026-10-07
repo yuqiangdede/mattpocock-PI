@@ -3,8 +3,10 @@ import type { ChangelogEntry } from "./changelog.js";
 export const trEntries: ChangelogEntry[] = [
   {
     "version": "0.16.1",
-    "date": "2026-10-04",
+    "date": "2026-10-06",
     "highlights": [
+      "Geçerli oturumun yerel Pi Skills araçlarıyla altı bağımsız Coding Action çalıştırın; uzantı ayarlarında adları, istemleri, sıralamayı ve etkinlik durumunu düzenleyin.",
+      "Yükseltmede mevcut kısayol istemlerini koruyun; Actions JSON içe veya dışa aktarın ve özgün dosyayı yedekleyerek bozuk yapılandırmayı güvenle kurtarın.",
       "Composer veya Workflow içinde şartname sürümünü onaylayın; değişiklikler yeniden onay gerektirir.",
       "Composer beceri kısayollarında kullanım açıklamalarını ve örnekleri okuyun.",
       "Kanal seçimi ve beceri yedeğini geri yükleme ile uygulamayı veya becerileri açıkça güncelleyin.",
