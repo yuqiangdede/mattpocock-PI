@@ -16,6 +16,7 @@ import { registerRequirementsIpc } from "./requirements-ipc";
 import { createWorkflowExecutionService } from "../services/workflow-execution";
 import { createFreeTaskService } from "../services/free-task-execution";
 import { registerFreeTaskIpc } from "./free-task-ipc";
+import { registerNavigatorIpc } from "./navigator-ipc";
 import { registerAppIpc } from "./app-ipc";
 import { registerDiagnosticsIpc } from "./diagnostics-ipc";
 import { registerMarketIpc } from "./market-ipc";
@@ -457,6 +458,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
   };
   registerWorkflowArtifactsIpc({ registrar, getHost, readFile: readEngineeringFile });
   registerRequirementsIpc({ registrar, getHost, readFile: readEngineeringFile });
+  registerNavigatorIpc(registrar, getHost);
   registerFreeTaskIpc(registrar, createFreeTaskService({
     getHost,
     onIdle: (sessionId) => getAgentHostBridge()?.kickQueue(sessionId),

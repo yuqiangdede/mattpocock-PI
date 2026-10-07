@@ -41,6 +41,7 @@ import {
   IconWorkflow,
 } from "../icons";
 import { ReviewTab } from "./ReviewTab";
+import { NavigatorTab } from "../../features/navigator/NavigatorTab";
 import { FilesTab } from "./FilesTab";
 import { PluginViewTab } from "./PluginViewTab";
 import { SubagentTranscriptTab } from "./SubagentTranscriptTab";
@@ -57,6 +58,7 @@ import {
 const TAB_ICONS = {
   new: IconPlus,
   review: IconDiff,
+  navigator: IconWorkflow,
   workflow: IconWorkflow,
   file: IconFileText,
   plugin: IconPlug,
@@ -115,6 +117,7 @@ function tabLabel(
   }
   if (tab.kind === "new") return t("panel.new.title");
   if (tab.kind === "subagent") return tab.label ?? t("panel.tabs.subagent");
+  if (tab.kind === "navigator") return t("navigator.title");
   if (tab.kind !== "file") return t(`panel.tabs.${tab.kind}`);
   const path = tab.resource ?? "";
   return path.split("/").filter(Boolean).pop() || t("panel.tabs.file");
@@ -126,6 +129,12 @@ function workPanelTools(
 ): WorkPanelTool[] {
   // Review is host-owned; other tools are contributed by plugins.
   return [
+    {
+      id: "navigator",
+      tab: toolWorkPanelTab("navigator"),
+      label: t("navigator.title"),
+      icon: IconWorkflow,
+    },
     {
       id: "review",
       tab: toolWorkPanelTab("review"),
@@ -904,6 +913,11 @@ export function WorkPanel({
           </div>
         </header>
         <div className="work-panel-body">
+          {activeTab?.kind === "navigator" && (
+            <div id={`work-panel-surface-${activeTab.id}`} className="work-panel-tabpane" role="tabpanel" aria-labelledby={`work-panel-tab-${activeTab.id}`}>
+              <NavigatorTab />
+            </div>
+          )}
           {activeTab?.kind === "subagent" && (
             <div
               key={activeTab.id}

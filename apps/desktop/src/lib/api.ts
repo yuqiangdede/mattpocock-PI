@@ -546,6 +546,7 @@ export const api = {
   getCodingActions: () => invoke<CodingActionSnapshot>(IPC.invoke.codingActionsGet),
   saveCodingActions: (value: CodingActionConfiguration, recover = false) => invoke<CodingActionConfiguration>(IPC.invoke.codingActionsSave, value, recover),
   resetCodingActions: () => invoke<CodingActionConfiguration>(IPC.invoke.codingActionsReset),
+  listNavigator: (sessionId: string) => invoke<import("@pi-desktop/shared").NavigatorSnapshot>(IPC.invoke.navigatorList, { sessionId }),
   startFreeTask: (input: import("@pi-desktop/shared").FreeTaskRequest) => invoke<import("@pi-desktop/shared").FreeTask>(IPC.invoke.freeTaskStart, input),
   checkFreeTask: (sessionId: string) => invoke<{ busy: boolean }>(IPC.invoke.freeTaskCheck, { sessionId }),
   listFreeTasks: (projectPath: string) => invoke<{ tasks: import("@pi-desktop/shared").FreeTask[]; unavailableCount?: number }>(IPC.invoke.freeTaskList, { projectPath }),

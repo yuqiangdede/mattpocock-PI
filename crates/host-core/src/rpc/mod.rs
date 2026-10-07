@@ -1,6 +1,7 @@
 mod config_sync_rpc;
 mod engineering_settings;
 mod free_tasks;
+mod navigator;
 mod requirements;
 mod scheduled_rpc;
 mod scheduled_tools;
@@ -2643,6 +2644,10 @@ async fn handle_request(
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "ok": ok }))
         }
+        method if method.starts_with("navigator.") => {
+            let st = state.lock().await;
+            navigator::handle(&st.db, method, &params)
+        }
         "session.appendMessage" => {
             let session_id = params
                 .get("sessionId")
@@ -3045,6 +3050,10 @@ async fn handle_request(
                 .and_then(|v| v.as_str())
                 .unwrap_or("completed");
             let st = state.lock().await;
+            if params.get("recoverInflight").and_then(Value::as_bool) == Some(true) {
+                crate::navigator::mark_unresolved(&st.db, turn_id)
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            }
             let result = sessions::end_turn_settling(
                 &st.db,
                 turn_id,

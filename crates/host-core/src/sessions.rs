@@ -2237,6 +2237,7 @@ fn append_record(
         return Err(anyhow!("session not found: {session_id}"));
     };
     insert_index_row(&tx, session_id, seq - 1, turn_id, record, text)?;
+    crate::navigator::record_submission(&tx, session_id, turn_id, record)?;
     tx.commit()?;
     Ok(())
 }

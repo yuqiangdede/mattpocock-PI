@@ -2,6 +2,17 @@ import { en, type EnglishCatalog } from "../en/index.js";
 import { engineeringSkillGuides } from "./engineering-skill-guides.js";
 
 export const zhCN = {
+  navigator: {
+    unsupported: '导入的原生 Pi 会话暂不提供 Host 关联的导航记录，聊天仍可正常使用。',
+    actualUseObserved: '已观察到本次请求加载了 Skill。',
+    title: '开发导航', refresh: '刷新', loading: '正在加载活动记录…',
+    explanation: '这里记录请求与实际执行状态。回复结束不代表活动结束或内容已经批准。',
+    empty: '通过 Composer 上方的工程动作或 /skill 命令发送工程 Skill 请求后，这里显示活动记录。',
+    sessionRequired: '打开一个会话以查看其工程活动。',
+    actualUseUnknown: '已请求 Skill；实际使用尚未核实。',
+    loadFailed: '无法加载活动：{{detail}}', unavailable: '{{count}} 条记录的格式暂不支持，原数据已保留。',
+    outcomes: { waiting: '等待执行', running: '执行中', normal: '本轮回复正常结束', failed: '执行失败', cancelled: '已取消', unresolved: '执行状态待核实' },
+  },
   codingActions: {
     groups: { exploration: "需求与探索", design: "设计与规划", development: "开发与测试", maintenance: "审查与维护", delivery: "协作与交付", custom: "自定义动作" },
   noOtherSkills: "暂无其他可用 Skill",

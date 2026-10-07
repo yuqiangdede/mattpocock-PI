@@ -198,6 +198,7 @@ export const IPC = {
     requirementsHistory: "pi-desktop/requirements/history",
     requirementsPreview: "pi-desktop/requirements/preview",
     requirementsConfirm: "pi-desktop/requirements/confirm",
+    navigatorList: "pi-desktop/navigator/list",
     freeTaskStart: "pi-desktop/free-task/start",
     freeTaskCheck: "pi-desktop/free-task/check",
     freeTaskList: "pi-desktop/free-task/list",

@@ -1,6 +1,17 @@
 import { engineeringSkillGuides } from "./engineering-skill-guides.js";
 
 export const en = {
+  navigator: {
+    unsupported: 'Imported native Pi conversations do not provide Host-bound navigation records yet. Chat remains available.',
+    actualUseObserved: 'Skill loading observed in this request.',
+    title: 'Navigator', refresh: 'Refresh', loading: 'Loading activity records…',
+    explanation: 'Requests and native outcomes are recorded here. A reply ending does not approve or end an activity.',
+    empty: 'Send an engineering Skill request using the Actions above Composer or a /skill command to start a record.',
+    sessionRequired: 'Open a conversation to view its engineering activities.',
+    actualUseUnknown: 'Requested Skill; actual use has not been verified.',
+    loadFailed: 'Could not load activities: {{detail}}', unavailable: '{{count}} records use an unsupported format and are preserved.',
+    outcomes: { waiting: 'Waiting', running: 'Running', normal: 'Reply ended normally', failed: 'Failed', cancelled: 'Cancelled', unresolved: 'Execution status requires verification' },
+  },
   codingActions: {
     groups: { exploration: "Requirements and exploration", design: "Design and planning", development: "Development and testing", maintenance: "Review and maintenance", delivery: "Collaboration and delivery", custom: "Custom actions" },
   noOtherSkills: "No other available skills",
