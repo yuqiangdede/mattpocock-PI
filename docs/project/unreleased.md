@@ -1,5 +1,10 @@
 # Unreleased changes
 
+- Complete More with the 12 previously unmapped bundled Matt skills, including
+  Implement specification, PR writing, workflow design, writing and repository
+  setup. Localized labels, usage guidance and editable prompts cover all 37
+  bundled skills; explicit disabled actions and custom configuration are preserved.
+
 - Remove native Workflow navigation and the work-panel surface. Legacy Workflow
   tabs are filtered while other session resources survive; Host history and APIs
   remain intact. Coding Actions continue as independent Skill shortcuts.

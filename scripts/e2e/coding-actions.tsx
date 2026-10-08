@@ -85,6 +85,22 @@ globalThis.codingActionsProbe = async () => {
   check(JSON.stringify((await api.getCodingActions()).configuration) === originalConfiguration, "恢复入口改写用户配置");
   useAppStore.setState({ composerPrefill: { sessionId: view.sessionId, text: "", fileReferences: [] } });
   await until(() => readEditorValue(editor()) === "");
+  for (const action of ["implementSpec", "pr", "claudeHandoff", "loopMe", "setupTsDeepModules", "writingBeats", "writingFragments", "writingShape", "gitGuardrails", "migrateToShoehorn", "scaffoldExercises", "setupPreCommit"]) {
+    await click(i18n.t("codingActions.more"));
+    const label = i18n.t(`coding.${action}`);
+    const button = await until(() => [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(item => item.textContent?.trim() === label));
+    check(!button.disabled, `Bundled shortcut unavailable: ${action}`);
+    check(button.getAttribute("aria-description")?.includes(i18n.t(`coding.skillGuides.${action}.when`)), `Missing localized guide: ${action}`);
+    useAppStore.setState({ composerPrefill: { sessionId: view.sessionId, text: "Keep my draft", fileReferences: [] } });
+    await until(() => readEditorValue(editor()) === "Keep my draft");
+    await click(label);
+    await until(() => readEditorValue(editor()).includes(i18n.t(`coding.prompts.${action}`)));
+    check(readEditorValue(editor()).endsWith("Keep my draft"), `Draft lost: ${action}`);
+    check((await fixture("snapshot") as { prompts: number }).prompts === 0, `Shortcut auto-submitted: ${action}`);
+    check(JSON.stringify((await api.getCodingActions()).configuration) === originalConfiguration, `Configuration changed: ${action}`);
+    useAppStore.setState({ composerPrefill: { sessionId: view.sessionId, text: "", fileReferences: [] } });
+    await until(() => readEditorValue(editor()) === "");
+  }
   view.settings(); await until(() => input("Action 名称") && !input("Action 名称").disabled);
   await select("选择 Action", "create-spec", "固化需求");
   check(input("可选提示词").value === i18n.t("coding.prompts.spec"), "设置未显示生效的默认提示词");

@@ -1,6 +1,18 @@
 import type { engineeringSkillGuides as enGuides } from "../en/engineering-skill-guides.js";
 
 export const engineeringSkillGuides = {
+  implementSpec: { when: "已有确认的规格和配套工单，需要完成整体实现时使用。", purpose: "依据已确认的规格及工单依赖关系完成实现，验证验收标准，并遵守项目的 Git 授权规则。", example: "实现导出规格，逐项验证验收标准。" },
+  pr: { when: "准备为已完成的改动编写 PR 描述时使用。", purpose: "根据实际 diff 编写 PR 描述，说明问题、修改后的行为和验证证据，不自动发布。", example: "根据本分支的 diff 和测试结果编写 PR 描述。" },
+  claudeHandoff: { when: "需要将当前工作交给 Claude 后台 Agent 时使用。", purpose: "为新的 Claude 后台 Agent 准备包含已核实状态的交接内容，启动前检查 Claude CLI 可用性及项目授权。", example: "为剩余导出工作准备 Claude 交接。" },
+  loopMe: { when: "需要为重复活动设计工作流规格时使用。", purpose: "围绕本工作区中的重复工作向我提问，将确认的目标、状态流转和成功标准整理为工作流规格。", example: "帮我明确每周发布工作流的规格。" },
+  setupTsDeepModules: { when: "需要为 TypeScript 包内部实现建立可检查边界时使用。", purpose: "检查 TypeScript 包入口，配置 dependency-cruiser 约束深模块边界，验证合法导入通过、违规导入失败。", example: "约束导入只能经过包的公开入口。" },
+  writingBeats: { when: "已有素材，需要编排文章叙述顺序时使用。", purpose: "阅读提供的原始素材，按连贯的表达节奏组织文章，在使用概念前交代背景；缺少输出路径时先确认。", example: "将这些发布素材编排为清晰的叙述。" },
+  writingFragments: { when: "尚在探索写作内容、未确定结构时使用。", purpose: "围绕写作主题向我提问，将原始片段记录到约定的 Markdown 文件，暂不规定大纲和文章结构。", example: "帮我收集这次调试经历的写作素材。" },
+  writingShape: { when: "已有原始素材，需要逐段整理成文时使用。", purpose: "阅读原始素材，逐段整理为独立文章，保留源素材；需要时先确认输出路径。", example: "把这些笔记整理成文章，保留原文件。" },
+  gitGuardrails: { when: "需要通过 Claude Code hooks 防护危险 Git 命令时使用。", purpose: "检查现有 Claude Code hooks，添加针对危险 Git 操作的防护，保留已有 hooks 并验证规则。", example: "添加阻止破坏性 Git 命令的 hooks。" },
+  migrateToShoehorn: { when: "测试夹具需要更安全的部分类型数据时使用。", purpose: "将相关测试中的类型断言迁移到 @total-typescript/shoehorn，保留测试行为并验证类型及受影响测试。", example: "用 shoehorn 替换这些测试中的类型断言。" },
+  scaffoldExercises: { when: "需要新增课程章节或练习骨架时使用。", purpose: "按现有约定创建所需课程练习结构，包含题目、解答和讲解，并运行 lint 检查。", example: "创建一组 TypeScript 类型收窄练习。" },
+  setupPreCommit: { when: "仓库需要自动提交前检查时使用。", purpose: "检查仓库，配置 Husky 和 lint-staged 执行格式化、类型检查及测试，保留已有 hooks 并验证配置。", example: "使用现有项目脚本配置提交前检查。" },
   ask: { when: "已有项目，但不确定下一步最该做什么时使用。", purpose: "检查当前代码、规格、测试和交付记录，找出优先级最高的一个具体行动，并说明依据与完成标准。", example: "登录功能已经实现，请检查项目现状，判断下一步应该补测试、修问题还是开始新功能。" },
   initialize: { when: "新项目开始，或现有项目准备引入 Matt 工程流程时使用。", purpose: "初始化或补齐任务追踪、CONTEXT.md 领域术语和 ADR 决策文档约定，复用并保留已有配置。", example: "为这个仓库建立工程流程，继续使用已有 GitHub Issues，不覆盖现有文档。" },
   discovery: { when: "功能想法还不清晰，需要确认范围、用户路径和验收标准，并把结论记录下来时使用。", purpose: "先查证现有行为，再逐轮询问影响决策的问题，挑战假设，记录达成的需求结论；需求清晰前不开始实现。", example: "我想加批量导出，请帮我确认谁会使用、支持哪些格式，以及部分失败时应该怎么处理。" },
