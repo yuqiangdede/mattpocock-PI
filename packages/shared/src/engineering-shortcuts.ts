@@ -11,6 +11,18 @@ export const CODING_SKILL_SHORTCUTS = [
 
 /** Matt skills that are useful from the coding workbench but do not need a visible shortcut. */
 export const CODING_MORE_SKILLS = [
+  { action: "implementSpec", skill: "implement-spec" },
+  { action: "pr", skill: "pr" },
+  { action: "claudeHandoff", skill: "claude-handoff" },
+  { action: "loopMe", skill: "loop-me" },
+  { action: "setupTsDeepModules", skill: "setup-ts-deep-modules" },
+  { action: "writingBeats", skill: "writing-beats" },
+  { action: "writingFragments", skill: "writing-fragments" },
+  { action: "writingShape", skill: "writing-shape" },
+  { action: "gitGuardrails", skill: "git-guardrails-claude-code" },
+  { action: "migrateToShoehorn", skill: "migrate-to-shoehorn" },
+  { action: "scaffoldExercises", skill: "scaffold-exercises" },
+  { action: "setupPreCommit", skill: "setup-pre-commit" },
   { action: "grillMe", skill: "grill-me" },
   { action: "grilling", skill: "grilling" },
   { action: "handoff", skill: "handoff" },

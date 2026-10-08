@@ -10,7 +10,7 @@ const source = await readFile(new URL("../../../packages/shared/src/engineering-
 const actions = [...new Set(["ask", ...[...source.matchAll(/\{ action: "([^"]+)", skill: "([^"]+)" \}/g)].map(match => match[1])])];
 
 test("every visible and More skill has a localized nonempty default instruction", () => {
-  assert.equal(actions.length, 26);
+  assert.equal(actions.length, 38);
   for (const action of actions) {
     for (const catalog of [en, zhCN]) {
       assert.ok(catalog.coding.prompts[action]?.trim(), `Missing prompt: ${action}`);

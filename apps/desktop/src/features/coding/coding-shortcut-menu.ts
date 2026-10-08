@@ -31,6 +31,18 @@ export function codingShortcutMenu(configuration: CodingActionConfiguration, cat
 export const CODING_SHORTCUT_GROUPS = ["exploration", "design", "development", "maintenance", "delivery", "custom"] as const;
 export type CodingShortcutGroup = typeof CODING_SHORTCUT_GROUPS[number];
 const shortcutGroups: Record<EngineeringShortcutAction, CodingShortcutGroup> = {
+  implementSpec: "development",
+  pr: "delivery",
+  claudeHandoff: "delivery",
+  loopMe: "exploration",
+  setupTsDeepModules: "design",
+  writingBeats: "delivery",
+  writingFragments: "exploration",
+  writingShape: "delivery",
+  gitGuardrails: "maintenance",
+  migrateToShoehorn: "development",
+  scaffoldExercises: "development",
+  setupPreCommit: "maintenance",
   ask: "exploration", discovery: "exploration", grillMe: "exploration", grilling: "exploration",
   questionnaire: "exploration", research: "exploration",
   initialize: "design", spec: "design", tickets: "design", prototype: "design",

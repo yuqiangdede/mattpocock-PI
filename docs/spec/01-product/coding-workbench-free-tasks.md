@@ -82,14 +82,24 @@ The Ask button inserts `ask-matt`. The More menu inserts `grill-me`, `grilling`,
 `resolving-merge-conflicts`, `teach`, `to-questionnaire`, `wait-what`, `wizard`,
 or `writing-for-agents`.
 
+The remaining bundled Matt skills also appear in More when installed and not
+already configured: `implement-spec`, `pr`, `claude-handoff`, `loop-me`,
+`setup-ts-deep-modules`, `writing-beats`, `writing-fragments`, `writing-shape`,
+`git-guardrails-claude-code`, `migrate-to-shoehorn`, `scaffold-exercises` and
+`setup-pre-commit`. Each has localized labels, instructions and usage guidance.
+The bundled package inventory is checked against the launcher in regression
+tests so a newly bundled skill cannot silently lose its entry point.
+These entries follow the same editable-draft and manual-Send contract, including
+skills whose eventual execution requires an external CLI such as Claude Code.
+
 
 The shortcuts use two separate wrapping rows. The first row is Ask next step,
 Discuss requirements (with Form specification and Split tickets in its
 split-button menu), Implement, Diagnose bug, and Review code, in that order.
 The second row contains More and Coding Actions configuration. The Engineering Workflow entry is no longer exposed.
-More groups skills into Requirements and exploration, Implementation and
-maintenance, Collaboration and reflection (including Retrospective), and
-Project setup (Initialize). Every skill remains available exactly once.
+More groups skills into Requirements and exploration, Design and planning,
+Development and testing, Review and maintenance, and Collaboration and delivery
+(including Retrospective). Every skill remains available exactly once.
 All shortcuts use regular text. At narrow widths each row wraps independently
 without horizontal overflow; order stays fixed across task states.
 

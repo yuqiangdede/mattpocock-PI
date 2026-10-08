@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { register } from "node:module";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 register(new URL("./helpers/engineering-settings-imports.mjs", import.meta.url));
 const { createDefaultCodingActions } = await import("@pi-desktop/shared");
 const { codingShortcutMenu } = await import("../src/features/coding/coding-shortcut-menu.ts");
@@ -72,7 +73,7 @@ test("All installed Matt shortcuts have localized labels and prepare editable dr
     const skillLabels = Object.fromEntries(ENGINEERING_SHORTCUTS.map(entry => [entry.action, copy.coding[entry.action]]));
     const menu = codingShortcutMenu(configuration, catalog, { ...labels, skillLabels });
     assert.equal(menu.primary.length, 8);
-    assert.equal(menu.more.length, 18);
+    assert.equal(menu.more.length, ENGINEERING_SHORTCUTS.length - menu.primary.length);
     const allIds = [...menu.primary, ...menu.more].map(row => row.action.skillId);
     assert.equal(new Set(allIds).size, ENGINEERING_SHORTCUTS.length);
     assert.deepEqual(new Set(allIds), new Set(ENGINEERING_SHORTCUTS.map(entry => entry.skill)));
@@ -96,6 +97,28 @@ test("All installed Matt shortcuts have localized labels and prepare editable dr
 });
 
 const { groupCodingShortcuts } = await import("../src/features/coding/coding-shortcut-menu.ts");
+test("Every bundled Matt skill has exactly one localized launcher entry", () => {
+  const bundle = JSON.parse(readFileSync(new URL("../../../crates/host-core/resources/workflow-skills.json", import.meta.url), "utf8"));
+  const catalog = bundle.packages.map(entry => skill(entry.id));
+  const menu = codingShortcutMenu(createDefaultCodingActions(), catalog, labels);
+  const ids = [...menu.primary, ...menu.more].map(row => row.action.skillId);
+  assert.equal(new Set(ids).size, ids.length);
+  assert.deepEqual(new Set(ids), new Set(bundle.packages.map(entry => entry.id)));
+  const configuration = createDefaultCodingActions();
+  configuration.actions.push({ id: "disabled-spec", skillId: "implement-spec", label: "Disabled", enabled: false });
+  const filtered = codingShortcutMenu(configuration, catalog, labels);
+  assert.ok(!filtered.more.some(row => row.action.skillId === "implement-spec"));
+  assert.ok(!codingShortcutMenu(createDefaultCodingActions(), [], labels).more.some(row => row.action.skillId === "implement-spec"));
+  for (const entry of ENGINEERING_SHORTCUTS) {
+    for (const locale of ["en", "zh-CN"]) {
+      const copy = catalogs[locale].coding;
+      assert.ok(copy[entry.action], `${locale} label: ${entry.skill}`);
+      assert.ok(copy.prompts[entry.action], `${locale} prompt: ${entry.skill}`);
+      for (const field of ["when", "purpose", "example"]) assert.ok(copy.skillGuides[entry.action]?.[field], `${locale} ${field}: ${entry.skill}`);
+    }
+  }
+});
+
 test("Lifecycle groups cover Matt skills once, omit empty groups and preserve custom order", () => {
   const configuration = createDefaultCodingActions();
   configuration.actions.push({ id: "custom-a", label: "自定义 A", skillId: "local-a", prompt: "保留 A" });

@@ -51,6 +51,12 @@
   configuration. Preserve custom common prompts and explicit disabled actions.
 - More includes installed unrepresented Matt skills with localized labels and excludes imagegen and unrelated catalog skills; configured
   overflow remains available. The empty menu displays an explicit status.
+- Verify all 37 bundled Matt skills have exactly one launcher entry. Select each
+  of the 12 added More entries (including Implement specification, PR writing,
+  Claude handoff, workflow design, writing and repository setup). Verify localized
+  guidance, preserved existing draft, no automatic submission and unchanged
+  configuration. Missing catalog skills and explicitly disabled actions remain
+  excluded from automatic More entries.
 - Coverage: `coding-shortcut-menu.test.mjs`, `coding-workbench-shortcuts.test.mjs`
   and `pnpm test:e2e:coding-actions`.
 
