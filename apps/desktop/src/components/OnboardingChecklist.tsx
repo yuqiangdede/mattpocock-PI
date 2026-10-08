@@ -20,6 +20,7 @@ export function OnboardingChecklist() {
   const onboarding = useAppStore((s) => s.onboarding);
   const setPage = useAppStore((s) => s.setPage);
   const setSettingsTab = useAppStore((s) => s.setSettingsTab);
+  const setSettingsAnchor = useAppStore((s) => s.setSettingsAnchor);
   const openProject = useAppStore((s) => s.openProject);
 
   if (!onboarding?.showChecklist) return null;
@@ -38,6 +39,7 @@ export function OnboardingChecklist() {
       case "addProvider":
       case "saveKey":
         setSettingsTab("agent");
+        setSettingsAnchor("settings.presetHikvision");
         setPage("settings");
         break;
       case "project.open":

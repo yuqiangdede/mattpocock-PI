@@ -62,6 +62,7 @@ function initialBaseUrl(provider?: ProviderPublic | null): string {
 
 export type ProviderSetupDialogProps = {
   provider?: ProviderPublic | null;
+  initialPresetId?: string | null;
   initialDraft?: ProviderCopyDraft | null;
   onClose: () => void;
   imageModelIds?: string[];
@@ -74,6 +75,7 @@ export type ProviderSetupDialogProps = {
 
 export function ProviderSetupDialog({
   provider,
+  initialPresetId,
   initialDraft,
   onClose,
   onSaved,
@@ -85,11 +87,11 @@ export function ProviderSetupDialog({
   const [imageModelDraft, setImageModelDraft] = useState<string[] | undefined>();
   const editing = !!provider;
   const apiKeyRef = useRef<HTMLInputElement>(null);
-  const [service, setService] = useState(() => initialDraft
+  const [service, setService] = useState(() => initialPresetId ?? (initialDraft
     ? initialDraft.apiStyle === OPENCODE_GO_API_STYLE
       ? NAMED_ENDPOINT_PRESETS.find((preset) => preset.apiStyle === OPENCODE_GO_API_STYLE)?.id ?? CUSTOM_SERVICE
       : CUSTOM_SERVICE
-    : serviceIdFor(provider));
+    : serviceIdFor(provider)));
   const [name, setName] = useState(() => initialDraft?.name ?? initialName(provider));
   const [baseUrl, setBaseUrl] = useState(() => initialDraft?.baseUrl ?? initialBaseUrl(provider));
   const [apiKey, setApiKey] = useState("");

@@ -103,6 +103,8 @@ export function ModelConfigPage() {
   const settings = useAppStore((s) => s.settings);
   const refreshProviders = useAppStore((s) => s.refreshProviders);
   const showToast = useAppStore((s) => s.showToast);
+  const settingsAnchor = useAppStore((s) => s.settingsAnchor);
+  const setSettingsAnchor = useAppStore((s) => s.setSettingsAnchor);
 
   // null = closed, "" = add flow, provider id = edit flow.
   const [copyDraft, setCopyDraft] = useState<ProviderCopyDraft | null>(null);
@@ -127,6 +129,12 @@ export function ModelConfigPage() {
     saveAccount,
   } = useVendorAccounts();
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (settingsAnchor !== "settings.presetHikvision") return;
+    setSetupFor("__hikvision__");
+    setSettingsAnchor(null);
+  }, [setSettingsAnchor, settingsAnchor]);
 
   useEffect(() => {
     void (async () => {
@@ -163,7 +171,9 @@ export function ModelConfigPage() {
   const defaultProvider =
     providers.find((provider) => provider.id === settings.defaultProviderId) ?? null;
   const editingProvider =
-    setupFor ? providers.find((provider) => provider.id === setupFor) ?? null : null;
+    setupFor && setupFor !== "__hikvision__"
+      ? providers.find((provider) => provider.id === setupFor) ?? null
+      : null;
   const editingAccount = editingAccountId
     ? providers.find((provider) => provider.id === editingAccountId) ?? null
     : null;
@@ -679,6 +689,7 @@ export function ModelConfigPage() {
       {setupFor !== null ? (
         <ProviderSetupDialog
           provider={editingProvider}
+          initialPresetId={setupFor === "__hikvision__" ? "hikvision" : undefined}
           initialDraft={copyDraft}
           onClose={() => { setSetupFor(null); setCopyDraft(null); }}
           imageModelIds={editingProvider

@@ -31,6 +31,15 @@ const apiSource = await read("../src/lib/api.ts");
 const catalogContractSource = await read("../../../packages/shared/src/model-catalog.ts");
 const styles = await loadStyles();
 
+test("onboarding SK action opens the Hikvision preset form directly", async () => {
+  const onboardingSource = await read("../src/components/OnboardingChecklist.tsx");
+  assert.match(onboardingSource, /setSettingsAnchor\("settings\.presetHikvision"\)/);
+  assert.match(pageSource, /settingsAnchor !== "settings\.presetHikvision"/);
+  assert.match(pageSource, /setSetupFor\("__hikvision__"\)/);
+  assert.match(pageSource, /initialPresetId=\{setupFor === "__hikvision__" \? "hikvision"/);
+  assert.match(setupSource, /initialPresetId \?\? /);
+});
+
 test("the model list comes from the AI service, not from a browsable catalog", () => {
   assert.match(hookSource, /api\.listProviderModels\(/);
   // The rejected surface and its host-side search must be gone.
