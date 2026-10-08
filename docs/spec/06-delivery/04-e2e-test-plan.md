@@ -8,6 +8,17 @@
 
 ## 1. Goals
 
+### E2E-BRAND-matt-pi-icon
+
+- Verify the default package/window icon and light/dark sidebar/startup marks
+  show the shared Matt M / Pi π monogram. Switching themes preserves the
+  silhouette and does not change the empty-home mascot.
+- Decode the PNG masters and derivatives, every Windows ICO size, and macOS
+  ICNS representations. The macOS tray silhouette has transparent background
+  pixels and retains both legs and the entire crossbar.
+- Asset-only changes use resource integrity and packaging contract checks;
+  installed taskbar/Dock behavior remains a release qualification check.
+
 ### E2E-CODING-ACTIONS-withdraw-workflow-entry
 
 - Composer and the work-panel launcher expose no native Workflow entry. Restore
