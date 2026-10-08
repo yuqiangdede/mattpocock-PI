@@ -8,25 +8,38 @@ const { codingShortcutMenu } = await import("../src/features/coding/coding-short
 const labels = { ask: "咨询下一步", diagnose: "Bug 排查" };
 const skill = skillId => ({ name: skillId, kind: "skill", skillId, title: skillId });
 
+test("Initialize leads Ask next step and stays out of More without rewriting saved actions", () => {
+  const configuration = createDefaultCodingActions();
+  const original = structuredClone(configuration);
+  const menu = codingShortcutMenu(configuration, [skill("setup-matt-pocock-skills")],
+    { ...labels, skillLabels: { initialize: "初始化" } });
+  assert.equal(menu.primary[0].action.skillId, "setup-matt-pocock-skills");
+  assert.equal(menu.primary[0].action.label, "初始化");
+  assert.equal(menu.primary[1].action.skillId, "ask-matt");
+  assert.ok(!menu.more.some(row => row.action.skillId === "setup-matt-pocock-skills"));
+  assert.deepEqual(configuration, original);
+});
+
 test("Existing six-action profiles regain common shortcuts without changing persisted data", () => {
   const configuration = createDefaultCodingActions();
   const snapshot = structuredClone(configuration);
   const { primary, more } = codingShortcutMenu(configuration, [skill("retro"), skill("retro"), skill("ask-matt"), skill("implement"), { name: "help", kind: "builtin", title: "Help" }], labels);
-  assert.equal(primary.length, 8);
-  assert.equal(primary[0].action.skillId, "ask-matt");
+  assert.equal(primary.length, 9);
+  assert.equal(primary[0].action.skillId, "setup-matt-pocock-skills");
+  assert.equal(primary[1].action.skillId, "ask-matt");
   assert.equal(primary.at(-1).action.skillId, "diagnosing-bugs");
   assert.deepEqual(more.map(row => row.action.skillId), ["retro"]);
   assert.deepEqual(configuration, snapshot);
 });
 
 test("Empty configurations retain common entries; custom overflow and prompt overrides survive", () => {
-  assert.equal(codingShortcutMenu({ schemaVersion: 1, actions: [] }, [], labels).primary.length, 2);
+  assert.equal(codingShortcutMenu({ schemaVersion: 1, actions: [] }, [], labels).primary.length, 3);
   const configuration = createDefaultCodingActions();
   configuration.actions.push({ id: "my-ask", label: "My next step", skillId: "ask-matt", prompt: "My prompt" });
   configuration.actions.push({ id: "second-ask", label: "Second ask", skillId: "ask-matt", prompt: "" });
   const { primary, more } = codingShortcutMenu(configuration, [], labels);
-  assert.equal(primary[0].action.prompt, "My prompt");
-  assert.equal(primary[0].configured, true);
+  assert.equal(primary[1].action.prompt, "My prompt");
+  assert.equal(primary[1].configured, true);
   assert.equal(more[0].action.id, "second-ask");
   assert.equal(more[0].action.prompt, "");
 });
@@ -72,12 +85,12 @@ test("All installed Matt shortcuts have localized labels and prepare editable dr
     const copy = catalogs[locale];
     const skillLabels = Object.fromEntries(ENGINEERING_SHORTCUTS.map(entry => [entry.action, copy.coding[entry.action]]));
     const menu = codingShortcutMenu(configuration, catalog, { ...labels, skillLabels });
-    assert.equal(menu.primary.length, 8);
+    assert.equal(menu.primary.length, 9);
     assert.equal(menu.more.length, ENGINEERING_SHORTCUTS.length - menu.primary.length);
     const allIds = [...menu.primary, ...menu.more].map(row => row.action.skillId);
     assert.equal(new Set(allIds).size, ENGINEERING_SHORTCUTS.length);
     assert.deepEqual(new Set(allIds), new Set(ENGINEERING_SHORTCUTS.map(entry => entry.skill)));
-    for (const row of menu.more) {
+    for (const row of [menu.primary[0], ...menu.more]) {
       const entry = ENGINEERING_SHORTCUTS.find(entry => entry.skill === row.action.skillId);
       assert.equal(row.action.label, copy.coding[entry.action]);
       assert.doesNotThrow(() => new CodingActionRegistry({ schemaVersion: 1, actions: [row.action] }));

@@ -615,6 +615,8 @@ export const es = {
     "dismiss": "Descartar"
   },
   "settings": {
+    apiKeyDirectHint: en.settings.apiKeyDirectHint,
+    presetHikvision: en.settings.presetHikvision,
     showAllSkills: "Mostrar todas las habilidades",
     showWorkflowSkills: "Mostrar habilidades del flujo",
     engineering: en.settings.engineering,

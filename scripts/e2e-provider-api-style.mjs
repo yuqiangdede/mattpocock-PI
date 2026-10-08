@@ -3,8 +3,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveElectronBinary } from "./e2e/boot.mjs";
@@ -15,7 +14,9 @@ const require = createRequire(
 );
 const { build } = require("esbuild");
 const { electronBinary } = resolveElectronBinary(root);
-const temp = await mkdtemp(join(tmpdir(), "pi-provider-api-style-"));
+const cache = join(root, "cache");
+await mkdir(cache, { recursive: true });
+const temp = await mkdtemp(join(cache, "pi-provider-api-style-"));
 try {
   await build({
     entryPoints: [join(root, "scripts/e2e/provider-api-style.tsx")],
@@ -29,6 +30,7 @@ try {
     loader: { ".css": "empty" },
     alias: {
       "@pi-desktop/i18n": join(root, "packages/i18n/src/index.ts"),
+      "@pi-desktop/shared": join(root, "packages/shared/src/index.ts"),
       // The fixture lives outside the desktop package; use its React instance.
       react: join(root, "apps/desktop/node_modules/react"),
       "react-dom": join(root, "apps/desktop/node_modules/react-dom"),

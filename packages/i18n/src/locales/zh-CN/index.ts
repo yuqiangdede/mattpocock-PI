@@ -885,7 +885,7 @@ export const zhCN = {
   onboarding: {
     title: "开始使用",
     addProvider: "添加 AI 模型服务",
-    saveKey: "保存 API 密钥",
+    saveKey: "直接填写 SK（API Key）",
     openProject: "打开项目文件夹",
     firstPrompt: "发送第一条消息",
     loadPlugin: "加载开发插件（可选）",
@@ -1657,6 +1657,8 @@ sklm: {
     "copyProviderHint": "创建独立的服务配置，不复制 API 密钥、账号登录信息或自定义请求头。当前默认模型保持不变。",
     editProviderTitle: "编辑 AI 服务",
     apiKeyKeepHint: "留空则保留已保存的密钥。",
+    apiKeyDirectHint: "请直接填写 SK（API Key），密钥由你自行提供。",
+    presetHikvision: "海康（自定义模型）",
     apiStyle: "接口格式",
     apiStyleChatCompletions: "OpenAI Chat Completions",
     apiStyleOpenCodeGo: "OpenCode Go",

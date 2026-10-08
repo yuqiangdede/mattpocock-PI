@@ -624,6 +624,8 @@ export const ko = {
     dismiss: "닫기",
   },
   settings: {
+    apiKeyDirectHint: en.settings.apiKeyDirectHint,
+    presetHikvision: en.settings.presetHikvision,
     showAllSkills: "모든 스킬 표시",
     showWorkflowSkills: "워크플로 스킬 표시",
     engineering: en.settings.engineering,

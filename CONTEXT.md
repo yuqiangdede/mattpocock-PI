@@ -5,6 +5,14 @@ This glossary records terms resolved during product discovery; it is not an impl
 
 ## Language
 
+**Full Auto**:
+The permission mode that approves eligible agent tool actions without a permission prompt. It does not remove the restrictions of an operating mode or prevent the agent from asking task questions.
+_Avoid_: unrestricted agent, no questions
+
+**Service Preset**:
+A selectable starting point for configuring a model service. It supplies an endpoint and connection format; the user supplies their own SK and chooses the models.
+_Avoid_: preconfigured account, bundled credential
+
 **Update Source**:
 An independently updatable product: the Matt Pocock skill bundle or the
 mattpocock-PI application. Upstream PI-Desktop is part of an application release,

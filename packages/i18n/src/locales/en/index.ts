@@ -894,7 +894,7 @@ export const en = {
   onboarding: {
     title: "Get started",
     addProvider: "Add an AI provider",
-    saveKey: "Save your API key",
+    saveKey: "Enter your SK (API Key) directly",
     openProject: "Open a project folder",
     firstPrompt: "Send your first message",
     loadPlugin: "Load a development plugin (optional)",
@@ -1691,6 +1691,8 @@ sklm: {
     "copyProviderHint": "Creates an independent service. API keys, account logins and custom headers are not copied. Your default model stays unchanged.",
     editProviderTitle: "Edit AI provider",
     apiKeyKeepHint: "Leave blank to keep the saved key.",
+    apiKeyDirectHint: "Enter your SK (API Key) directly.",
+    presetHikvision: "Hikvision (custom model)",
     apiStyle: "API format",
     apiStyleChatCompletions: "OpenAI Chat Completions",
     apiStyleOpenCodeGo: "OpenCode Go",

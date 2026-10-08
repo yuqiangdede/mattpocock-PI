@@ -5,6 +5,15 @@ import test from "node:test";
 
 const composerSource = await readComposerSource();
 
+test("unsaved global permissions show Full auto while session and draft choices win", async () => {
+  assert.match(composerSource, /settings\?\.defaultPermissionMode \?\? "auto"/);
+  assert.match(composerSource, /activeSession\.permissionMode/);
+  assert.match(composerSource, /draftConfiguration\.permissionMode/);
+  assert.match(composerSource, /sessionPermissionMode === "inherit"/);
+  const settingsSource = await readFile(new URL("../src/features/settings/SettingsPage.tsx", import.meta.url), "utf8");
+  assert.match(settingsSource, /value=\{settings\.defaultPermissionMode \?\? "auto"\}/);
+});
+
 test("Agent and Plan permission menus present only effective selectable modes", () => {
   const permissionControlSource = composerSource.slice(
     composerSource.indexOf('className="composer-permission"'),

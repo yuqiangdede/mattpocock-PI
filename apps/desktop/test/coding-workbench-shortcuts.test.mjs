@@ -31,6 +31,8 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
   for (const label of Object.values(en.codingActions.defaults)) assert.ok(html.includes(label));
   assert.ok(html.includes(en.codingActions.configure));
   assert.ok(html.includes(en.codingActions.askNext));
+  assert.ok(html.includes(en.coding.initialize));
+  assert.ok(html.indexOf(`aria-label="${en.coding.initialize}"`) < html.indexOf(`aria-label="${en.codingActions.askNext}"`));
   assert.ok(html.includes(en.codingActions.diagnose));
   assert.ok(html.includes(en.codingActions.more));
   assert.ok(!html.includes(en.coding.requirements.action), "Composer must not expose requirements confirmation");

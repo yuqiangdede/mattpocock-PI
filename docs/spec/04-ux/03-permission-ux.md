@@ -6,6 +6,13 @@ Make high-risk local actions visible, interruptible, and predictable.
 
 ## 2. Mode matrix
 
+When no global permission mode has been saved, the effective default is Full
+Auto (`auto`). New sessions inherit it; an explicit global or session choice
+(`ask`, `accept-edits`, or `auto`) continues to take precedence. This changes
+only the fallback, without rewriting stored settings or existing sessions.
+Full Auto suppresses eligible tool permission prompts, not task clarification
+questions or the operating-mode restrictions below.
+
 | Mode | Read/Glob/Grep | BrowserPreview | Write/Edit | Bash | Plugins |
 |---|---|---|---|---|---|
 | Agent | allow | allow | permission policy | permission policy | registered risk policy |

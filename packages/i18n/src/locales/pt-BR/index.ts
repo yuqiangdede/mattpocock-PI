@@ -613,6 +613,8 @@ export const ptBR = {
     dismiss: "Dispensar"
   },
   settings: {
+    apiKeyDirectHint: en.settings.apiKeyDirectHint,
+    presetHikvision: en.settings.presetHikvision,
     showAllSkills: "Mostrar todas as habilidades",
     showWorkflowSkills: "Mostrar habilidades do fluxo",
     engineering: en.settings.engineering,

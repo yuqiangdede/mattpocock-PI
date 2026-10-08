@@ -52,12 +52,18 @@ globalThis.codingActionsProbe = async () => {
   view.composer(); await until(() => editor());
   check(![...document.querySelectorAll("button")].some(button => button.textContent?.trim() === i18n.t("coding.formal")), "Composer 仍显示工程流程入口");
   const originalConfiguration = JSON.stringify((await api.getCodingActions()).configuration);
+  const primary = await until(() => {
+    const buttons = [...document.querySelectorAll<HTMLButtonElement>(".coding-shortcuts-primary button")];
+    return buttons[0]?.textContent?.trim() === i18n.t("coding.initialize") && !buttons[0].disabled ? buttons : null;
+  });
+  check(primary[1]?.textContent?.trim() === i18n.t("codingActions.askNext"), "初始化未排在咨询下一步前面");
   for (const [label, marker, prompt] of [
+    [i18n.t("coding.initialize"), "/setup-matt-pocock-skills ", i18n.t("coding.prompts.initialize")],
     [initial.actions.find(action => action.skillId === "ask-matt")?.label ?? i18n.t("codingActions.askNext"), "/ask-matt ", initial.actions.find(action => action.skillId === "ask-matt")?.prompt ?? i18n.t("coding.prompts.ask")],
     [initial.actions.find(action => action.skillId === "diagnosing-bugs")?.label ?? i18n.t("codingActions.diagnose"), "/diagnosing-bugs ", initial.actions.find(action => action.skillId === "diagnosing-bugs")?.prompt ?? i18n.t("coding.prompts.diagnose")],
   ]) {
     const commonButton = await until(() => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.trim() === label && !button.disabled));
-    const guide = i18n.t(`coding.skillGuides.${marker.includes("ask-matt") ? "ask" : "diagnose"}.when`);
+    const guide = i18n.t(`coding.skillGuides.${marker.includes("setup-matt") ? "initialize" : marker.includes("ask-matt") ? "ask" : "diagnose"}.when`);
     check(commonButton.getAttribute("aria-description")?.includes(guide), "常用按钮丢失中文使用提示");
     const bounds = commonButton.getBoundingClientRect();
     await fixture("movePointer", { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 });
@@ -75,6 +81,7 @@ globalThis.codingActionsProbe = async () => {
   const extra = commands.find(command => command.kind === "skill" && command.skillId === "retro")!;
   check(Boolean(extra), "其他 Skill 未进入目录");
   const moreButton = await until(() => [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(button => button.textContent?.trim() === i18n.t("coding.retro")));
+  check(![...document.querySelectorAll('[role="menuitem"]')].some(button => button.textContent?.trim() === i18n.t("coding.initialize")), "初始化仍出现在更多中");
   check(moreButton.getAttribute("aria-description")?.includes(i18n.t("coding.skillGuides.retro.when")), "更多 Skill 丢失中文使用提示");
   check(moreButton.closest('[role="group"]')?.getAttribute("aria-label") === i18n.t("codingActions.groups.delivery"), "Retrospective is not grouped under collaboration and delivery");
   for (const group of ["exploration", "design", "development", "maintenance", "delivery"]) check(document.querySelector(`[role="menu"] [role="group"][aria-label="${i18n.t(`codingActions.groups.${group}`)}"]`), `Missing lifecycle group: ${group}`);

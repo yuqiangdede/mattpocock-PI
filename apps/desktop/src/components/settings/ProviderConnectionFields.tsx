@@ -68,7 +68,7 @@ export function ProviderConnectionFields({
   requiresApiStyleChoice,
 }: ProviderConnectionFieldsProps) {
   const { t } = useTranslation();
-  const keyHint = editing ? t("settings.apiKeyKeepHint") : undefined;
+  const keyHint = editing ? t("settings.apiKeyKeepHint") : t("settings.apiKeyDirectHint");
 
   return (
     <div className={named ? "provider-setup-fields is-named" : "provider-setup-fields is-custom"}>

@@ -8,6 +8,20 @@
 
 ## 1. Goals
 
+### E2E-AGENT-default-auto-and-hikvision-preset
+
+- With no saved global permission mode, create an inherited Agent session:
+  Composer and Settings show Full Auto, and eligible tool requests execute
+  without a permission card. Explicit global and session choices continue to
+  take precedence; Plan tool restrictions remain enforced.
+- From the first-run model setup, choose Hikvision, verify the exact HTTP
+  endpoint and Chat Completions format, enter an SK, discover and select a model,
+  then save the same endpoint, credential and selection. A discovery failure
+  permits manual model IDs. No credential is bundled or persisted by selecting
+  the preset alone; editing retains a saved key when left blank.
+- Coverage: `hikvision-preset.test.mjs`, Host permission inheritance and tool
+  RPC tests, and `test:e2e:provider-api-style` with mocked external APIs.
+
 ### E2E-BRAND-matt-pi-icon
 
 - Verify the default package/window icon and light/dark sidebar/startup marks
@@ -44,7 +58,9 @@
 
 - More has localized lifecycle group headings, hides empty groups and places Retrospective under Collaboration and delivery. Grouping preserves all entries and the selection-to-editable-draft path; unknown custom overflow has its own group.
 
-- An existing six-action profile shows Ask next step, Diagnose bug and More.
+- An existing six-action profile shows Initialize first, then Ask next step,
+  the configured actions, Diagnose bug and More. Initialize never appears in
+  More. Clicking Initialize inserts an editable draft without submitting.
   Click each common entry and an installed Matt skill in More. Verify
   localized tooltip on native pointer hover, localized instruction insertion, no
   automatic prompt, and unchanged saved

@@ -2,6 +2,15 @@
 
 ## 1. Goal
 
+The service chooser includes an optional Hikvision custom-model preset at
+`http://lanz.hikvision.com/v3/openai/model/v1`, using OpenAI Chat Completions.
+Choosing it supplies the name, endpoint and API format without creating an
+account or supplying a credential. The onboarding checklist and new-service
+key field direct the user to enter their SK (API Key) directly. Discovery starts
+after key entry, and the user selects models before saving; a failed discovery
+still permits manual model IDs. Editing keeps the existing blank-key retention
+hint and behavior. The preset does not change the default model automatically.
+
 PI-Desktop must support **all major market model vendors and models** that users commonly need, without hardcoding a tiny allowlist as product ceiling.
 
 Strategy:

@@ -10,14 +10,15 @@ export function codingShortcutMenu(configuration: CodingActionConfiguration, cat
     const action = all.find(action => action.skillId === skillId);
     return { action: action ?? { id: `catalog:${skillId}`, skillId, label }, configured: Boolean(action) };
   };
+  const initialize = common("setup-matt-pocock-skills", labels.skillLabels?.initialize ?? "setup-matt-pocock-skills");
   const ask = common("ask-matt", labels.ask);
   const diagnose = common("diagnosing-bugs", labels.diagnose);
-  const commonIds = new Set([ask.action.id, diagnose.action.id]);
-  const enabled = registry.list(true).filter(action => !commonIds.has(action.id));
-  const primary = [ask, ...enabled.slice(0, 6).map(action => ({ action, configured: true })), diagnose];
+  const commonIds = new Set([initialize.action.id, ask.action.id, diagnose.action.id]);
+  const enabled = registry.list(true).filter(action => !commonIds.has(action.id) && action.skillId !== initialize.action.skillId);
+  const primary = [initialize, ask, ...enabled.slice(0, 6).map(action => ({ action, configured: true })), diagnose];
   // Native availability is resolved by PI; only known Matt shortcuts are added to More.
   const more: CodingShortcut[] = enabled.slice(6).map(action => ({ action, configured: true }));
-  const represented = new Set([...all.map(action => action.skillId), ask.action.skillId, diagnose.action.skillId]);
+  const represented = new Set([...all.map(action => action.skillId), initialize.action.skillId, ask.action.skillId, diagnose.action.skillId]);
   for (const entry of ENGINEERING_SHORTCUTS) {
     if (represented.has(entry.skill)) continue;
     const command = catalog.find(command => command.kind === "skill" && command.skillId === entry.skill);

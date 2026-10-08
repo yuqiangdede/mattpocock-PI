@@ -624,6 +624,8 @@ export const tr = {
     dismiss: "Kapat",
   },
   settings: {
+    apiKeyDirectHint: en.settings.apiKeyDirectHint,
+    presetHikvision: en.settings.presetHikvision,
     showAllSkills: "Tüm becerileri göster",
     showWorkflowSkills: "İş akışı becerilerini göster",
     engineering: en.settings.engineering,

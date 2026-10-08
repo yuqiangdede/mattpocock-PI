@@ -11,8 +11,10 @@ More groups available Matt skills by Requirements and exploration, Design and pl
 
 The configurable Registry presents six default actions: Discuss requirements,
 Create specification, Technical design, Create tickets, Implement and Code review.
-Ask next step (`ask-matt`) and Diagnose bug (`diagnosing-bugs`) remain visible
+Initialize (`setup-matt-pocock-skills`), Ask next step (`ask-matt`) and Diagnose bug (`diagnosing-bugs`) remain visible
 alongside the first six other enabled configured actions. More is always visible
+with Initialize first, immediately before Ask next step. Initialize never appears
+in More, including when an existing profile has duplicate initialization actions.
 and exposes remaining enabled configured actions plus installed Matt skills from
 the shared engineering shortcut list, excluding skills already configured (including
 disabled entries). Matt labels and guidance are localized; imagegen and unrelated
@@ -93,9 +95,9 @@ These entries follow the same editable-draft and manual-Send contract, including
 skills whose eventual execution requires an external CLI such as Claude Code.
 
 
-The shortcuts use two separate wrapping rows. The first row is Ask next step,
-Discuss requirements (with Form specification and Split tickets in its
-split-button menu), Implement, Diagnose bug, and Review code, in that order.
+The shortcuts use two separate wrapping rows. The first row is Initialize,
+Ask next step, the first six other enabled configured actions, and Diagnose bug,
+in that order.
 The second row contains More and Coding Actions configuration. The Engineering Workflow entry is no longer exposed.
 More groups skills into Requirements and exploration, Design and planning,
 Development and testing, Review and maintenance, and Collaboration and delivery

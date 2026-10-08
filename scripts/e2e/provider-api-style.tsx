@@ -40,6 +40,8 @@ globalThis.providerApiStyleProbe = async () => {
   const creates: ProviderCreateInput[] = [];
   const updates: ProviderUpdateInput[] = [];
   const discoveries: Parameters<typeof api.listProviderModels>[0][] = [];
+  let failHikvisionDiscovery = false;
+  api.lookupProviderModel = async () => ({ info: null });
   // Only the API boundary is faked: render the production form/hooks and inspect
   // exact save payloads. This does not validate Host persistence or live OAuth.
   api.createProvider = async (input) => {
@@ -52,6 +54,14 @@ globalThis.providerApiStyleProbe = async () => {
   };
   api.listProviderModels = async (input) => {
     discoveries.push(structuredClone(input));
+    if (input.baseUrl === "http://lanz.hikvision.com/v3/openai/model/v1") {
+      if (failHikvisionDiscovery) throw new Error("Fixture discovery unavailable");
+      return { models: [{
+        modelId: "hikvision-fixture", displayName: "Hikvision fixture", providerId: "hikvision",
+        source: "discovered", capabilities: ["text", "tools"],
+        supportedThinkingLevels: ["off"], contextWindow: 32000, maxTokens: 4000,
+      }], source: "remote" };
+    }
     if (input.baseUrl === "https://api.stepfun.com/step_plan/v1") {
       return { models: [{
         modelId: "step-5-preview", displayName: "Step 5 Preview", providerId: "stepfun-fixture",
@@ -179,6 +189,59 @@ globalThis.providerApiStyleProbe = async () => {
   try {
     for (const locale of ["en", "zh-CN"]) {
       await i18n.changeLanguage(locale);
+      for (const failDiscovery of [false, true]) {
+        failHikvisionDiscovery = failDiscovery;
+        render();
+        const beforeCreate = creates.length;
+        const beforeDiscovery = discoveries.length;
+        click(document.querySelector<HTMLElement>('[data-service-id="hikvision"]'));
+        await frame();
+        assert(document.querySelector(".provider-service-chip-host")?.textContent ===
+          "lanz.hikvision.com/v3/openai/model/v1", `${locale}: Hikvision endpoint changed`);
+        const keyInput = document.querySelector<HTMLInputElement>('input[type="password"]');
+        assert(keyInput?.value === "", `${locale}: preset supplies no SK`);
+        assert(creates.length === beforeCreate && discoveries.length === beforeDiscovery,
+          `${locale}: choosing the preset must neither save nor probe without an SK`);
+        assert([...document.querySelectorAll<HTMLElement>(".ui-help-icon")]
+          .some(element => element.getAttribute("aria-label") === i18n.t("settings.apiKeyDirectHint")),
+          `${locale}: direct SK hint missing`);
+        flushSync(() => {
+          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!
+            .call(keyInput, "hikvision-fixture-key");
+          keyInput!.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+        await until(() => discoveries.length > beforeDiscovery, "Hikvision discovery");
+        const discovery = discoveries.at(-1)!;
+        assert(discovery.apiStyle === "chat_completions" && discovery.apiKey === "hikvision-fixture-key",
+          `${locale}: Hikvision discovery uses the selected credentials and format`);
+        const modelId = failDiscovery ? "manual-hikvision-fixture" : "hikvision-fixture";
+        if (failDiscovery) {
+          await until(() => !control("settings.addCustomModel").disabled, "manual model available");
+          const input = [...document.querySelectorAll<HTMLInputElement>("input")]
+            .find(element => element.placeholder === i18n.t("settings.customModelPlaceholder"));
+          assert(input, "manual model input missing");
+          flushSync(() => {
+            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, modelId);
+            input!.dispatchEvent(new Event("input", { bubbles: true }));
+          });
+          click(control("settings.addCustomModel"));
+        } else {
+          const checkbox = () => [...document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
+            .find(element => element.closest("label")?.textContent?.includes(modelId));
+          await until(() => Boolean(checkbox()), "Hikvision discovered model");
+          if (checkbox()!.checked) click(checkbox());
+          click(checkbox());
+        }
+        await until(() => !control("settings.saveProvider").disabled, "Hikvision save enabled");
+        click(control("settings.saveProvider"));
+        await until(() => creates.length === beforeCreate + 1, "Hikvision saved");
+        const saved = creates.at(-1)!;
+        assert(saved.baseUrl === "http://lanz.hikvision.com/v3/openai/model/v1" &&
+          saved.apiStyle === "chat_completions" && saved.secretValue === "hikvision-fixture-key" &&
+          saved.vendorKey === "hikvision" && saved.models?.[0]?.id === modelId,
+          `${locale}: Hikvision save lost endpoint, format, key or model choice`);
+        results.push(`${locale}:hikvision-${failDiscovery ? "manual-after-failure" : "discover-select"}-save`);
+      }
       render();
       const beforeStepfunCreate = creates.length;
       const beforeStepfunDiscovery = discoveries.length;

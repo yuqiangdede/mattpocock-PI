@@ -1,5 +1,27 @@
 use super::*;
 
+#[test]
+fn inherited_permissions_default_to_auto_without_overwriting_explicit_choices() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
+    let inherited =
+        sessions::create_session_with_options(&db, sessions::SessionCreateOptions::default())
+            .unwrap()
+            .id;
+    let explicit = session(&db, "Explicit ask");
+    assert_eq!(
+        permissions::effective_mode(&db, &inherited).unwrap(),
+        "auto"
+    );
+    assert_eq!(permissions::effective_mode(&db, &explicit).unwrap(), "ask");
+    for mode in ["ask", "accept-edits", "auto"] {
+        db.set_setting("app", &json!({"defaultPermissionMode": mode}))
+            .unwrap();
+        assert_eq!(permissions::effective_mode(&db, &inherited).unwrap(), mode);
+        assert_eq!(permissions::effective_mode(&db, &explicit).unwrap(), "ask");
+    }
+}
+
 fn session(db: &Database, title: &str) -> String {
     sessions::create_session_with_options(
         db,

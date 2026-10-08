@@ -237,6 +237,7 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 ### 全局 AI (`ai` tab)
 - **Permissions** card: the global permission-mode control
   (ask / accept-edits / auto) that governs how autonomously the agent acts.
+  The unsaved default is Full Auto; explicit saved choices remain unchanged.
   The control is a menu select on the shared anchored-menu surface rather than
   a platform-drawn `<select>` popup, so every Settings picker opens the same
   way. The closed trigger sizes to the current label, capped by the settings

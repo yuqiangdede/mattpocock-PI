@@ -22,6 +22,14 @@ export type NamedEndpointPreset = {
 
 export const NAMED_ENDPOINT_PRESETS: readonly NamedEndpointPreset[] = [
   {
+    id: "hikvision",
+    vendorKey: "hikvision",
+    name: "Hikvision",
+    baseUrl: "http://lanz.hikvision.com/v3/openai/model/v1",
+    apiStyle: "chat_completions",
+    labelKey: "settings.presetHikvision",
+  },
+  {
     id: "openai",
     vendorKey: "openai",
     name: "OpenAI",

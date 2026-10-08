@@ -465,7 +465,7 @@ export function SettingsPage() {
                   <SettingsMenuSelect
                     className="settings-permission-select"
                     label={t("settings.permissionMode")}
-                    value={settings.defaultPermissionMode ?? "ask"}
+                    value={settings.defaultPermissionMode ?? "auto"}
                     onChange={(mode) =>
                       void saveSettings({
                         defaultPermissionMode: mode as GlobalPermissionMode,

@@ -3710,7 +3710,7 @@ async fn handle_request(
                     }
                     // Effective permission mode (D115): per-session override
                     // unless it is `inherit`, then the global settings default,
-                    // then `ask`. A subagent's tool call carries its own scope
+                    // then `auto`. A subagent's tool call carries its own scope
                     // (ADR 0089), which resolves the call under that mode
                     // instead; external-path gating and the contract modes'
                     // hard deny are untouched by the override.
@@ -3730,7 +3730,7 @@ async fn handle_request(
                                     .map(str::to_string)
                             })
                             .filter(|m| sessions::is_valid_permission_mode(m) && m != "inherit")
-                            .unwrap_or_else(|| "ask".to_string()),
+                            .unwrap_or_else(|| "auto".to_string()),
                     };
                     let effective_pm = match p.permission_scope.as_deref() {
                         Some(scope)
@@ -4273,7 +4273,7 @@ async fn handle_request(
                                 .map(str::to_string)
                         })
                 })
-                .unwrap_or_else(|| "ask".into());
+                .unwrap_or_else(|| "auto".into());
             let args = params.get("args").cloned().unwrap_or_else(|| json!({}));
             let workspace_path = resolve_tool_workspace_for_call(&st, session_id, &args)?;
             let scratch_path = scratch::session_dir(&st.data_dir, session_id);
@@ -5095,6 +5095,107 @@ mod tests {
     use crate::sessions;
     use crate::state::AppState;
     use std::time::Duration;
+
+    #[tokio::test]
+    async fn unsaved_permission_default_executes_tools_and_preserves_explicit_choices() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let project = data_dir.path().join("project");
+        fs::create_dir_all(&project).unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let session = sessions::create_session_with_options(
+            &app_state.db,
+            sessions::SessionCreateOptions {
+                project_path: Some(project.to_string_lossy().into_owned()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let args = json!({"path": project.join("auto.txt"), "content": "Full auto default"});
+        let evaluate = json!({"sessionId": session.id, "toolName": "Write", "args": args});
+        let decision = handle_request(
+            state.clone(),
+            "permissions.evaluate",
+            evaluate.clone(),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(decision["decision"], "allow-once");
+        let result = tokio::time::timeout(Duration::from_secs(5), handle_request(
+            state.clone(), "tools.execute",
+            json!({"sessionId": session.id, "toolCallId": "default-auto-write", "toolName": "Write", "args": args, "mode": "agent"}),
+            tx.clone(),
+        )).await.unwrap().unwrap();
+        assert!(result.get("errorCode").is_none(), "{result}");
+        assert_eq!(
+            fs::read_to_string(project.join("auto.txt")).unwrap(),
+            "Full auto default"
+        );
+        while let Ok(notification) = rx.try_recv() {
+            let value: Value = serde_json::from_str(&notification).unwrap();
+            assert_ne!(value["method"], "permissions.request");
+        }
+        state
+            .lock()
+            .await
+            .db
+            .set_setting("app", &json!({"defaultPermissionMode":"ask"}))
+            .unwrap();
+        let decision = handle_request(
+            state.clone(),
+            "permissions.evaluate",
+            evaluate.clone(),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert!(decision["decision"].is_null());
+        {
+            let st = state.lock().await;
+            st.db
+                .set_setting("app", &json!({"defaultPermissionMode":"auto"}))
+                .unwrap();
+            sessions::configure_session_with_thinking(
+                &st.db,
+                &session.id,
+                "agent",
+                None,
+                None,
+                None,
+                Some("ask"),
+            )
+            .unwrap();
+        }
+        let decision = handle_request(
+            state.clone(),
+            "permissions.evaluate",
+            evaluate.clone(),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert!(decision["decision"].is_null());
+        {
+            let st = state.lock().await;
+            sessions::configure_session_with_thinking(
+                &st.db,
+                &session.id,
+                "plan",
+                None,
+                None,
+                None,
+                Some("inherit"),
+            )
+            .unwrap();
+        }
+        let decision = handle_request(state, "permissions.evaluate", evaluate, tx)
+            .await
+            .unwrap();
+        assert_eq!(decision["decision"], "deny");
+    }
 
     // Issue #1071: the per-request wall-clock budget must cut loose requests
     // stuck on the global state lock (the dominant queueing case) so their
