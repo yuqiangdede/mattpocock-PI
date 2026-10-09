@@ -91,7 +91,7 @@ test("the composer lists active skills last and routes slash skills to the Skill
   assert.match(mainSrc, /skillId: skill\.id/);
   assert.match(
     mainSrc,
-    /\.\.\.extensionCommands,\s*\.\.\.skillCommands,/,
+    /\.\.\.extensionCommands,\s*\.\.\.mcpCommands,\s*\.\.\.skillCommands,/,
   );
   assert.match(mainSrc, /let submittedContent = req\.content/);
   assert.match(mainSrc, /submittedContent = context\.prompt/);

@@ -18,6 +18,20 @@ async function fixture(t) {
 }
 const catalog = skillId => [{ name: skillId, kind: "skill", skillId, title: skillId }];
 
+test("prefixed native Skill selection keeps the editable draft and saved action", async () => {
+  const configuration = createDefaultCodingActions();
+  const before = structuredClone(configuration);
+  let draft = "Keep the existing request";
+  await executeCodingAction("code-review", {
+    sessionId: "session", projectPath: "project", configuration,
+    catalog: async () => [{ name: "skill:code-review", kind: "skill", skillId: "code-review", title: "Code review" }],
+    isCurrent: () => true, defaultPrompt: () => "Review the changes",
+    readLiveDraft: () => draft, applyDraft: text => { draft = text; },
+  });
+  assert.equal(draft, "/skill:code-review Review the changes\n\nKeep the existing request");
+  assert.deepEqual(configuration, before);
+});
+
 test("默认仅配置六个独立编码 Actions，不展开整个 Skill Catalog", () => {
   const config = createDefaultCodingActions();
   assert.deepEqual(config.actions.map(action => action.label), ["Discuss requirements", "Create specification", "Technical design", "Create tickets", "Implement", "Code review"]);

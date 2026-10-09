@@ -1,6 +1,7 @@
 import type { CodingActionConfiguration, CodingActionSnapshot } from "@pi-desktop/shared";
 import type { VersionSourceId, VersionSourceState } from "../../../../packages/shared/src/version-sources";
 import { validateEngineeringSettings, engineeringSettingsForWrite, type EngineeringShortcutPrompts, type EngineeringSkillUpdateMode, type EngineeringSkillStatus } from "@pi-desktop/shared";
+import { projectPlanHistory } from "./plan-history";
 import type {
   ScheduledTaskRun,
   ActivationScope,
@@ -288,6 +289,9 @@ export interface ExternalMcpImportItem {
 }
 
 export interface ExternalMcpImportPayload {
+  /** Defaults to global for existing callers. */
+  level?: "global" | "project";
+  projectPath?: string;
   items: ExternalMcpImportItem[];
 }
 
@@ -342,6 +346,7 @@ function normalizeSessionDetail(detail: SessionDetail | null): SessionDetail | n
   return detail
     ? {
         ...detail,
+        messages: projectPlanHistory(detail.messages, detail.planHistory ?? [], detail.id),
         mode: normalizeMode((detail as { mode?: unknown }).mode),
       }
     : null;

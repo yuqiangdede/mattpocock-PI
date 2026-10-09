@@ -23,6 +23,7 @@ Each ADR includes:
 | 0314 | [Engineering Workflow ownership and acceptance](0314-engineering-workflow-ownership-and-acceptance.md) | Accepted; implemented V0 candidate |
 | 0315 | [Profile-managed engineering skill fallback](0315-bundled-engineering-skill-fallback.md) | Implemented candidate |
 | 0316 | [Free Task Host ownership](0316-free-task-host-ownership.md) | Implementation candidate |
+| composer-mcp-invocations | [Composer MCP Invocations](composer-mcp-invocations.md) | Accepted |
 | chronological-system-transcript | [Preserve chronological model system state](chronological-system-transcript.md) | Accepted |
 | mcp-tool-approval-risk | [User MCP tools keep the normal approval path](mcp-tool-approval-risk.md) | Accepted |
 | models-dev-catalog-authority | [models.dev owns published model metadata](models-dev-catalog-authority.md) | Accepted for implementation |
@@ -362,4 +363,7 @@ Each ADR includes:
 
 | 0317 | [Preserve Windows resizing without the native frameless rim](0317-windows-borderless-window-resize.md) | Accepted (D637) |
 | 0318 | [Publish native Linux arm64 artifacts](0318-linux-arm64-release-lane.md) | Accepted (D638) |
-| 0319 | [快捷按钮扩展设置与原生 PI 设置分离](0319-separate-extension-shortcut-settings.md) | Accepted |
+| extension-shortcut-settings | [快捷按钮扩展设置与原生 PI 设置分离](extension-shortcut-settings.md) | Accepted |
+| 0319 | [Inline external imports in owning Settings destinations](0319-settings-inline-imports.md) | Accepted (D645) |
+| 0320 | [Host-owned OAuth lifecycle for plugin providers](0320-plugin-oauth-provider-callbacks.md) | Accepted for implementation (D647; amends ADR 0259) |
+| 0321 | [Pin an acceptable address for mixed direct DNS answers](0321-skill-market-direct-dns-pinning.md) | Accepted (D648; amends ADR 0272) |

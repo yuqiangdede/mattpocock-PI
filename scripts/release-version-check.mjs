@@ -10,3 +10,14 @@ export function resolveReleaseDocumentCheck(currentVersion, requestedVersion) {
     isPrereleasePreview,
   };
 }
+
+export function isModelsDevProviderCatalog(value) {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      Object.values(value).some(
+        (provider) => provider && typeof provider === "object" && provider.models,
+      ),
+  );
+}

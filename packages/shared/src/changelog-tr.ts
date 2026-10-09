@@ -2,6 +2,15 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const trEntries: ChangelogEntry[] = [
   {
+    "version": "0.17.0",
+    "date": "2026-10-09",
+    "highlights": [
+      "Görseller ve konuşmalar için satır içi kartlar, son modeller ve Composer'da açık MCP araçlarıyla PI-Desktop 0.17.0 temelini alın.",
+      "Coding Actions düzenlenebilir taslaklar olarak kalır; yerel Skills `/skill:<id>` komut kataloğunu kullanır.",
+      "Yapılandırma eşzamanlama, eklenti OAuth, döküm oluşturma, alt aracı kurtarma, depolama bakımı ve sistem proxy yönlendirmesi iyileştirilir."
+    ]
+  },
+  {
     "version": "0.16.2",
     "date": "2026-10-07",
     "highlights": [

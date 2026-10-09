@@ -30,6 +30,15 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    "version": "0.17.0",
+    "date": "2026-10-09",
+    "highlights": [
+      "Adopt the PI-Desktop 0.17.0 base with inline image and conversation chips, recent model selection and explicit Composer MCP tools.",
+      "Keep Coding Actions editable and draft-first while native Skills use the `/skill:<id>` command catalog.",
+      "Improve config sync, plugin OAuth, transcript rendering, subagent recovery, storage maintenance and system proxy routing."
+    ]
+  },
+  {
     "version": "0.16.2",
     "date": "2026-10-07",
     "highlights": [
@@ -922,6 +931,15 @@ const enEntries: ChangelogEntry[] = [
 
 const zhCNEntries: ChangelogEntry[] = [
   {
+    "version": "0.17.0",
+    "date": "2026-10-09",
+    "highlights": [
+      "接入 PI-Desktop 0.17.0，支持图片与会话引用内联卡片、最近使用模型和 Composer 中显式选择 MCP 工具。",
+      "Coding Actions 继续保持可编辑草稿优先，原生 Skill 使用 `/skill:<id>` 命令目录。",
+      "改进配置同步、插件 OAuth、长对话渲染、子 Agent 恢复、存储维护和系统代理路由。"
+    ]
+  },
+  {
     "version": "0.16.2",
     "date": "2026-10-07",
     "highlights": [
@@ -1813,6 +1831,15 @@ const zhCNEntries: ChangelogEntry[] = [
 ];
 
 const zhTWEntries: ChangelogEntry[] = [
+  {
+    "version": "0.17.0",
+    "date": "2026-10-09",
+    "highlights": [
+      "接入 PI-Desktop 0.17.0，支援圖片與對話引用內嵌卡片、最近使用模型及 Composer 中明確選取 MCP 工具。",
+      "Coding Actions 維持可編輯草稿優先，原生 Skill 使用 `/skill:<id>` 命令目錄。",
+      "改進設定同步、外掛 OAuth、長對話渲染、子 Agent 復原、儲存維護及系統代理路由。"
+    ]
+  },
   {
     "version": "0.16.2",
     "date": "2026-10-07",

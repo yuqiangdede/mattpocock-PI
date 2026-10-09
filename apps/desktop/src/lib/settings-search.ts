@@ -15,7 +15,6 @@ export type SettingsTabId =
   | "skills"
   | "mcp"
   | "subagents"
-  | "import"
   | "projects"
   | "sync"
   | "remoteHosts"
@@ -181,13 +180,20 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
     keywordKeys: [
       "settings.providers",
       "settings.models",
-      "settings.defaultModel",
       "settings.apiKey",
       "settings.baseUrl",
       "settings.apiStyle",
       // Subscription accounts share the service list (D625).
       "settings.vendorAccounts",
       "settings.vendorSubscription",
+      "settings.importTitle",
+      "settings.importModelsScanDesc",
+      "settings.importModelsTitle",
+      "settings.importSourceClaudeCode",
+      "settings.importSourceOpenCode",
+      "settings.importSourceCodex",
+      "settings.importSourcePi",
+      "settings.importSourceCcSwitch",
     ],
   },
   {
@@ -201,6 +207,9 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.globalScopeDescription",
       "settings.projectScopeDescription",
       "settings.importSkill",
+      "settings.importSkillFromTools",
+      "settings.importAgentSkillsTitle",
+      "settings.importAgentSkillsDesc",
       "settings.capabilityFilterGlobal",
       "settings.capabilityFilterProject",
       "extensions.skills.add",
@@ -220,6 +229,9 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.globalScopeDescription",
       "settings.projectScopeDescription",
       "settings.addMcp",
+      "settings.importMcpFromTools",
+      "settings.importAgentMcpTitle",
+      "settings.importAgentMcpDesc",
       "settings.editMcp",
       "settings.transport",
       "settings.capabilityFilterGlobal",
@@ -252,21 +264,6 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
     ],
   },
   {
-    id: "import",
-    labelKey: "settings.nav.import",
-    titleKey: "settings.import",
-    group: "workspace",
-    keywordKeys: [
-      "settings.importTitle",
-      "settings.importModelsTitle",
-      "settings.importSourceClaudeCode",
-      "settings.importSourceOpenCode",
-      "settings.importSourceCodex",
-      "settings.importSourcePi",
-      "settings.importSourceCcSwitch",
-    ],
-  },
-  {
     id: "projects",
     labelKey: "settings.nav.projects",
     titleKey: "settings.projectArchive",
@@ -284,9 +281,10 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
     labelKey: "settings.nav.sync",
     titleKey: "settings.configSync.title",
     group: "system",
-    developerOnly: true,
+    // Cloud sync (encrypted portable configuration backup) is not open to
+    // users yet: packaged builds hide the destination and its search hits,
+    // development builds keep it. Drop this flag to ship it again.
     developmentOnly: true,
-    experimentalBadgeKey: "settings.configSync.experimental",
     keywordKeys: [
       "settings.configSync.connectionTitle",
       "settings.configSync.endpoint",

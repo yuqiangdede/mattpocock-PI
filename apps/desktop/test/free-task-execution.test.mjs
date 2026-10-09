@@ -9,7 +9,7 @@ async function service(host, submit) {
   const module = { exports: {} };
   new Function("exports", "module", compiled)(module.exports, module);
   return module.exports.createFreeTaskService({ getHost: () => host,
-    catalog: async () => [{ kind: "skill", name: "implement", skillId: "implement" }],
+    catalog: async () => [{ kind: "skill", name: "skill:implement", skillId: "implement" }],
     submit, cancel: async () => ({ aborted: true }) });
 }
 

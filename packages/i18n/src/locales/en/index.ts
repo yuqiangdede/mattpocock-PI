@@ -514,6 +514,11 @@ export const en = {
   },
   chat: {
     tableActions: "Table actions",
+    markdownPlainTextFallback: "Large response shown as plain text to keep the conversation responsive.",
+    largeTextPageControls: "Large output pages",
+    largeTextPage: "Part {{current}} of {{total}}",
+    largeTextPreviousPage: "Previous part",
+    largeTextNextPage: "Next part",
     copyTableMarkdown: "Copy table as Markdown",
     exportTableCsv: "Download table as CSV",
     tablePreview: "Expand table",
@@ -548,6 +553,7 @@ export const en = {
     slashGroupApp: "App commands",
     slashGroupPlugins: "Plugin commands",
     slashGroupExtensions: "Extension commands",
+    slashGroupMcp: "MCP",
     slashGroupSkills: "Skills",
     slashEmpty: "No matching commands",
     slashCommandSourceUnavailable: "Command list unavailable, so nothing was sent. Try again.",
@@ -566,7 +572,6 @@ export const en = {
       progress: "{{completed}}/{{total}} completed",
       current: "{{completed}}/{{total}} · Current: {{content}}",
       completed: "{{completed}}/{{total}} completed",
-      more: "{{count}} more items",
       updated: "Checklist updated",
       updating: "Updating checklist",
       status: {
@@ -818,6 +823,8 @@ export const en = {
     userMessage: "User message",
     assistantMessage: "Assistant message",
     model: "Model",
+    recentModels: "Recently used",
+    otherModels: "Other models",
     searchModels: "Search models",
     noModelResults: "No matching models",
     modelBadgeReasoning: "reasoning",
@@ -854,6 +861,15 @@ export const en = {
     renameCancel: "Cancel",
     renameSave: "Save",
     renameSaving: "Saving…",
+  },
+  planHistory: {
+    pending: "Awaiting approval",
+    approved: "Approved",
+    rejected: "Rejected",
+    expired: "Expired",
+    interrupted: "Interrupted",
+    unknown: "Status unavailable",
+    superseded: "Superseded",
   },
   plan: {
     planning: "Planning",
@@ -1099,7 +1115,6 @@ sklm: {
       skills: "Skills",
       mcp: "MCP",
       subagents: "Subagents",
-      import: "Import",
       projects: "Projects",
       sync: "Cloud sync",
       remoteHosts: "Remote hosts",
@@ -1332,7 +1347,6 @@ sklm: {
     skillSaved: "Saved {{name}}",
     subagentCreated: "Created {{name}}",
     subagentSaved: "Saved {{name}}",
-    import: "Import",
     projectArchive: "Project archive",
     remoteHosts: {
       title: "Remote hosts",
@@ -1379,7 +1393,6 @@ sklm: {
     },
     configSync: {
       title: "Cloud sync",
-      experimental: "Experimental",
       connectionTitle: "WebDAV cloud sync",
       connectionDescription:
         "Synchronize portable configuration through an encrypted WebDAV vault. Conversation history, source files, and runtime state are never included.",
@@ -1545,7 +1558,6 @@ sklm: {
     importFound: "Sessions found: {{count}}",
     importFound_one: "1 session found",
     importFound_other: "{{count}} sessions found",
-    importCodexCapped: "Codex is limited to the {{limit}} newest session files (by folder date).",
     importNone: "No importable sessions found on this machine.",
 
     importSelectAll: "Select all",
@@ -1556,9 +1568,6 @@ sklm: {
     importMessages_other: "{{count}} messages",
     importMessagesUnknown: "—",
     importNoProject: "No project",
-    importSessionCount: "{{count}} sessions",
-    importSessionCount_one: "1 session",
-    importSessionCount_other: "{{count}} sessions",
     importSelectedCount: "{{count}} selected",
     importGroupBy: "Group by",
     importGroupByPath: "Project path",
@@ -1779,6 +1788,9 @@ sklm: {
     vendorAccountUpdated: "Vendor account updated",
     vendorRemoveAccount: "Remove account",
     vendorAccountRemoved: "{{vendor}} account removed",
+    vendorSignOut: "Sign out",
+    vendorSignedOut: "Signed out of {{vendor}}",
+    pluginOauthFailed: "The plugin could not complete provider sign-in.",
     vendorLoginStarting: "Starting sign-in…",
     vendorBrowserOpened:
       "Finish signing in in your browser, then come back to this window.",
@@ -2630,6 +2642,7 @@ importConfirm: "Imported extensions run inside the agent process with the same a
       "agent.extension": "Run code inside the agent",
       "renderer.extension": "Draw UI in chat slots",
       "provider.register": "Add providers to the model list",
+      "provider.oauth": "Sign in to a provider with OAuth",
       "desktop.control": "Control the desktop",
       "models.list": "List authenticated models",
       "session.read": "Read the current conversation sent to the model",
@@ -2679,6 +2692,8 @@ importConfirm: "Imported extensions run inside the agent process with the same a
         "Loads this plugin's renderer module into the app window to draw UI slot components (message action bars, entry extras, tool cards, code-block renderers, composer controls). The module runs in the same document as PI-Desktop. Enable only code you trust.",
       "provider.register":
         "Adds the providers this plugin defines to Settings' provider list. The plugin supplies the endpoint and models; your API key stays in PI-Desktop.",
+      "provider.oauth":
+        "Lets this plugin run OAuth login and refresh for its declared provider. PI-Desktop encrypts the tokens, but the trusted callback can read them. Host-mediated network access still requires net.fetch and declared domains; plugin entry code is not an OS sandbox, so grant this only to code you trust.",
       "desktop.control":
         "Lets the plugin invoke the reviewed PI-Desktop control catalog. Destructive operations still require confirm=true; the MCP bearer token is never exposed.",
       "models.list": "Can see which models you have signed in for. It does not receive keys.",
@@ -3131,6 +3146,8 @@ importConfirm: "Imported extensions run inside the agent process with the same a
     },
   },
   errors: {
+    COMPOSER_MCP_UNAVAILABLE: "The selected MCP server is disconnected or unavailable in this project. Reconnect it and select it again.",
+    COMPOSER_MCP_REQUEST_REQUIRED: "Add task text or an attachment after selecting an MCP server or tool.",
     HOST_UNAVAILABLE: "The local service is unavailable",
     MODEL_NOT_CONFIGURED: "This model isn't set up, or the AI provider doesn't offer it.",
     TOOL_DENIED: "Permission was denied for this action",

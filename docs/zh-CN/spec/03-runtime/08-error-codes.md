@@ -116,6 +116,7 @@ stdio 与 Tokio 的动态阻塞池隔离，因此后一种情况
 | `SUBAGENT_DURATION_TIMEOUT` | 不 | 已撤回（D328）：时长看门狗不再武装；代码仅为已存储结果保留 |
 | `SUBAGENT_CONTEXT_OVERFLOW` | 不 | 委派自身的模型上下文超出其安全预算，自动的回合边界压缩与仅保留任务简报和最近消息的降级重试都没能把它带回限制以内；该失败给出可执行的恢复方式，而不是提供商的溢出文本 |
 | `SUBAGENT_OUTPUT_TRUNCATED` | 不 | 委派报告在模型输出 token 上限处结束；保留部分报告用于诊断，但该运行报告为失败，不会被呈现为已完成的委派 |
+| `SUBAGENT_PARENT_FAILED` | 不 | 父级失败中断了运行中的委托；可通过 Task 手动恢复，仍受现有历史与读取预算限制 |
 
 ### 3. 3 工作空间/工具/权限
 
@@ -207,6 +208,7 @@ stdio 与 Tokio 的动态阻塞池隔离，因此后一种情况
 | `EDIT_REGISTER_AMBIGUOUS` | 否 | 存在多个待粘贴的匿名捕获时进行匿名粘贴 |
 | `EDIT_REPAIR_AMBIGUOUS` | 否 | 边界修复候选在最小代价上并列 |
 | `EDIT_NO_CHANGE` | 否 | 应用产生了与输入完全相同的文本 |
+| `EDIT_LEGACY_MATCH_FAILED` | 否 | 旧版 `old_string` 编辑未能唯一匹配；重试前重新读取文件 |
 | `EDIT_AMPLIFICATION_LIMIT` | 否 | 下降展开超过膨胀上限 |
 
 当消息报告 reveal 完整时，`EDIT_LINES_UNSEEN` **无需**再次 `Read` 即可重试：

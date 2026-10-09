@@ -235,7 +235,8 @@ try {
   assert.ok(await evaluate(`document.body.innerText.includes('Auto can run restricted actions')`));
   await click(await evaluate(`document.querySelector('.scheduled-execution-toolbar .composer-model-thinking-chip').getAttribute('aria-label')`), 'button[aria-haspopup]', true);
   await waitFor(() => evaluate(`!!document.querySelector('.composer-model-menu.is-open .composer-menu-root')`), 5000, "measured root menu");
-  await evaluate(`document.querySelector('.composer-menu-root .composer-menu-entry').click()`);
+  // The combined model menu focuses search directly, including without
+  // recent-model history; no separate model-list entry is required.
   await waitFor(() => evaluate(`document.activeElement?.getAttribute('aria-label') === 'Search models'`), 5000, "model search focus");
   await fill('.composer-model-search input', 'fixture-alt');
   await waitFor(() => evaluate(`document.querySelectorAll('.composer-model-option').length === 1`), 5000, "filtered model");
@@ -323,8 +324,7 @@ try {
   await click(await evaluate(`document.querySelector('.scheduled-execution-toolbar .composer-model-thinking-chip').getAttribute('aria-label')`), 'button[aria-haspopup]', true);
   await waitFor(() => evaluate(`!!document.querySelector('.composer-model-menu.is-open')`), 5000, "composer model menu");
   await screenshot("after-model-menu.png");
-  await evaluate(`document.querySelector('.composer-menu-root .composer-menu-entry').click()`);
-  await waitFor(() => evaluate(`!!document.querySelector('.composer-model-search')`), 5000, "shared model submenu");
+  await waitFor(() => evaluate(`!!document.querySelector('.composer-model-search')`), 5000, "shared model search");
   await screenshot("after-model-search.png");
   await key("Escape", 27);
   await choose("Cadence", "Weekly");
@@ -425,7 +425,12 @@ try {
   assert.equal(runs.length, manualCount + 1);
   await invoke("scheduledUpdate", { id: task.id, enabled: false });
   await evaluate(`document.querySelector('[data-nav="scheduled"]').click()`);
-  await waitFor(() => evaluate(`document.querySelector('.page-title')?.textContent === 'Scheduled'`), 5000, "return to tasks");
+  try {
+    await waitFor(() => evaluate(`document.querySelector('.page-title')?.textContent === 'Scheduled'`), 5000, "return to tasks");
+  } catch (error) {
+    const navigation = await evaluate(`({ titles: [...document.querySelectorAll('.page-title')].map(element => element.textContent), nav: document.querySelector('[data-nav="scheduled"]')?.outerHTML, text: document.body.innerText.slice(-1800) })`);
+    throw new Error(`Scheduled return navigation failed: ${JSON.stringify(navigation)}`, { cause: error });
+  }
   acceptDelete = true;
   await click("Delete");
   await waitFor(async () => (await invoke("scheduledList")).tasks.length === 0, 5000, "confirmed deletion");
