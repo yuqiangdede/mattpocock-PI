@@ -27,7 +27,7 @@ jobs:
         run: node scripts/update-upstream.mjs --version "$UPSTREAM_VERSION"
       - name: 保存预览报告和补丁
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: upstream-preview
           path: cache/upstream/
