@@ -26,6 +26,29 @@ BUILD = ROOT / "apps" / "desktop" / "build"
 SOURCE = BUILD / "icon_1024.png"
 
 BASE = 1024
+ROUNDED_TILE_RADIUS = 172
+
+
+def with_transparent_corners(image: Image.Image) -> Image.Image:
+    """Remove the opaque canvas outside the rounded application tile.
+
+    The source artwork is a rounded light tile rendered on a black canvas.
+    Windows treats every opaque pixel in an ICO as part of the icon, so the
+    canvas must become transparent before deriving platform resources.
+    """
+
+    source = image.convert("RGBA")
+    mask = Image.new("L", source.size, 0)
+    ImageDraw.Draw(mask).rounded_rectangle(
+        (0, 0, source.width - 1, source.height - 1),
+        radius=ROUNDED_TILE_RADIUS,
+        fill=255,
+    )
+    # Preserve the source's existing alpha while replacing only the canvas
+    # outside the rounded tile with transparency.
+    alpha = ImageChops.multiply(source.getchannel("A"), mask)
+    source.putalpha(alpha)
+    return source
 
 
 def main() -> None:
@@ -33,7 +56,7 @@ def main() -> None:
         raise FileNotFoundError(f"canonical logo is missing: {SOURCE}")
 
     with Image.open(SOURCE) as source:
-        master = source.convert("RGBA")
+        master = with_transparent_corners(source)
     if master.size != (BASE, BASE):
         raise ValueError(
             f"canonical logo must be {BASE}x{BASE}, got {master.width}x{master.height}"
