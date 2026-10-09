@@ -663,12 +663,12 @@ visually distinct from list content.
 
 ### 3.7 Brand and icon contract
 
-- The mattpocock-PI fork uses a unified Matt `M` / Pi `π` monogram: a navy
-  shared crossbar and legs, an internal M valley, and a blue crossbar accent
-  on an ivory tile. Package icons, theme brand marks, and the documentation
-  logo share this artwork; the macOS tray uses its transparent monochrome
-  silhouette. This asset replacement does not alter theme switching or the
-  empty-home mascot.
+- The mattpocock-PI fork uses a unified Matt `M` / Pi `π` monogram: navy
+  structural strokes and a cobalt crossbar on an ivory tile. A cobalt handwritten `y` signature and the `yuqiangdede` wordmark
+  identify the creator. Package icons, theme brand marks,
+  and the documentation logo share this artwork; the macOS tray uses its
+  transparent monochrome silhouette. This asset replacement does not alter
+  theme switching or the empty-home mascot.
 - The visible shell name is `PI-Desktop`; Codex is not used as the renderer
   identity.
 - A control with no label states `.icon-btn-square`, which pins both axes to
