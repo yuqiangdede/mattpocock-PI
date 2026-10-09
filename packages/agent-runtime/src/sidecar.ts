@@ -1,3 +1,4 @@
+import { parseMcpServerIds, parseMcpToolNames } from "./mcp-tool-selection.js";
 /**
  * Node pi agent sidecar.
  * Protocol: NDJSON JSON-RPC on stdio with Electron main.
@@ -370,7 +371,13 @@ async function handle(method: string, params: any): Promise<unknown> {
     case "sidecar.configure": {
       // Main owns host-core; sidecar only keeps config metadata.
       if (params && typeof params === "object" && "networkProxy" in params) {
-        applyNodeNetworkProxy(normalizeNetworkProxy(params.networkProxy));
+        applyNodeNetworkProxy(
+          normalizeNetworkProxy(params.networkProxy),
+          process.env,
+          typeof params.systemProxyRelayUrl === "string"
+            ? params.systemProxyRelayUrl
+            : undefined,
+        );
       }
       return { ok: true, mode: "host-proxy" };
     }
@@ -444,6 +451,8 @@ async function handle(method: string, params: any): Promise<unknown> {
       }
       const prompt: RuntimePrompt = {
         text: content,
+        mcpServerIds: parseMcpServerIds(params.mcpServerIds),
+        mcpToolNames: parseMcpToolNames(params.mcpToolNames),
         attachments,
         ...(params.sessionMessage ? { sessionMessage: params.sessionMessage as SessionMessageOrigin } : {}),
       };
@@ -472,7 +481,7 @@ async function handle(method: string, params: any): Promise<unknown> {
       const expectedTurnId = String(params.expectedTurnId ?? "");
       if (method === "agent.steeringContext") return runtime.steeringContext(expectedTurnId);
       return runtime.steer(
-        { text: String(params.content ?? ""), attachments: params.attachments },
+        { text: String(params.content ?? ""), attachments: params.attachments, mcpServerIds: parseMcpServerIds(params.mcpServerIds), mcpToolNames: parseMcpToolNames(params.mcpToolNames) },
         expectedTurnId,
         params.message,
       );

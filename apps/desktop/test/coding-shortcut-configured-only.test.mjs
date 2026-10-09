@@ -9,7 +9,7 @@ test('Matt skills appear in More without exposing imagegen or raw English titles
   const original = structuredClone(configuration);
   const catalog = [{ name: 'imagegen', kind: 'skill', skillId: 'pi-desktop/imagegen', title: 'imagegen' }, { name: 'retro', kind: 'skill', skillId: 'retro', title: 'Retrospective' }];
   const menu = codingShortcutMenu(configuration, catalog, { ask: '咨询下一步', diagnose: 'Bug 排查', skillLabels: { retro: '复盘' } });
-  assert.equal(menu.primary.length, 8);
+  assert.equal(menu.primary.length, 9);
   assert.deepEqual(menu.more.map(row => row.action.label), ['复盘']);
   assert.equal(menu.more[0].action.skillId, 'retro');
   assert.ok(!menu.more.some(row => row.action.skillId === 'pi-desktop/imagegen'));

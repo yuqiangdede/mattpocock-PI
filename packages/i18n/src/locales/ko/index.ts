@@ -242,6 +242,11 @@ export const ko = {
   },
   chat: {
     tableActions: "표 작업",
+    markdownPlainTextFallback: "긴 응답은 화면의 반응성을 유지하기 위해 일반 텍스트로 표시됩니다.",
+    largeTextPageControls: "대용량 출력 페이지",
+    largeTextPage: "{{total}}개 중 {{current}}번째 부분",
+    largeTextPreviousPage: "이전 부분",
+    largeTextNextPage: "다음 부분",
     copyTableMarkdown: "표를 Markdown으로 복사",
     exportTableCsv: "표를 CSV로 다운로드",
     tablePreview: "표 확대",
@@ -276,6 +281,7 @@ export const ko = {
     slashGroupApp: "앱 명령",
     slashGroupPlugins: "플러그인 명령",
     slashGroupExtensions: "확장 명령",
+    slashGroupMcp: "MCP",
     slashGroupSkills: "스킬",
     slashEmpty: "일치하는 명령 없음",
     slashCommandSourceUnavailable: "명령 목록을 불러오지 못해 전송하지 않았습니다. 다시 시도하세요.",
@@ -294,7 +300,6 @@ export const ko = {
       progress: "{{completed}}/{{total}} 완료",
       current: "{{completed}}/{{total}} · 현재: {{content}}",
       completed: "{{completed}}/{{total}} 완료",
-      more: "{{count}}개 더 있음",
       updated: "체크리스트 업데이트됨",
       updating: "체크리스트 업데이트 중",
       status: { pending: "대기", in_progress: "진행 중", completed: "완료", cancelled: "취소됨" },
@@ -541,6 +546,8 @@ export const ko = {
     userMessage: "사용자 메시지",
     assistantMessage: "어시스턴트 메시지",
     model: "모델",
+    recentModels: "최근 사용",
+    otherModels: "다른 모델",
     searchModels: "모델 검색",
     noModelResults: "일치하는 모델 없음",
     modelBadgeReasoning: "추론",
@@ -577,6 +584,15 @@ export const ko = {
     renameCancel: "취소",
     renameSave: "저장",
     renameSaving: "저장 중…",
+  },
+  planHistory: {
+    pending: "승인 대기",
+    approved: "승인됨",
+    rejected: "거부됨",
+    expired: "만료됨",
+    interrupted: "중단됨",
+    unknown: "상태를 확인할 수 없음",
+    superseded: "새 버전으로 대체됨",
   },
   plan: {
     planning: "계획 중",
@@ -795,7 +811,6 @@ sklm: {
       skills: "스킬",
       mcp: "MCP",
       subagents: "서브에이전트",
-      import: "가져오기",
       projects: "프로젝트",
       sync: "클라우드 동기화",
       remoteHosts: "원격 호스트",
@@ -804,7 +819,6 @@ sklm: {
     },
     configSync: {
       title: "Cloud sync",
-      experimental: "실험적",
       connectionTitle: "WebDAV cloud sync",
       connectionDescription:
         "Synchronize portable configuration through an encrypted WebDAV vault. Conversation history, source files, and runtime state are never included.",
@@ -1187,7 +1201,6 @@ sklm: {
     skillSaved: "{{name}} 저장됨",
     subagentCreated: "{{name}} 생성됨",
     subagentSaved: "{{name}} 저장됨",
-    import: "가져오기",
     projectArchive: "프로젝트 보관함",
     remoteHosts: {
       title: "원격 호스트",
@@ -1238,7 +1251,6 @@ sklm: {
     importFound: "찾은 세션: {{count}}",
     importFound_one: "세션 1개 찾음",
     importFound_other: "세션 {{count}}개 찾음",
-    importCodexCapped: "Codex는 폴더 날짜 기준 최신 세션 파일 {{limit}}개만 표시합니다.",
     importNone: "이 컴퓨터에서 가져올 수 있는 세션을 찾지 못했습니다.",
 
     importSelectAll: "모두 선택",
@@ -1249,9 +1261,6 @@ sklm: {
     importMessages_other: "메시지 {{count}}개",
     importMessagesUnknown: "—",
     importNoProject: "프로젝트 없음",
-    importSessionCount: "세션 {{count}}개",
-    importSessionCount_one: "세션 1개",
-    importSessionCount_other: "세션 {{count}}개",
     importSelectedCount: "{{count}}개 선택됨",
     importGroupBy: "그룹화 기준",
     importGroupByPath: "프로젝트 경로",
@@ -1470,6 +1479,9 @@ sklm: {
     vendorAccountUpdated: "벤더 계정 업데이트됨",
     vendorRemoveAccount: "계정 제거",
     vendorAccountRemoved: "{{vendor}} 계정 제거됨",
+    vendorSignOut: "로그아웃",
+    vendorSignedOut: "{{vendor}}에서 로그아웃됨",
+    pluginOauthFailed: "플러그인이 공급자 로그인을 완료하지 못했습니다.",
     vendorLoginStarting: "로그인 시작 중…",
     vendorBrowserOpened:
       "브라우저에서 로그인을 완료한 후 이 창으로 돌아오세요.",
@@ -2313,6 +2325,7 @@ importConfirm: "가져온 확장은 에이전트 프로세스 안에서 에이�
       "agent.extension": "에이전트 안에서 코드 실행",
       "renderer.extension": "채팅 슬롯에 UI 그리기",
       "provider.register": "모델 목록에 프로바이더 추가",
+      "provider.oauth": "OAuth로 프로바이더 로그인",
       "desktop.control": "데스크톱 제어",
       "models.list": "인증된 모델 목록 표시",
       "session.read": "모델에 전송되는 현재 대화 읽기",
@@ -2360,6 +2373,8 @@ importConfirm: "가져온 확장은 에이전트 프로세스 안에서 에이�
       "renderer.extension": "이 플러그인의 렌더러 모듈을 앱 창에 로드하여 메시지 작업 표시줄, 응답 추가 영역, 도구 카드, 코드 블록 렌더러, 작성기 컨트롤 등 UI 슬롯 구성 요소를 그립니다. 모듈은 PI-Desktop과 같은 문서에서 실행됩니다. 신뢰하는 코드만 활성화하세요.",
       "provider.register":
         "이 플러그인이 정의한 프로바이더를 설정의 프로바이더 목록에 추가합니다. 플러그인은 엔드포인트와 모델을 제공하며, API 키는 PI-Desktop에 남습니다.",
+      "provider.oauth":
+        "이 플러그인이 선언된 프로바이더의 OAuth 로그인과 토큰 갱신을 수행하도록 허용합니다. PI-Desktop은 토큰을 암호화하지만 신뢰하는 콜백은 토큰을 읽을 수 있습니다. 호스트가 중개하는 네트워크 접근에는 net.fetch와 선언된 도메인이 필요하며, 플러그인 프로세스는 운영체제 샌드박스가 아닙니다. 신뢰하는 코드에만 허용하세요.",
       "desktop.control":
         "플러그인이 검토된 PI-Desktop 제어 카탈로그를 호출할 수 있습니다. 파괴적 작업에는 여전히 confirm=true가 필요하며 MCP bearer token은 노출되지 않습니다.",
       "models.list": "로그인한 모델을 볼 수 있지만 키는 받지 않습니다.",
@@ -2718,6 +2733,8 @@ importConfirm: "가져온 확장은 에이전트 프로세스 안에서 에이�
     phase: { idle: "꺼짐", preparing: "준비 중", "acquiring-mic": "마이크 대기 중", negotiating: "협상 중", connecting: "연결 중…", connected: "연결됨", reconnecting: "재연결 중", closing: "종료 중…", ended: "종료됨", failed: "중지됨" },
   },
   errors: {
+    COMPOSER_MCP_UNAVAILABLE: "선택한 MCP 서버의 연결이 끊겼거나 현재 프로젝트에서 사용할 수 없습니다. 다시 연결하고 선택하세요.",
+    COMPOSER_MCP_REQUEST_REQUIRED: "MCP 서버 또는 도구를 선택한 뒤 작업 내용을 입력하거나 첨부 파일을 추가하세요.",
     HOST_UNAVAILABLE: "로컬 서비스를 사용할 수 없습니다",
     MODEL_NOT_CONFIGURED: "이 모델이 설정되지 않았거나 AI 프로바이더에서 제공하지 않습니다.",
     TOOL_DENIED: "이 작업에 대한 권한이 거부되었습니다",

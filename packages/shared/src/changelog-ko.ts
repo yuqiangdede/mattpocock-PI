@@ -2,6 +2,15 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const koEntries: ChangelogEntry[] = [
   {
+    "version": "0.17.0",
+    "date": "2026-10-09",
+    "highlights": [
+      "이미지와 대화 인라인 카드, 최근 모델 선택 및 Composer의 명시적 MCP 도구를 포함한 PI-Desktop 0.17.0을 적용합니다.",
+      "Coding Actions는 편집 가능한 초안으로 유지되며 기본 Skill은 `/skill:<id>` 명령 카탈로그를 사용합니다.",
+      "구성 동기화, 플러그인 OAuth, 대화 렌더링, 하위 에이전트 복구, 저장소 유지 관리 및 시스템 프록시 라우팅을 개선합니다."
+    ]
+  },
+  {
     "version": "0.16.2",
     "date": "2026-10-07",
     "highlights": [

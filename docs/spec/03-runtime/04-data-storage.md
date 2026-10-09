@@ -69,8 +69,10 @@ The location is machine-local and never part of cloud configuration sync.
 
 Migration is cold: the accepted settings action journals pending work, then uses
 existing ordered shutdown to settle turns/outbox and stop writers. The next launch
-opens only a sandboxed, nonpersistent maintenance window before importing the
-application composition root. It inventories bytes/files, checks free space, streams
+points Chromium `sessionData` at a temporary directory, then opens only a
+sandboxed, nonpersistent maintenance window before importing the application
+composition root. The default session initializes with that first window, so it
+must not be inside a profile the job is about to copy or clean. It inventories bytes/files, checks free space, streams
 the copy, preserves permissions and internal/external links, and SHA-256 verifies
 both source and copied files. An interrupted copy may be retried only with its
 matching ownership marker; nonempty/unrelated destinations and overlapping roots

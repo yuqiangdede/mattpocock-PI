@@ -73,7 +73,7 @@ test("同一来源并发检测只发起一个请求", async () => {
   let resolve;
   let count = 0;
   const response = new Promise((done) => { resolve = done; });
-  const checker = createVersionSourceChecker({appVersion: "0.16.0", skillVersion: async () => sha, request: async () => { count++; return response; }});
+  const checker = createVersionSourceChecker({appVersion: "0.16.0", upstreamVersion: "0.16.0", skillVersion: async () => sha, request: async () => { count++; return response; }});
   const first = checker.check("pi-desktop");
   const second = checker.check("pi-desktop");
   assert.equal(first, second);

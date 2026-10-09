@@ -49,7 +49,7 @@ export function createWorkflowExecutionService({
   };
   const requireSkill = async (path: string, skillId: string) => {
     const commands = await catalog(path);
-    if (!commands.some((command) => command.kind === "skill" && command.skillId === skillId && command.name === skillId)) {
+    if (!commands.some((command) => command.kind === "skill" && command.skillId === skillId)) {
       throw Object.assign(new Error(`The installed ${skillId} skill is unavailable`), { errorCode: "WORKFLOW_SKILL_UNAVAILABLE" });
     }
   };

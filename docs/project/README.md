@@ -25,3 +25,4 @@
 
 - 官方稳定版更新与定制维护：[`upstream-updates.md`](upstream-updates.md)
 - 官方 0.16.1 升级知识与历史验收：[`upstream-0.16.1-retrospective.md`](upstream-0.16.1-retrospective.md)
+- Official 0.17.0 source integration: [`upstream-0.17.0.md`](upstream-0.17.0.md)

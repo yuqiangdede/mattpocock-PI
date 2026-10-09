@@ -147,9 +147,10 @@ ipcMain.handle("pi-desktop/clipboard/recordPaste", (_event, input) => {
   return { ok: true, data: null };
 });
 app.whenReady().then(async () => {
+  // Native Tab/Escape focus behavior requires an active window on Windows.
   if (process.argv.includes("--history-check")) {
     try {
-      const window = new BrowserWindow({ show: false, webPreferences: {
+      const window = new BrowserWindow({ show: true, webPreferences: {
         preload: ${JSON.stringify(join(root, "apps/desktop/out/preload/index.cjs"))},
         sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false,
       } });
@@ -176,7 +177,7 @@ app.whenReady().then(async () => {
   await fs.mkdir(path.join(__dirname, "attachments"));
   await fs.writeFile(path.join(__dirname, "attachments", "a".repeat(64)), Buffer.alloc(512 * 1024 + 1));
   await fs.writeFile(path.join(__dirname, "attachments", "b".repeat(64)), Buffer.from([0, 1, 2, 0]));
-  const window = new BrowserWindow({ show: false, webPreferences: {
+  const window = new BrowserWindow({ show: true, webPreferences: {
     preload: ${JSON.stringify(join(root, "apps/desktop/out/preload/index.cjs"))},
     sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false,
   } });
@@ -217,8 +218,18 @@ app.whenReady().then(async () => {
     const result = await window.webContents.executeJavaScript("globalThis.composerPasteProbe()");
     await opensDone;
     assert.deepEqual(opened.map(path.extname), [".mp4", ".mp4", ".mp4"]);
-    assert.equal(await fs.realpath(opened[0]), await fs.realpath(path.join(__dirname, "attachments", "a".repeat(64))));
-    assert.equal(await fs.realpath(opened[1]), await fs.realpath(path.join(__dirname, "attachments", "b".repeat(64))));
+    for (const [index, hash] of [[0, "a"], [1, "b"]]) {
+      const original = await fs.realpath(path.join(__dirname, "attachments", hash.repeat(64)));
+      if (process.platform === "win32") {
+        const source = await fs.stat(original, { bigint: true });
+        const alias = await fs.stat(opened[index], { bigint: true });
+        assert(source.ino !== 0n, "attachment identity is unavailable");
+        assert.equal(alias.ino, source.ino);
+        assert.equal(alias.dev, source.dev);
+      } else {
+        assert.equal(await fs.realpath(opened[index]), original);
+      }
+    }
     assert.equal(opened[2], saved.find(entry => entry.mimeTypes.includes("video/mp4"))?.files[0].path);
     const mimeSets = saved.map((entry) => entry.mimeTypes.join("+"));
     assert.equal(

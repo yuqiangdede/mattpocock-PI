@@ -2,6 +2,15 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const frEntries: ChangelogEntry[] = [
   {
+    "version": "0.17.0",
+    "date": "2026-10-09",
+    "highlights": [
+      "Adoptez PI-Desktop 0.17.0 avec des cartes intégrées pour les images et conversations, les modèles récents et les outils MCP explicites dans Composer.",
+      "Les Coding Actions restent des brouillons modifiables ; les Skills natives utilisent le catalogue `/skill:<id>`.",
+      "La synchronisation de configuration, OAuth des plugins, le rendu des transcriptions, la reprise des sous-agents, la maintenance du stockage et le proxy système sont améliorés."
+    ]
+  },
+  {
     "version": "0.16.2",
     "date": "2026-10-07",
     "highlights": [

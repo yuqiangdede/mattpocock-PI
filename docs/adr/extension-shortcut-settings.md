@@ -1,7 +1,10 @@
-# ADR 0319: 快捷按钮扩展设置与原生 PI 设置分离
+# ADR extension-shortcut-settings: 快捷按钮扩展设置与原生 PI 设置分离
 
 - Status: Accepted
 - Date: 2026-10-06
+
+Previously numbered 0319 in this fork. The stable slug preserves this fork
+decision when upstream 0.17.0 introduces its own unrelated ADR 0319.
 
 ## Context
 

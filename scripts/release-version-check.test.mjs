@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveReleaseDocumentCheck } from "./release-version-check.mjs";
+import {
+  isModelsDevProviderCatalog,
+  resolveReleaseDocumentCheck,
+} from "./release-version-check.mjs";
 
 test("defaults a prerelease to its stable documentation without changing version surfaces", () => {
   assert.deepEqual(resolveReleaseDocumentCheck("0.16.0-beta.1"), {
@@ -32,4 +35,14 @@ test("does not hide a mismatched requested version", () => {
     surfaceVersion: "0.15.1",
     isPrereleasePreview: false,
   });
+});
+
+test("accepts a models.dev provider catalog with model records", () => {
+  assert.equal(isModelsDevProviderCatalog({ provider: { models: { model: {} } } }), true);
+});
+
+test("rejects invalid or empty models.dev catalogs", () => {
+  for (const value of [null, [], {}, { provider: {} }, { provider: null }]) {
+    assert.equal(isModelsDevProviderCatalog(value), false);
+  }
 });

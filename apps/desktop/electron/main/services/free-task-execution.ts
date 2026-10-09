@@ -25,7 +25,7 @@ export function createFreeTaskService({ getHost, catalog, submit, cancel, onIdle
         try {
           const context = await boundary.call<{ projectPath: string; skillId: string; prompt: string }>("freeTask.context", { id: task.id, sessionId: task.sessionId });
           const commands = await catalog(context.projectPath);
-          if (!commands.some((command) => command.kind === "skill" && command.name === context.skillId && command.skillId === context.skillId)) {
+          if (!commands.some((command) => command.kind === "skill" && command.skillId === context.skillId)) {
             throw Object.assign(new Error(`Skill unavailable: ${context.skillId}`), { errorCode: "FREE_TASK_SKILL_UNAVAILABLE" });
           }
           if (getHost() !== boundary) throw new Error("Host changed before dispatch");

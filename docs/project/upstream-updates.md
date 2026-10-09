@@ -4,6 +4,8 @@
 
 首次升级的问题、Windows 修复、验收与交付证据见 [0.16.1 升级复盘](upstream-0.16.1-retrospective.md)。本手册提供操作入口，复盘中的历史测试结果不替代下一次升级验收。
 
+The 0.17.0 integration records its upstream revision, conflict decisions and validation in [the 0.17.0 integration report](upstream-0.17.0.md). Upstream source adoption does not itself publish a new fork release.
+
 ## 人工更新
 
 环境要求：Node >= 22.19、pnpm >= 10（优先使用 packageManager 指定版本）、项目要求的 Rust 工具链、Git 支持 `merge-tree --write-tree --merge-base`。依赖初始化使用 `pnpm install --frozen-lockfile`。开发启动使用 `pnpm dev`。
@@ -12,15 +14,16 @@
 
 ```powershell
 git fetch origin main
-git worktree add -b codex/upstream-0.16.2 ../mattpocock-PI-upstream-0.16.2 origin/main
-Set-Location -LiteralPath '../mattpocock-PI-upstream-0.16.2'
-pnpm upstream:check --version 0.16.2
-pnpm upstream:check --version 0.16.2 --apply
-pnpm install --frozen-lockfile
+git worktree add -b codex/upstream-0.17.0 ../mattpocock-PI-upstream-0.17.0 origin/main
+Set-Location -LiteralPath '../mattpocock-PI-upstream-0.17.0'
+pnpm upstream:check --version 0.17.0
+pnpm upstream:check --version 0.17.0 --apply
 pnpm upstream:verify
 ```
 
 版本号只是下一次更新的示例，必须使用真实官方稳定版本。
+
+Reuse compatible host dependencies and build caches for candidate validation. Install from the frozen lockfile only when dependencies are missing or incompatible; keep mutable dependency metadata, profiles and test state local to the request worktree.
 
 预览只抓取指定官方标签并生成项目内 `cache/upstream/<version>.json` 与 `.patch`；不改源码或索引。应用时使用固定官方基线执行三方增量合并，保留定制文件；拒绝主分支、脏工作树、降级和版本不一致的标签。基线文件随候选更新变更，必须和源码一起通过验证后交付。
 

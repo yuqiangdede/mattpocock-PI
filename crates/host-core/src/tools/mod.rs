@@ -1034,6 +1034,51 @@ pub async fn execute_tool_with_options(
     .await
 }
 
+/// Run a synchronous file-tool body on Tokio's blocking pool so a long
+/// traversal, read, or rg child wait cannot occupy an async worker (#1071).
+async fn run_file_tool(
+    workspace: Option<&Path>,
+    scratch: Option<&Path>,
+    tool_name: &str,
+    args: &Value,
+    allow_external_paths: bool,
+    hashline: Option<&HashlineContext<'_>>,
+) -> Result<Value, hashline::ToolError> {
+    let workspace = workspace.map(Path::to_path_buf);
+    let scratch = scratch.map(Path::to_path_buf);
+    let tool_name = tool_name.to_string();
+    let args = args.clone();
+    let hashline = hashline.map(|ctx| (ctx.session_id.to_string(), ctx.store.clone()));
+    #[cfg(test)]
+    let test_rg = grep_rg::current_test_rg();
+    tokio::task::spawn_blocking(move || {
+        // The test rg override is thread-local; carry it onto the blocking
+        // thread for the duration of the body.
+        #[cfg(test)]
+        let _test_rg = test_rg.map(grep_rg::install_test_rg);
+        let hashline = hashline.as_ref().map(|(id, store)| HashlineContext {
+            session_id: id,
+            store,
+        });
+        let (workspace, scratch, hashline) =
+            (workspace.as_deref(), scratch.as_deref(), hashline.as_ref());
+        let args = &args;
+        match tool_name.as_str() {
+            "Read" => tool_read(workspace, scratch, args, allow_external_paths, hashline)
+                .map_err(Into::into),
+            "Glob" => tool_glob(workspace, scratch, args, allow_external_paths).map_err(Into::into),
+            "Grep" => tool_grep(workspace, scratch, args, allow_external_paths, hashline)
+                .map_err(Into::into),
+            "Write" => tool_write(workspace, scratch, args, allow_external_paths, hashline)
+                .map_err(Into::into),
+            // "Edit": the caller routes only these five file tools here.
+            _ => tool_edit(workspace, scratch, args, allow_external_paths, hashline),
+        }
+    })
+    .await
+    .map_err(|error| hashline::ToolError::new("INTERNAL", format!("tool task failed: {error}")))?
+}
+
 /// Execute a builtin tool after the host permission gate has decided whether
 /// an explicit outside-workspace path is allowed for this call.
 pub async fn execute_tool_with_path_access(
@@ -1070,38 +1115,17 @@ pub async fn execute_tool_with_path_access(
         // Authorize the desktop-owned image request through the normal host gate.
         // Only the trusted desktop runner performs the external call.
         "GenerateImages" => Ok(serde_json::json!({ "authorized": true })),
-        "Read" => tool_read(
-            workspace,
-            scratch,
-            args,
-            allow_external_paths,
-            hashline.as_ref(),
-        )
-        .map_err(Into::into),
-        "Glob" => tool_glob(workspace, scratch, args, allow_external_paths).map_err(Into::into),
-        "Grep" => tool_grep(
-            workspace,
-            scratch,
-            args,
-            allow_external_paths,
-            hashline.as_ref(),
-        )
-        .map_err(Into::into),
-        "Write" => tool_write(
-            workspace,
-            scratch,
-            args,
-            allow_external_paths,
-            hashline.as_ref(),
-        )
-        .map_err(Into::into),
-        "Edit" => tool_edit(
-            workspace,
-            scratch,
-            args,
-            allow_external_paths,
-            hashline.as_ref(),
-        ),
+        "Read" | "Glob" | "Grep" | "Write" | "Edit" => {
+            run_file_tool(
+                workspace,
+                scratch,
+                tool_name,
+                args,
+                allow_external_paths,
+                hashline.as_ref(),
+            )
+            .await
+        }
         "Bash" => {
             let options = bash_options.unwrap_or_else(|| {
                 let id = shell::catalog(None)
@@ -1484,6 +1508,51 @@ fn tool_write(
     }))
 }
 
+/// Lower a legacy `old_string`/`new_string` replacement to one line-anchored op.
+///
+/// The match may start or end mid-line (#1106), so the op is derived from the
+/// full substring result and anchors only the lines that actually differ;
+/// returns `None` when the replacement changes nothing.
+fn legacy_replace_ops(text: &str, start: usize, old: &str, new: &str) -> Option<String> {
+    let replaced = format!("{}{new}{}", &text[..start], &text[start + old.len()..]);
+    let old_lines = hashline::split_lines(text);
+    let new_lines = hashline::split_lines(&replaced);
+    let prefix = old_lines
+        .iter()
+        .zip(&new_lines)
+        .take_while(|(old, new)| old == new)
+        .count();
+    let suffix = old_lines[prefix..]
+        .iter()
+        .rev()
+        .zip(new_lines[prefix..].iter().rev())
+        .take_while(|(old, new)| old == new)
+        .count();
+    let old_end = old_lines.len() - suffix;
+    let new_span = &new_lines[prefix..new_lines.len() - suffix];
+    let first = prefix + 1;
+    let mut ops = if prefix == old_end {
+        if new_span.is_empty() {
+            return None;
+        }
+        if prefix == 0 {
+            "PUT <1:\n".to_string()
+        } else {
+            format!("PUT >{prefix}:\n")
+        }
+    } else if new_span.is_empty() {
+        return Some(format!("CUT {first}.={old_end}\n"));
+    } else {
+        format!("PUT {first}.={old_end}:\n")
+    };
+    for line in new_span {
+        ops.push('+');
+        ops.push_str(line);
+        ops.push('\n');
+    }
+    Some(ops)
+}
+
 fn tool_edit(
     workspace: Option<&Path>,
     scratch: Option<&Path>,
@@ -1496,16 +1565,6 @@ fn tool_edit(
         .get("path")
         .and_then(|v| v.as_str())
         .ok_or_else(|| hashline::ToolError::new("INVALID_ARGUMENT", "path required"))?;
-    let tag = args.get("tag").and_then(|v| v.as_str()).ok_or_else(|| {
-        hashline::ToolError::new(
-            "EDIT_TAG_REQUIRED",
-            "tag required; pass the 4-hex tag from the latest Read, Grep, Write, or Edit",
-        )
-    })?;
-    let ops = args
-        .get("ops")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| hashline::ToolError::new("INVALID_ARGUMENT", "ops required"))?;
     let (resolved, root_kind) =
         resolve_tool_path_with_external(root, scratch, path, allow_external_paths)
             .map_err(|e| hashline::ToolError::new(e.clone(), e))?;
@@ -1520,13 +1579,65 @@ fn tool_edit(
             hashline::ToolError::new("TOOL_FAILED", format!("read failed: {e}"))
         }
     })?;
+    let legacy_old = args.get("old_string").and_then(Value::as_str);
+    let legacy_new = args.get("new_string").and_then(Value::as_str);
+    let (tag, ops) = match (
+        args.get("tag").and_then(Value::as_str),
+        args.get("ops").and_then(Value::as_str),
+        legacy_old,
+        legacy_new,
+    ) {
+        (Some(tag), Some(ops), _, _) => (tag.to_string(), ops.to_string()),
+        (None, None, Some(old), Some(new)) => {
+            let file = hashline::normalize_file(&live);
+            let tag = hashline::tag_of_lf_text(&file.text);
+            let matches: Vec<_> = file
+                .text
+                .match_indices(old)
+                .map(|(start, _)| start)
+                .collect();
+            if matches.is_empty() {
+                return Err(hashline::ToolError::new(
+                    "EDIT_LEGACY_MATCH_FAILED",
+                    format!(
+                        "old_string not found in {path}; re-read the file to verify the content"
+                    ),
+                ));
+            }
+            if matches.len() > 1 {
+                return Err(hashline::ToolError::new(
+                    "EDIT_LEGACY_MATCH_FAILED",
+                    format!(
+                        "old_string must match exactly once; found {} matches in {path}",
+                        matches.len()
+                    ),
+                ));
+            }
+            let ops = legacy_replace_ops(&file.text, matches[0], old, new).ok_or_else(|| {
+                hashline::ToolError::new(
+                    "EDIT_NO_CHANGE",
+                    "new_string is identical to old_string; nothing to change",
+                )
+            })?;
+            (tag, ops)
+        }
+        (None, _, _, _) => {
+            return Err(hashline::ToolError::new(
+                "EDIT_TAG_REQUIRED",
+                "tag required; pass the 4-hex tag from the latest Read, Grep, Write, or Edit",
+            ));
+        }
+        (_, None, _, _) => {
+            return Err(hashline::ToolError::new("INVALID_ARGUMENT", "ops required"));
+        }
+    };
     let display = display_tool_path(root_kind, root, &resolved);
     let canonical = hashline::canonical_key(&resolved);
     let (file, success) = hashline::apply_edit(
         &display,
         &canonical,
-        tag,
-        ops,
+        &tag,
+        &ops,
         &live,
         hashline.map(|c| c.session_id),
         hashline.map(|c| c.store),
@@ -2999,6 +3110,45 @@ mod tests {
                 > MCP_CONNECT_TIMEOUT_MS + MCP_TOOL_DISCOVERY_TIMEOUT_MS + MCP_CALL_TIMEOUT_MS
         );
         assert_eq!(desktop_dispatch_timeout_ms(Some(5_000)), 5_000);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    async fn glob_traversal_does_not_occupy_the_async_worker() {
+        let dir = tempfile::tempdir().unwrap();
+        for directory in 0..60 {
+            let path = dir.path().join(format!("dir-{directory}"));
+            std::fs::create_dir(&path).unwrap();
+            for file in 0..100 {
+                std::fs::File::create(path.join(format!("file-{file}.txt"))).unwrap();
+            }
+        }
+
+        let root = dir.path().to_path_buf();
+        let glob = tokio::spawn(async move {
+            execute_tool(
+                Some(&root),
+                None,
+                "Glob",
+                &serde_json::json!({ "pattern": "**/*.zzz" }),
+                30_000,
+            )
+            .await
+        });
+        // With one worker, the probe can only be polled during the Glob while
+        // the Glob task is parked at an await. An inline synchronous traversal
+        // never yields, so the probe cannot complete until the traversal ends.
+        let probe = tokio::spawn(async {
+            tokio::task::yield_now().await;
+        });
+        probe.await.unwrap();
+        assert!(
+            !glob.is_finished(),
+            "probe could only run after Glob finished: the Glob body blocked the only async worker (#1071)"
+        );
+
+        let result = glob.await.unwrap();
+        assert!(result.ok, "glob failed: {:?}", result.content);
+        assert_eq!(result.content["count"].as_u64(), Some(0));
     }
 
     #[cfg(unix)]
@@ -4655,6 +4805,223 @@ mod tests {
 
         let written = std::fs::read_to_string(&target).unwrap();
         assert_eq!(written, "line one\r\nline TWO replaced\r\nline three\r\n");
+    }
+
+    #[tokio::test]
+    async fn edit_accepts_legacy_old_string_new_string_shape() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("legacy.txt");
+        std::fs::write(&target, "fn main() {\n    println!(\"hello\");\n}\n").unwrap();
+
+        // Model sends old_string and new_string without tag or ops
+        let result = execute_tool(
+            Some(dir.path()),
+            None,
+            "Edit",
+            &serde_json::json!({
+                "path": "legacy.txt",
+                "old_string": "    println!(\"hello\");",
+                "new_string": "    println!(\"world\");"
+            }),
+            5_000,
+        )
+        .await;
+        assert!(
+            result.ok,
+            "Edit with legacy shape should succeed: {:?}",
+            result.content
+        );
+        assert_eq!(result.content["tag"].as_str().unwrap().len(), 4);
+
+        let written = std::fs::read_to_string(&target).unwrap();
+        assert_eq!(written, "fn main() {\n    println!(\"world\");\n}\n");
+
+        // Fails cleanly when old_string is not found
+        let not_found = execute_tool(
+            Some(dir.path()),
+            None,
+            "Edit",
+            &serde_json::json!({
+                "path": "legacy.txt",
+                "old_string": "non_existent_text",
+                "new_string": "replacement"
+            }),
+            5_000,
+        )
+        .await;
+        assert!(!not_found.ok);
+        assert_eq!(
+            not_found.error_code.as_deref(),
+            Some("EDIT_LEGACY_MATCH_FAILED")
+        );
+    }
+
+    #[tokio::test]
+    async fn edit_legacy_replacement_preserves_unmatched_bytes() {
+        let cases = [
+            (
+                "1: partial-line suffix match keeps prefix",
+                "let x = foo;\nnext\n",
+                "= foo;",
+                "= bar;",
+                "let x = bar;\nnext\n",
+            ),
+            (
+                "2: partial-line prefix match keeps trailing comment",
+                "value = 1; // keep me\n",
+                "value = 1;",
+                "value = 2;",
+                "value = 2; // keep me\n",
+            ),
+            (
+                "3: mid-line match keeps both sides",
+                "call(alpha, beta);\n",
+                "alpha",
+                "gamma",
+                "call(gamma, beta);\n",
+            ),
+            (
+                "4: multi-line match keeps both partial boundary lines",
+                "fn a() { one();\n    two(); } // end\n",
+                "one();\n    two();",
+                "uno();",
+                "fn a() { uno(); } // end\n",
+            ),
+            (
+                "5: multi-line replacement keeps partial-match boundaries",
+                "let x = foo;\n",
+                "foo",
+                "bar(\n    1,\n)",
+                "let x = bar(\n    1,\n);\n",
+            ),
+            (
+                "6: empty replacement removes only matched text",
+                "keep remove keep\nz\n",
+                " remove",
+                "",
+                "keep keep\nz\n",
+            ),
+            (
+                "7: whole-line deletion including newline leaves no blank line",
+                "a\nfoo\nb\n",
+                "foo\n",
+                "",
+                "a\nb\n",
+            ),
+            (
+                "8: partial match preserves CRLF and unmatched text",
+                "let x = foo;\r\nnext\r\n",
+                "= foo;",
+                "= bar;",
+                "let x = bar;\r\nnext\r\n",
+            ),
+            (
+                "9: whole-line multi-line replacement stays compatible",
+                "a\nb\nc\nd\n",
+                "b\nc",
+                "B\nC",
+                "a\nB\nC\nd\n",
+            ),
+            (
+                "10: pure insertion after a whole line",
+                "a\nc\n",
+                "a\n",
+                "a\nb\n",
+                "a\nb\nc\n",
+            ),
+            (
+                "11: joining two lines preserves unmatched text",
+                "ab\ncd\n",
+                "b\nc",
+                "b c",
+                "ab cd\n",
+            ),
+        ];
+        let mut failures = Vec::new();
+        for (label, input, old_string, new_string, expected) in cases {
+            let dir = tempfile::tempdir().unwrap();
+            let target = dir.path().join("legacy.txt");
+            std::fs::write(&target, input).unwrap();
+
+            let result = execute_tool(
+                Some(dir.path()),
+                None,
+                "Edit",
+                &serde_json::json!({
+                    "path": "legacy.txt",
+                    "old_string": old_string,
+                    "new_string": new_string
+                }),
+                5_000,
+            )
+            .await;
+            // Collect every failed check so one regression cannot hide another case.
+            if !result.ok {
+                failures.push(format!(
+                    "{label}: Edit should succeed: {:?}",
+                    result.content
+                ));
+            }
+            if result.content["tag"]
+                .as_str()
+                .map(|tag| tag.chars().count())
+                != Some(4)
+            {
+                failures.push(format!(
+                    "{label}: expected a 4-character tag, got {:?}",
+                    result.content["tag"]
+                ));
+            }
+            match std::fs::read(&target) {
+                Ok(written) if written == expected.as_bytes() => {}
+                Ok(written) => failures.push(format!(
+                    "{label}: file bytes differ: expected {expected:?}, got {:?}",
+                    String::from_utf8_lossy(&written)
+                )),
+                Err(error) => {
+                    failures.push(format!("{label}: could not read edited file: {error}"))
+                }
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
+    #[tokio::test]
+    async fn edit_legacy_identical_replacement_leaves_file_unchanged() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("legacy.txt");
+        let input = "keep foo keep\n";
+        std::fs::write(&target, input).unwrap();
+        let result = execute_tool(
+            Some(dir.path()),
+            None,
+            "Edit",
+            &json!({"path": "legacy.txt", "old_string": "foo", "new_string": "foo"}),
+            5_000,
+        )
+        .await;
+        assert!(!result.ok);
+        assert_eq!(result.error_code.as_deref(), Some("EDIT_NO_CHANGE"));
+        assert_eq!(std::fs::read(&target).unwrap(), input.as_bytes());
+    }
+
+    #[tokio::test]
+    async fn edit_legacy_terminal_newline_only_change_reports_no_change() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("legacy.txt");
+        let input = "keep\n";
+        std::fs::write(&target, input).unwrap();
+        let result = execute_tool(
+            Some(dir.path()),
+            None,
+            "Edit",
+            &json!({"path": "legacy.txt", "old_string": "\n", "new_string": ""}),
+            5_000,
+        )
+        .await;
+        assert!(!result.ok);
+        assert_eq!(result.error_code.as_deref(), Some("EDIT_NO_CHANGE"));
+        assert_eq!(std::fs::read(&target).unwrap(), input.as_bytes());
     }
 
     #[tokio::test]

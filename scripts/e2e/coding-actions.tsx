@@ -56,11 +56,12 @@ globalThis.codingActionsProbe = async () => {
     const buttons = [...document.querySelectorAll<HTMLButtonElement>(".coding-shortcuts-primary button")];
     return buttons[0]?.textContent?.trim() === i18n.t("coding.initialize") && !buttons[0].disabled ? buttons : null;
   });
-  check(primary[1]?.textContent?.trim() === i18n.t("codingActions.askNext"), "初始化未排在咨询下一步前面");
+  const askLabel = initial.actions.find(action => action.skillId === "ask-matt")?.label ?? i18n.t("codingActions.askNext");
+  check(primary[1]?.textContent?.trim() === askLabel, "初始化未排在已配置的咨询下一步前面");
   for (const [label, marker, prompt] of [
-    [i18n.t("coding.initialize"), "/setup-matt-pocock-skills ", i18n.t("coding.prompts.initialize")],
-    [initial.actions.find(action => action.skillId === "ask-matt")?.label ?? i18n.t("codingActions.askNext"), "/ask-matt ", initial.actions.find(action => action.skillId === "ask-matt")?.prompt ?? i18n.t("coding.prompts.ask")],
-    [initial.actions.find(action => action.skillId === "diagnosing-bugs")?.label ?? i18n.t("codingActions.diagnose"), "/diagnosing-bugs ", initial.actions.find(action => action.skillId === "diagnosing-bugs")?.prompt ?? i18n.t("coding.prompts.diagnose")],
+    [i18n.t("coding.initialize"), "/skill:setup-matt-pocock-skills ", i18n.t("coding.prompts.initialize")],
+    [initial.actions.find(action => action.skillId === "ask-matt")?.label ?? i18n.t("codingActions.askNext"), "/skill:ask-matt ", initial.actions.find(action => action.skillId === "ask-matt")?.prompt ?? i18n.t("coding.prompts.ask")],
+    [initial.actions.find(action => action.skillId === "diagnosing-bugs")?.label ?? i18n.t("codingActions.diagnose"), "/skill:diagnosing-bugs ", initial.actions.find(action => action.skillId === "diagnosing-bugs")?.prompt ?? i18n.t("coding.prompts.diagnose")],
   ]) {
     const commonButton = await until(() => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.trim() === label && !button.disabled));
     const guide = i18n.t(`coding.skillGuides.${marker.includes("setup-matt") ? "initialize" : marker.includes("ask-matt") ? "ask" : "diagnose"}.when`);
@@ -146,7 +147,7 @@ globalThis.codingActionsProbe = async () => {
   useAppStore.setState({ composerPrefill: { sessionId: view.sessionId, text: "检验 Action 当前会话请求", fileReferences: [] } });
   await until(() => readEditorValue(editor()) === "检验 Action 当前会话请求");
   await fixture("releaseLaunch"); await click("快速审查");
-  await until(() => readEditorValue(editor()).startsWith("/code-review 检查当前项目改动。"));
+  await until(() => readEditorValue(editor()).startsWith("/skill:code-review 检查当前项目改动。"));
   check((await fixture("snapshot") as { prompts: number }).prompts === before.prompts, "选择 Action 自动发送了请求");
   await fixture("pressKey", "Enter");
   await until(async () => (await fixture("snapshot") as { prompts: number }).prompts === 1);
@@ -158,7 +159,7 @@ globalThis.codingActionsProbe = async () => {
   await fixture("updateActionSkill", { path: view.projectPath, body: "UPDATED_ACTION_SKILL_BODY" });
   const configBeforeUpdate = JSON.stringify((await api.getCodingActions()).configuration);
   await fixture("reset"); const beforeSecond = await fixture("snapshot") as { prompts: number }; await fixture("releaseLaunch"); await click("快速审查");
-  await until(() => readEditorValue(editor()).startsWith("/code-review 检查当前项目改动。"));
+  await until(() => readEditorValue(editor()).startsWith("/skill:code-review 检查当前项目改动。"));
   check((await fixture("snapshot") as { prompts: number }).prompts === beforeSecond.prompts, "选择 Action 自动发送了请求");
   await fixture("pressKey", "Enter");
   await until(async () => (await fixture("snapshot") as { prompts: number }).prompts === 2);

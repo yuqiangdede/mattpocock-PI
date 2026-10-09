@@ -24,7 +24,10 @@ try {
     platform: "browser",
     format: "iife",
     jsx: "automatic",
-    define: { "process.env.NODE_ENV": '"production"', "import.meta.env.DEV": "false" },
+    define: {
+      "process.env.NODE_ENV": '"production"',
+      "import.meta.env": '{"DEV":false,"MODE":"production"}',
+    },
     // Styles are outside the render-count contract; component and hook code is real.
     loader: { ".css": "empty" },
     alias: {
@@ -142,7 +145,9 @@ const { app, BrowserWindow } = require("electron");
 const path = require("node:path");
 app.setPath("userData", path.join(__dirname, "profile"));
 app.whenReady().then(async () => {
-  const window = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
+  // Offscreen rendering keeps native frame scheduling active for hidden
+  // Windows geometry probes without replacing requestAnimationFrame.
+  const window = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, offscreen: true } });
   window.webContents.on("console-message", (event) => console.error(event.message));
   try {
     await window.loadFile(path.join(__dirname, "index.html"));

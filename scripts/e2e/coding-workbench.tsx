@@ -24,7 +24,7 @@ const check = (value: unknown, message: string) => { if (!value) throw new Error
 const draftFor = (skill: string, body = "") => {
   const action = skill === "ask-matt" ? "ask" : [...CODING_SKILL_SHORTCUTS, ...CODING_MORE_SKILLS].find(item => item.skill === skill)!.action;
   const prompt = i18n.t(`coding.prompts.${action}`);
-  return `/${skill} ${prompt}` + (body ? "\n\n" + body : "");
+    return `/skill:${skill} ${prompt}` + (body ? "\n\n" + body : "");
 };
 const editor = () => document.querySelector<HTMLElement>(".composer-input")!;
 function focusForTooltip(button: HTMLButtonElement) {

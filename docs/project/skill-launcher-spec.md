@@ -36,6 +36,8 @@ Selecting an Action only fills the Composer draft. Undefined/null prompt uses th
 
 Skill Resolver 消费原生 Catalog 已合并的结果，不自行规定项目、用户、内置或插件优先级，不引入来源限定别名。Skill 更新无需保存 Action。
 
+After adopting upstream 0.17.0, the native catalog supplies `skill:<id>` command names. Actions resolve by the stable `skillId` and insert `/skill:<id>` using the catalog name. Persisted Actions retain their existing ids and configuration. Historical Workflow and Free Task prompts continue resolving their host-owned bare skill markers through the same active Skill ids.
+
 ## 界面与配置
 
 More groups available Matt skills by Requirements and exploration, Design and planning, Development and testing, Review and maintenance, and Collaboration and delivery. Unknown configured overflow appears under Custom actions. Empty groups are hidden. Grouping is presentation only: no stage prerequisites, execution order, or persisted configuration changes.
