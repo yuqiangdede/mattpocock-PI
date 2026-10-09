@@ -51,7 +51,7 @@
 
 了解更多：[工程 Workflow](docs/user/engineering-workflow.md) · [Coding Actions](docs/project/skill-launcher-spec.md) · [工程技能分发](docs/project/engineering-skills-distribution.md) · [更新机制](docs/spec/01-product/executable-updates.md)。
 
-以下介绍中的桌面底座能力来自 PI-Desktop；感谢上游项目及技能作者的贡献。
+[PI-Desktop](https://github.com/vastsa/PI-Desktop)
 
 ---
 
