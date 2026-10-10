@@ -15,7 +15,7 @@ A Work Item is more than a cosmetic chat folder: it can later retain referenced 
 
 ## 2. Logical model and boundaries
 
-\`\`\`text
+```text
 Logical Project Group (existing durable project identity)
   |-- Native Session A (unchanged)
   |-- Native Session B (unchanged)
@@ -32,7 +32,7 @@ Logical Project Group (existing durable project identity)
        |-- Work Item: fix remote routing
        |    +-- link -> existing Session D
        +-- Ungrouped sessions (still native Pi sessions)
-\`\`\`
+```
 
 - **Project**: the existing logical, durable project group, not the current folder string alone.
 - **Work Item**: a goal-specific, project-owned entity; can be active, completed or archived.
@@ -65,7 +65,7 @@ If native session creation succeeds but the link operation fails, keep the new S
 
 **Do not modify the native project sidebar or force a new tree structure in the first release.** A separate Navigator entry (prefer the existing work-panel extensibility point/feature module) presents a project-scoped Work Item view alongside ordinary Pi chat.
 
-\`\`\`text
+```text
 Navigator / Work Items
   Left: Work Item list (active / completed / archived; create, rename, select)
   Main: selected Work Item overview (goal, status, last activity, next user action)
@@ -75,7 +75,7 @@ Navigator / Work Items
     Activity       — linked run/turn evidence when authoritative identifiers exist
     Tasks          — later optional task list / graph; not required for MVP
   Independent "Ungrouped Conversations" entry (view only; links to native chat)
-\`\`\`
+```
 
 The normal chat and Coding Action/Skill Launcher remain available, including when Navigator is disabled. Clicking a linked Session navigates via the existing session-selection route. A Work Item can be reopened across application restarts without injecting its entire chat history into the model. When a new Skill is invoked, only the user-selected, authorized Work Item artifacts and necessary confirmed context are handed off; explicit Send remains required.
 
@@ -85,7 +85,7 @@ A plugin-provided work-panel view is the preferred UI exploration path, **condit
 
 Host Core remains the durable authority (existing host-owned versioned KV or additive SQLite metadata after evaluating current domain models). UI state is a projection, never the source of truth.
 
-\`\`\`text
+```text
 WorkItem
   id, projectGroupId, title, optionalSummary
   status, version, createdAt, updatedAt, archivedAt?
@@ -98,7 +98,7 @@ Later, only as needed:
   WorkItemArtifact(workItemId, artifactId, versionRef, verification)
   WorkItemTask(workItemId, taskId, dependencies, acceptance)
   TaskExecution(taskId, sessionId, turnId, sourceRunId, outcome)
-\`\`\`
+```
 
 The concrete schema, transaction boundaries and migration must be designed against the actual Host data model rather than creating a second independent session store. Use existing stable Session IDs and project identities. For references to files, retain path/source + content hash/version; never infer that a file or its content was produced by a particular Skill without evidence.
 
