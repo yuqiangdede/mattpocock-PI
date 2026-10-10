@@ -8,12 +8,14 @@ Current fork release line: `0.17.x`; official source baseline: `0.17.0`.
 
 | Stage | Positioning | Status |
 | --- | --- | --- |
-| **Skill Launcher** | Turn engineering methods into selectable Coding Actions executed by the active Pi Agent. | Current foundation |
-| **Development Navigator** | Evolve the action buttons into a **visual control surface for development tasks and execution state**: reliable cross-Skill artifact handoff, dynamic task graphs, review, debugging, and progress. | Planned, incrementally delivered |
-| **Engineering Control Surface** | Make requirements, design, implementation, tests, and Review inspectable, comparable, selectable, and traceable at engineering scale. | Long-term direction |
+| **Skill Launcher** | Make Matt Pocock engineering methods clickable Coding Actions, executed by the current native Pi Agent. | Current foundation |
+| **Development Navigator** | Organize multiple native Pi conversations and engineering artifacts around **Work Items**; begin with grouping, Spec/Tickets handoff and recovery in a standalone Navigator page. | Product direction decided; incremental planning |
+| **Engineering Control Surface** | Make requirements, design, implementation, tests and review inspectable, selectable, comparable and traceable at engineering scale. | Long-term direction |
 
-The intended stage-two path connects **requirements decisions** (Matt: `grill-with-docs`, `to-spec`) → **implementation planning** (Superpowers: `writing-plans`) → **development execution** (Superpowers: `executing-plans`, `subagent-driven-development`). Review, debugging, and change management are available on demand, with **no enforced stage order or automatic advancement**. Superpowers integration is a proposed direction, **not** a claim of an existing built-in integration.
+**Stage two uses Matt Pocock Skills only at first**: `setup-matt-pocock-skills` (engineering-skill setup), `grill-with-docs` / `to-spec` (requirements and specification), `to-tickets` (task breakdown), and `implement` (development), with `diagnosing-bugs`, `tdd`, `code-review`, `pr`, `retro` and `handoff` on demand. These are optional actions, with **no enforced order or automatic advancement**.
 
-[Stage-two positioning (Chinese)](docs/project/development-navigator-positioning.md) · [Skill Launcher spec](docs/project/skill-launcher-spec.md) · [Navigator first-release issue #46](https://github.com/yuqiangdede/mattpocock-PI/issues/46)
+A Work Item is an optional, goal-specific grouping for multiple existing Pi sessions; ordinary ungrouped chats remain fully supported. The first delivery is a standalone Navigator page, not a change to PI-Desktop's core Session lifecycle or sidebar. Superpowers / ECC integration and cross-framework orchestration are **out of scope for stage two** unless a later evidenced need warrants revisiting the decision.
+
+[Stage-two positioning (Chinese)](docs/project/development-navigator-positioning.md) · [Work Item and standalone Navigator design](docs/project/development-navigator-work-items.md) · [Skill Launcher spec](docs/project/skill-launcher-spec.md) · [Navigator first-release issue #46](https://github.com/yuqiangdede/mattpocock-PI/issues/46)
 
 [PI-Desktop](https://github.com/vastsa/PI-Desktop)
