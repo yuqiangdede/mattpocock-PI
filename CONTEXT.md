@@ -103,8 +103,8 @@ _Avoid_: 页面按钮配置、Workflow Step、强制阶段
 _Avoid_: Workflow Engine、状态机、Recommendation Engine
 
 **Development Navigator**:
-未来用于理解项目开发状态、检查产物并提供可选建议的能力，属于第二阶段且不限制用户选择 Action。
-_Avoid_: 固定流程、自动阶段推进
+第二阶段的开发任务与运行状态可视化控制面。围绕当前开发事项，串联需求决策、实施计划、执行开发、Review 与 Bug 排查，支持跨 Skill 的 Spec/Plan/执行产物可靠交接、动态任务图、任务进度、变更影响和过程回溯；不限制用户自由调用 Action。2026-10-10 的完整产品目标见 `docs/project/development-navigator-positioning.md`；首版 #46 是较窄的迭代范围。
+_Avoid_: 固定流程、自动阶段推进、把 Agent 运行结束等同于任务完成、把首版活动记录等同于完整任务图
 
 **Engineering Skills Setup**:
 Configuring a project's issue tracker, triage vocabulary and domain documentation conventions for engineering skills.
