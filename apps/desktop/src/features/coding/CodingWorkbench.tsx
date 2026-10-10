@@ -9,8 +9,8 @@ import { AnchoredMenu } from "../../components/settings/AnchoredMenu";
 import { useAppStore } from "../../stores/app-store";
 import { loadCodingActions, useCodingActions } from "../extensions/coding-action-state";
 
-export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill }: {
-  disabled: boolean; error: string | null; onExecute: (actionId: string) => void; onSelectSkill: (skillId: string) => void;
+export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onCommit }: {
+  disabled: boolean; error: string | null; onExecute: (actionId: string) => void; onSelectSkill: (skillId: string) => void; onCommit: () => void;
 }) {
   const { t } = useTranslation();
   const projectPath = useAppStore(state => state.workspace?.path ?? "");
@@ -45,8 +45,7 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill }: {
   };
   const configure = () => { const store = useAppStore.getState(); store.setSettingsTab("codingActions"); store.setPage("settings"); };
   return <section className="coding-workbench" aria-label={t("codingActions.title")}>
-    <div className="coding-shortcuts coding-shortcuts-primary">{primary.map(action => renderAction(action))}</div>
-    <div className="coding-shortcuts coding-shortcuts-secondary">
+    <div className="coding-shortcuts coding-shortcuts-primary">{primary.map(action => renderAction(action))}
       <AnchoredMenu open={moreOpen} onClose={() => setMoreOpen(false)} role="menu" side="top" restoreFocus={!disabled} label={t("codingActions.more")} menuClassName="context-menu coding-more-menu"
         trigger={ref => <Button ref={ref} variant="ghost" disabled={disabled} aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(value => !value)}>{t("codingActions.more")}</Button>}>
         {groupCodingShortcuts(more).map(group => <div key={group.id} role="group" aria-label={t(`codingActions.groups.${group.id}`)}>
@@ -55,7 +54,10 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill }: {
         </div>)}
         {!more.length && <div role="status">{t("codingActions.noOtherSkills")}</div>}
       </AnchoredMenu>
+    </div>
+    <div className="coding-shortcuts coding-shortcuts-secondary">
       <Button variant="ghost" onClick={configure}>{t("codingActions.configure")}</Button>
+      <Button className="coding-commit-action" disabled={disabled} title={t("codingActions.commitHint")} onClick={onCommit}>{t("codingActions.commitCode")}</Button>
     </div>
     {actions.some(action => reason(action)) && <div role="status">{actions.filter(action => reason(action)).map(shortcut => `${shortcut.action.label}：${reason(shortcut)}`).join("；")}<Button onClick={() => setCatalogVersion(value => value + 1)}>{t("codingActions.recheck")}</Button></div>}
     {(error || diagnostic) && <div className="coding-shortcut-error" role="alert"><span>{error || t("codingActions.diagnostic", { detail: diagnostic })}</span><Button onClick={configure}>{t("codingActions.configure")}</Button></div>}

@@ -98,7 +98,7 @@ skills whose eventual execution requires an external CLI such as Claude Code.
 The shortcuts use two separate wrapping rows. The first row is Initialize,
 Ask next step, the first six other enabled configured actions, and Diagnose bug,
 in that order.
-The second row contains More and Coding Actions configuration. The Engineering Workflow entry is no longer exposed.
+The first row ends with Diagnose bug followed immediately by More, so all Skill controls stay together. The second row holds Coding Actions configuration and a right-aligned Commit code button. Commit code prepares an editable, localized build-then-commit prompt with no Skill dependency. It preserves existing Composer text and attachments; only manual Send executes the prompt. Git (including GitLab hosting) and SVN are supported by the instruction; failed verification forbids commit and Git Push is excluded. The Engineering Workflow entry is no longer exposed.
 More groups skills into Requirements and exploration, Design and planning,
 Development and testing, Review and maintenance, and Collaboration and delivery
 (including Retrospective). Every skill remains available exactly once.
