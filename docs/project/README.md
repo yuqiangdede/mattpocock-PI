@@ -1,5 +1,7 @@
 # Project Tracking
 
+- 第二阶段新定位（2026-10-10）：[Development Navigator — 任务图、运行状态与跨 Skill 产物交接](development-navigator-positioning.md)。这是产品目标，不等同于 [首版规格 #46](https://github.com/yuqiangdede/mattpocock-PI/issues/46) 或正在审查的 [PR #53](https://github.com/yuqiangdede/mattpocock-PI/pull/53) 已实现的范围。
+
 - 当前编码入口方向：[阶段一 Skill Launcher](skill-launcher-spec.md)。#31–#37 按 CodingAction → 原生 Skill → 当前 Session Pi Agent 重写；旧快捷按钮规格仅保留历史，Development Navigator 留待第二阶段。
 
 - Windows 0.16.1-beta.2：[发布说明](windows-release-notes-0.16.1-beta.2.md)、[最新主分支打包验收](windows-release-acceptance-2026-10-07-beta2.md) 与 [GitHub Release](https://github.com/yuqiangdede/mattpocock-PI/releases/tag/v0.16.1-beta.2)。
