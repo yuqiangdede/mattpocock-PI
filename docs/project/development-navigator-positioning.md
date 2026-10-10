@@ -27,7 +27,7 @@
 | 工程 Skills 初始化 | `setup-matt-pocock-skills` | 按需配置 issue tracker、triage 标签和领域文档；**不是**创建 Pi 项目或替代 Host 项目初始化 |
 | 需求分析与决策 | `grill-with-docs` | 通过讨论明确范围、约束和术语；可以多轮继续 |
 | 规格文档 | `to-spec` | 由已讨论内容整理 Spec，按实际 issue tracker 配置发布；将结果登记到 Work Item |
-| 任务拆解 | `to-tickets` | 由 Spec/讨论产生具备阻塞依赖的 tickets；不等同于 Superpowers 的 `writing-plans` |
+| 任务拆解 | `to-tickets` | 由 Spec/讨论产生具备阻塞依赖的 tickets；聚焦可执行任务拆解，不强制独立的详细计划阶段 |
 | 日常开发 | `implement` | 基于选定 Spec/Tickets 执行，按需结合 `tdd`、测试和 `code-review`；提交仍受项目 Git 与权限规则约束 |
 | 大型需求实现（后续评估） | `implement-spec` | 涉及 subagents、多分支/worktrees、合并；先验证与本仓库隔离规则及 Pi 能力是否兼容，**不作为 MVP 默认入口** |
 | Bug 排查 | `diagnosing-bugs` | 任何时刻按需使用；复现、根因、修复、回归 |
