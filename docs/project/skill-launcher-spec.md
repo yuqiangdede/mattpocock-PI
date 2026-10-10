@@ -70,6 +70,12 @@ Renderer 通过既有 Preload IPC 访问 Main；Main 在当前应用数据目录
 8. 原生 Chat、Agent、Plan、Goal、权限和队列的行为不被替换。
 9. 目标测试覆盖默认、解析、missing、迁移、排序、enabled、执行、持久化及损坏回退，以及诊断重试取消保留草稿、保存与重试互斥、临时空名称排序和 i18n 键集合 / 插值一致性；运行真实 Electron / Host / Pi 的 Action 和工程 Skill 回归。
 
+## 插件化可行性验证（后续，不代表已迁移）
+
+按照项目的扩展优先准则，先基于 PI-Desktop 已有的 `composerControl`、`composer.insertText` / `composer.replaceDraft` 与 `contributes.views` 执行独立 POC，验证现有 Action 的按钮、目录、可编辑草稿、图片/文件引用、配置及切换时序能否无损保留。参见 [Skill Launcher 插件可行性](skill-launcher-plugin-feasibility.md)。
+
+插件 `renderer.extension` 是可信渲染扩展，不能假定它与隔离的 Work Panel view 有相同安全边界；如果 Catalog 读取或准确草稿插入欠缺正式 SDK，就先采用薄适配/混合方案，**不为插件化修改 Pi Runtime 或强制移除当前第一阶段实现**。
+
 ## 明确不实现
 
 Development Navigator 留待第二阶段：ProjectState、Artifact Tracking / Freshness、Recommendation、Next Step、流程完成状态与百分比、强制阶段跳转、依赖阻塞和自动推进均不实现。

@@ -43,6 +43,22 @@ Reuse compatible host dependencies and build caches for candidate validation. In
 | 工程工作流 | `ipc/workflow-*.ts`、`services/workflow-execution.ts`、`features/coding`、`components/workpanel/Workflow*` | IPC 注册、工作面板、Host RPC 与数据库 |
 | Matt 技能资源 | `crates/host-core/resources/workflow-skills.json` 与工程技能模块 | 技能目录、设置与 Host 技能加载 |
 
+## Extension-first architecture rule (mandatory)
+
+For mattpocock-PI-specific behavior, prioritize independent feature modules,
+approved plugin/work-panel APIs, existing Host interfaces, and additive
+versioned data models. Do not modify PI-Desktop Project/Session/Turn,
+permission, queue, recovery or Agent Runtime lifecycles merely to implement
+workflow grouping, custom Skills or Navigator UI.
+
+When a core change cannot be avoided, document rejected extension alternatives,
+exact upstream touchpoints, migration/compatibility impact and regression tests;
+obtain explicit architecture approval and record an ADR before implementing.
+This is the enforceable fork-maintenance rule mirrored in
+[AGENTS.md](../../AGENTS.md) and [CLAUDE.md](../../CLAUDE.md).
+For a concrete example, see the
+[Work Item / standalone Navigator proposal](development-navigator-work-items.md).
+
 新增定制优先扩展这些模块，保持官方接入位置短小。Agent Runtime 已恢复官方实现；不要为 Matt 工作流复制或替换推理、压缩、提供商和 OAuth 核心。现有 Workflow 持久化与执行还会接触 Host/共享类型，不能宣称已完全插件化；本次不改变数据库和执行语义，也不搬迁全部定制代码。
 
 官方 UI 或协议变更仍可能需要适配。目标是把差异集中到可审阅的接入位置并由回归验证把关，不能保证每次更新零冲突。官方发布说明用于查看继承功能；定制功能和定制版更新来源继续属于本仓库。
