@@ -102,6 +102,21 @@ _Avoid_: 页面按钮配置、Workflow Step、强制阶段
 将 Coding Action 交给当前项目和会话的原生 Pi Agent 执行的附加操作入口。
 _Avoid_: Workflow Engine、状态机、Recommendation Engine
 
+**Work Item**:
+An optional project-scoped engineering-goal container that groups explicitly
+linked existing Pi conversations and later references verified artifacts,
+tasks and evidence. Work Item relationships do not own Session lifecycles.
+One Work Item focuses on one requirement, defect or refactoring objective;
+ordinary ungrouped conversations remain supported.
+_Avoid_: Chat folder as the only purpose, Session, a fixed workflow stage,
+automatic transcript-based grouping, a second Session owner
+
+**Work Item Session Association**:
+An explicit and reversible link from one durable Session ID to a Work Item
+within the same logical project. It changes navigation metadata only;
+unassigning or deleting a Work Item does not delete the underlying Session.
+_Avoid_: Session migration, transcript ownership, automatic context merging
+
 **Development Navigator**:
 第二阶段的开发任务与运行状态可视化控制面。围绕当前开发事项，串联需求决策、实施计划、执行开发、Review 与 Bug 排查，支持跨 Skill 的 Spec/Plan/执行产物可靠交接、动态任务图、任务进度、变更影响和过程回溯；不限制用户自由调用 Action。2026-10-10 的完整产品目标见 `docs/project/development-navigator-positioning.md`；首版 #46 是较窄的迭代范围。
 _Avoid_: 固定流程、自动阶段推进、把 Agent 运行结束等同于任务完成、把首版活动记录等同于完整任务图
