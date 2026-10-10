@@ -110,7 +110,12 @@ Codex as a visual reference. The identity contract is deliberately small:
 - The sidebar shell name, settings copy, and composer placeholder use
   `PI-Desktop`; `Codex` is reserved for the external session-import source or
   historical design-reference text.
-- `build/icon_1024.png` is the canonical shell logo master; the renderer
+- `build/icon_1024.png` is the canonical shell logo master. It
+  retains the official vastsa/PI-Desktop tile and central Pi mark, with rounded
+  charcoal signature lettering `m` at bottom left and `yu` at bottom right.
+  Package, Windows executable/window, and light/dark renderer icons derive
+  from this same master; the macOS tray uses its monochrome silhouette.
+  The renderer
   imports the 192x192 marks derived from it under `src/assets/brand/`
   (ADR 0125). `BrandLogo` imports those
   through Vite so the renderer bundle, development Dock, and packaged

@@ -25,7 +25,8 @@
 ### E2E-BRAND-matt-pi-icon
 
 - Verify the default package/window icon and light/dark sidebar/startup marks
-  show the shared Matt M / Pi π monogram. Switching themes preserves the
+  show the official Pi tile with rounded `m` bottom-left and `yu` bottom-right
+  signatures. Switching themes preserves the
   silhouette and does not change the empty-home mascot.
 - Decode the PNG masters and derivatives, every Windows ICO size, and macOS
   ICNS representations. The macOS tray silhouette has transparent background

@@ -24,7 +24,7 @@ import shutil
 import struct
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageChops
 
 ROOT = Path(__file__).resolve().parent.parent
 BUILD = ROOT / "apps" / "desktop" / "build"
@@ -124,15 +124,18 @@ def main() -> None:
 
     # 5. macOS tray icon (template image)
     tray = BUILD / "tray-icon-mac.png"
-    if not tray.is_file():
-        # Fallback if not already generated
-        master.resize((512, 512), Image.Resampling.LANCZOS).save(tray, format="PNG")
+    # Derive the monochrome template from the same master, including initials.
+    silhouette = master.convert("L").point(lambda value: 255 if value < 128 else 0)
+    silhouette = ImageChops.darker(silhouette, master.getchannel("A"))
+    template = Image.new("RGBA", master.size, (0, 0, 0, 0))
+    template.putalpha(silhouette)
+    template.resize((36, 36), Image.Resampling.LANCZOS).save(tray, format="PNG")
     print(f"verified {tray}")
 
     # 6. Renderer brand marks
     BRAND.mkdir(parents=True, exist_ok=True)
     for path in (BRAND / "logo-light.png", BRAND / "logo-dark.png"):
-        master.save(path, format="PNG", optimize=True)
+        master.resize((192, 192), Image.Resampling.LANCZOS).save(path, format="PNG", optimize=True)
         print(f"wrote {path}")
 
     # 7. Documentation site icon
