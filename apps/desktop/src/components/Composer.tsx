@@ -520,6 +520,7 @@ export function Composer({
           error={codingAction.error}
           onExecute={actionId => void codingAction.execute(actionId)}
           onSelectSkill={skillId => void codingAction.selectSkill(skillId)}
+          onCommit={codingAction.prepareCommit}
         />
         {activeSessionId ? <TodoDock sessionId={activeSessionId} /> : null}
         {planCheckpoint?.status === "pending" ? (

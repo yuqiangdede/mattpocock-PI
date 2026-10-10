@@ -27,9 +27,14 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
   const { en } = await server.ssrLoadModule(fileURLToPath(new URL("../../../packages/i18n/src/locales/en/index.ts", import.meta.url)));
   const i18n = createInstance(); await i18n.init({ lng: "en", resources: { en: { translation: en } } });
   const html = renderToStaticMarkup(createElement(I18nextProvider, { i18n },
-    createElement(CodingWorkbench, { disabled: false, error: null, onExecute: () => { executions++; }, onSelectSkill: () => { executions++; } })));
+    createElement(CodingWorkbench, { disabled: false, error: null, onExecute: () => { executions++; }, onSelectSkill: () => { executions++; }, onCommit: () => { executions++; } })));
   for (const label of Object.values(en.codingActions.defaults)) assert.ok(html.includes(label));
   assert.ok(html.includes(en.codingActions.configure));
+  assert.ok(html.includes(en.codingActions.commitCode));
+  assert.ok(html.includes("coding-commit-action"));
+  assert.ok(html.indexOf(en.codingActions.diagnose) < html.indexOf(en.codingActions.more), "More follows Diagnose in the primary Skill row");
+  assert.ok(html.indexOf(en.codingActions.more) < html.indexOf(en.codingActions.configure), "Configuration follows the Skill row");
+  assert.ok(html.indexOf(en.codingActions.configure) < html.indexOf(en.codingActions.commitCode), "Commit code follows configuration");
   assert.ok(html.includes(en.codingActions.askNext));
   assert.ok(html.includes(en.coding.initialize));
   assert.ok(html.indexOf(`aria-label="${en.coding.initialize}"`) < html.indexOf(`aria-label="${en.codingActions.askNext}"`));
