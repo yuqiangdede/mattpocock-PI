@@ -83,6 +83,8 @@ MVP 的归属规则：
 
 先验证现有 Plugin SDK / Work Panel 和原生 Session API 能否安全地完成会话发现、打开及关联；若插件 API 不足，则采用独立 Navigator 功能模块加最小 Host-owned 接口，不扩张会话权限边界。
 
+**实施前置验证**：先对现有第一阶段 Skill Launcher 做 [插件扩展可行性验证](skill-launcher-plugin-feasibility.md)；区别对待可用的扩展接口与尚未证明的草稿/目录/配置迁移能力。验证没有通过前不替换现有原生入口。
+
 ## 五、跨对话文档交接：Spec → Tickets → Implement
 
 **第一条必须跑通的真实链路**：
@@ -119,7 +121,8 @@ MVP 的归属规则：
 
 | 顺序 | 交付 | 必须验证 |
 | --- | --- | --- |
-| 0. 适配评估 | 验证插件 / Navigator / Host 能否安全列出和打开原生会话 | 不越权、不改 Runtime、不伪造新 API |
+| 0a. 第一阶段插件化预验证 | 用受限 POC 验证 Coding Actions 能否通过 PI-Desktop 插件 `composerControl` + 原生 Skill Catalog / Composer 草稿完成；重点验证已有输入、附件、配置和会话切换 | 不修改 Runtime、不自动发送；无法无损实现时保留现有 Launcher，参见 [Skill Launcher 插件可行性](skill-launcher-plugin-feasibility.md) |
+| 0b. Navigator 适配评估 | 验证插件 / Navigator / Host 能否安全列出和打开原生会话 | 不越权、不改 Runtime、不伪造新 API |
 | 1. Work Item MVP | 可选分组、会话创建/关联/解绑、独立 Navigator 页面、持久化恢复 | 普通对话不受影响；删除分组不删除会话；跨项目不可偷挂 |
 | 2. Matt 产物交接 | Spec → Tickets → Implement，明确来源、版本、确认和不可用状态 | 跨三个原生会话可继续，不需复制整段聊天；失效输入不会静默继续 |
 | 3. 轻量任务与证据 | 引用原生 Tickets 状态、Pi Turn、测试/Review/Commit 的可验证证据 | 任务状态与执行状态分离，失败/中断/未知不会被标为完成 |
