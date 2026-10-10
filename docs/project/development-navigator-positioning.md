@@ -1,140 +1,137 @@
-# 第二阶段 Development Navigator — 产品定位与演进方向
+# 第二阶段 Development Navigator — Matt Pocock Skills + Work Item
 
 > 更新日期：2026-10-10  
-> 状态：第二阶段产品目标与增量演进规划，不代表功能已经实现或通过验收。  
-> 项目：[mattpocock-PI](https://github.com/yuqiangdede/mattpocock-PI)
+> 状态：已确定的第二阶段产品方向，**不是功能已实现或完成验收的声明**。  
+> 项目：[mattpocock-PI](https://github.com/yuqiangdede/mattpocock-PI)  
+> 相关设计：[Work Item 分组与独立 Navigator 页面](development-navigator-work-items.md)
 
-## 一、定位
+## 一、产品定位：在一套 Skills 之上组织持续开发
 
-**从“按钮集合”升级为“开发任务与运行状态的可视化控制面”。**
+**第二阶段优先只使用 Matt Pocock Skills，让 Work Item 成为跨对话开发的稳定组织单位。**
 
-以一个真实开发目标（需求、变更或 Bug）为中心，组织需求决策、实施计划、开发执行、代码审查和 Bug 排查，使不同 Skill 的输入输出能够可靠交接，并展示任务依赖、实际运行状态、证据和调整历史。
+阶段一 Skill Launcher 解决“如何方便地发起一次工程 Skill 操作”；阶段二 Development Navigator 解决“围绕同一个开发目标，如何在多个原生 Pi 对话中继续工作、找到文档和恢复进度”。
 
-- **不强制固定顺序**：允许从任意适用节点进入、并行处理、返回补充需求或重新验证。
-- **不替换底层 Agent**：Pi 继续负责当前会话、模型、工具、权限和原生 Skill 执行；Navigator 负责组织与展示开发过程。
-- **不把对话结束当成任务完成**：任务是否完成、用户是否认可，与某次 Agent 响应成功结束分离。
-- **不自动改变已确认的需求**：发现冲突、缺失或技术风险时显式提出，交由用户决策。
+- **单一方法体系**：当前阶段默认只集成和组织 [Matt Pocock Skills](https://github.com/mattpocock/skills)，不接入 Superpowers / ECC 作为必需或默认执行框架。
+- **以 Work Item 为中心**：一个明确需求、Bug 或重构目标对应一个可选 Work Item，关联多个原生 Pi Session；无需 AI 根据聊天记录猜测任务归属。
+- **独立 Navigator 页面优先**：先实现 Work Item 分组、会话导航、工程产物引用与恢复；不先修改原生侧边栏或开发通用任务图编辑器。
+- **Pi Runtime 保持原生**：模型、会话、工具权限、命令执行、Git、队列和恢复继续由既有 Pi / PI-Desktop 能力负责。
+- **不强制流程**：可直接进入诊断、审查、实现或讨论；已产生的 Spec/Tickets 可在后续对话继续使用，不能因为一个 Turn 结束就判断工程目标完成。
+- **扩展优先**：遵循 [AGENTS.md](../../AGENTS.md) 中的强制原则，优先独立模块、插件、现有 API 和增量数据模型，不为工作流组织改动 PI-Desktop 核心生命周期。
 
-## 二、能力分工与项目初始化（建议架构）
+第二阶段的差异化不是提供更多 Skill 按钮，而是**跨会话仍然稳定存在的开发事项和工程上下文**。
 
-第二阶段采用“项目初始化入口 + 主工作流 + 横向工程能力”的组合。以下是产品规划中的默认能力提供者，**不表示各框架已经完成集成或拥有一致的 Pi 支持能力**。
+## 二、统一的 Matt Pocock 能力组合
 
-| 能力 | 默认提供者 | 职责边界 |
+| 工程活动 | 首选 Matt Pocock Skills | 使用方式与边界 |
 | --- | --- | --- |
-| 项目初始化 | mattpocock-PI 自身，ECC 辅助 | 识别仓库/技术栈/规范/已有 Spec、Plan 和任务，恢复工作上下文；由产品保存任务状态，ECC 仅提供可用的规则与上下文能力 |
-| 需求决策、规格文档 | Matt Pocock Skills | `grill-with-docs`、`to-spec`；输出可确认、可版本化的决策与 Spec |
-| 实施计划、执行开发 | Superpowers | `writing-plans`、`executing-plans`、`subagent-driven-development`；按实际运行能力启用 |
-| Bug 排查 | Superpowers | 系统化复现、定位根因、修复及回归；允许从任意阶段进入 |
-| 代码提交 | Superpowers 流程指导 + Pi/Git 执行 | 提交前验证与开发收尾；实际 Git 操作、提交关联及权限由现有 Pi 工具和用户确认控制 |
-| 项目规范、安全检查、代码审查 | ECC | 选择性加载工程规则及审查能力；作为横向可调用服务，不强制串行阶段 |
-| 记忆、持续学习 | ECC（逐项验证后接入） | 经验提炼与上下文复用；**不**代替产品的规范化 Work Item、Execution Run、Artifact 持久状态 |
+| 工程 Skills 初始化 | `setup-matt-pocock-skills` | 按需配置 issue tracker、triage 标签和领域文档；**不是**创建 Pi 项目或替代 Host 项目初始化 |
+| 需求分析与决策 | `grill-with-docs` | 通过讨论明确范围、约束和术语；可以多轮继续 |
+| 规格文档 | `to-spec` | 由已讨论内容整理 Spec，按实际 issue tracker 配置发布；将结果登记到 Work Item |
+| 任务拆解 | `to-tickets` | 由 Spec/讨论产生具备阻塞依赖的 tickets；不等同于 Superpowers 的 `writing-plans` |
+| 日常开发 | `implement` | 基于选定 Spec/Tickets 执行，按需结合 `tdd`、测试和 `code-review`；提交仍受项目 Git 与权限规则约束 |
+| 大型需求实现（后续评估） | `implement-spec` | 涉及 subagents、多分支/worktrees、合并；先验证与本仓库隔离规则及 Pi 能力是否兼容，**不作为 MVP 默认入口** |
+| Bug 排查 | `diagnosing-bugs` | 任何时刻按需使用；复现、根因、修复、回归 |
+| TDD 与代码审查 | `tdd`、`code-review` | 作为工程质量能力按需调用；是否由用户/模型调用取决于 Skill 的真实调用限制 |
+| PR 与复盘 | `pr`、`retro` | PR 说明、开发过程复盘；真实提交/PR 操作遵循原生 Git 和项目规则 |
+| 跨会话辅助交接 | `handoff` | 生成精简的上下文指引；不能把临时 handoff 文件当作持久 Work Item 状态 |
 
-### 集成规则
+运行时必须检查目标 Skill 是否真实安装、启用以及底层 Pi 是否能以所需方式调用；不可用时明确反馈，不自动切换到另一套框架或伪造执行成功。
 
-- **单一状态来源**：Work Item、Task Node、Execution Run、Artifact 及其版本/证据关联由 mattpocock-PI 持有；任何 Skill/Agent 的文本输出不能直接当作已验证状态。
-- **默认提供者避免冲突**：每种动作优先一个默认框架；避免多个框架同时注入重复 Rules、Hooks 或执行同一审查/计划。允许以后显式切换。
-- **动态工作路径**：初始化不是强制重新开始；已具备 Spec 可以直接制定计划，已有代码可直接排 Bug，Review 随时可触发。
-- **兼容性门槛**：运行时发现、版本校验、Pi 适配评估、权限与 Hook 隔离、独立验收后才能启用 ECC 功能；缺失时显式标记未安装/不可用。
-- **安全与记忆边界**：记忆召回视为不可信输入，不自动改变已确认规范和需求；安全扫描不代表真实安全审计已完成。
-- **不扩大当前 PR 的实现范围**：本节只更新产品分工及后续集成方向，具体接入和数据模型改造另开 Issue。
+**不做的事**：第二阶段暂不建设 Superpowers / ECC 安装、Hooks、Memory、跨框架路由、产物转换或兼容层。未来若发现 Matt 某项能力不足，再以明确需求和独立验证为前提评估，而非提前增加架构复杂度。
 
-### Work Item 分组与独立 Navigator 页面（优先验证）
+## 三、Work Item：开发事项，而非另一套会话系统
 
-第二阶段以 **Work Item（开发事项）作为可选的对话分组和工程上下文容器**：一个 Work Item 对应一个明确需求、Bug 或重构目标，可关联多个已有 Pi Session，并聚合经过确认的 Spec/Plan 等产物引用。用户显式选择归属，AI 只建议不自动移动；普通对话可以不加入 Work Item。
+一个 Work Item 专注一件事，可以关联多个既有 Pi Session：
 
-- **引用而非接管**：Work Item 仅记录与既有 Session ID 的关系，不改变会话创建、执行、权限、历史、删除和恢复语义；取消分组或删除 Work Item 不删除原生会话。
-- **独立入口先行**：MVP 在 Navigator 独立页面管理 Work Item 与会话关联，不调整 PI-Desktop 原生项目树或侧边栏；之后依据实际使用情况再评估原生侧边栏集成。
-- **共享工程产物，不拼接全部对话**：同组的新会话选择性引用已授权、已确认且版本有效的 Spec/Plan；不自动加载全组聊天历史，也不自动发送请求。
-- **状态权威归属**：关联和状态由 Host 持久化；#53 的会话级 Engineering Activity 是观测记录，不能直接等同于跨会话 Work Item；旧 Workflow Run 可复用机制但不能继承固定六阶段锁定行为。
-- **扩展优先**：优先复用 Plugin SDK / Work Panel / 既有 Host API、独立模块及增量持久化，避免修改 PI-Desktop 核心生命周期；跨边界确需更改时按项目级架构准则走论证和审批。
+```text
+Project (existing Pi project identity)
+  |-- Native Session A
+  |-- Native Session B
+  |-- Native Session C
+  |
+  +-- Navigator / Work Items (additional view)
+       +-- Work Item: user login
+            |-- reference -> Session A (grill-with-docs / to-spec)
+            |-- reference -> Session B (to-tickets)
+            |-- reference -> Session C (implement)
+            +-- artifact references: Spec, Tickets, Review
+```
 
-详细逻辑、最小数据模型、删除/重启边界、交互结构、分阶段交付和验收场景见 [Work Item 分组与独立 Navigator 页面设计](development-navigator-work-items.md)。
+MVP 的归属规则：
 
-## 三、主要工作阶段（可选路径，而非锁定状态机）
+1. 在 Work Item 内新建对话：仍由原生 Pi 创建 Session，拿到确认的 Session ID 后关联。
+2. 在普通入口新建对话：保持未分组，仍能自由使用 Skills。
+3. 旧对话加入、移动或移出 Work Item：由用户明确操作；AI 仅建议，不能自行移动或拆分聊天历史。
+4. 一个 Session 在 MVP 中最多属于同一 Project 下的一个**主要 Work Item**，一个 Work Item 可以关联多个 Sessions。
+5. 删除、归档、完成 Work Item 不删除原生会话，也不结束正在运行的 Pi 任务；原生会话删除和项目删除沿用原本的 Host 生命周期。
 
-| 主要能力 | 参考 Skills | 输入 | 预期产物 |
-| --- | --- | --- | --- |
-| 需求决策 | Matt Pocock：`grill-with-docs`、`to-spec` | 用户目标、代码现状、约束、讨论记录 | 已确认的需求决策与 Spec（含范围和验收条件） |
-| 制定实施计划 | Superpowers：`writing-plans` | 指定版本的 Spec、当前代码上下文 | 实施任务、依赖、修改范围、测试和验收计划 |
-| 执行开发 | Superpowers：`executing-plans`、`subagent-driven-development` | 计划、选定任务、依赖和约束 | 代码变更、测试结果、提交/差异与执行记录 |
-| 代码审查 | ECC（按实际可用能力配置） | Spec、实现差异、测试证据 | 审查发现、修复建议、审查结论 |
-| Bug 排查 | Superpowers 调试类 Skills（按实际可用能力配置） | 问题现象、日志、复现步骤、关联代码 | 根因判断、修复任务、回归验证证据 |
+**Work Item 是对原生 Session 的引用与附加工程元数据，不是 Session 的新所有者。**
 
-以上 Skill 是**首选组合而非产品硬依赖**；需在运行时校验安装状态和执行能力，未安装时明确提示，不静默替代。`subagent-driven-development` 还需校验底层子 Agent 支持。
+详情及错误、权限、恢复、交互约束见 [Work Item 设计](development-navigator-work-items.md)。
 
-代码审查、Bug 排查可以在任何阶段按需触发，不是必须排在开发结束后。
+## 四、独立 Navigator 页面与 MVP
 
-## 四、跨 Skill 文档与产物交接（第一优先级）
+优先在独立 Navigator 页面实现可选工作区，不先改 PI-Desktop 原生侧边栏。
 
-上一节点的输出需要成为下一节点**可确定、可检查、可追踪的输入**，而非仅拼接一段自然语言提示词。
-
-1. **显式输入**：用户指定要使用哪份 Spec / Plan / Review 产物，可以来自本地文件或现有 Issue 等来源；使用实际可访问的资源引用。
-2. **记录版本**：至少记录来源、位置、内容版本/摘要、生成时间、关联任务与确认状态；未确认的产物不能被 UI 误标为已批准。
-3. **检查新鲜度**：输入被修改、删除或不可访问时，将关联任务标记为待检查或已过期，而非静默使用历史内容。
-4. **保留交接上下文**：传递必要的决策、限制、验收条件和引用，避免复制整个聊天历史，也不扩大既有工具权限。
-5. **人工确认继续**：Plan 审核、需求冲突处理、任务发送仍由用户控制；绝不因为产物出现而自动提交 Agent 请求。
-6. **失败可诊断**：缺少文件、引用失效、解析失败、Skills 不可用等必须有明确反馈，不伪造成功或完整性。
-
-**首个需要验证的纵向链路**：Matt 产生 Spec → Superpowers `writing-plans` 产生 Plan → Superpowers 执行选定开发任务 → 测试/Review 证据与原始 Spec 建立关联。
-
-## 五、任务图与运行状态
-
-### 最小领域对象
-
-- **Work Item（开发事项）**：一个需求、需求变更或 Bug，是任务图的业务归属单位。
-- **Task Node（任务节点）**：计划或人工增加的任务，包含能力类型、依赖、状态、输入/输出引用与验收条件。
-- **Execution Run（执行记录）**：一次真实的 Skill/Agent 执行，包含会话归属、开始/结束、取消/失败、实际可观测结果和相关证据。
-- **Artifact（产物）**：Spec、Plan、代码差异、测试报告、Review 结论等，保存来源、版本和引用关系。
-
-### 必须区分的状态
-
-| 层次 | 示例状态 | 含义 |
+| 区域 | 首版内容 | 非首版内容 |
 | --- | --- | --- |
-| Task Node | 待执行、进行中、阻塞、待验收、已完成、需重做 | 表示开发任务的业务进度 |
-| Execution Run | 等待、运行、成功结束、失败、已取消、结果未明 | 表示一次实际 Agent 运行的客观结果 |
-| Artifact | 待确认、已确认、已过期、不可用 | 表示产物是否可作为后续输入 |
+| Work Item 列表 | 创建、重命名、归档、选择、项目内查询 | AI 自动聚类 |
+| 对话区域 | 从 Work Item 新建原生会话；关联/移除既有会话；打开原生聊天 | 合并聊天消息或重写 Session 存储 |
+| 产物区域 | 用户选择并登记 Spec、Tickets、Review 等路径/Issue 引用；展示来源与版本 | 全自动扫描推断“某 Skill 生成了某文件” |
+| 进度区域 | 最近活动、已关联产物、待确认事项、最近会话状态 | 强制阶段状态机、复杂图形编辑 |
+| 普通对话 | 未分组会话继续可用 | 强制所有对话归组 |
 
-**执行成功结束不等于任务完成，任务完成也不等于需求验收。** 进度只从有证据的任务状态计算，不根据 Agent 回复或按钮点击臆测百分比。
+先验证现有 Plugin SDK / Work Panel 和原生 Session API 能否安全地完成会话发现、打开及关联；若插件 API 不足，则采用独立 Navigator 功能模块加最小 Host-owned 接口，不扩张会话权限边界。
 
-### 图的交互边界
+## 五、跨对话文档交接：Spec → Tickets → Implement
 
-- 显示当前事项的任务节点、关联关系、依赖、阻塞原因和产物。
-- 允许用户选择下一节点、重新执行、返回上游或修改任务依赖；跨分支变更要提示影响。
-- 不要求每个任务走相同阶段，不自动推进、不设置不可绕过的阶段锁。
-- 执行必须复用已有 Pi 原生会话、队列、权限与取消机制；若无法可靠暂停、重试或恢复，就不显示虚假的控制能力。
-- 不将历史文件和聊天结果推断为“真实执行过的 Skill”；要求有实际事件或用户确认的关联依据。
+**第一条必须跑通的真实链路**：
 
-## 六、其他能力
+1. 会话 A 通过 `grill-with-docs` 讨论需求，`to-spec` 形成 Spec，用户登记并确认其确切来源与版本。
+2. 会话 B 在同一 Work Item 中选择该 Spec，使用 `to-tickets` 生成任务文件或 issue tracker 记录；关联 tickets 和真实依赖。
+3. 会话 C 选择指定 Spec/Tickets，使用 `implement` 开发，按需调用 `tdd` / `code-review`。
+4. 关闭并重启应用，Work Item 仍能找到上述 Sessions、文档版本和已知状态，用户可以继续工作。
 
-- **需求变更管理**：新需求与既有 Spec 版本关联，列出受影响的计划、任务和验收条件；保留历史决策，不静默覆盖。
-- **任务进度**：基于任务及其依赖、阻塞、验收状态展示进度；将“正在运行”与“已经交付”分开。
-- **Review 证据**：关联具体提交或差异、测试输出、审查发现、修复项、验证结论；区分 Agent 自述与实际运行证据。
-- **过程回溯**：可查询每次执行的输入版本、输出、失败/取消、人工决策及后续变更，不自动重放历史操作。
+产物可以存于项目 Markdown、Issue tracker 或已有 Host Plan 路径；Navigator **记录引用**，不强行要求 Matt 输出一种新的专用格式。首版至少记录：类型、Work Item、实际来源（文件或 Issue URL / ID）、内容版本/摘要、登记人/执行 ID（如有）、确认状态、可用性。
 
-其中**任务进度、任务依赖和产物交接属于任务图的核心基础**，需求变更、Review 证据和回溯先做最小闭环，再逐步增强。
+- 交接前核验文件是否存在、版本是否匹配、用户是否确认；失效或不可访问时提示，不静默用旧内容。
+- `to-tickets` 的 ticket/阻塞关系是任务领域的来源之一；第一版不需要再维护一份互相竞争的完整任务状态机。
+- `handoff` 可作为可选总结，但它默认写临时目录，**不可代替**持久化的 Spec/Tickets 引用、Work Item 归属和 Host 状态。
+- 同一个 Work Item **不意味着把所有会话聊天全文发送给新模型**；用户选择实际需要的上下文并继续遵循 Pi 文件、工具权限。
+- 所有可执行操作仍需用户明确触发；准备好 Skill 草稿、找到产物或生成建议都不能自动提交请求。
 
-## 七、分步交付与验收
+## 六、状态恢复与执行证据：只记录可证明的事实
 
-1. **交接闭环优先**：在现有 Skill Launcher 的基础上，验证 Matt Spec → Superpowers Plan → 执行开发的真实链路；保存来源/版本/人工确认信息。验收：引用失效、Spec 更新或 Skill 缺失时不会静默继续。
-2. **动态任务图与状态**：把 Plan 中的任务映射为可核对的节点，关联 Execution Run 与 Artifact，展示依赖、任务状态及运行状态。验收：取消/失败/未确认不会显示为完成，可从任意适用节点发起工作。
-3. **审查、排错与变更闭环**：增加 Review/Bug 分支，处理新需求影响，记录修复与回归证据。验收：能够回看“需求版本 → 任务 → 修改 → 验证”的证据链。
-
-MVP 不先建设通用工作流 DSL、复杂调度器、自动需求决策引擎或完整跨项目治理系统。
-
-## 八、与现有第一阶段及 Navigator 规格的关系
-
-- **阶段一 Skill Launcher**：继续保留独立 Coding Action → Skill → Pi 原生会话的行为。按钮准备可编辑草稿，用户手动发送。第二阶段的状态/任务图不能成为第一阶段按钮的前置条件。
-- **[Issue #46：Development Navigator First Release](https://github.com/yuqiangdede/mattpocock-PI/issues/46)**：已有会话级 Engineering Activity、执行证据和按需 `ask-matt` 分析规格，是**历史上已确认的首版范围**，并不等同于这里更新的第二阶段最终目标。
-- **[PR #53：Navigator 实现](https://github.com/yuqiangdede/mattpocock-PI/pull/53)**：独立依据其既定验收标准 Review；本规划不追认未实现的任务图，也不自动扩大正在审查的 PR 范围。
-- 后续新增文档交接和任务图，应单独拆分增量工单，评估与首版数据模型的复用或迁移，不能直接假设现有 Engineering Activity 已等同 Work Item / Task Node。
-
-## 九、与第三阶段的边界
-
-| | 第二阶段 Development Navigator | 第三阶段 Engineering Control Surface |
+| 状态层 | 所属权威 | 首版呈现 |
 | --- | --- | --- |
-| 范围 | 当前开发事项的任务图与运行控制 | 需求、设计、实现、测试、Review 的工程级治理 |
-| 核心问题 | 当前做什么、输入来自哪里、运行和任务进度怎样、如何继续 | 各版本方案为什么被采纳、如何比较、审批、审计和治理 |
-| 数据深度 | 必需的版本引用、执行证据、关联记录 | 全链路版本/决策治理、跨事项比较、完整溯源与审计 |
-| 不提前建设 | 固定流程引擎、全项目治理看板 | — |
+| Work Item 状态 | Navigator 在 Host 的持久化元数据 | 活跃、完成、归档；完成需要明确用户动作 |
+| Session / Turn 状态 | 原生 Pi / Host | 实际等待、执行、结束、失败、取消或未知 |
+| Artifact 状态 | 可验证的文件/Issue 内容与人工确认 | 待确认、已确认、已变更、不可用 |
+| Ticket 状态（后续） | 配置的 issue tracker 或用户明确管理的数据 | 引用真实状态，不与 Issue tracker 争夺权威 |
 
-**判断第二阶段是否有效的标准，不是画出了多少流程节点，而是跨 Skill 的输入交接与任务状态是否真实、可操作、可验证。**
+- Session/Turn 成功结束不意味着 Work Item 完成、Spec 被批准或测试已通过。
+- Agent 文本自述属于模型报告，不等于实际测试、Git commit 或用户验收；执行证据需关联原生 sessionId/turnId、工具结果与其他可核验来源。
+- 应用重启时恢复 Work Item 关联与持久化引用；未完成执行标记中断/不明，**不自动重放工具调用或提示**。
+- #53 中的会话级 Engineering Activity 只用于观察，不能直接当成跨会话 Work Item。旧 V0 Workflow Run 可评估复用 Host 持久化/恢复机制，但不能继承固定六阶段锁定规则。
+- 出现 Spec 更新时，只提示关联 Tickets/实现结果可能需要复核；不删除历史，不擅自覆盖用户已确认的内容。
+
+## 七、分阶段交付与验收
+
+| 顺序 | 交付 | 必须验证 |
+| --- | --- | --- |
+| 0. 适配评估 | 验证插件 / Navigator / Host 能否安全列出和打开原生会话 | 不越权、不改 Runtime、不伪造新 API |
+| 1. Work Item MVP | 可选分组、会话创建/关联/解绑、独立 Navigator 页面、持久化恢复 | 普通对话不受影响；删除分组不删除会话；跨项目不可偷挂 |
+| 2. Matt 产物交接 | Spec → Tickets → Implement，明确来源、版本、确认和不可用状态 | 跨三个原生会话可继续，不需复制整段聊天；失效输入不会静默继续 |
+| 3. 轻量任务与证据 | 引用原生 Tickets 状态、Pi Turn、测试/Review/Commit 的可验证证据 | 任务状态与执行状态分离，失败/中断/未知不会被标为完成 |
+| 4. 可选增强 | 需求变更影响、任务图、审查回溯、长期记忆 | 基于真实使用再做，不是阶段二进入门槛 |
+
+MVP 不建设完整工作流引擎、跨 Skills 框架调度、独立 Agent Runtime、强制阶段顺序、复杂任务图画布或自动记忆学习。
+
+## 八、与既有能力和第三阶段的关系
+
+- **阶段一 Skill Launcher**：保留用户按需点击 Coding Action → 原生 Pi Skill 草稿 → 手动发送的路径；与是否存在 Work Item 无关。
+- **[Issue #46：Navigator 首版](https://github.com/yuqiangdede/mattpocock-PI/issues/46)**：会话级活动和分析的既定范围不变。
+- **[PR #53：首版实现](https://github.com/yuqiangdede/mattpocock-PI/pull/53)**：单独 Review 与验收；本 PR 不追加 Work Item 分组的代码范围，也不追认功能已上线。
+- **第三阶段 Engineering Control Surface**：在实测需要时再加强跨事项决策、完整工程审计、任务图及多框架扩展，而不是第二阶段一开始就做平台型框架编排。
+
+**衡量第二阶段是否成功：同一个 Work Item 下的多个 Pi 对话，是否能稳定找到同一份已确认的 Spec/Tickets、理解当前开发进度，并安全继续工作。**
