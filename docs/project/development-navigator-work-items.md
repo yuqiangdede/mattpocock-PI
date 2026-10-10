@@ -1,7 +1,7 @@
-# Development Navigator — Work Item Grouping and Isolated Page (Proposal)
+# Development Navigator — Work Item Grouping and Standalone Page (Planned)
 
 > Date: 2026-10-10
-> Status: Product/architecture proposal only; not implemented or accepted as an executable contract.
+> Status: Stage-two product direction accepted; implementation and API details remain proposals, not implemented or validated.
 > Parent: [Stage 2 positioning](development-navigator-positioning.md).
 > Principle: **Extension first; preserve PI-Desktop core lifecycles.**
 
