@@ -9,13 +9,14 @@ test('Matt skills appear in More without exposing imagegen or raw English titles
   const original = structuredClone(configuration);
   const catalog = [{ name: 'imagegen', kind: 'skill', skillId: 'pi-desktop/imagegen', title: 'imagegen' }, { name: 'retro', kind: 'skill', skillId: 'retro', title: 'Retrospective' }];
   const menu = codingShortcutMenu(configuration, catalog, { ask: '咨询下一步', diagnose: 'Bug 排查', skillLabels: { retro: '复盘' } });
-  assert.equal(menu.primary.length, 9);
-  assert.deepEqual(menu.more.map(row => row.action.label), ['复盘']);
-  assert.equal(menu.more[0].action.skillId, 'retro');
+  assert.equal(menu.primary.length, 8);
+  assert.deepEqual(menu.more.map(row => row.action.label), ['Technical design', '复盘']);
+  assert.equal(menu.more[0].action.skillId, 'codebase-design');
+  assert.equal(menu.more[1].action.skillId, 'retro');
   assert.ok(!menu.more.some(row => row.action.skillId === 'pi-desktop/imagegen'));
   for (const row of menu.primary) assert.doesNotThrow(() => new CodingActionRegistry({ schemaVersion: 1, actions: [row.action] }));
   assert.deepEqual(configuration, original);
   configuration.actions.push({ id: 'custom-retro', label: '复盘', skillId: 'retro', prompt: '保留自定义提示词' });
   const overflow = codingShortcutMenu(configuration, catalog, { ask: '咨询下一步', diagnose: 'Bug 排查', skillLabels: { retro: '复盘' } }).more;
-  assert.deepEqual(overflow, [{ action: configuration.actions.at(-1), configured: true }]);
+  assert.deepEqual(overflow, [menu.more[0], { action: configuration.actions.at(-1), configured: true }]);
 });

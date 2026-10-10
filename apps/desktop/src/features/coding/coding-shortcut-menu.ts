@@ -15,9 +15,12 @@ export function codingShortcutMenu(configuration: CodingActionConfiguration, cat
   const diagnose = common("diagnosing-bugs", labels.diagnose);
   const commonIds = new Set([initialize.action.id, ask.action.id, diagnose.action.id]);
   const enabled = registry.list(true).filter(action => !commonIds.has(action.id) && action.skillId !== initialize.action.skillId);
-  const primary = [initialize, ask, ...enabled.slice(0, 6).map(action => ({ action, configured: true })), diagnose];
+  const isHiddenFromPrimary = (action: CodingAction) => action.id === "design" || action.skillId === "codebase-design";
+  const primaryActions = enabled.filter(action => !isHiddenFromPrimary(action));
+  const hiddenToMore = enabled.filter(action => isHiddenFromPrimary(action));
+  const primary = [initialize, ask, ...primaryActions.slice(0, 5).map(action => ({ action, configured: true })), diagnose];
   // Native availability is resolved by PI; only known Matt shortcuts are added to More.
-  const more: CodingShortcut[] = enabled.slice(6).map(action => ({ action, configured: true }));
+  const more: CodingShortcut[] = [...hiddenToMore, ...primaryActions.slice(5)].map(action => ({ action, configured: true }));
   const represented = new Set([...all.map(action => action.skillId), initialize.action.skillId, ask.action.skillId, diagnose.action.skillId]);
   for (const entry of ENGINEERING_SHORTCUTS) {
     if (represented.has(entry.skill)) continue;
