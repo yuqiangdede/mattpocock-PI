@@ -2,6 +2,8 @@
 
 - 第二阶段已确定的简化方向（2026-10-10）：[Development Navigator — Matt Pocock Skills + Work Item](development-navigator-positioning.md)。优先独立页面中的对话分组、Spec → Tickets → Implement 交接和状态恢复；暂不集成 Superpowers / ECC。属于产品规划，不等同于 [首版规格 #46](https://github.com/yuqiangdede/mattpocock-PI/issues/46) 或正在审查的 [PR #53](https://github.com/yuqiangdede/mattpocock-PI/pull/53) 已实现范围。
 
+- 第一阶段插件化预验证：[Skill Launcher Plugin Feasibility Gate](skill-launcher-plugin-feasibility.md)。优先验证 Plugin SDK 的 Composer 控件、原生 Skill Catalog、草稿/附件保持与配置迁移；验证成功前保留现有入口。
+
 - Work Item 分组与独立 Navigator 页面：[设计方案（规划中）](development-navigator-work-items.md)，以明确开发目标关联多个原生 Pi 对话，先独立 Navigator 页面，不改变底层会话生命周期。
 - 项目强制架构准则：[AGENTS.md：Extension First](../../AGENTS.md)；优先插件 / 独立模块 / 现有 API / 增量数据模型，避免修改 PI-Desktop 核心生命周期。
 
