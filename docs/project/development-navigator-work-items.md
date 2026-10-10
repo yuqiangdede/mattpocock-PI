@@ -44,7 +44,7 @@ Logical Project Group (existing durable project identity)
 
 MVP ownership constraint: each Session has **zero or one primary Work Item within its owning project**. References from another Work Item can be considered later but should not silently imply shared execution ownership. Multiple Session links can belong to one Work Item. No cross-project attachment, reassignment or root permission widening without an explicit separately reviewed operation.
 
-## 2a. Single-Skill-family workflow boundary
+## 3. Single-Skill-family workflow boundary
 
 The current stage-two default uses only Matt Pocock Skills:
 `setup-matt-pocock-skills` for one-time engineering tooling configuration,
@@ -63,7 +63,7 @@ time, and changes or commits require the same Pi permissions and user control
 as normal coding. There is no mandatory third-party framework integration,
 adapter, automatic Skill transition or shared transcript injection.
 
-## 3. Conversation membership rules
+## 4. Conversation membership rules
 
 | User action | Membership result |
 | --- | --- |
@@ -80,7 +80,7 @@ adapter, automatic Skill transition or shared transcript injection.
 
 If native session creation succeeds but the link operation fails, keep the new Session ungrouped and expose a retryable attachment error. Do not recreate the Session or replay its prompt.
 
-## 4. Independent Navigator page: MVP information architecture
+## 5. Independent Navigator page: MVP information architecture
 
 **Do not modify the native project sidebar or force a new tree structure in the first release.** A separate Navigator entry (prefer the existing work-panel extensibility point/feature module) presents a project-scoped Work Item view alongside ordinary Pi chat.
 
@@ -100,7 +100,7 @@ The normal chat and Coding Action/Skill Launcher remain available, including whe
 
 A plugin-provided work-panel view is the preferred UI exploration path, **conditional** on verified access to ordinary native Session IDs, project identities and allowed navigation via existing permission-gated APIs. The current imported-session plugin API is not permission to read every native conversation. If the plugin surface is insufficient, use a narrow Navigator-owned UI and additive read/association endpoints instead of broadening plugin permissions or changing Pi session semantics.
 
-## 5. Suggested minimal persistence (not an implementation commitment)
+## 6. Suggested minimal persistence (not an implementation commitment)
 
 Host Core remains the durable authority (existing host-owned versioned KV or additive SQLite metadata after evaluating current domain models). UI state is a projection, never the source of truth.
 
@@ -121,7 +121,7 @@ Later, only as needed:
 
 The concrete schema, transaction boundaries and migration must be designed against the actual Host data model rather than creating a second independent session store. Use existing stable Session IDs and project identities. For references to files, retain path/source + content hash/version; never infer that a file or its content was produced by a particular Skill without evidence.
 
-## 6. State, recovery and trust rules
+## 7. State, recovery and trust rules
 
 - **Work Item state** (active/completed/archived) is distinct from **Session/Turn** status and later **Task Node** acceptance.
 - Finishing a conversation, model reply or Skill call cannot automatically complete a Work Item.
@@ -132,7 +132,7 @@ The concrete schema, transaction boundaries and migration must be designed again
 - Project deletion must follow the existing policy that owns and removes its sessions; Work Item deletion is deliberately less destructive.
 - Associations must be concurrency-safe and idempotent; stale/late events must not attach a result to the wrong item or session.
 
-## 7. Delivery slices and acceptance
+## 8. Delivery slices and acceptance
 
 **Slice 0 — extension-surface feasibility:** Verify whether the existing Navigator/work-panel/plugin APIs can list/open ordinary native Sessions safely. Document exact missing capabilities before requesting any new Host APIs; no runtime or sidebar change.
 
@@ -155,7 +155,7 @@ The concrete schema, transaction boundaries and migration must be designed again
 9. Executed Tool/Turn observations are kept distinct from Agent-written completion claims.
 10. Existing #46/#53 acceptance and legacy project Workflow data are unaffected.
 
-## 8. Extension-first implementation guardrail
+## 9. Extension-first implementation guardrail
 
 For a feature specific to mattpocock-PI, evaluate in order: existing public API/plugin/work-panel integration → independent Navigator domain modules/adapters → additive, Host-owned metadata and narrow IPC/RPC → minimal, reviewed core integration. Do **not** alter PI-Desktop's Project, Session, Turn, queue, permission or Pi Agent Runtime lifecycles just to add grouping or workflow organization.
 
