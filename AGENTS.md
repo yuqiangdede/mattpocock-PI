@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Policy-Sync: 2026-10-01.1
+Policy-Sync: 2026-10-10.1
 
 Mandatory rules for AI coding agents working in PI-Desktop.
 
@@ -177,6 +177,37 @@ Mandatory boundaries:
 
 Changing a frozen architecture, public interface, data ownership model,
 or security boundary requires an ADR.
+
+### Fork extension-first policy (mattpocock-PI; mandatory)
+
+For fork-specific features, **if an independent module, plugin, existing API,
+or additive data model can solve the problem, do not change PI-Desktop's core
+lifecycles**. This is an upstream-compatibility rule, not a reason to bypass
+Host ownership, permission checks, security boundaries, or tests.
+
+Evaluate in this order:
+
+1. Existing public extension interfaces (Plugin SDK, work-panel views,
+   Skills, hooks where appropriate, and permission-gated APIs).
+2. Independent feature/domain modules and small adapters using existing
+   Host-owned capabilities.
+3. Additive, versioned Host-owned metadata and narrowly scoped IPC/RPC
+   extensions, with migration and regression coverage where applicable.
+4. Only as a last resort, a minimal, explicitly approved core change.
+
+Do not rewrite Project / Session / Turn / queue / approval / Agent Runtime
+creation, execution, recovery, or deletion semantics for a custom workflow
+or organizational feature. For example, Work Item grouping **references**
+existing Session IDs and must not become a second Session owner or runtime.
+
+If a core-lifecycle change is truly unavoidable, *before implementation*
+document (a) the extension alternatives tried and why they fail, (b) the
+exact invariants and upstream merge surface affected, (c) backward/data
+compatibility, migration, security and rollback risks, and (d) targeted
+regression tests. Obtain user approval for the architecture exception and
+record the decision in an ADR. Keep any approved core touchpoints small,
+isolated, and independently reviewable. Do not silently expand feature scope.
+
 
 ### ADR discipline
 
