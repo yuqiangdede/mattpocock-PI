@@ -11,7 +11,7 @@ The existing Pi Project → Session model is appropriate for chat, while an engi
 
 **Proposed decision:** introduce an optional **Work Item**, a project-scoped grouping and engineering-context container, with explicitly linked existing sessions. One Work Item represents one specific requirement, defect or refactoring goal. A Work Item **references** sessions; it never owns their lifecycle.
 
-A Work Item is more than a cosmetic chat folder: it can later retain referenced Specs, Plans, tasks, run evidence and user approvals. However, these integrations are incremental; grouping is the first deliverable.
+A Work Item is more than a cosmetic chat folder: it can later retain referenced Matt Pocock Specs, Tickets, reviews, run evidence and user approvals. However, these integrations are incremental; grouping is the first deliverable. The stage-two MVP uses **Matt Pocock Skills only**; no Superpowers/ECC integration or cross-framework routing is in scope.
 
 ## 2. Logical model and boundaries
 
@@ -23,10 +23,10 @@ Logical Project Group (existing durable project identity)
   |
   +-- Navigator (optional, independent page)
        |-- Work Item: user login
-       |    |-- link -> Session A (requirements)
-       |    |-- link -> Session B (plan)
-       |    |-- link -> Session C (implementation)
-       |    |-- Artifact refs: Spec v2, Plan v1
+       |    |-- link -> Session A (grill-with-docs / to-spec)
+       |    |-- link -> Session B (to-tickets)
+       |    |-- link -> Session C (implement)
+       |    |-- Artifact refs: Spec v2, Tickets / issue links
        |    +-- Later: tasks, execution and evidence
        |
        |-- Work Item: fix remote routing
@@ -43,6 +43,25 @@ Logical Project Group (existing durable project identity)
 - **Execution Run / Artifact / Evidence**: linked later using their authoritative Host-owned identifiers and verified source versions.
 
 MVP ownership constraint: each Session has **zero or one primary Work Item within its owning project**. References from another Work Item can be considered later but should not silently imply shared execution ownership. Multiple Session links can belong to one Work Item. No cross-project attachment, reassignment or root permission widening without an explicit separately reviewed operation.
+
+## 2a. Single-Skill-family workflow boundary
+
+The current stage-two default uses only Matt Pocock Skills:
+`setup-matt-pocock-skills` for one-time engineering tooling configuration,
+`grill-with-docs` / `to-spec` for requirements and a Spec,
+`to-tickets` for issue-tracker or local-file tasks with dependencies,
+`implement` for incremental work, and `diagnosing-bugs`, `tdd`,
+`code-review`, `pr` and `retro` when relevant. `implement-spec` is
+**not** an MVP default because its subagent/worktree/merging behavior needs
+separate compatibility review against the project's existing engineering rules.
+
+This is a **method selection, not a new agent runtime**. A Work Item records
+the links between native Pi Sessions and the output of these Skills; it does
+not require that every named step run or that all work take place in one chat.
+Skill installation/availability and invocation capability are checked at use
+time, and changes or commits require the same Pi permissions and user control
+as normal coding. There is no mandatory third-party framework integration,
+adapter, automatic Skill transition or shared transcript injection.
 
 ## 3. Conversation membership rules
 
@@ -71,7 +90,7 @@ Navigator / Work Items
   Main: selected Work Item overview (goal, status, last activity, next user action)
   Tabs/sections:
     Conversations  — linked Session list, open native chat, new chat, attach/detach
-    Artifacts      — explicit Spec / Plan / Review references and versions
+    Artifacts      — explicit Spec / Tickets / Review references and versions
     Activity       — linked run/turn evidence when authoritative identifiers exist
     Tasks          — later optional task list / graph; not required for MVP
   Independent "Ungrouped Conversations" entry (view only; links to native chat)
@@ -119,9 +138,9 @@ The concrete schema, transaction boundaries and migration must be designed again
 
 **Slice 1 — optional grouping MVP:** Work Item CRUD, attach/detach Sessions, create native Session from Work Item, ungrouped chat access, reopen/restart persistence. No task graph or auto-clustering. Acceptance: normal chat unchanged; project isolation; session deletion leaves no broken clickable link; deleting a Work Item never deletes chats; failed linkage can be retried without duplicating a Session.
 
-**Slice 2 — artifact handoff:** Add explicit file references and version/approval checks. Validate Matt Spec (Session A) → Superpowers Plan (Session B) within one Work Item. Acceptance: stale/removed/unapproved inputs are visible and never silently treated as valid.
+**Slice 2 — Matt artifact handoff:** Add explicit file/issue references and version/approval checks. Validate Matt `grill-with-docs` / `to-spec` (Session A) → `to-tickets` (Session B) → `implement` (Session C) within one Work Item. Record the tracker/local-file source rather than assuming a particular generated file format. The optional `handoff` skill provides compact pointers, not durable state; its temporary output must not replace Work Item persistence. Acceptance: stale/removed/unapproved inputs are visible and never silently treated as valid.
 
-**Slice 3 — execution evidence and optional tasks:** Attach existing Pi Session/Turn outcomes to Work Item and optional Task Node; support interrupted/failed/unknown statuses. Add Review/Bug branches and eventually a task graph only after evidence attribution is reliable.
+**Slice 3 — evidence and referenced tickets:** Attach existing Pi Session/Turn outcomes and Matt `code-review` / `diagnosing-bugs` evidence to Work Item and the configured issue tracker's tickets. Support interrupted/failed/unknown statuses; do not create a competing authoritative ticket state store. Consider a visual task graph only after evidence attribution and real needs are proven.
 
 ### Minimum regression scenarios
 
@@ -132,7 +151,7 @@ The concrete schema, transaction boundaries and migration must be designed again
 5. Deleted/missing Sessions become unavailable without corrupting other Work Items.
 6. A Session from another project cannot be linked without an explicit, authorized cross-project design.
 7. A failed association does not duplicate the Session or prompt execution.
-8. Spec v1 changed to v2 invalidates stale Plan references until user review.
+8. Spec v1 changed to v2 flags derived Tickets / implementation references for review; do not silently accept old inputs.
 9. Executed Tool/Turn observations are kept distinct from Agent-written completion claims.
 10. Existing #46/#53 acceptance and legacy project Workflow data are unaffected.
 
