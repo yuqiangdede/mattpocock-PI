@@ -7,6 +7,18 @@
 > 状态：已接受
 > 交叉引用：[00 基线](/zh-CN/spec/00-baseline) · [决策日志](/zh-CN/spec/08-meta/decisions-log) · [接受标准](/zh-CN/spec/06-delivery/02-acceptance-criteria) · [e2e-测试计划](/zh-CN/spec/06-delivery/04-e2e-test-plan) · [更改检查表](/zh-CN/spec/06-delivery/05-change-checklist) · [ADR索引](/adr/README)
 
+## Parallel stage development exception
+
+For fork stage-two experiments, the parallel-stage policy in
+[AGENTS.md](../../../../AGENTS.md#parallel-stage-development-fork-exception)
+and [the branch guide](../../../project/parallel-stage-development.md) overrides
+the main-only task-start, PR-target and task-cleanup wording below.
+Record the exploration base and main revision, validate the actual
+exploration integration candidate, and retain active stage worktrees.
+Promotion to stable main still requires a fresh main-based delivery branch,
+latest-main ancestry and the normal validation/PR gates. This exception
+does not authorize commits, publishing, merging or live-instance testing.
+
 ---
 
 ## 1. 核心不可变规则

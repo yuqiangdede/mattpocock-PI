@@ -7,6 +7,18 @@
 > 状态：已接受（protocol/Electron 自动化已激活；完整桌面 Playwright 仍在计划中）
 > 交叉引用：[验收标准](/zh-CN/spec/06-delivery/02-acceptance-criteria) · [里程碑](/zh-CN/spec/06-delivery/01-mvp-milestones) · [ai-开发工作流程](/zh-CN/spec/06-delivery/03-ai-development-workflow) · [变更清单](/zh-CN/spec/06-delivery/05-change-checklist)
 
+## Parallel stage development exception
+
+For fork stage-two experiments, the parallel-stage policy in
+[AGENTS.md](../../../../AGENTS.md#parallel-stage-development-fork-exception)
+and [the branch guide](../../../project/parallel-stage-development.md) overrides
+the main-only task-start, PR-target and task-cleanup wording below.
+Record the exploration base and main revision, validate the actual
+exploration integration candidate, and retain active stage worktrees.
+Promotion to stable main still requires a fresh main-based delivery branch,
+latest-main ancestry and the normal validation/PR gates. This exception
+does not authorize commits, publishing, merging or live-instance testing.
+
 ---
 
 ### E2E-CODING-ACTIONS-draft-and-manual-send
