@@ -2,7 +2,7 @@
 
 ## Candidate and scope
 
-- Fork base: `9ab1f8f07`; branch: `codex/upstream-0.18.0`.
+- Fork base: `389c2474f`; branch: `codex/upstream-0.18.0`.
 - Previous official baseline: `0.17.0`, `72b5e826cb7a9928467091ccf745aa9b225eeb04`.
 - Official target: `v0.18.0`, `0c0902b25f0cc22a00fabbf98dee35f499f149cf`.
 - Release: <https://github.com/vastsa/PI-Desktop/releases/tag/v0.18.0>.
@@ -13,8 +13,9 @@ The fixed-baseline preview contained 456 files and 31 conflicts. Resolution
 preserves fork branding, manual updates, Hikvision onboarding, Coding Actions,
 engineering skills, retained Workflow data and Host APIs. Compatible upstream
 plugin, model, runtime, persistence, window and documentation changes are adopted.
-The final base refresh preserves the new Commit code draft entry and first-row
-Skills menu from remote main. The viewer remains available during execution.
+The final base refresh preserves configurable plain prompt buttons (including
+Commit code) and the first-row Skills menu from remote main. The viewer remains
+available during execution.
 
 ## Pi 1.1.0 and the Desktop adapter
 
@@ -95,10 +96,11 @@ no permission and does not replace execution checks.
 ## Validation evidence
 
 Logs and isolated fixtures are under `cache/upstream/`.
-The final Coding Actions and task graph journeys, seven focused component
+The final Coding Actions and task graph journeys, eleven focused component
 tests, Desktop typecheck, lint and PR-base checks ran after the base refresh.
+Shared regression was rerun after integrating plain prompt configuration.
 Runtime and Host suites apply unchanged executable code from the previous
-base; the incoming commit only touches Composer, Coding Actions, i18n and docs.
+base; the incoming commits only touch Composer, Coding Actions, i18n and docs.
 `cache/upstream/candidate-manifest.json` records the original working-tree
 candidate. Final delivery records the committed task and PR integration tree
 separately; passing source gates is not installer release qualification.
