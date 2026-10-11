@@ -19,7 +19,7 @@ await i18n.init({ lng: "en", resources: { en: { translation: en } }, interpolati
 const container = document.getElementById("root");
 assert(container, "root is present");
 const root = createRoot(container!);
-flushSync(() => root.render(<I18nextProvider i18n={i18n}><CodingWorkbench disabled={true} error={null} onExecute={() => executions++} onSelectSkill={() => executions++} onCommit={() => executions++} /></I18nextProvider>));
+flushSync(() => root.render(<I18nextProvider i18n={i18n}><CodingWorkbench disabled={true} error={null} onExecute={() => executions++} onSelectSkill={() => executions++} onSelectPrompt={() => executions++} /></I18nextProvider>));
 const button = (label: string) => [...document.querySelectorAll<HTMLButtonElement>("button")].find(element => element.textContent?.trim() === label);
 const click = (element: HTMLButtonElement | undefined) => { assert(element && !element.disabled, "available button"); element!.focus(); flushSync(() => element!.click()); };
 window.taskGraphProbe = async () => {

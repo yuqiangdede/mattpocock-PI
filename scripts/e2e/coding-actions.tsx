@@ -117,6 +117,28 @@ globalThis.codingActionsProbe = async () => {
     useAppStore.setState({ composerPrefill: { sessionId: view.sessionId, text: "", fileReferences: [] } });
     await until(() => readEditorValue(editor()) === "");
   }
+  view.settings(); await until(() => input(i18n.t("codingActions.promptName")) && !input(i18n.t("codingActions.promptName")).disabled);
+  check(input(i18n.t("codingActions.promptName")).value === i18n.t("codingActions.commitCode"), "Missing localized plain prompt default");
+  await fill(i18n.t("codingActions.promptName"), "Verify and commit", type);
+  await fill(i18n.t("codingActions.promptText"), "Verify the build, then commit with Git or SVN.", type);
+  await click(i18n.t("codingActions.save"));
+  await until(async () => (await api.getCodingActions()).configuration.promptActions?.[0]?.label === "Verify and commit");
+  await fill(i18n.t("codingActions.promptName"), "Unsaved name", type);
+  await click(i18n.t("codingActions.cancel"));
+  await until(() => input(i18n.t("codingActions.promptName")).value === "Verify and commit");
+  await loadCodingActions(true);
+  view.composer(); await until(() => editor());
+  useAppStore.setState({ composerPrefill: { sessionId: view.sessionId, text: "Keep my draft", fileReferences: [] } });
+  await until(() => readEditorValue(editor()) === "Keep my draft");
+  const secondary = [...document.querySelectorAll<HTMLButtonElement>(".coding-shortcuts-secondary button")];
+  check(secondary.some(button => button.textContent?.trim() === "Verify and commit"), "Saved prompt label missing from second row");
+  check(!document.querySelector(".coding-shortcuts-secondary [aria-haspopup='menu']"), "More left the Skill row");
+  const beforePlain = (await fixture("snapshot") as { prompts: number }).prompts;
+  await click("Verify and commit");
+  await until(() => readEditorValue(editor()) === "Verify the build, then commit with Git or SVN.\n\nKeep my draft");
+  check((await fixture("snapshot") as { prompts: number }).prompts === beforePlain, "Plain button submitted automatically");
+  useAppStore.setState({ composerPrefill: { sessionId: view.sessionId, text: "", fileReferences: [] } });
+  await until(() => readEditorValue(editor()) === "");
   view.settings(); await until(() => input("Action 名称") && !input("Action 名称").disabled);
   await select("选择 Action", "create-spec", "固化需求");
   check(input("可选提示词").value === i18n.t("coding.prompts.spec"), "设置未显示生效的默认提示词");
@@ -203,6 +225,9 @@ globalThis.codingActionsProbe = async () => {
   window.confirm = () => true; await click("重试读取");
   await until(() => input("Action 名称").value === "需求讨论");
   await click("恢复默认 Actions");
+  await until(() => input(i18n.t("codingActions.promptName")).value === i18n.t("codingActions.commitCode"));
+  await fill(i18n.t("codingActions.promptName"), "Final commit", type);
+  await fill(i18n.t("codingActions.promptText"), "Final verification before commit", type);
   await select("选择 Action", "code-review", "代码审查");
   await fill("Action 名称", "最终审查", type);
   await click("保存");
@@ -215,6 +240,8 @@ globalThis.codingActionsRestored = async checkpoint => {
   const view = await initialize(); view.settings(); await until(() => input("Action 名称"));
   await select("选择 Action", "code-review", "最终审查");
   check(input("Action 名称").value === "最终审查", "重启丢失 Action 配置");
+  check(input(i18n.t("codingActions.promptName")).value === "Final commit", "Restart lost the plain prompt label");
+  check(input(i18n.t("codingActions.promptText")).value === "Final verification before commit", "Restart lost the plain prompt text");
   check(JSON.stringify(await api.getSettings()) === JSON.stringify(checkpoint.nativeSettings), "重启修改原生设置");
   view.root.unmount();
   return { ok: true, actions: true, migrated: true, crud: true, order: true, enabled: true, executed: true, latestSkill: true, missing: true, corruptFallback: true, ordinaryChat: true, persisted: true, nativeSettingsPreserved: true };

@@ -46,6 +46,17 @@
 
 ### E2E-CODING-ACTIONS-effective-settings-content
 
+- Edit the default Commit code button's name and plain prompt, save, return to
+  Composer and click the renamed second-row button. Verify exact custom text,
+  preserved draft and attachments, no Skill marker and no automatic provider
+  request. Add, reorder, disable and delete plain buttons; restore the built-in
+  prompt, cancel unsaved edits and verify persistence after reload. Legacy
+  configurations show the localized default; explicit empty lists stay empty.
+- Coverage: `coding-prompt-actions.test.mjs`,
+  `coding-prompt-settings.test.mjs`, `coding-prompt-user-path.test.mjs`,
+  `coding-workbench-shortcuts.test.mjs`,
+  and `pnpm test:e2e:coding-actions` with isolated fixture state.
+
 - Open the default Create specification Action. Verify the complete localized
   default instruction and built-in guidance are visible without modifying saved
   configuration. Edit the prompt, clear it, and restore its default; verify the

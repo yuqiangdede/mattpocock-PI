@@ -27,11 +27,11 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
   const { en } = await server.ssrLoadModule(fileURLToPath(new URL("../../../packages/i18n/src/locales/en/index.ts", import.meta.url)));
   const i18n = createInstance(); await i18n.init({ lng: "en", resources: { en: { translation: en } } });
   const html = renderToStaticMarkup(createElement(I18nextProvider, { i18n },
-    createElement(CodingWorkbench, { disabled: false, error: null, onExecute: () => { executions++; }, onSelectSkill: () => { executions++; }, onCommit: () => { executions++; } })));
+    createElement(CodingWorkbench, { disabled: false, error: null, onExecute: () => { executions++; }, onSelectSkill: () => { executions++; }, onSelectPrompt: () => { executions++; } })));
   for (const label of Object.values(en.codingActions.defaults)) assert.ok(html.includes(label));
   assert.ok(html.includes(en.codingActions.configure));
   assert.ok(html.includes(en.codingActions.commitCode));
-  assert.ok(html.includes("coding-commit-action"));
+  assert.ok(html.includes("coding-prompt-actions"));
   assert.ok(html.indexOf(en.codingActions.diagnose) < html.indexOf(en.codingActions.more), "More follows Diagnose in the primary Skill row");
   assert.ok(html.indexOf(en.codingActions.more) < html.indexOf(en.codingActions.configure), "Configuration follows the Skill row");
   assert.ok(html.indexOf(en.codingActions.configure) < html.indexOf(en.codingActions.commitCode), "Commit code follows configuration");
@@ -44,4 +44,24 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
   assert.ok(!html.includes(en.coding.formal), "不再显示工程流程面板入口");
   assert.doesNotMatch(html, /当前阶段|下一阶段|完成百分比/);
   assert.equal(requests, 0); assert.equal(executions, 0);
+  const { api } = await server.ssrLoadModule("/src/lib/api.ts");
+  const originalLoad = api.getCodingActions;
+  const configuration = { schemaVersion: 1, actions: [], promptActions: [
+    { id: "commit-code", label: "My commit", prompt: "Custom build checks" },
+    { id: "summary", label: "My summary", prompt: "Summarize changes" },
+    { id: "hidden", label: "Hidden prompt", prompt: "Do not show", enabled: false },
+  ] };
+  api.getCodingActions = async () => ({ configuration });
+  t.after(() => { api.getCodingActions = originalLoad; });
+  const { loadCodingActions } = await server.ssrLoadModule("/src/features/extensions/coding-action-state.ts");
+  await loadCodingActions(true);
+  const customized = renderToStaticMarkup(createElement(I18nextProvider, { i18n }, createElement(CodingWorkbench,
+    { disabled: false, error: null, onExecute() {}, onSelectSkill() {}, onSelectPrompt() {} })));
+  const secondary = customized.slice(customized.indexOf('class="coding-shortcuts coding-shortcuts-secondary"'));
+  assert.ok(secondary.includes("My commit"));
+  assert.ok(secondary.includes("My summary"));
+  assert.ok(!secondary.includes("Hidden prompt"));
+  assert.ok(!secondary.includes("aria-haspopup"), "More stays in the Skill row");
+  assert.match(secondary, /<button[^>]*>My commit<\/button>/);
+  assert.ok(!secondary.match(/<button[^>]*disabled[^>]*>My commit<\/button>/), "plain prompts remain available with an empty Skill catalog");
 });
