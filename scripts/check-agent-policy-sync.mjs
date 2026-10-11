@@ -57,6 +57,10 @@ const claude = claudeRaw ? normalize(claudeRaw) : "";
 /** @type {{ id: string, anyOf: string[] }[]} */
 const REQUIRED_ANCHORS = [
   {
+    id: "fork-extension-first",
+    anyOf: ["Fork extension-first policy (mattpocock-PI; mandatory)"],
+  },
+  {
     id: "worktree-isolation",
     anyOf: ["1 request = 1 branch + 1 dedicated worktree"],
   },

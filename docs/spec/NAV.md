@@ -16,6 +16,8 @@
 - [requirements-confirmation.md](01-product/requirements-confirmation.md)
 - [executable-updates.md](01-product/executable-updates.md)
 
+- [development-navigator.md](01-product/development-navigator.md) — Planned stage-two contract; not shipped
+
 ## 2. Architecture
 - [README.md](02-architecture/README.md)
 - [01-architecture.md](02-architecture/01-architecture.md)

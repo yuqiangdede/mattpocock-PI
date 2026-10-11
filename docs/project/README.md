@@ -1,6 +1,14 @@
 # Project Tracking
 
+- Stage-two direction decided on 2026-10-10: [Matt Pocock Skills + Work Item](development-navigator-positioning.md). Prioritize standalone-page grouping, Spec → Tickets → Implement handoff and recovery; defer Superpowers / ECC. This is planning, distinct from the implemented scope of [issue #46](https://github.com/yuqiangdede/mattpocock-PI/issues/46) and [PR #53](https://github.com/yuqiangdede/mattpocock-PI/pull/53). Product requirements live in the [authoritative specification](../spec/01-product/development-navigator.md).
+
+- Stage-one plugin prevalidation: [Skill Launcher Plugin Feasibility Gate](skill-launcher-plugin-feasibility.md). Verify Composer controls, native Skill Catalog, draft/attachment preservation and configuration migration before replacing existing entries.
+
+- Work Item grouping and standalone Navigator: [planned design](development-navigator-work-items.md); explicitly associate native Pi conversations with one engineering goal without changing Session lifecycles.
+- Mandatory architecture policy: [AGENTS.md: Extension First](../../AGENTS.md); prefer plugins, independent modules, existing APIs and additive data models over core-lifecycle changes.
+
 - Parallel stages: [branch roles and exploration/promotion workflow](parallel-stage-development.md).
+
 
 - 当前编码入口方向：[阶段一 Skill Launcher](skill-launcher-spec.md)。#31–#37 按 CodingAction → 原生 Skill → 当前 Session Pi Agent 重写；旧快捷按钮规格仅保留历史，Development Navigator 留待第二阶段。
 
