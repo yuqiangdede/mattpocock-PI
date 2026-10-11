@@ -8,6 +8,17 @@
 
 ## 1. Goals
 
+### E2E-DEV-package-guard-first-start
+
+- In an isolated checkout with package sources and no guard snapshot, execute
+  the `predev` command (`node scripts/guard-packages.mjs verify --warn-only`).
+  Expect exit 0 and a warning suggesting `pnpm guard:snapshot`; no snapshot
+  is created. Strict verification and restore must exit 1 in the same state.
+- Create a snapshot, verify unchanged sources successfully, change a source,
+  and verify strict mode exits 2 while advisory mode exits 0.
+- Coverage: `node --test scripts/guard-packages.test.mjs`, exercising real
+  CLI subprocesses and filesystem state without launching Desktop.
+
 ### E2E-AGENT-default-auto-and-hikvision-preset
 
 - With no saved global permission mode, create an inherited Agent session:

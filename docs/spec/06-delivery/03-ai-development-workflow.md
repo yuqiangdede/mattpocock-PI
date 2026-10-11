@@ -8,6 +8,14 @@
 
 ## 1. Core Immutable Rules
 
+### Development startup source guard
+
+The `predev` package-source verification hook is advisory. With no local
+snapshot, `verify --warn-only` warns, suggests `pnpm guard:snapshot`, and exits
+successfully without creating a baseline. Existing snapshot drift remains
+advisory in this mode. Strict `guard:verify` and `guard:restore` still fail
+without a snapshot; strict verification fails on missing or changed sources.
+
 The rules below govern every change to the PI-Desktop codebase and documentation. R1–R4 restate the five numbered Immutable Rules in `AGENTS.md` (R4 covers both the merge-back and worktree clean-up rules); R5 and R6 restate its GitHub issue and pull request handling sections. They cannot be relaxed by an agent without explicit human override.
 
 ### R1 — Spec-first / Spec-sync
