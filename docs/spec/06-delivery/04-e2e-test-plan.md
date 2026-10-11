@@ -90,9 +90,10 @@
   configuration. Preserve custom common prompts and explicit disabled actions.
 - More includes installed unrepresented Matt skills with localized labels and excludes imagegen and unrelated catalog skills; configured
   overflow remains available. The empty menu displays an explicit status.
-- Verify all 37 bundled Matt skills have exactly one launcher entry. Select each
-  of the 12 added More entries (including Implement specification, PR writing,
-  Claude handoff, workflow design, writing and repository setup). Verify localized
+- Verify curated Matt skills have localized launcher entries while pruned skills
+  remain catalog-only. Select More entries (including Implement specification, PR writing,
+  grilling, handoff, prototype, architecture improvement, deep module design, domain modeling,
+  TDD, research, merge conflicts, wizard and agent docs). Verify localized
   guidance, preserved existing draft, no automatic submission and unchanged
   configuration. Missing catalog skills and explicitly disabled actions remain
   excluded from automatic More entries.

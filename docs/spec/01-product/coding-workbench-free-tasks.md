@@ -78,21 +78,16 @@ including prior markers; ordinary slash processing resolves those mentions.
 | Review code | `code-review` |
 | Retrospective | `retro` |
 
-The Ask button inserts `ask-matt`. The More menu inserts `grill-me`, `grilling`,
-`handoff`, `prototype`, `improve-codebase-architecture`, `codebase-design`,
-`domain-modeling`, `tdd`, `wayfinder`, `triage`, `research`,
-`resolving-merge-conflicts`, `teach`, `to-questionnaire`, `wait-what`, `wizard`,
-or `writing-for-agents`.
+The Ask button inserts `ask-matt`. The More menu exposes curated engineering shortcuts:
+`implement-spec`, `pr`, `grilling`, `handoff`, `prototype`, `improve-codebase-architecture`,
+`codebase-design`, `domain-modeling`, `tdd`, `research`, `resolving-merge-conflicts`,
+`wizard`, and `writing-for-agents`.
 
-The remaining bundled Matt skills also appear in More when installed and not
-already configured: `implement-spec`, `pr`, `claude-handoff`, `loop-me`,
-`setup-ts-deep-modules`, `writing-beats`, `writing-fragments`, `writing-shape`,
-`git-guardrails-claude-code`, `migrate-to-shoehorn`, `scaffold-exercises` and
-`setup-pre-commit`. Each has localized labels, instructions and usage guidance.
-The bundled package inventory is checked against the launcher in regression
-tests so a newly bundled skill cannot silently lose its entry point.
-Except for `implement-spec`, these entries follow the same editable-draft and manual-Send contract, including
-skills whose eventual execution requires an external CLI such as Claude Code.
+Specialized or niche skills remain available through the catalog, subagents and slash commands
+without cluttering the More menu. Each exposed shortcut has localized labels, instructions and
+usage guidance. Except for `implement-spec`, these entries follow the same editable-draft and
+manual-Send contract, including skills whose eventual execution requires an external CLI such
+as Claude Code.
 
 
 The shortcuts use two separate wrapping rows. The first row is Initialize,

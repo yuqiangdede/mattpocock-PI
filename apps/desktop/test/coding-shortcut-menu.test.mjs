@@ -29,7 +29,7 @@ test("Existing six-action profiles regain common shortcuts without changing pers
   assert.equal(primary[1].action.skillId, "ask-matt");
   assert.equal(primary.at(-1).action.skillId, "diagnosing-bugs");
   assert.ok(!primary.some(row => row.action.skillId === "codebase-design"));
-  assert.deepEqual(more.map(row => row.action.skillId), ["codebase-design", "retro"]);
+  assert.deepEqual(more.map(row => row.action.skillId), ["codebase-design", "retro", "implement-spec"]);
   assert.deepEqual(configuration, snapshot);
 });
 
@@ -52,6 +52,7 @@ test("Disabled actions are not silently reintroduced through the Skill catalog",
   configuration.actions[2].enabled = false;
   configuration.actions[4].enabled = false;
   configuration.actions.push({ id: "my-diagnose", label: "Debug", skillId: "diagnosing-bugs", enabled: false });
+  configuration.actions.push({ id: "disabled-spec", skillId: "implement-spec", label: "Disabled", enabled: false });
   const { primary, more } = codingShortcutMenu(configuration, [skill("implement"), skill("diagnosing-bugs"), skill("custom-skill")], labels);
   assert.equal(primary.at(-1).action.enabled, false);
   assert.ok(!more.some(row => row.action.skillId === "implement"));
@@ -116,18 +117,21 @@ test("All installed Matt shortcuts have localized labels and prepare editable dr
 });
 
 const { groupCodingShortcuts } = await import("../src/features/coding/coding-shortcut-menu.ts");
-test("Every bundled Matt skill has exactly one localized launcher entry", () => {
+test("Curated Matt skills have localized launcher entries while pruned skills remain catalog-only", () => {
   const bundle = JSON.parse(readFileSync(new URL("../../../crates/host-core/resources/workflow-skills.json", import.meta.url), "utf8"));
   const catalog = bundle.packages.map(entry => skill(entry.id));
   const menu = codingShortcutMenu(createDefaultCodingActions(), catalog, labels);
   const ids = [...menu.primary, ...menu.more].map(row => row.action.skillId);
   assert.equal(new Set(ids).size, ids.length);
-  assert.deepEqual(new Set(ids), new Set(bundle.packages.map(entry => entry.id)));
+  const expected = new Set(ENGINEERING_SHORTCUTS.map(entry => entry.skill).filter(id => bundle.packages.some(p => p.id === id)));
+  assert.deepEqual(new Set(ids), expected);
+  assert.ok(!menu.more.some(row => row.action.skillId === "scaffold-exercises"));
+  assert.ok(!menu.more.some(row => row.action.skillId === "writing-beats"));
+  assert.ok(!menu.more.some(row => row.action.skillId === "migrate-to-shoehorn"));
   const configuration = createDefaultCodingActions();
   configuration.actions.push({ id: "disabled-spec", skillId: "implement-spec", label: "Disabled", enabled: false });
   const filtered = codingShortcutMenu(configuration, catalog, labels);
   assert.ok(!filtered.more.some(row => row.action.skillId === "implement-spec"));
-  assert.ok(!codingShortcutMenu(createDefaultCodingActions(), [], labels).more.some(row => row.action.skillId === "implement-spec"));
   for (const entry of ENGINEERING_SHORTCUTS) {
     for (const locale of ["en", "zh-CN"]) {
       const copy = catalogs[locale].coding;
@@ -148,7 +152,7 @@ test("Lifecycle groups cover Matt skills once, omit empty groups and preserve cu
   const groups = groupCodingShortcuts(menu.more);
   assert.deepEqual(groups.map(group => group.id), ["exploration", "design", "development", "maintenance", "delivery", "custom"]);
   const find = skillId => groups.find(group => group.shortcuts.some(row => row.action.skillId === skillId))?.id;
-  for (const [skillId, group] of [["grill-me", "exploration"], ["prototype", "design"], ["tdd", "development"], ["triage", "maintenance"], ["handoff", "delivery"], ["retro", "delivery"]]) assert.equal(find(skillId), group);
+  for (const [skillId, group] of [["grilling", "exploration"], ["prototype", "design"], ["tdd", "development"], ["improve-codebase-architecture", "maintenance"], ["handoff", "delivery"], ["retro", "delivery"]]) assert.equal(find(skillId), group);
   assert.deepEqual(groups.at(-1).shortcuts.map(row => row.action.id), ["custom-a", "custom-b"]);
   const ids = groups.flatMap(group => group.shortcuts.map(row => row.action.id));
   assert.equal(new Set(ids).size, menu.more.length);

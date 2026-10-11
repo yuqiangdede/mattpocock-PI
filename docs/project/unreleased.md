@@ -1,9 +1,11 @@
 # Unreleased changes
 
-- Complete More with the 12 previously unmapped bundled Matt skills, including
-  Implement specification, PR writing, workflow design, writing and repository
-  setup. Localized labels, usage guidance and editable prompts cover all 37
-  bundled skills; explicit disabled actions and custom configuration are preserved.
+- Curate the Coding Actions More menu down to 13 high-value, general-purpose
+  engineering shortcuts (including Implement specification, PR writing, grilling,
+  handoff, prototype, architecture improvement, deep module design, domain modeling,
+  TDD, research, merge conflicts, wizard and agent docs). Prune niche course-authoring,
+  novel-writing, and redundant entries from the More menu while keeping them available
+  via the catalog and slash commands.
 
 - Remove native Workflow navigation and the work-panel surface. Legacy Workflow
   tabs are filtered while other session resources survive; Host history and APIs
