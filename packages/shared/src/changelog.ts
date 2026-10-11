@@ -29,6 +29,23 @@ export type ChangelogEntry = {
 };
 
 const enEntries: ChangelogEntry[] = [
+{
+    version: "0.18.0",
+    date: "2026-10-09",
+    highlights: [
+      "Set up TypeSafe's Jev classifier from Add Service and verify its API key before saving.",
+      "Add plugin-owned API-key services from Add Service, with localized descriptions and model discovery after setup.",
+      "Authorized plugin actions can transform a Composer draft with undo; prompt enhancement now runs as an optional plugin.",
+      "Tool details stay collapsed until opened, keeping the completed answer in view.",
+      "Review past AskTool questions and answers in a clear Q&A card.",
+      "Generate session titles with an optional plugin while keeping first-prompt fallback and manual renames.",
+      "Open local Markdown links from chat in the bundled File Manager, including relative links and line references.",
+      "Show configured context-window limits in the Composer's model list.",
+      "Plugins can inspect or refuse network redirects; existing fetch calls still follow redirects by default.",
+      "Stop a running subagent directly from its card or detail panel, or stop all subagents in the current session without stopping the coordinator.",
+      "See total session time beside cumulative model response time and its share of the session.",
+    ],
+  },
   {
     "version": "0.17.0",
     "date": "2026-10-09",
@@ -930,6 +947,23 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+{
+    version: "0.18.0",
+    date: "2026-10-09",
+    highlights: [
+      "可从「添加服务」接入 TypeSafe 的 Jev 分类器；保存前会先验证 API 密钥。",
+      "可从「添加服务」添加插件提供的 API 密钥服务；提供本地化说明，并在配置密钥后发现模型。",
+      "获准的插件操作可改写 Composer 草稿并支持撤销；提示词增强现由可选插件提供。",
+      "工具详情默认收起，展开后再查看，让已完成的回答保持在视野中。",
+      "可在清晰的问答卡片中查看 AskTool 历史问题和答案。",
+      "可通过可选插件生成会话标题；首条提示仍可作为回退，手动重命名优先。",
+      "从聊天打开本地 Markdown 文件链接，包括相对链接和行号引用；文件管理器不可用时会显示说明。",
+      "Composer 的模型列表现在会显示已配置的上下文窗口上限。",
+      "插件可查询支持的重定向模式，并选择检查或拒绝网络重定向；现有请求默认仍会跟随重定向。",
+      "可从卡片或详情停止正在运行的子智能体，也可停止当前会话中的全部子智能体，主智能体会继续运行。",
+      "在上下文用量面板查看会话总耗时、模型响应累计耗时及其占比。",
+    ],
+  },
   {
     "version": "0.17.0",
     "date": "2026-10-09",
@@ -1831,6 +1865,23 @@ const zhCNEntries: ChangelogEntry[] = [
 ];
 
 const zhTWEntries: ChangelogEntry[] = [
+{
+    version: "0.18.0",
+    date: "2026-10-09",
+    highlights: [
+      "可從「新增服務」設定 TypeSafe 的 Jev 分類器，並在儲存前驗證 API 金鑰。",
+      "可從「新增服務」加入外掛提供的 API 金鑰服務，查看在地化說明，並在設定金鑰後探索模型。",
+      "獲授權的外掛操作可改寫 Composer 草稿並支援復原；提示詞增強現在由選用外掛提供。",
+      "工具詳細內容預設收合，展開後才會顯示，讓已完成的回答保持在視線內。",
+      "可在清晰的問答卡片中查看 AskTool 歷史問題與答案。",
+      "可透過選用外掛產生工作階段標題；第一則提示仍會作為備援，手動重新命名優先。",
+      "可從聊天在內建檔案管理器中開啟本機 Markdown 連結，包括相對連結與行號參照。",
+      "Composer 的模型清單現在會顯示已設定的上下文視窗上限。",
+      "外掛可查詢支援的重新導向模式，並選擇檢查或拒絕網路重新導向；現有請求預設仍會跟隨重新導向。",
+      "可從卡片或詳情停止執行中的子智能體，也可停止目前工作階段的全部子智能體，主智能體會繼續執行。",
+      "在上下文用量面板查看工作階段總耗時、模型回應累計耗時及其占比。",
+    ],
+  },
   {
     "version": "0.17.0",
     "date": "2026-10-09",

@@ -9,7 +9,7 @@
  * (target/debug or target/release, or PI_DESKTOP_HOST_BIN).
  */
 import { spawn } from "node:child_process";
-import { rmSync, existsSync, readFileSync } from "node:fs";
+import { rmSync, existsSync, readFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import {
   createTempDataDir,
@@ -47,12 +47,23 @@ for (const preloadPath of [
 }
 
 const dataDir = createTempDataDir("pi-desktop-boot-");
+const fixtureHome = join(dataDir, "home");
+mkdirSync(fixtureHome);
+const fixtureAppData = join(fixtureHome, "AppData", "Roaming");
+const fixtureLocalAppData = join(fixtureHome, "AppData", "Local");
+mkdirSync(fixtureAppData, { recursive: true });
+mkdirSync(fixtureLocalAppData, { recursive: true });
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 const child = spawn(electronBin, ["."], {
   cwd: appDir,
   env: {
     ...env,
+    // Native Pi discovery must never read the user's ~/.pi tree in a boot probe.
+    HOME: fixtureHome,
+    USERPROFILE: fixtureHome,
+    APPDATA: fixtureAppData,
+    LOCALAPPDATA: fixtureLocalAppData,
     PI_DESKTOP_DATA_DIR: dataDir,
     PI_DESKTOP_BOOT_PROBE: "1",
     PI_DESKTOP_START_MAXIMIZED: process.platform === "darwin" ? "0" : "1",

@@ -256,7 +256,8 @@ export class TurnEventPipeline {
           toolResult: event.result,
           ...(event.toolUsage ? { toolUsage: event.toolUsage } : {}),
           toolCompletedAt: new Date(envelope.ts).toISOString(),
-          toolDurationMs: started ? Math.max(0, envelope.ts - Date.parse(started.createdAt)) : undefined,
+          toolDurationMs: typeof event.durationMs === "number" && Number.isFinite(event.durationMs) && event.durationMs >= 0
+            ? event.durationMs : started ? Math.max(0, envelope.ts - Date.parse(started.createdAt)) : undefined,
           isError: event.isError,
           status: "complete",
           ...(started?.parentToolCallId ? { parentToolCallId: started.parentToolCallId } : {}),

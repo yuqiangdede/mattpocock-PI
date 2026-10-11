@@ -1,0 +1,6 @@
+.task-graph-dialog { width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; padding: 24px; }
+.task-graph-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.task-graph-dialog form { display: grid; gap: 12px; }
+.task-graph-dialog code { overflow-wrap: anywhere; }
+.task-graph-tasks { padding-left: 20px; }
+.task-graph-tasks li { margin-block: 16px; }

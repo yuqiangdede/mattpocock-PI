@@ -297,7 +297,7 @@ test("diagnostics treat a missing identity as a warning by default", { skip: pro
   assert.doesNotMatch(result.stdout, /Developer ID identity available/);
 });
 
-test("diagnostics refuse to run off macOS", async (t) => {
+test("diagnostics refuse to run off macOS", { skip: process.platform === "win32" ? "POSIX subprocess fixture" : false }, async (t) => {
   const root = await tempRoot(t, "pi-desktop-signing-linux-");
   const bin = join(root, "bin");
   await writeDiagnosticsShims(bin, { unameSystem: "Linux" });

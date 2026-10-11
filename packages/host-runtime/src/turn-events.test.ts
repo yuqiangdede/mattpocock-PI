@@ -78,3 +78,24 @@ describe("usage ledger ingress", () => {
     expect(writes.at(-1)?.params).toMatchObject({ turnId: "old-turn", usage: { operationId: "late" } });
   });
 });
+
+
+describe("Pi monotonic tool duration persistence", () => {
+  it.each([0, 47, undefined, -1, NaN, Infinity])("persists valid duration %s and falls back for invalid input", async durationMs => {
+    const written: UiMessage[] = [];
+    const pipeline = new TurnEventPipeline({
+      getHost: () => ({ async call<T>(method: string, params: unknown): Promise<T> {
+        if (method === "session.appendMessage") written.push((params as { message: UiMessage }).message);
+        return {} as T;
+      } }),
+      ownership: { activeTurnId: () => "t", isStaleTerminalEvent: () => false, finishTurn: async () => undefined },
+      emit: () => undefined, log: () => undefined,
+    });
+    pipeline.handle({ sessionId: "s", turnId: "t", ts: 1000,
+      event: { type: "tool_start", toolCallId: "read", toolName: "Read", args: {} } });
+    pipeline.handle({ sessionId: "s", turnId: "t", ts: 1200,
+      event: { type: "tool_end", toolCallId: "read", result: "done", durationMs } });
+    await pipeline.dispose();
+    expect(written[0]?.toolDurationMs).toBe(typeof durationMs === "number" && Number.isFinite(durationMs) && durationMs >= 0 ? durationMs : 200);
+  });
+});

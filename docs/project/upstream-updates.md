@@ -50,3 +50,6 @@ Reuse compatible host dependencies and build caches for candidate validation. In
 ## Windows 验证适配
 
 完整测试采用受限并发，保留官方断言和超时。模型目录夹具使用 `fileURLToPath`；打包验证执行真实 Node 打包入口，不依赖 Bash。项目内打包夹具通过子进程解析守卫拒绝继承父目录依赖。Native Pi 持久化断言计数真正的用户/助手记录，避免把项目指令中的同名文字误判成重复消息。上游自动升级控制器通过独立测试策略验证；本应用默认仍仅手动更新。POSIX 权限位不作为 Windows ACL 的验证结果。文件符号链接权限不足会明确跳过，目录 junction 仍实际检查。
+
+The 0.18.0 adoption and Desktop engineering boundaries are recorded in
+[the 0.18.0 integration report](upstream-0.18.0.md).

@@ -1,3 +1,4 @@
+import { normalizePiDuration, terminalPiPhase } from "./pi-run-state.js";
 /**
  * Subagents: bounded delegate agent loops spawned by the `Task` tool (ADR 0062).
  *
@@ -127,6 +128,7 @@ export type SubagentRunResult = {
 export type SubagentToolOutcome = {
   isError?: boolean;
   terminate?: boolean;
+  error?: { code: string; message: string };
 };
 
 export type SubagentRunOptions = {
@@ -245,11 +247,13 @@ export class SubagentRun {
   private toolCalls = 0;
   private usage?: MessageUsage;
   private streamError?: { code: string; message: string };
+  private mutationTermination?: { code: string; message: string };
   /** Set when a settled message reads as a cancel — `stopReason: "aborted"`, or
    * a local marker whose preserved cause name is `AbortError`. pi-ai can wrap
    * an abort that fired before the parent signal flipped, so this is the only
    * trace of the Stop and the run has to report `aborted` from it. */
   private turnAborted = false;
+  private readonly toolStartedAt = new Map<string, number>();
   private contextCompactions = 0;
   private contextDegraded = false;
   /** Set when the turn-boundary guard throws because even the degraded
@@ -372,6 +376,7 @@ export class SubagentRun {
     } finally {
       signal?.removeEventListener("abort", onAbort);
       this.finalizeCurrentAssistant();
+      this.toolStartedAt.clear();
     }
 
     if (signal?.aborted) {
@@ -384,6 +389,9 @@ export class SubagentRun {
     // session runtime reads that same marker as an aborted turn.
     if (this.turnAborted) {
       return this.result("aborted", "The delegated task was aborted.");
+    }
+    if (this.mutationTermination) {
+      return this.result("failed", this.lastReportText, this.mutationTermination);
     }
     if (caughtError) {
       if (caughtError.code === "TURN_ABORTED") {
@@ -741,6 +749,7 @@ export class SubagentRun {
     const parent = this.opts.resolveToolOutcome?.(context);
     const terminate = parent?.terminate === true;
     if (!parent?.isError && !terminate) return undefined;
+    if (terminate && parent?.error) this.mutationTermination = parent.error;
     return {
       ...(parent?.isError ? { isError: true } : {}),
       ...(terminate ? { terminate: true } : {}),
@@ -868,8 +877,7 @@ export class SubagentRun {
         // trace of the Stop. An abort is not a failure, so it neither retries
         // nor produces an error row; other local errors stay terminal below.
         const localError = readLocalRequestErrorDetails(message);
-        const aborted =
-          stopReason === "aborted" || localError?.causeName === "AbortError";
+        const aborted = terminalPiPhase(stopReason, localError?.causeName) === "aborted";
         if (aborted) this.turnAborted = true;
         const failed = !aborted && stopReason === "error";
         let classifiedError: ReturnType<typeof classifyAgentError> | undefined;
@@ -935,6 +943,7 @@ export class SubagentRun {
             ? { thinking: content.thinking }
             : {}),
           status: failed ? "error" : aborted ? "aborted" : "complete",
+          responseDurationMs: normalizePiDuration(message.durationMs),
           ...(messageUsage ? { usage: messageUsage } : {}),
           ...(failed ? { isError: true } : {}),
           ...(classifiedError?.details?.origin === "local" ||
@@ -946,6 +955,7 @@ export class SubagentRun {
         break;
       }
       case "tool_execution_start":
+        this.toolStartedAt.set(event.toolCallId, performance.now());
         this.toolCalls += 1;
         this.emit({
           type: "tool_start",
@@ -961,14 +971,19 @@ export class SubagentRun {
           partialResult: event.partialResult,
         });
         break;
-      case "tool_execution_end":
+      case "tool_execution_end": {
+        const startedAt = this.toolStartedAt.get(event.toolCallId);
+        this.toolStartedAt.delete(event.toolCallId);
         this.emit({
           type: "tool_end",
           toolCallId: event.toolCallId,
           result: event.result,
           isError: event.isError,
+          durationMs: normalizePiDuration(event.durationMs,
+            startedAt !== undefined ? Math.max(0, performance.now() - startedAt) : undefined),
         });
         break;
+      }
       default:
         break;
     }

@@ -1,3 +1,4 @@
+import { createNativeSessionList } from "./native-pi-session-discovery.js";
 import { parseMcpServerIds, parseMcpToolNames } from "./mcp-tool-selection.js";
 /**
  * Node pi agent sidecar.
@@ -62,6 +63,8 @@ async function getNativePiService() {
   return nativePiServiceFactory();
 }
 
+const listNativeSessions = createNativeSessionList(getNativePiService);
+
 const runtimes: RuntimeMap = new Map();
 const hostProxy = new ParentHostProxy();
 const testRuntimeIds = new WeakMap<DesktopAgentRuntime, string>();
@@ -106,6 +109,8 @@ type RuntimeParams = {
   turnId?: string;
   thinkingLevel?: SessionThinkingLevel;
   infiniteProviderRetry?: boolean;
+  /** Opt-in TypeSafe classifier credential resolved by Electron main. */
+  jevApiKey?: string;
   provider: RuntimeProviderConfig;
   commandShell: CommandShellOption;
   pluginTools?: PluginToolDef[];
@@ -229,6 +234,7 @@ async function runtimeFor(
     subagents,
     subagentProviders,
     subagentModelKeys,
+    jevApiKey: params.jevApiKey,
     projectInstructions: params.projectInstructions,
     customSystemPrompt: params.customSystemPrompt,
     projectMemory: params.projectMemory,
@@ -293,6 +299,7 @@ async function runtimeFor(
     commandShell: params.commandShell,
     thinkingLevel,
     infiniteProviderRetry: params.infiniteProviderRetry === true,
+    jevApiKey: params.jevApiKey,
     history,
     compaction,
     compactionSettings: params.compactionSettings,
@@ -384,8 +391,7 @@ async function handle(method: string, params: any): Promise<unknown> {
     case "sidecar.health":
       return { ok: true, runtimes: runtimes.size };
     case "native.session.list": {
-      const service = await getNativePiService();
-      return { sessions: await service.list() };
+      return { sessions: await listNativeSessions() };
     }
     case "native.session.search": {
       const service = await getNativePiService();
@@ -532,6 +538,16 @@ async function handle(method: string, params: any): Promise<unknown> {
         await runtime.abort();
       }
       return { ok: true };
+    }
+    case "agent.stopSubagents": {
+      const runtime = runtimes.get(String(params.sessionId));
+      if (!runtime) throw new Error("No active runtime for this session");
+      const ids = params.delegationIds;
+      if (ids !== undefined && (!Array.isArray(ids) || ids.length === 0 || ids.length > 100 || ids.some(id => typeof id !== "string" || !id.trim()))) {
+        throw new Error("Invalid delegation IDs");
+      }
+      const result = await runtime.stopSubagents(ids as string[] | undefined);
+      return { pending: result.details.stopPending?.flatMap(record => typeof record.delegationId === "string" ? [record.delegationId] : []) ?? [] };
     }
     case "agent.stop": {
       const sessionId = String(params.sessionId);

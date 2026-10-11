@@ -8,7 +8,9 @@ restoration, preserving remaining review, file, plugin and subagent resources.
 The contracts below document retained Host capabilities and historical UI
 acceptance; they do not require the withdrawn panel to remain visible. This
 change does not delete Workflow Runs, confirmations, artifacts or Host APIs.
-Coding Actions remain independent Skill shortcuts with manual submission.
+Coding Actions remain independent Skill shortcuts with manual submission, except
+that `implement-spec` opens a local read-only task graph viewer. The viewer does
+not reinstate Workflow scheduling or own task execution.
 
 - Status: Project-owned runs, six-stage execution, recovery, explicit acceptance, reopening and artifact references implemented (#5-#10)
 - Date: 2026-10-01
