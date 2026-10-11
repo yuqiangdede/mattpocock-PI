@@ -1,11 +1,11 @@
 # Project Tracking
 
-- 第二阶段已确定的简化方向（2026-10-10）：[Development Navigator — Matt Pocock Skills + Work Item](development-navigator-positioning.md)。优先独立页面中的对话分组、Spec → Tickets → Implement 交接和状态恢复；暂不集成 Superpowers / ECC。属于产品规划，不等同于 [首版规格 #46](https://github.com/yuqiangdede/mattpocock-PI/issues/46) 或正在审查的 [PR #53](https://github.com/yuqiangdede/mattpocock-PI/pull/53) 已实现范围。
+- Stage-two direction decided on 2026-10-10: [Matt Pocock Skills + Work Item](development-navigator-positioning.md). Prioritize standalone-page grouping, Spec → Tickets → Implement handoff and recovery; defer Superpowers / ECC. This is planning, distinct from the implemented scope of [issue #46](https://github.com/yuqiangdede/mattpocock-PI/issues/46) and [PR #53](https://github.com/yuqiangdede/mattpocock-PI/pull/53). Product requirements live in the [authoritative specification](../spec/01-product/development-navigator.md).
 
-- 第一阶段插件化预验证：[Skill Launcher Plugin Feasibility Gate](skill-launcher-plugin-feasibility.md)。优先验证 Plugin SDK 的 Composer 控件、原生 Skill Catalog、草稿/附件保持与配置迁移；验证成功前保留现有入口。
+- Stage-one plugin prevalidation: [Skill Launcher Plugin Feasibility Gate](skill-launcher-plugin-feasibility.md). Verify Composer controls, native Skill Catalog, draft/attachment preservation and configuration migration before replacing existing entries.
 
-- Work Item 分组与独立 Navigator 页面：[设计方案（规划中）](development-navigator-work-items.md)，以明确开发目标关联多个原生 Pi 对话，先独立 Navigator 页面，不改变底层会话生命周期。
-- 项目强制架构准则：[AGENTS.md：Extension First](../../AGENTS.md)；优先插件 / 独立模块 / 现有 API / 增量数据模型，避免修改 PI-Desktop 核心生命周期。
+- Work Item grouping and standalone Navigator: [planned design](development-navigator-work-items.md); explicitly associate native Pi conversations with one engineering goal without changing Session lifecycles.
+- Mandatory architecture policy: [AGENTS.md: Extension First](../../AGENTS.md); prefer plugins, independent modules, existing APIs and additive data models over core-lifecycle changes.
 
 - 当前编码入口方向：[阶段一 Skill Launcher](skill-launcher-spec.md)。#31–#37 按 CodingAction → 原生 Skill → 当前 Session Pi Agent 重写；旧快捷按钮规格仅保留历史，Development Navigator 留待第二阶段。
 

@@ -3,6 +3,7 @@
 > Date: 2026-10-10
 > Status: Stage-two product direction accepted; implementation and API details remain proposals, not implemented or validated.
 > Parent: [Stage 2 positioning](development-navigator-positioning.md).
+> Planned product contract: [Development Navigator](../spec/01-product/development-navigator.md).
 > Principle: **Extension first; preserve PI-Desktop core lifecycles.**
 
 ## 1. Problem and decision
@@ -74,6 +75,7 @@ adapter, automatic Skill transition or shared transcript injection.
 | Rename/archive/complete a Work Item | Change Work Item metadata only; do not complete or stop Sessions |
 | Delete a Work Item | Confirm and remove grouping/association metadata; never delete native Sessions or project files |
 | Delete a native Session | Reconcile the link as unavailable/remove it safely; do not keep a clickable invalid Session |
+| Move a native Session to another project | Reconcile its current Host project ownership; detach the old primary Work Item link or expose it as unavailable before clickable navigation, without moving the Work Item or changing native move behavior |
 | Delete the Project | Respect the existing Host-owned project/session deletion policy and clean up orphaned Work Item metadata |
 | Conversation contains unrelated goals | Keep one explicit primary Work Item in MVP; offer a manual split/new-item operation later |
 | AI detects a likely relationship | Suggest an association only; never silently assign, move or split chats |
@@ -121,6 +123,10 @@ Later, only as needed:
 
 The concrete schema, transaction boundaries and migration must be designed against the actual Host data model rather than creating a second independent session store. Use existing stable Session IDs and project identities. For references to files, retain path/source + content hash/version; never infer that a file or its content was produced by a particular Skill without evidence.
 
+A legacy project group currently uses `legacy:<path>` and may become a UUID-backed group when its roots are expanded. Host-owned reconciliation must transactionally migrate Navigator ownership references to the confirmed new logical identity, preserving Work Item IDs, session links and artifact references. Recovery must resume or safely reject incomplete reconciliation; it must not create duplicate items or infer identity from a folder string. This adds metadata compatibility without replacing the native project-upgrade lifecycle.
+
+For eligible local requirements files, artifact confirmation is a projection of the existing [Requirements Confirmation](../spec/01-product/requirements-confirmation.md) service: retain the authoritative decision ID, registered root/relative path, exact SHA256 and history revision, and revalidate current content and decision freshness before handoff. Do not add an independently writable Navigator `approved` flag or reuse Workflow stage acceptance as file-content approval. A summary describes content for display; it is never a version identifier. Unsupported sources such as Issues require a separately defined, reviewed Host-owned confirmation contract with exact source revision and actor before confirmed handoff is enabled; an Issue status or model claim is not approval.
+
 ## 7. State, recovery and trust rules
 
 - **Work Item state** (active/completed/archived) is distinct from **Session/Turn** status and later **Task Node** acceptance.
@@ -154,6 +160,9 @@ The concrete schema, transaction boundaries and migration must be designed again
 8. Spec v1 changed to v2 flags derived Tickets / implementation references for review; do not silently accept old inputs.
 9. Executed Tool/Turn observations are kept distinct from Agent-written completion claims.
 10. Existing #46/#53 acceptance and legacy project Workflow data are unaffected.
+11. Moving a native Session between projects reconciles its old Work Item association before navigation; late results cannot restore that association.
+12. Upgrading a legacy project identity to a stored UUID preserves Work Items and their links atomically, including recovery after interruption.
+13. Existing requirements decisions remain authoritative; content changes or stale revisions reject confirmed handoff, and unsupported sources cannot acquire an unreviewed approval flag.
 
 ## 9. Extension-first implementation guardrail
 

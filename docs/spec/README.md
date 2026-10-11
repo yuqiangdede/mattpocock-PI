@@ -16,6 +16,7 @@ is v16 (see `00-baseline.md`).
 
 | Doc | Description |
 |---|---|
+| [Development Navigator](01-product/development-navigator.md) | Planned stage-two Work Item contract; not shipped |
 | [NAV.md](NAV.md) | One-page full navigation |
 | [00-baseline.md](00-baseline.md) | Frozen baseline |
 | [08-meta/decisions-log.md](08-meta/decisions-log.md) | Frozen detail decisions |

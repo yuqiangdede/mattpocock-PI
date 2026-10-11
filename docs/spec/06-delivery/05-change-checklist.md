@@ -3,6 +3,17 @@
 > A practical checklist agents must run before finishing work.  
 > Cross-references: [ai-development-workflow](03-ai-development-workflow.md) · [e2e-test-plan](04-e2e-test-plan.md) · [decisions-log](../08-meta/decisions-log.md) · [ADR index](../../adr/README.md) · [BOARD](../../project/BOARD.md)
 
+### Fork extension-first implementation gate
+
+Before a fork-specific feature, evaluate public extension APIs, independent
+modules/adapters and additive Host-owned metadata before core integration.
+Preserve Project/Session/Turn/queue/approval/Agent Runtime lifecycles.
+If core changes are unavoidable, document tried alternatives, invariants,
+upstream merge impact, compatibility, migration/security/rollback risks and
+targeted regression checks. Obtain architecture approval and record an ADR
+before implementation. See AGENTS.md's mandatory extension-first policy.
+The policy sync gate checks that both agent entry points retain this rule.
+
 ---
 
 ## 0. GitHub Issue Intake

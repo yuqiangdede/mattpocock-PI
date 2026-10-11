@@ -6,6 +6,14 @@
 > 代理在完成工作之前必须运行一份实用的清单。
 > 交叉引用：[ai-development-workflow](/zh-CN/spec/06-delivery/03-ai-development-workflow) · [e2e-test-plan](/zh-CN/spec/06-delivery/04-e2e-test-plan) · [决策日志](/zh-CN/spec/08-meta/decisions-log) · [ADR 索引](/adr/README) · [BOARD](/project/BOARD)
 
+### Fork 扩展优先实施门禁
+
+实施 fork 专属功能前，先评估公开扩展 API、独立模块/适配器和新增的 Host 所有元数据，再考虑核心集成。
+保留 Project、Session、Turn、队列、批准及 Agent Runtime 的生命周期。
+若核心变更不可避免，记录尝试过的替代方案、不变量、上游合并影响、兼容性、迁移/安全/回滚风险及针对性回归检查。
+实施前获得架构批准并记录 ADR。参见 AGENTS.md 中强制执行的扩展优先策略。
+策略同步门禁检查两个代理入口文件是否均保留此规则。
+
 ---
 
 ## 0. GitHub Issue 准入

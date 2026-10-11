@@ -118,8 +118,8 @@ unassigning or deleting a Work Item does not delete the underlying Session.
 _Avoid_: Session migration, transcript ownership, automatic context merging
 
 **Development Navigator**:
-第二阶段以 Matt Pocock Skills + Work Item 为核心的跨会话开发组织能力。在独立 Navigator 页面关联同一工程目标下的多个原生 Pi 对话、Spec/Tickets 等产物、人工确认和可核验的执行状态；普通对话与第一阶段 Coding Actions 保持可用。优先交付 Work Item 分组、Spec → Tickets → Implement 文档交接与重启恢复；任务图及更完整的证据治理按需后置。产品方向见 `docs/project/development-navigator-positioning.md`，工作项交互见 `docs/project/development-navigator-work-items.md`；首版 #46 属于独立的较窄范围。
-_Avoid_: 强制阶段状态机、自动推进、跨框架统一 Runtime、自动合并聊天上下文、把 Agent 运行结束等同于工程验收
+The planned stage-two capability centered on Matt Pocock Skills and Work Items. A standalone Navigator page links native Pi conversations, Spec/Ticket artifacts, human confirmation and verifiable execution states around one engineering goal. Ordinary chat and stage-one Coding Actions remain available. Prioritize grouping, Spec → Tickets → Implement handoff and restart recovery; defer graphs and broader evidence governance until needed. Product requirements: `docs/spec/01-product/development-navigator.md`; positioning: `docs/project/development-navigator-positioning.md`; interaction proposal: `docs/project/development-navigator-work-items.md`. Issue #46 remains a separate narrower scope.
+_Avoid_: Mandatory stage machine, automatic advancement, cross-framework Runtime, automatic transcript merging, equating Agent termination with engineering acceptance
 
 **Engineering Skills Setup**:
 Configuring a project's issue tracker, triage vocabulary and domain documentation conventions for engineering skills.

@@ -4,6 +4,17 @@
 > Status: Accepted
 > Cross-references: [00-baseline](../00-baseline.md) · [decisions-log](../08-meta/decisions-log.md) · [acceptance-criteria](02-acceptance-criteria.md) · [e2e-test-plan](04-e2e-test-plan.md) · [change-checklist](05-change-checklist.md) · [ADR index](../../adr/README.md)
 
+### Fork extension-first implementation gate
+
+Before a fork-specific feature, evaluate public extension APIs, independent
+modules/adapters and additive Host-owned metadata before core integration.
+Preserve Project/Session/Turn/queue/approval/Agent Runtime lifecycles.
+If core changes are unavoidable, document tried alternatives, invariants,
+upstream merge impact, compatibility, migration/security/rollback risks and
+targeted regression checks. Obtain architecture approval and record an ADR
+before implementation. See AGENTS.md's mandatory extension-first policy.
+The policy sync gate checks that both agent entry points retain this rule.
+
 ---
 
 ## 1. Core Immutable Rules
