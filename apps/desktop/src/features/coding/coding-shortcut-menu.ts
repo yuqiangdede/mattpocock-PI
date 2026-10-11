@@ -25,7 +25,7 @@ export function codingShortcutMenu(configuration: CodingActionConfiguration, cat
   for (const entry of ENGINEERING_SHORTCUTS) {
     if (represented.has(entry.skill)) continue;
     const command = catalog.find(command => command.kind === "skill" && command.skillId === entry.skill);
-    if (!command) continue;
+    if (!command && entry.skill !== "implement-spec") continue;
     represented.add(entry.skill);
     more.push({ configured: false, action: { id: `catalog:${entry.skill}`, skillId: entry.skill, label: labels.skillLabels?.[entry.action] ?? entry.skill } });
   }

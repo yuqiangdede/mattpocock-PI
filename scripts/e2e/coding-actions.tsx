@@ -102,7 +102,15 @@ globalThis.codingActionsProbe = async () => {
     useAppStore.setState({ composerPrefill: { sessionId: view.sessionId, text: "Keep my draft", fileReferences: [] } });
     await until(() => readEditorValue(editor()) === "Keep my draft");
     await click(label);
-    await until(() => readEditorValue(editor()).includes(i18n.t(`coding.prompts.${action}`)));
+    if (action === "implementSpec") {
+      await until(() => document.querySelector('[role="dialog"][aria-labelledby="task-graph-title"]'));
+      check(readEditorValue(editor()) === "Keep my draft", "Task graph viewer changed the draft");
+      check((await fixture("snapshot") as { prompts: number }).prompts === 0, "Task graph viewer dispatched an agent");
+      await click(i18n.t("taskGraph.close"));
+      await until(() => !document.querySelector('[role="dialog"][aria-labelledby="task-graph-title"]'));
+    } else {
+      await until(() => readEditorValue(editor()).includes(i18n.t(`coding.prompts.${action}`)));
+    }
     check(readEditorValue(editor()).endsWith("Keep my draft"), `Draft lost: ${action}`);
     check((await fixture("snapshot") as { prompts: number }).prompts === 0, `Shortcut auto-submitted: ${action}`);
     check(JSON.stringify((await api.getCodingActions()).configuration) === originalConfiguration, `Configuration changed: ${action}`);
@@ -131,11 +139,13 @@ globalThis.codingActionsProbe = async () => {
   await until(async () => (await api.getCodingActions()).configuration.actions.some(action => action.label === "快速审查"));
   check(!document.body.textContent?.includes("显示位置") && !document.body.textContent?.includes("更多分组"), "出现页面布局配置");
   input("启用 Action").click(); await click("保存");
+  await until(async () => (await api.getCodingActions()).configuration.actions.find(action => action.id === "code-review")?.enabled === false);
   view.composer(); await until(() => editor());
   check(![...document.querySelectorAll("button")].some(button => button.textContent?.trim() === "快速审查"), "停用 Action 仍然显示");
   view.settings(); await until(() => input("Action 名称"));
   await select("选择 Action", "code-review", "快速审查（已停用）");
   input("启用 Action").click(); await click("保存");
+  await until(async () => (await api.getCodingActions()).configuration.actions.find(action => action.id === "code-review")?.enabled !== false);
   await click("新建 Action"); await fill("Action 名称", "临时审查", type); await fill("Skill id", "code-review", type); await click("保存");
   await until(async () => (await api.getCodingActions()).configuration.actions.some(action => action.label === "临时审查"));
   view.composer(); await until(() => editor());
@@ -149,6 +159,7 @@ globalThis.codingActionsProbe = async () => {
   await fixture("releaseLaunch"); await click("快速审查");
   await until(() => readEditorValue(editor()).startsWith("/skill:code-review 检查当前项目改动。"));
   check((await fixture("snapshot") as { prompts: number }).prompts === before.prompts, "选择 Action 自动发送了请求");
+  await until(() => document.activeElement === editor());
   await fixture("pressKey", "Enter");
   await until(async () => (await fixture("snapshot") as { prompts: number }).prompts === 1);
   await finishProvider();
@@ -161,6 +172,7 @@ globalThis.codingActionsProbe = async () => {
   await fixture("reset"); const beforeSecond = await fixture("snapshot") as { prompts: number }; await fixture("releaseLaunch"); await click("快速审查");
   await until(() => readEditorValue(editor()).startsWith("/skill:code-review 检查当前项目改动。"));
   check((await fixture("snapshot") as { prompts: number }).prompts === beforeSecond.prompts, "选择 Action 自动发送了请求");
+  await until(() => document.activeElement === editor());
   await fixture("pressKey", "Enter");
   await until(async () => (await fixture("snapshot") as { prompts: number }).prompts === 2);
   await finishProvider();

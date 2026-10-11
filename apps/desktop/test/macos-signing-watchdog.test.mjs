@@ -94,7 +94,7 @@ function summaryNumber(stdout, name) {
   return Number(match[1]);
 }
 
-test("forwards child output with a [sign] prefix and reports a clean exit", async () => {
+test("forwards child output with a [sign] prefix and reports a clean exit", { skip: process.platform === "win32" ? "POSIX subprocess fixture" : false }, async () => {
   const { status, stdout } = await runWatchdog([
     "--label",
     "clean",
@@ -111,7 +111,7 @@ test("forwards child output with a [sign] prefix and reports a clean exit", asyn
   assert.match(summaryLine(stdout), /exit=0 /);
 });
 
-test("passes a non-zero child exit code through to the caller", async () => {
+test("passes a non-zero child exit code through to the caller", { skip: process.platform === "win32" ? "POSIX subprocess fixture" : false }, async () => {
   const { status, stdout } = await runWatchdog([
     "--label",
     "failing",
@@ -125,7 +125,7 @@ test("passes a non-zero child exit code through to the caller", async () => {
   assert.match(summaryLine(stdout), /exit=7 /);
 });
 
-test("a silent signing stage produces a stall dump without failing the run", async () => {
+test("a silent signing stage produces a stall dump without failing the run", { skip: process.platform === "win32" ? "POSIX subprocess fixture" : false }, async () => {
   const { status, stdout, elapsedMs } = await runWatchdog([
     "--label",
     "stall",
@@ -174,7 +174,7 @@ test("a hard timeout kills the process group, dumps diagnostics and exits 124", 
   assert.ok(elapsedMs < 10_000, `timeout took ${elapsedMs}ms`);
 });
 
-test("redacts a short certificate password even below the length guard", async () => {
+test("redacts a short certificate password even below the length guard", { skip: process.platform === "win32" ? "POSIX subprocess fixture" : false }, async () => {
   // The certificate password is the one value builder-util itself may print
   // unredacted, so it must be redacted at any length.
   const shortPassword = "pw12";
@@ -198,7 +198,7 @@ test("redacts a short certificate password even below the length guard", async (
   assert.match(stdout, /\[redacted\]/);
 });
 
-test("redacts secrets printed by the child and by codesign-style arguments", async () => {
+test("redacts secrets printed by the child and by codesign-style arguments", { skip: process.platform === "win32" ? "POSIX subprocess fixture" : false }, async () => {
   const cscKeyPassword = "sentinel-csc-key-password-abcdef";
   const appSpecificPassword = "sentinel-apple-app-password-abcdef";
   const cscLink = "sentinel-csc-link-abcdef";
@@ -337,7 +337,7 @@ test(
   },
 );
 
-test("--no-codesign-shim runs the command untouched and reports zero calls", async (t) => {
+test("--no-codesign-shim runs the command untouched and reports zero calls", { skip: process.platform === "win32" ? "POSIX subprocess fixture" : false }, async (t) => {
   const root = await makeTempDir(t);
   const codesignLog = join(root, "unused-codesign-timing.log");
 
@@ -372,7 +372,7 @@ test("a missing -- separator is a usage error", async () => {
   assert.match(withoutCommand.stderr, /Usage: node scripts\/macos-signing-watchdog\.mjs/);
 });
 
-test("appends a markdown summary to GITHUB_STEP_SUMMARY", async (t) => {
+test("appends a markdown summary to GITHUB_STEP_SUMMARY", { skip: process.platform === "win32" ? "POSIX subprocess fixture" : false }, async (t) => {
   const root = await makeTempDir(t);
   const stepSummary = join(root, "step-summary.md");
 

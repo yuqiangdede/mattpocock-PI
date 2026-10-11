@@ -24,7 +24,7 @@ required to restore the entry points. Missing skills remain visibly unavailable.
 timing, purpose and example tooltips on both primary and More entries; raw catalog
 descriptions are fallback only for unknown skills. Explicit configured descriptions
 remain verbatim.
-Selecting any action prepares an editable Composer draft and never
+Except for the `implement-spec` viewer entry, selecting an action prepares an editable Composer draft and never
 submits. Undefined/null instructions use the localized engineering prompt matched
 by skill id; explicit empty instructions retain marker-only insertion. Custom
 instructions remain verbatim. Unknown custom skills have no built-in instruction.
@@ -91,7 +91,7 @@ already configured: `implement-spec`, `pr`, `claude-handoff`, `loop-me`,
 `setup-pre-commit`. Each has localized labels, instructions and usage guidance.
 The bundled package inventory is checked against the launcher in regression
 tests so a newly bundled skill cannot silently lose its entry point.
-These entries follow the same editable-draft and manual-Send contract, including
+Except for `implement-spec`, these entries follow the same editable-draft and manual-Send contract, including
 skills whose eventual execution requires an external CLI such as Claude Code.
 
 
@@ -216,3 +216,25 @@ the corresponding skill and closes the menu without changing the primary action.
 Escape and outside clicks dismiss the menu; disabling the Composer closes it.
 The group wraps as one unit at narrow widths. Existing draft and manual-send
 semantics remain unchanged.
+
+## implement-spec task graph viewer
+
+Selecting a Coding Workbench action whose skill ID is `implement-spec` opens a
+local task graph viewer rather than inserting a Skill prompt. Other shortcuts
+retain editable drafts and manual Send. Existing CodingAction profiles and their
+schema remain unchanged, including any saved custom prompt.
+
+The user pastes `{ "tasks": [{ "id": "task", "title": "Title", "status":
+"pending", "blockedBy": [], "url": "https://example.com/task" }] }`. `blockedBy`
+and `url` are optional. Status is `pending`, `running`, `done`, or `aborted`.
+Inspection rejects malformed input, duplicate IDs, unknown dependencies, cycles,
+unsafe URLs, more than 1,000 tasks, and more than 1,000,000 characters. URLs are
+shown as text and are not fetched. The pending frontier contains only tasks whose
+dependencies are all done. It is informational, never a dispatch queue.
+
+The viewer has no scheduler, issue-write path, automatic task closure, model
+execution, or persisted task graph. Updating input clears stale results. Closing
+is explicit; no task completion event closes the viewer. Key engineering Skill
+tooltips and the viewer show separate descriptive gate metadata. Actual safety
+constraints remain enforced by CLI permissions or Hooks; metadata grants no
+permission and does not change the CodingAction schema.

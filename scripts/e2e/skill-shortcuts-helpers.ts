@@ -1,12 +1,24 @@
 /** Electron 验证使用真实 DOM 与输入事件，避免直接改 React 内部状态。 */
+function nextTask(): Promise<void> {
+  return new Promise(resolve => {
+    const channel = new MessageChannel();
+    channel.port1.onmessage = () => {
+      channel.port1.close();
+      channel.port2.close();
+      resolve();
+    };
+    channel.port2.postMessage(null);
+  });
+}
+
 export async function until<T>(read: () => T | false | null | undefined | Promise<T | false | null | undefined>): Promise<T> {
   const end = performance.now() + 15000;
   while (performance.now() < end) {
     const value = await read();
     if (value) return value;
-    await new Promise<void>(requestAnimationFrame);
+    await nextTask();
   }
-  throw new Error(`Coding Actions timed out: ${document.body.textContent?.slice(-1500)}`);
+  throw new Error(`Coding Actions timed out (${String(read).slice(0, 240)}): ${document.body.textContent?.slice(-1500)}`);
 }
 
 export function check(value: unknown, message: string): asserts value {
@@ -18,7 +30,7 @@ export async function click(label: string) {
     .find(item => (item.textContent?.trim() === label || item.getAttribute("aria-label") === label) && !item.disabled));
   button.focus();
   button.click();
-  await new Promise<void>(requestAnimationFrame);
+  await nextTask();
 }
 
 export async function fill(label: string, value: string, insertText: (value: string) => Promise<unknown>) {
@@ -38,9 +50,9 @@ export async function select(label: string, value: string, optionLabel = value) 
   });
   if (control instanceof HTMLButtonElement) {
     control.focus();
-    await new Promise<void>(requestAnimationFrame);
+    await nextTask();
     control.click();
-    await new Promise<void>(requestAnimationFrame);
+    await nextTask();
     const option = await until(() => [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
       .find(item => item.textContent?.trim() === optionLabel && !item.disabled));
     option.click();

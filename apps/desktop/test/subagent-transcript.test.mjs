@@ -123,7 +123,7 @@ test("a terminal tool event repairs a row lost during renderer reload", () => {
     eventsSource,
     /messages: existing\s*\? state\.messages\.map\([\s\S]*?: \[\.\.\.state\.messages, completed\]/,
   );
-  assert.match(eventsSource, /toolDurationMs: toolStart\s*\n\s*\? Math\.max/);
+  assert.match(eventsSource, /toolDurationMs: typeof event\.durationMs[\s\S]*?Number\.isFinite\(event\.durationMs\)/);
   assert.match(eventsSource, /toolName: message\.toolName \?\? completed\.toolName/);
 });
 
