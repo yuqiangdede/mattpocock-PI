@@ -98,7 +98,21 @@ skills whose eventual execution requires an external CLI such as Claude Code.
 The shortcuts use two separate wrapping rows. The first row is Initialize,
 Ask next step, the first six other enabled configured actions, and Diagnose bug,
 in that order.
-The first row ends with Diagnose bug followed immediately by More, so all Skill controls stay together. The second row holds Coding Actions configuration and a right-aligned Commit code button. Commit code prepares an editable, localized build-then-commit prompt with no Skill dependency. It preserves existing Composer text and attachments; only manual Send executes the prompt. Git (including GitLab hosting) and SVN are supported by the instruction; failed verification forbids commit and Git Push is excluded. The Engineering Workflow entry is no longer exposed.
+The first row ends with Diagnose bug followed immediately by More, so all Skill controls stay together. The second row holds Coding Actions configuration and right-aligned plain prompt buttons. The default Commit code button prepares an editable, localized build-then-commit prompt with no Skill dependency. It preserves existing Composer text and attachments; only manual Send executes the prompt. Git (including GitLab hosting) and SVN are supported by the default instruction; failed verification forbids commit and Git Push is excluded. The Engineering Workflow entry is no longer exposed.
+
+Extensions > Coding Actions includes a separate Plain prompt buttons editor.
+Names, instructions, enabled state and order are editable; buttons can be added
+or deleted. Save, Cancel, backup, import/export and reset cover both lists.
+Viewing defaults does not persist overrides. Restoring the Commit code prompt
+keeps its customized name and uses the current locale's default instruction.
+Plain prompts do not require the Skill Catalog and never add a Skill marker.
+The schema-version-1 configuration accepts an optional `promptActions` list;
+an absent list preserves the localized Commit code default without rewriting
+legacy files, while an explicit empty list hides all plain prompt buttons.
+Each list supports up to 256 entries. Names and custom prompts must be nonempty,
+with limits of 128 and 16000 characters. `prompt: null` is permitted only for
+the built-in `commit-code` entry. Older app versions cannot read configurations
+containing `promptActions`; the saved pre-edit backup supports downgrade recovery.
 More groups skills into Requirements and exploration, Design and planning,
 Development and testing, Review and maintenance, and Collaboration and delivery
 (including Retrospective). Every skill remains available exactly once.

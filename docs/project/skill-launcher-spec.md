@@ -52,6 +52,14 @@ Renderer 通过既有 Preload IPC 访问 Main；Main 在当前应用数据目录
 
 ## 兼容
 
+The second Composer row now supports independently configured plain prompt
+buttons through Extensions > Coding Actions. The optional `promptActions`
+array stores button names, instructions, enabled state and order without a
+Skill binding. Missing legacy lists retain the localized Commit code default;
+explicit empty lists remain empty. Both lists share the existing save, cancel,
+backup and import/export path. See the current
+[product contract](../spec/01-product/coding-workbench-free-tasks.md).
+
 - engineeringShortcutPrompts 迁移到对应 Action.prompt，自定义、null 和显式空值保留。
 - 旧主快捷动作转换为对应 Coding Action；仅有自定义提示词的辅助动作继续保留。
 - 未合并旧 skill-shortcuts.json 若已被使用，迁移名称、Skill id、启用、提示词、备注和原顺序；丢弃位置、分组和来源锁定语义并提示来源策略变化。原文件及迁移备份保留。
