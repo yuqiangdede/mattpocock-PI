@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ENGINEERING_SHORTCUTS, CodingActionError, CodingActionRegistry, resolveCodingAction, type ComposerCommand } from "@pi-desktop/shared";
+import { ENGINEERING_SHORTCUTS, CodingActionError, CodingActionRegistry, resolveCodingAction, codingPromptActions, type ComposerCommand } from "@pi-desktop/shared";
 import { codingShortcutTooltip } from "./coding-shortcut-tooltip";
 import { groupCodingShortcuts, codingShortcutMenu, type CodingShortcut } from "./coding-shortcut-menu";
 import { api } from "../../lib/api";
@@ -9,8 +9,8 @@ import { AnchoredMenu } from "../../components/settings/AnchoredMenu";
 import { useAppStore } from "../../stores/app-store";
 import { loadCodingActions, useCodingActions } from "../extensions/coding-action-state";
 
-export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onCommit }: {
-  disabled: boolean; error: string | null; onExecute: (actionId: string) => void; onSelectSkill: (skillId: string) => void; onCommit: () => void;
+export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onSelectPrompt }: {
+  disabled: boolean; error: string | null; onExecute: (actionId: string) => void; onSelectSkill: (skillId: string) => void; onSelectPrompt: (id: string) => void;
 }) {
   const { t } = useTranslation();
   const projectPath = useAppStore(state => state.workspace?.path ?? "");
@@ -57,7 +57,10 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onC
     </div>
     <div className="coding-shortcuts coding-shortcuts-secondary">
       <Button variant="ghost" onClick={configure}>{t("codingActions.configure")}</Button>
-      <Button className="coding-commit-action" disabled={disabled} title={t("codingActions.commitHint")} onClick={onCommit}>{t("codingActions.commitCode")}</Button>
+      <div className="coding-prompt-actions">
+        {codingPromptActions(configuration, t("codingActions.commitCode")).filter(action => action.enabled !== false).map(action =>
+          <Button key={action.id} disabled={disabled} title={action.id === "commit-code" && action.prompt === null ? t("codingActions.commitHint") : t("codingActions.plainPromptHint")} onClick={() => onSelectPrompt(action.id)}>{action.label}</Button>)}
+      </div>
     </div>
     {actions.some(action => reason(action)) && <div role="status">{actions.filter(action => reason(action)).map(shortcut => `${shortcut.action.label}：${reason(shortcut)}`).join("；")}<Button onClick={() => setCatalogVersion(value => value + 1)}>{t("codingActions.recheck")}</Button></div>}
     {(error || diagnostic) && <div className="coding-shortcut-error" role="alert"><span>{error || t("codingActions.diagnostic", { detail: diagnostic })}</span><Button onClick={configure}>{t("codingActions.configure")}</Button></div>}
