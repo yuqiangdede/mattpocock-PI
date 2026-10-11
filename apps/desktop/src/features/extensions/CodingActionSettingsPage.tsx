@@ -8,6 +8,7 @@ import { Button, Checkbox, Field, Input, Textarea } from "../../components/ui";
 import { SettingsMenuSelect } from "../../components/settings/SettingsMenuSelect";
 import { SettingsCard } from "../settings/primitives";
 import { CodingActionContentFields } from "./CodingActionContentFields";
+import { CodingPromptSettings } from "./CodingPromptSettings";
 import { loadCodingActions, resetCodingActions, saveCodingActions, setCodingActionLeaveGuard, useCodingActions } from "./coding-action-state";
 
 export function CodingActionSettingsPage() {
@@ -72,7 +73,7 @@ export function CodingActionSettingsPage() {
     const parsed: unknown = JSON.parse(importText.replace(/^\uFEFF/, ""));
     const value = Array.isArray(parsed) ? { schemaVersion: 1, actions: parsed } : parsed;
     validateCodingActions(value);
-    if (!window.confirm(t("codingActions.importConfirm", { count: value.actions.length, current: configuration.actions.length }))) return;
+    if (!window.confirm(t("codingActions.importConfirm", { count: value.actions.length + (value.promptActions?.length ?? 1), current: configuration.actions.length + (configuration.promptActions?.length ?? 1) }))) return;
     await save(value); setImportText("");
   };
   const ordered = CodingActionRegistry.sort(draft.actions);
@@ -90,11 +91,17 @@ export function CodingActionSettingsPage() {
         <Checkbox label={t("codingActions.enabled")} aria-label={t("codingActions.enabledAria")} disabled={disabled} checked={action.enabled !== false} onChange={event => patchAction({ enabled: event.target.checked })} />
         <div className="coding-shortcuts"><Button disabled={disabled} onClick={() => move(-1)}>{t("codingActions.moveUp")}</Button><Button disabled={disabled} onClick={() => move(1)}>{t("codingActions.moveDown")}</Button><Button disabled={disabled} onClick={() => { if (!operations.busy && window.confirm(t("codingActions.deleteConfirm"))) { setDraft(value => ({ ...value, actions: value.actions.filter(item => item.id !== selected) })); setSelected(draft.actions.find(item => item.id !== selected)?.id ?? ""); } }}>{t("codingActions.delete")}</Button></div>
       </>}
+    </div>
+  </SettingsCard>
+  <SettingsCard title={t("codingActions.promptButtons")}>
+    <CodingPromptSettings configuration={draft} disabled={disabled} onChange={value => { if (!operations.busy) setDraft(value); }} />
+  </SettingsCard>
+  <div className="settings-form-grid">
       <div className="coding-shortcuts"><Button disabled={disabled || !dirty} onClick={() => void perform(() => save())}>{t("codingActions.save")}</Button><Button disabled={disabled || !dirty} onClick={() => { if (operations.busy) return; setDraft(structuredClone(configuration)); setSelected(configuration.actions[0]?.id ?? ""); setMessage(""); }}>{t("codingActions.cancel")}</Button><Button disabled={disabled} onClick={() => void perform(async () => { if (window.confirm(t("codingActions.resetConfirm"))) { await resetCodingActions(); setMessage(t("codingActions.resetDone")); } })}>{t("codingActions.reset")}</Button></div>
       <Button disabled={disabled} onClick={exportJson}>{t("codingActions.export")}</Button>
       <Field label={t("codingActions.import")}><Textarea aria-label={t("codingActions.import")} value={importText} disabled={disabled} onChange={event => setImportText(event.target.value)} /></Field>
       <Button disabled={disabled || !importText.trim()} onClick={() => void perform(importJson)}>{t("codingActions.validateImport")}</Button>
       {message && <div role="status">{message}</div>}
     </div>
-  </SettingsCard></div>;
+  </div>;
 }

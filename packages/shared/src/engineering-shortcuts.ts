@@ -13,17 +13,6 @@ export const CODING_SKILL_SHORTCUTS = [
 export const CODING_MORE_SKILLS = [
   { action: "implementSpec", skill: "implement-spec" },
   { action: "pr", skill: "pr" },
-  { action: "claudeHandoff", skill: "claude-handoff" },
-  { action: "loopMe", skill: "loop-me" },
-  { action: "setupTsDeepModules", skill: "setup-ts-deep-modules" },
-  { action: "writingBeats", skill: "writing-beats" },
-  { action: "writingFragments", skill: "writing-fragments" },
-  { action: "writingShape", skill: "writing-shape" },
-  { action: "gitGuardrails", skill: "git-guardrails-claude-code" },
-  { action: "migrateToShoehorn", skill: "migrate-to-shoehorn" },
-  { action: "scaffoldExercises", skill: "scaffold-exercises" },
-  { action: "setupPreCommit", skill: "setup-pre-commit" },
-  { action: "grillMe", skill: "grill-me" },
   { action: "grilling", skill: "grilling" },
   { action: "handoff", skill: "handoff" },
   { action: "prototype", skill: "prototype" },
@@ -31,13 +20,8 @@ export const CODING_MORE_SKILLS = [
   { action: "codebaseDesign", skill: "codebase-design" },
   { action: "domainModeling", skill: "domain-modeling" },
   { action: "tdd", skill: "tdd" },
-  { action: "wayfinder", skill: "wayfinder" },
-  { action: "triage", skill: "triage" },
   { action: "research", skill: "research" },
   { action: "resolveConflicts", skill: "resolving-merge-conflicts" },
-  { action: "teach", skill: "teach" },
-  { action: "questionnaire", skill: "to-questionnaire" },
-  { action: "waitWhat", skill: "wait-what" },
   { action: "wizard", skill: "wizard" },
   { action: "writingForAgents", skill: "writing-for-agents" },
 ] as const;
@@ -65,7 +49,8 @@ export function validateEngineeringSettings(value: unknown): void {
     const prompts = settings.engineeringShortcutPrompts;
     if (!prompts || typeof prompts !== "object" || Array.isArray(prompts)) fail("engineeringShortcutPrompts");
     for (const [key, prompt] of Object.entries(prompts as Record<string, unknown>)) {
-      if (!ENGINEERING_SHORTCUTS.some(item => item.action === key) || (prompt !== null && (typeof prompt !== "string" || prompt.length > ENGINEERING_PROMPT_MAX_LENGTH || prompt.includes("\0")))) fail("engineeringShortcutPrompts");
+      if (!ENGINEERING_SHORTCUTS.some(item => item.action === key)) continue;
+      if (prompt !== null && (typeof prompt !== "string" || prompt.length > ENGINEERING_PROMPT_MAX_LENGTH || prompt.includes("\0"))) fail("engineeringShortcutPrompts");
     }
   }
   if (settings.engineeringSkillCheck !== undefined) {

@@ -1,9 +1,11 @@
 # Unreleased changes
 
-- Complete More with the 12 previously unmapped bundled Matt skills, including
-  Implement specification, PR writing, workflow design, writing and repository
-  setup. Localized labels, usage guidance and editable prompts cover all 37
-  bundled skills; explicit disabled actions and custom configuration are preserved.
+- Curate the Coding Actions More menu down to 13 high-value, general-purpose
+  engineering shortcuts (including Implement specification, PR writing, grilling,
+  handoff, prototype, architecture improvement, deep module design, domain modeling,
+  TDD, research, merge conflicts, wizard and agent docs). Prune niche course-authoring,
+  novel-writing, and redundant entries from the More menu while keeping them available
+  via the catalog and slash commands.
 
 - Remove native Workflow navigation and the work-panel surface. Legacy Workflow
   tabs are filtered while other session resources survive; Host history and APIs
@@ -106,3 +108,16 @@
 - OpenAI Codex OAuth models can now opt into provider-hosted native web search.
   The feature remains off by default and search history is replayed only for
   the same Codex model.
+- Plugins can query supported fetch redirect modes and explicitly refuse or
+  inspect redirects without following them. Existing calls keep following by
+  default; a local-only probe plugin demonstrates the new API.
+- Use Pi 1.1.0's 3.5-character text estimate for compaction limits and its
+  monotonic request duration for completed-response throughput; interrupted
+  streams keep the existing fallback.
+
+- Adopt PI-Desktop 0.18.0 and audited Pi 1.1.0 patches while retaining fork
+  identity, Coding Actions and engineering skill settings.
+- Normalize running, aborted and tool execution timing through the shared
+  AgentRunState adapter; keep Pi implementation events out of page bindings.
+- Open implement-spec as a read-only task graph viewer with descriptive Skill
+  gates. Actual execution and safety remain with CLI permissions or Hooks.

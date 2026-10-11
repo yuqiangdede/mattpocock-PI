@@ -14,6 +14,21 @@
 实施前获得架构批准并记录 ADR。参见 AGENTS.md 中强制执行的扩展优先策略。
 策略同步门禁检查两个代理入口文件是否均保留此规则。
 
+
+## 两阶段并行开发例外
+
+Fork 的阶段二实验遵循
+[AGENTS.md](../../../../AGENTS.md#parallel-stage-development-fork-exception)
+及[分支说明](../../../project/parallel-stage-development.md)；下文仅允许从
+main 启动任务、以 main 为 PR 目标和清理工作树的条款，对实验路线采用此例外。
+第一次实验前，阶段分支必须包含已合入 main 的本规则。
+实验验证或更新 PR 前，先用最新 origin/main 更新阶段目标分支，再让任务候选
+包含目标分支最新提交，并运行
+`node scripts/check-pr-base-main.mjs --base <latest-stage-head>`。
+记录实验基线与 main 版本，验证真实集成候选；活跃阶段工作树继续保留。
+成熟功能交付 main 时，仍须新建 main 基线的交付分支并通过通常门禁。
+本例外不自动授权提交、推送、合并或使用用户运行实例测试。
+
 ---
 
 ## 0. GitHub Issue 准入

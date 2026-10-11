@@ -2,7 +2,7 @@
 import type { AppError } from "../errors.js";
 import type { PlanExecution, PlanningStateEvent } from "./plans.js";
 import type { ContextCompactionFallback, ContextCompactionMark, ContextCompactionReason } from "./sessions.js";
-import type { AgentStatus } from "./sessions.js";
+import type { AgentRunState, AgentStatus } from "./sessions.js";
 import type { MessageUsage, ToolTokenUsage, UiMessage, VoiceOrigin } from "./messages.js";
 import type { PermissionDecision, Risk } from "./permissions.js";
 import type { ThinkingLevel } from "./models.js";
@@ -89,33 +89,6 @@ export type AgentSteerRequest = Pick<
 export type AgentPromptResponse = {
   accepted: boolean;
   turnId: string;
-};
-
-/** One-shot Composer draft enhancement; this never reads session history. */
-export type PromptEnhancementRequest = {
-  sessionId?: string | null;
-  draft: string;
-  /** Renderer snapshot of the model currently shown in the Composer. */
-  providerId?: string;
-  modelId?: string;
-  thinkingLevel?: ThinkingLevel;
-};
-
-export type PromptEnhancementResponse = {
-  enhancedDraft: string;
-};
-
-export type SessionSummarizeTitleRequest = {
-  sessionId: string;
-  userPrompt: string;
-  assistantReply?: string;
-  providerId?: string;
-  modelId?: string;
-  thinkingLevel?: ThinkingLevel;
-};
-
-export type SessionSummarizeTitleResponse = {
-  title: string;
 };
 
 export type AgentExecuteApprovedPlanRequest = {
@@ -285,7 +258,7 @@ export function formatAskToolOutput(
 
 export type AgentEvent =
   | { type: "agent_start" }
-  | { type: "agent_end"; messageIds: string[] }
+  | { type: "agent_end"; messageIds: string[]; runState?: AgentRunState }
   | { type: "turn_start" }
   | { type: "usage"; usage: MessageUsage }
   | { type: "turn_end"; subagentUsage?: MessageUsage }
@@ -314,6 +287,7 @@ export type AgentEvent =
       result: unknown;
       isError?: boolean;
       toolUsage?: ToolTokenUsage;
+      durationMs?: number;
     }
   | ({ type: "planning_state" } & Omit<PlanningStateEvent, "sessionId">)
   | { type: "tool_permission_request"; request: ToolPermissionRequest }
@@ -353,4 +327,14 @@ export type AgentEventEnvelope = {
   nestedParentToolCallId?: string;
   /** Definition name of the emitting subagent. */
   agentName?: string;
+};
+
+/** Explicit user cancellation; omitted IDs select this session's running delegates. */
+export type AgentStopSubagentsRequest = {
+  sessionId: string;
+  delegationIds?: string[];
+};
+
+export type AgentStopSubagentsResponse = {
+  pending: string[];
 };

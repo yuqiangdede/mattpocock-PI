@@ -2,7 +2,7 @@ import { ENGINEERING_SHORTCUTS, type CodingAction, type ComposerCommand } from "
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Button, Field, Textarea } from "../../components/ui";
-import { codingShortcutTooltip } from "../coding/coding-shortcut-tooltip";
+import { codingShortcutDescription } from "../coding/coding-shortcut-tooltip";
 
 type Props = {
   action: CodingAction;
@@ -21,7 +21,7 @@ export function CodingActionContentView({ action, catalog, disabled, onChange, t
   const defaultPrompt = entry ? t(`coding.prompts.${entry.action}`) : "";
   const usesDefault = action.prompt == null;
   const promptStatus = usesDefault ? (defaultPrompt ? "promptDefault" : "promptNone") : action.prompt === "" ? "promptEmpty" : "promptCustom";
-  const description = codingShortcutTooltip({ action, configured: true }, catalog, t);
+  const description = codingShortcutDescription({ action, configured: true }, catalog, t);
   return <>
     <Field label={t("codingActions.descriptionLabel")} hint={t("codingActions.descriptionHint")}>
       <Textarea aria-label={t("codingActions.descriptionAria")} value={action.description || description} disabled={disabled} maxLength={4000} onChange={event => onChange({ description: event.target.value })} />

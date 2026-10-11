@@ -15,9 +15,30 @@ targeted regression checks. Obtain architecture approval and record an ADR
 before implementation. See AGENTS.md's mandatory extension-first policy.
 The policy sync gate checks that both agent entry points retain this rule.
 
+## Parallel stage development exception
+
+For fork stage-two experiments, the parallel-stage policy in
+[AGENTS.md](../../../AGENTS.md#parallel-stage-development-fork-exception)
+and [the branch guide](../../project/parallel-stage-development.md) overrides
+the main-only task-start, PR-target and task-cleanup wording below.
+Before experimental validation or a PR update, refresh the stage target from latest origin/main, incorporate its latest head and check task ancestry with node scripts/check-pr-base-main.mjs --base <latest-stage-head>. Record the exploration base and main revision, validate the actual
+exploration integration candidate, and retain active stage worktrees.
+Promotion to stable main still requires a fresh main-based delivery branch,
+latest-main ancestry and the normal validation/PR gates. This exception
+does not authorize commits, publishing, merging or live-instance testing.
+
+
 ---
 
 ## 1. Core Immutable Rules
+
+### Development startup source guard
+
+The `predev` package-source verification hook is advisory. With no local
+snapshot, `verify --warn-only` warns, suggests `pnpm guard:snapshot`, and exits
+successfully without creating a baseline. Existing snapshot drift remains
+advisory in this mode. Strict `guard:verify` and `guard:restore` still fail
+without a snapshot; strict verification fails on missing or changed sources.
 
 The rules below govern every change to the PI-Desktop codebase and documentation. R1–R4 restate the five numbered Immutable Rules in `AGENTS.md` (R4 covers both the merge-back and worktree clean-up rules); R5 and R6 restate its GitHub issue and pull request handling sections. They cannot be relaxed by an agent without explicit human override.
 

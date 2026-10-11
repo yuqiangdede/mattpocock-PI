@@ -1,3 +1,4 @@
+import { createNativeSessionList, nativePiSessionPaths } from "./native-pi-session-discovery.js";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
@@ -1194,4 +1195,40 @@ describe("native settlement and reclaim boundaries", () => {
     writeFileSync(f.file, f.text.replace('"hello"', '"changed"'));
     expect((await service.list())[0].readOnlyReason).toBe("busy");
   });
+});
+
+
+it("discovery and native service use the same overridden session root", async () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-native-shared-root-"));
+  roots.push(root);
+  const agentDir = join(root, "agent");
+  const sessionRoot = join(root, "custom-sessions");
+  mkdirSync(sessionRoot);
+  const paths = nativePiSessionPaths({ agentDir, sessionRoot });
+  const load = vi.fn(async () => new NativePiSessionService({ ...paths,
+    modelRuntimeFactory: async () => { throw new Error("No model needed for an empty fixture"); },
+  }));
+  const list = createNativeSessionList(load, { agentDir, sessionRoot });
+  expect(await list()).toEqual([]);
+  expect(load).toHaveBeenCalledTimes(1);
+  rmSync(sessionRoot, { recursive: true });
+  expect(await list()).toEqual([]);
+  expect(load).toHaveBeenCalledTimes(1);
+});
+
+
+it("discovery retains the real native populated-root list behavior", async () => {
+  const f = fixture();
+  const paths = nativePiSessionPaths({ agentDir: f.agentDir, sessionRoot: f.sessionRoot });
+  const service = new NativePiSessionService({ ...paths,
+    modelRuntimeFactory: async () => { throw new Error("Offline fixture has no provider"); },
+  });
+  const load = vi.fn(async () => service);
+  const list = createNativeSessionList(load, paths);
+  try {
+    const direct = await service.list();
+    expect(direct).toHaveLength(1);
+    expect(await list()).toEqual(direct);
+    expect(load).toHaveBeenCalledTimes(1);
+  } finally { service.disposeAll(); }
 });

@@ -7,6 +7,9 @@
 - Work Item grouping and standalone Navigator: [planned design](development-navigator-work-items.md); explicitly associate native Pi conversations with one engineering goal without changing Session lifecycles.
 - Mandatory architecture policy: [AGENTS.md: Extension First](../../AGENTS.md); prefer plugins, independent modules, existing APIs and additive data models over core-lifecycle changes.
 
+- Parallel stages: [branch roles and exploration/promotion workflow](parallel-stage-development.md).
+
+
 - 当前编码入口方向：[阶段一 Skill Launcher](skill-launcher-spec.md)。#31–#37 按 CodingAction → 原生 Skill → 当前 Session Pi Agent 重写；旧快捷按钮规格仅保留历史，Development Navigator 留待第二阶段。
 
 - Windows 0.16.1-beta.2：[发布说明](windows-release-notes-0.16.1-beta.2.md)、[最新主分支打包验收](windows-release-acceptance-2026-10-07-beta2.md) 与 [GitHub Release](https://github.com/yuqiangdede/mattpocock-PI/releases/tag/v0.16.1-beta.2)。
@@ -27,6 +30,7 @@
 - Documentation/code alignment audit: [2026-07-30 audit](2026-07-30-docs-code-audit.md)
 - Plan implementation plan: [`plan-mode-implementation-plan.md`](plan-mode-implementation-plan.md)
 - Pi 1.0.1 adoption: [`pi-101-adoption.md`](pi-101-adoption.md)
+- Pi 1.1.0 adoption: [`pi-110-adoption.md`](pi-110-adoption.md)
 - GitHub Issues + Milestones: repository Issues page
 - GitHub Projects: create after adding the `project` token scope
 

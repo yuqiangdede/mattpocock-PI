@@ -143,9 +143,17 @@ export type MessageRevisionSummary = {
   messageCount: number;
 };
 
+/** Desktop projection; no Pi implementation types cross the process boundary. */
+export type AgentRunState = {
+  phase: "idle" | "running" | "completed" | "aborted" | "error";
+  /** Existing durable Host turn identity, when a turn has been admitted. */
+  turnId?: string;
+};
+
 export type AgentStatus = {
   sessionId: string;
   isRunning: boolean;
+  runState?: AgentRunState;
   currentTurnId?: string;
   modelId?: string;
   pendingToolConfirmations: number;

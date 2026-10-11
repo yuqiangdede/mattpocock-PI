@@ -4,6 +4,16 @@ Repository automation. Every script here is invoked from a `package.json`
 script, from a GitHub workflow, or by hand during a release; the alias column
 gives the invocation the rest of the documentation quotes.
 
+## Package source guard
+
+`pnpm guard:snapshot` establishes a local source snapshot. `pnpm guard:verify`
+fails when no snapshot exists or existing sources differ from the snapshot.
+The `predev` hook uses `verify --warn-only`: a fresh checkout without snapshots
+prints a warning and continues without creating a baseline automatically.
+Existing source drift also remains non-blocking in this mode. Explicit
+verification and restore continue to fail when no snapshot exists.
+Run `node --test scripts/guard-packages.test.mjs` for the isolated CLI tests.
+
 ## Release gates
 
 These are the checks that block a release. `release.mjs` runs the

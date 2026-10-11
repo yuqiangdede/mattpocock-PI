@@ -25,7 +25,7 @@ export function codingShortcutMenu(configuration: CodingActionConfiguration, cat
   for (const entry of ENGINEERING_SHORTCUTS) {
     if (represented.has(entry.skill)) continue;
     const command = catalog.find(command => command.kind === "skill" && command.skillId === entry.skill);
-    if (!command) continue;
+    if (!command && entry.skill !== "implement-spec") continue;
     represented.add(entry.skill);
     more.push({ configured: false, action: { id: `catalog:${entry.skill}`, skillId: entry.skill, label: labels.skillLabels?.[entry.action] ?? entry.skill } });
   }
@@ -37,25 +37,22 @@ export type CodingShortcutGroup = typeof CODING_SHORTCUT_GROUPS[number];
 const shortcutGroups: Record<EngineeringShortcutAction, CodingShortcutGroup> = {
   implementSpec: "development",
   pr: "delivery",
-  claudeHandoff: "delivery",
-  loopMe: "exploration",
-  setupTsDeepModules: "design",
-  writingBeats: "delivery",
-  writingFragments: "exploration",
-  writingShape: "delivery",
-  gitGuardrails: "maintenance",
-  migrateToShoehorn: "development",
-  scaffoldExercises: "development",
-  setupPreCommit: "maintenance",
-  ask: "exploration", discovery: "exploration", grillMe: "exploration", grilling: "exploration",
-  questionnaire: "exploration", research: "exploration",
-  initialize: "design", spec: "design", tickets: "design", prototype: "design",
-  codebaseDesign: "design", domainModeling: "design", wayfinder: "design",
-  implement: "development", tdd: "development",
-  diagnose: "maintenance", review: "maintenance", triage: "maintenance",
-  improveArchitecture: "maintenance", resolveConflicts: "maintenance",
-  handoff: "delivery", retro: "delivery", teach: "delivery", waitWhat: "delivery",
-  wizard: "delivery", writingForAgents: "delivery",
+  grilling: "exploration",
+  handoff: "delivery",
+  prototype: "design",
+  improveArchitecture: "maintenance",
+  codebaseDesign: "design",
+  domainModeling: "design",
+  tdd: "development",
+  research: "exploration",
+  resolveConflicts: "maintenance",
+  wizard: "delivery",
+  writingForAgents: "delivery",
+  ask: "exploration", discovery: "exploration",
+  initialize: "design", spec: "design", tickets: "design",
+  implement: "development",
+  diagnose: "maintenance", review: "maintenance",
+  retro: "delivery",
 };
 
 /** Presentation groups do not impose stages or modify the persisted Action order. */

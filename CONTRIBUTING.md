@@ -46,6 +46,19 @@ For a suspected security vulnerability, do not open a public issue. Follow
   documentation, and specifications. GitHub discussions may use the language
   of the original author.
 
+### Fork parallel-stage exception
+
+Stage-two experiments may use a dedicated request branch/worktree from the
+recorded committed head of codex/stage2-development-navigator. For this route,
+validate ancestry against the experiment target with
+`node scripts/check-pr-base-main.mjs --base <recorded-stage-head>` and review
+the actual stage integration candidate. Main-only startup, PR-target and
+cleanup instructions apply to stable delivery; active stage integration
+worktrees remain until the stage is retired. A mature slice uses a fresh
+main-based delivery branch and all normal main gates. See
+[parallel stage development](docs/project/parallel-stage-development.md).
+Commit, push and merge authorization are unchanged.
+
 ## Start an Isolated Request
 
 From the primary checkout, first inspect local work and fetch the current

@@ -1,5 +1,6 @@
 import type { ComposerCommand } from "./types/composer.js";
 import { ENGINEERING_SHORTCUTS, validateEngineeringSettings } from "./engineering-shortcuts.js";
+import { validateCodingPromptActions, type CodingPromptAction } from "./coding-prompt-actions.js";
 
 export type CodingAction = {
   id: string;
@@ -11,7 +12,7 @@ export type CodingAction = {
   icon?: string;
   order?: number;
 };
-export type CodingActionConfiguration = { schemaVersion: 1; actions: CodingAction[] };
+export type CodingActionConfiguration = { schemaVersion: 1; actions: CodingAction[]; promptActions?: CodingPromptAction[] };
 export type CodingActionSnapshot = {
   configuration: CodingActionConfiguration;
   diagnostic?: string;
@@ -44,7 +45,8 @@ export function validateCodingActions(value: unknown): asserts value is CodingAc
   const fail = (): never => { throw new Error("Coding Actions 配置格式或版本无效"); };
   if (!value || typeof value !== "object" || Array.isArray(value)) fail();
   const config = value as CodingActionConfiguration;
-  if (config.schemaVersion !== 1 || !Array.isArray(config.actions) || config.actions.length > 256 || Object.keys(config).some(key => !["schemaVersion", "actions"].includes(key))) fail();
+  if (config.schemaVersion !== 1 || !Array.isArray(config.actions) || config.actions.length > 256 || Object.keys(config).some(key => !["schemaVersion", "actions", "promptActions"].includes(key))) fail();
+  if (config.promptActions !== undefined) validateCodingPromptActions(config.promptActions);
   const ids = new Set<string>();
   const fields = ["id", "label", "description", "skillId", "enabled", "prompt", "icon", "order"];
   for (const action of config.actions) {
@@ -70,7 +72,7 @@ export class CodingActionRegistry {
     return CodingActionRegistry.sort(this.actions).filter(action => !enabledOnly || action.enabled !== false);
   }
   // 编辑中的空名称仍可排序；仅在保存或执行时校验完整配置。
-  static sort(actions: readonly CodingAction[]): CodingAction[] {
+  static sort<T extends { order?: number }>(actions: readonly T[]): T[] {
     return actions.map((action, index) => ({ action, index }))
       .sort((a, b) => (a.action.order ?? a.index) - (b.action.order ?? b.index) || a.index - b.index)
       .map(({ action }) => ({ ...action }));
@@ -91,6 +93,19 @@ export function resolveCodingAction(actionId: string, registry: CodingActionRegi
   return { action, command, content: `/${command.name}${action.prompt ? ` ${action.prompt}` : ""}` };
 }
 
+/** Missing legacy configuration keeps the localized built-in button; [] hides it. */
+export function codingPromptActions(configuration: CodingActionConfiguration, commitLabel = "Commit code"): CodingPromptAction[] {
+  return CodingActionRegistry.sort(configuration.promptActions ?? [{ id: "commit-code", label: commitLabel, prompt: null, order: 0 }]);
+}
+
+export function resolveCodingPromptAction(configuration: CodingActionConfiguration, id: string, commitPrompt: string) {
+  validateCodingActions(configuration);
+  const action = codingPromptActions(configuration).find(item => item.id === id);
+  if (!action) throw new CodingActionError("INVALID_ACTION", "The plain prompt button does not exist");
+  if (action.enabled === false) throw new CodingActionError("ACTION_DISABLED", "The plain prompt button is disabled");
+  return { action, prompt: action.prompt ?? commitPrompt };
+}
+
 export function moveCodingAction(configuration: CodingActionConfiguration, actionId: string, direction: -1 | 1): CodingActionConfiguration {
   const actions = new CodingActionRegistry(configuration).list();
   const index = actions.findIndex(action => action.id === actionId);
@@ -98,7 +113,7 @@ export function moveCodingAction(configuration: CodingActionConfiguration, actio
   const target = index + direction;
   if (target < 0 || target >= actions.length) return configuration;
   [actions[index], actions[target]] = [actions[target], actions[index]];
-  return { schemaVersion: 1, actions: actions.map((action, order) => ({ ...action, order })) };
+  return { ...configuration, actions: actions.map((action, order) => ({ ...action, order })) };
 }
 
 const legacyIds: Record<string, string> = { discovery: "discuss-requirements", spec: "create-spec", tickets: "create-tickets", implement: "implement", review: "code-review" };

@@ -55,7 +55,9 @@ test("settings show effective defaults and preserve edit, clear, reset and selec
   assert.ok(render().includes("Keep this"));
   const { codingShortcutTooltip } = await server.ssrLoadModule("/src/features/coding/coding-shortcut-tooltip.ts");
   const descriptionInput = () => elements(view()).find(element => element.props["aria-label"] === zhCN.codingActions.descriptionAria);
-  assert.equal(descriptionInput().props.value, codingShortcutTooltip({ action, configured: true }, catalog, i18n.t.bind(i18n)));
+  assert.equal(descriptionInput().props.value, "Custom guidance");
+  assert.ok(codingShortcutTooltip({ action, configured: true }, catalog, i18n.t.bind(i18n)).includes(zhCN.skillGates.description));
   descriptionInput().props.onChange({ target: { value: "" } });
-  assert.equal(descriptionInput().props.value, codingShortcutTooltip({ action, configured: true }, catalog, i18n.t.bind(i18n)));
+  assert.ok(descriptionInput().props.value.includes(zhCN.coding.skillGuides.spec.purpose));
+  assert.ok(!descriptionInput().props.value.includes(zhCN.skillGates.description));
 });

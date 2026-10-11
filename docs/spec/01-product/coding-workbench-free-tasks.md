@@ -24,7 +24,7 @@ required to restore the entry points. Missing skills remain visibly unavailable.
 timing, purpose and example tooltips on both primary and More entries; raw catalog
 descriptions are fallback only for unknown skills. Explicit configured descriptions
 remain verbatim.
-Selecting any action prepares an editable Composer draft and never
+Except for the `implement-spec` viewer entry, selecting an action prepares an editable Composer draft and never
 submits. Undefined/null instructions use the localized engineering prompt matched
 by skill id; explicit empty instructions retain marker-only insertion. Custom
 instructions remain verbatim. Unknown custom skills have no built-in instruction.
@@ -78,27 +78,36 @@ including prior markers; ordinary slash processing resolves those mentions.
 | Review code | `code-review` |
 | Retrospective | `retro` |
 
-The Ask button inserts `ask-matt`. The More menu inserts `grill-me`, `grilling`,
-`handoff`, `prototype`, `improve-codebase-architecture`, `codebase-design`,
-`domain-modeling`, `tdd`, `wayfinder`, `triage`, `research`,
-`resolving-merge-conflicts`, `teach`, `to-questionnaire`, `wait-what`, `wizard`,
-or `writing-for-agents`.
+The Ask button inserts `ask-matt`. The More menu exposes curated engineering shortcuts:
+`implement-spec`, `pr`, `grilling`, `handoff`, `prototype`, `improve-codebase-architecture`,
+`codebase-design`, `domain-modeling`, `tdd`, `research`, `resolving-merge-conflicts`,
+`wizard`, and `writing-for-agents`.
 
-The remaining bundled Matt skills also appear in More when installed and not
-already configured: `implement-spec`, `pr`, `claude-handoff`, `loop-me`,
-`setup-ts-deep-modules`, `writing-beats`, `writing-fragments`, `writing-shape`,
-`git-guardrails-claude-code`, `migrate-to-shoehorn`, `scaffold-exercises` and
-`setup-pre-commit`. Each has localized labels, instructions and usage guidance.
-The bundled package inventory is checked against the launcher in regression
-tests so a newly bundled skill cannot silently lose its entry point.
-These entries follow the same editable-draft and manual-Send contract, including
-skills whose eventual execution requires an external CLI such as Claude Code.
+Specialized or niche skills remain available through the catalog, subagents and slash commands
+without cluttering the More menu. Each exposed shortcut has localized labels, instructions and
+usage guidance. Except for `implement-spec`, these entries follow the same editable-draft and
+manual-Send contract, including skills whose eventual execution requires an external CLI such
+as Claude Code.
 
 
 The shortcuts use two separate wrapping rows. The first row is Initialize,
 Ask next step, the first six other enabled configured actions, and Diagnose bug,
 in that order.
-The second row contains More and Coding Actions configuration. The Engineering Workflow entry is no longer exposed.
+The first row ends with Diagnose bug followed immediately by More, so all Skill controls stay together. The second row holds Coding Actions configuration and right-aligned plain prompt buttons. The default Commit code button prepares an editable, localized build-then-commit prompt with no Skill dependency. It preserves existing Composer text and attachments; only manual Send executes the prompt. Git (including GitLab hosting) and SVN are supported by the default instruction; failed verification forbids commit and Git Push is excluded. The Engineering Workflow entry is no longer exposed.
+
+Extensions > Coding Actions includes a separate Plain prompt buttons editor.
+Names, instructions, enabled state and order are editable; buttons can be added
+or deleted. Save, Cancel, backup, import/export and reset cover both lists.
+Viewing defaults does not persist overrides. Restoring the Commit code prompt
+keeps its customized name and uses the current locale's default instruction.
+Plain prompts do not require the Skill Catalog and never add a Skill marker.
+The schema-version-1 configuration accepts an optional `promptActions` list;
+an absent list preserves the localized Commit code default without rewriting
+legacy files, while an explicit empty list hides all plain prompt buttons.
+Each list supports up to 256 entries. Names and custom prompts must be nonempty,
+with limits of 128 and 16000 characters. `prompt: null` is permitted only for
+the built-in `commit-code` entry. Older app versions cannot read configurations
+containing `promptActions`; the saved pre-edit backup supports downgrade recovery.
 More groups skills into Requirements and exploration, Design and planning,
 Development and testing, Review and maintenance, and Collaboration and delivery
 (including Retrospective). Every skill remains available exactly once.
@@ -216,3 +225,25 @@ the corresponding skill and closes the menu without changing the primary action.
 Escape and outside clicks dismiss the menu; disabling the Composer closes it.
 The group wraps as one unit at narrow widths. Existing draft and manual-send
 semantics remain unchanged.
+
+## implement-spec task graph viewer
+
+Selecting a Coding Workbench action whose skill ID is `implement-spec` opens a
+local task graph viewer rather than inserting a Skill prompt. Other shortcuts
+retain editable drafts and manual Send. Existing CodingAction profiles and their
+schema remain unchanged, including any saved custom prompt.
+
+The user pastes `{ "tasks": [{ "id": "task", "title": "Title", "status":
+"pending", "blockedBy": [], "url": "https://example.com/task" }] }`. `blockedBy`
+and `url` are optional. Status is `pending`, `running`, `done`, or `aborted`.
+Inspection rejects malformed input, duplicate IDs, unknown dependencies, cycles,
+unsafe URLs, more than 1,000 tasks, and more than 1,000,000 characters. URLs are
+shown as text and are not fetched. The pending frontier contains only tasks whose
+dependencies are all done. It is informational, never a dispatch queue.
+
+The viewer has no scheduler, issue-write path, automatic task closure, model
+execution, or persisted task graph. Updating input clears stale results. Closing
+is explicit; no task completion event closes the viewer. Key engineering Skill
+tooltips and the viewer show separate descriptive gate metadata. Actual safety
+constraints remain enforced by CLI permissions or Hooks; metadata grants no
+permission and does not change the CodingAction schema.

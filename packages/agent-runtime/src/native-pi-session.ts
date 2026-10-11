@@ -1,3 +1,4 @@
+import { nativePiSessionPaths } from "./native-pi-session-discovery.js";
 import { createHash, randomUUID } from "node:crypto";
 import {
   closeSync,
@@ -14,8 +15,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { homedir } from "node:os";
-import { isAbsolute, join, relative, resolve, dirname } from "node:path";
+import { isAbsolute, join, relative, dirname } from "node:path";
 import {
   CURRENT_SESSION_VERSION,
   DefaultResourceLoader,
@@ -308,8 +308,7 @@ const NATIVE_FORK_ERROR_CODES = new Set([
 const nativeServices = new Map<string, NativePiSessionService>();
 
 export function nativePiService(options: { agentDir?: string; sessionRoot?: string } = {}): NativePiSessionService {
-  const agentDir = resolve(options.agentDir ?? join(homedir(), ".pi", "agent"));
-  const sessionRoot = resolve(options.sessionRoot ?? join(agentDir, "sessions"));
+  const { agentDir, sessionRoot } = nativePiSessionPaths(options);
   const key = `${agentDir}\0${sessionRoot}`;
   let service = nativeServices.get(key);
   if (!service) {
@@ -472,8 +471,9 @@ export class NativePiSessionService {
     sessionRoot?: string;
     modelRuntimeFactory?: () => Promise<ModelRuntime>;
   } = {}) {
-    this.agentDir = resolve(options.agentDir ?? join(homedir(), ".pi", "agent"));
-    this.root = resolve(options.sessionRoot ?? join(this.agentDir, "sessions"));
+    const paths = nativePiSessionPaths(options);
+    this.agentDir = paths.agentDir;
+    this.root = paths.sessionRoot;
     this.modelRuntimeFactory =
       options.modelRuntimeFactory ??
       (() =>

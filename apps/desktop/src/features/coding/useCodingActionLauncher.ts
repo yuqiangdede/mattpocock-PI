@@ -6,6 +6,7 @@ import { api } from "../../lib/api";
 import type { ComposerFileReference } from "../chat/composer/model";
 import { getCodingActions, loadCodingActions } from "../extensions/coding-action-state";
 import { CodingActionContextError, executeCodingAction } from "./execute-coding-action";
+import { preparePromptAction } from "./prepare-prompt-action";
 export function useCodingActionLauncher(options: {
   sessionId: string | null | undefined; projectPath: string; blocked: boolean; draftKey: string;
   readLiveDraft: () => string;
@@ -46,5 +47,19 @@ export function useCodingActionLauncher(options: {
     } catch (cause) { if (current()) setError(cause instanceof CodingActionContextError ? t(`codingActions.${cause.code}`) : cause instanceof CodingActionError ? t(`codingActions.${cause.code === "SKILL_MISSING" ? "skillMissing" : cause.code}`, { skillId: "skillId" in target ? target.skillId : getCodingActions().actions.find(action => action.id === target.actionId)?.skillId }) : t("codingActions.executeFailed", { detail: cause instanceof Error ? cause.message : String(cause) })); }
     finally { if (current()) { inFlight.current = false; setPending(false); } }
   };
-  return { execute: (actionId: string) => select({ actionId }), selectSkill: (skillId: string) => select({ skillId }), pending, error };
+  const selectPrompt = (id: string) => {
+    const owner = latest.current;
+    if (owner.blocked || inFlight.current) return;
+    owner.invalidatePromptEnhancement();
+    try {
+      preparePromptAction(id, { configuration: getCodingActions(), commitPrompt: t("codingActions.commitPrompt"),
+        readLiveDraft: owner.readLiveDraft,
+        applyDraft: text => owner.applyEditorDraft(text, owner.fileReferencesRef.current, text.length),
+      });
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof CodingActionError ? t(`codingActions.${cause.code}`) : t("codingActions.executeFailed", { detail: String(cause) }));
+    }
+  };
+  return { execute: (actionId: string) => select({ actionId }), selectSkill: (skillId: string) => select({ skillId }), selectPrompt, pending, error };
 }

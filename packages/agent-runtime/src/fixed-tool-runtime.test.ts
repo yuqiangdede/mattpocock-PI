@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEEPSEEK_MODELS } from "@earendil-works/pi-ai/providers/deepseek.models";
 import { systemTranscriptCheckpoint } from "./system-transcript.js";
 import { readSystemMessage } from "./system-transcript-journal.js";
-import type { UiMessage } from "@pi-desktop/shared";
+import type { AgentEventEnvelope, UiMessage } from "@pi-desktop/shared";
 import { modelConfigFromPi } from "./model-capabilities.js";
 import { DesktopAgentRuntime, type PluginToolDef, type RuntimeProviderConfig } from "./runtime.js";
 
@@ -20,7 +20,7 @@ const pluginTools: PluginToolDef[] = ["plugin_alpha", "plugin_beta"].map((name) 
 }));
 type Payload = { tools: { function: { name: string } }[]; messages: { role: string; content?: unknown }[] };
 type Call = { name: string; args?: Record<string, unknown> };
-async function wireFixture(calls: Call[], beforeReply?: () => Promise<void>) {
+async function wireFixture(calls: Call[], beforeReply?: () => Promise<void>, replyText = "Done.") {
   const requests: Payload[] = [];
   const fetch = globalThis.fetch;
   const server = createServer(async (req, res) => {
@@ -31,7 +31,7 @@ async function wireFixture(calls: Call[], beforeReply?: () => Promise<void>) {
     await beforeReply?.();
     const delta = call ? { role: "assistant", tool_calls: [{ index: 0, id: randomUUID(),
       type: "function", function: { name: call.name, arguments: JSON.stringify(call.args ?? {}) } }] }
-      : { role: "assistant", content: "Done." };
+      : { role: "assistant", content: replyText };
     res.writeHead(200, { "content-type": "text/event-stream" });
     res.end(`data: ${JSON.stringify({ choices: [{ index: 0, delta, finish_reason: call ? "tool_calls" : "stop" }] })}\n\ndata: [DONE]\n\n`);
   });
@@ -48,6 +48,7 @@ function runtimeFixture(history: UiMessage[] = [], tools = pluginTools, provider
   const rows = structuredClone(history);
   const executed: string[] = [];
   const errors: unknown[] = [];
+  const events: AgentEventEnvelope[] = [];
   const runtime = new DesktopAgentRuntime({
     sessionId: "fixed-tools", mode, provider, thinkingLevel: "off", history: rows, pluginTools: tools,
     commandShell: { id: "bash", label: "Bash", dialect: "posix", available: true, isDefault: true },
@@ -60,13 +61,15 @@ function runtimeFixture(history: UiMessage[] = [], tools = pluginTools, provider
       } else throw new Error(`Unexpected host method: ${method}`);
       return undefined as T;
     } },
-    onEvent: ({ event }) => {
+    onEvent: (envelope) => {
+      events.push(envelope);
+      const { event } = envelope;
       if (event.type === "error") errors.push(event.error);
       if (event.type === "tool_start") rows.push({ id: event.toolCallId, role: "tool", content: "",
         toolCallId: event.toolCallId, toolName: event.toolName, toolArgs: event.args, createdAt: new Date().toISOString() });
       if (event.type === "tool_end") {
         const row = rows.find((row) => row.id === event.toolCallId)!;
-        row.toolResult = event.result; row.isError = event.isError; row.toolStatus = event.isError ? "error" : "success";
+        row.toolDurationMs = event.durationMs; row.toolResult = event.result; row.isError = event.isError; row.toolStatus = event.isError ? "error" : "success";
       }
       if (event.type === "message_end") {
         const index = rows.findIndex((row) => row.id === event.message.id);
@@ -74,7 +77,7 @@ function runtimeFixture(history: UiMessage[] = [], tools = pluginTools, provider
       }
     },
   });
-  return { runtime, rows, executed, errors, prompt: async (id = "user-1") => {
+  return { runtime, rows, executed, errors, events, prompt: async (id = "user-1") => {
     rows.push({ id, role: "user", content: "Run the synthetic probes", createdAt: new Date().toISOString() });
     await runtime.prompt("Run the synthetic probes", id, `turn-${id}`);
   } };
@@ -387,5 +390,84 @@ describe("MCP tool selection boundary", () => {
   it("preserves omitted selections and deduplicates exact names", () => {
     expect(parseMcpToolNames(undefined)).toBeUndefined();
     expect(parseMcpToolNames(["search", "search"])).toEqual(["search"]);
+  });
+});
+
+
+describe("Pi run-state public prompt path", () => {
+  it("keeps a held request running and completes with durable turn identity", async () => {
+    let release!: () => void;
+    let entered!: () => void;
+    const waiting = new Promise<void>(resolve => { release = resolve; });
+    const requested = new Promise<void>(resolve => { entered = resolve; });
+    const wire = await wireFixture([], async () => { entered(); await waiting; });
+    const f = runtimeFixture();
+    try {
+      expect(f.runtime.getStatus().runState?.phase).toBe("idle");
+      const prompt = f.prompt();
+      await requested;
+      expect(f.runtime.getStatus()).toMatchObject({ isRunning: true, runState: { phase: "running", turnId: "turn-user-1" } });
+      release();
+      await prompt;
+      expect(f.runtime.getStatus()).toMatchObject({ isRunning: false, runState: { phase: "completed", turnId: "turn-user-1" } });
+    } finally { release(); await f.runtime.dispose(); await wire.close(); }
+  });
+  it("persists executed tool duration through an offline provider and Host tool", async () => {
+    const wire = await wireFixture([{ name: "ToolSearch", args: { query: "plugin_alpha" } }, { name: "plugin_alpha" }]);
+    const f = runtimeFixture();
+    try {
+      await f.prompt();
+      const tool = f.rows.find(row => row.toolName === "plugin_alpha");
+      expect(f.executed).toEqual(["plugin_alpha"]);
+      expect(tool?.toolDurationMs).toBeGreaterThanOrEqual(0);
+      expect(f.runtime.getStatus().runState?.phase).toBe("completed");
+    } finally { await f.runtime.dispose(); await wire.close(); }
+  });
+});
+
+
+
+describe("run-state cancellation ownership through offline requests", () => {
+  it("publishes an aborted terminal and ignores a cancelled request released during the next turn", async () => {
+    let releaseOld!: () => void;
+    let oldEntered!: () => void;
+    let newEntered!: () => void;
+    let releaseNew!: () => void;
+    const oldHeld = new Promise<void>(resolve => { releaseOld = resolve; });
+    const oldRequested = new Promise<void>(resolve => { oldEntered = resolve; });
+    const newHeld = new Promise<void>(resolve => { releaseNew = resolve; });
+    const newRequested = new Promise<void>(resolve => { newEntered = resolve; });
+    let request = 0;
+    const wire = await wireFixture([], async () => {
+      if (++request === 1) { oldEntered(); await oldHeld; }
+      else { newEntered(); await newHeld; }
+    });
+    const f = runtimeFixture();
+    try {
+      const first = f.prompt("cancelled");
+      await oldRequested;
+      await f.runtime.abort();
+      await first;
+      expect([...f.events].reverse().find(envelope => envelope.event.type === "agent_end")?.event)
+        .toMatchObject({ type: "agent_end", runState: { phase: "aborted", turnId: "turn-cancelled" } });
+      const next = f.prompt("next");
+      await newRequested;
+      releaseOld();
+      expect(f.runtime.getStatus()).toMatchObject({ isRunning: true, runState: { phase: "running", turnId: "turn-next" } });
+      releaseNew();
+      await next;
+      expect(f.runtime.getStatus()).toMatchObject({ isRunning: false, runState: { phase: "completed", turnId: "turn-next" } });
+      const ends = f.events.filter(envelope => envelope.event.type === "agent_end");
+      expect(ends.map(envelope => envelope.turnId)).toEqual(["turn-cancelled", "turn-next"]);
+    } finally { releaseOld(); releaseNew(); await f.runtime.dispose(); await wire.close(); }
+  });
+  it("does not classify the word aborted in successful assistant content as cancellation", async () => {
+    const wire = await wireFixture([], undefined, "The old command was aborted; this request completed.");
+    const f = runtimeFixture();
+    try {
+      await f.prompt();
+      expect(f.runtime.getStatus().runState?.phase).toBe("completed");
+      expect([...f.rows].reverse().find(row => row.role === "assistant")?.status).toBe("complete");
+    } finally { await f.runtime.dispose(); await wire.close(); }
   });
 });

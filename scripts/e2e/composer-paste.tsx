@@ -1151,9 +1151,6 @@ globalThis.composerHistoryProbe = async (phase) => {
           delete next[key];
           return next;
         },
-        promptFallbackSessionTitle: () => "",
-        untitledTaskTitle: () => "",
-        isDefaultSessionTitle: () => false,
         viewingSessionIdForPrompt: () => null,
         messageErrorFromUnknown: () => { throw new Error("unexpected prompt failure"); },
         assistantErrorMessage: () => { throw new Error("unexpected prompt failure"); },

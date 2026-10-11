@@ -191,7 +191,7 @@ test("buildBootstrapScript interpolates every input as a quoted literal", () => 
   assert.deepEqual(interpolations, ["HOME:-"]);
 });
 
-test("the generated script is valid POSIX shell, even with hostile inputs", async () => {
+test("the generated script is valid POSIX shell, even with hostile inputs", { skip: process.platform === "win32" ? "POSIX subprocess fixture" : false }, async () => {
   const { dir, cleanup } = await tempDir("pi-host-script-syntax-");
   try {
     const plain = join(dir, "plain.sh");
@@ -218,7 +218,7 @@ test("the generated script is valid POSIX shell, even with hostile inputs", asyn
   }
 });
 
-test("a hostile version stays one literal value when the assignments run", async () => {
+test("a hostile version stays one literal value when the assignments run", { skip: process.platform === "win32" ? "POSIX subprocess fixture" : false }, async () => {
   const { dir, cleanup } = await tempDir("pi-host-script-quote-");
   try {
     const hostileVersion = "1.0.0'; touch \"$HOME/pwned\"; echo '";

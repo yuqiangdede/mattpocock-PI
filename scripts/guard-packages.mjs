@@ -191,6 +191,10 @@ function pickSnapshot(id) {
 }
 
 function cmdVerify(opts = {}) {
+  if (opts.warnOnly && listSnapshots().length === 0) {
+    log("[guard-packages] WARNING: No snapshots available; verification skipped. Run pnpm guard:snapshot to establish a baseline.");
+    return 0;
+  }
   const snapId = pickSnapshot(opts.id);
   const snapDir = join(SNAPSHOTS_DIR, snapId);
   const expected = readManifest(snapDir);

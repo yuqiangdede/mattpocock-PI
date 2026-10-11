@@ -33,6 +33,13 @@ import {
 } from "../work-panel-window";
 import { readWindowState, writeWindowState } from "../window-preferences";
 import { suppressLinuxFramelessSystemMenu } from "../frameless-system-menu";
+import { isWindowFullScreen } from "../window-fullscreen";
+import { DEFAULT_WINDOW_CORNER_RADIUS, installWindowShape } from "../window-shape";
+import {
+  installWindows11CornerController,
+  usesWindows11NativeCorners,
+} from "../window-native-corners";
+import { applyMainWindowBackground, mainWindowBackgroundOptions } from "../window-background";
 import { recoverRendererAfterGone } from "../renderer-recovery";
 
 function windowsIconPath(): string | undefined {
@@ -161,6 +168,13 @@ export async function createWindow({
       { width: windowMinWidth, height: windowMinHeight },
       restoreWorkArea,
     );
+  const initialWindowBackground = builtinWindowBackground(
+    nativeTheme.shouldUseDarkColors ? "dark" : "light",
+  );
+  const windows11NativeCorners = usesWindows11NativeCorners(
+    process.platform,
+    process.getSystemVersion(),
+  );
   windowState.mainWindow = new BrowserWindow({
     ...(restoredBounds ?? { width: 1200, height: 800 }),
     minWidth: initialMinWidth,
@@ -187,8 +201,12 @@ export async function createWindow({
         }
       : {
           frame: false,
-          backgroundColor: builtinWindowBackground(
-            nativeTheme.shouldUseDarkColors ? "dark" : "light",
+          ...(process.platform === "win32" ? { thickFrame: false } : {}),
+          ...mainWindowBackgroundOptions(
+            process.platform,
+            initialWindowBackground,
+            windows11NativeCorners,
+            initialWindowBackground,
           ),
         }),
     ...(process.platform === "win32"
@@ -208,6 +226,26 @@ export async function createWindow({
     },
   });
   const window = windowState.mainWindow;
+  if (process.platform === "win32") {
+    if (windows11NativeCorners) {
+      await installWindows11CornerController(
+        window,
+        DEFAULT_WINDOW_CORNER_RADIUS,
+        () => windowState.host,
+        screen,
+        logger,
+      );
+    } else {
+      installWindowShape(window, DEFAULT_WINDOW_CORNER_RADIUS, screen);
+    }
+  }
+  applyMainWindowBackground(
+    window,
+    process.platform,
+    initialWindowBackground,
+    windows11NativeCorners,
+    initialWindowBackground,
+  );
   suppressLinuxFramelessSystemMenu(window);
   const initialBounds = window.getBounds();
   windowState.workPanelBaseBounds = restoredBounds
@@ -331,7 +369,7 @@ export async function createWindow({
     if (
       nativeWorkPanelResize ||
       windowState.requestedWorkPanelReservation <= 0 ||
-      window.isFullScreen() ||
+      isWindowFullScreen(window) ||
       window.isMaximized()
     ) {
       return nativeWorkPanelResize;
@@ -364,7 +402,7 @@ export async function createWindow({
     if (
       !isLiveWindow() ||
       windowState.requestedWorkPanelReservation <= 0 ||
-      window.isFullScreen() ||
+      isWindowFullScreen(window) ||
       window.isMaximized()
     ) {
       return windowState.workPanelBaseBounds?.width ?? windowMinWidth;
@@ -553,7 +591,7 @@ export async function createWindow({
   const sendFullScreen = () => {
     if (window.isDestroyed() || window.webContents.isDestroyed()) return;
     window.webContents.send(IPC.event.windowFullScreen, {
-      fullScreen: window.isFullScreen(),
+      fullScreen: isWindowFullScreen(window),
     });
   };
   window.on("enter-full-screen", sendFullScreen);
@@ -578,7 +616,7 @@ export async function createWindow({
   // window never lands partly off-screen. macOS keeps its own restore behavior.
   const refitWindowToWorkArea = () => {
     if (!isLiveWindow() || process.platform === "darwin") return;
-    if (window.isMaximized() || window.isFullScreen() || window.isMinimized()) return;
+    if (window.isMaximized() || isWindowFullScreen(window) || window.isMinimized()) return;
     const currentBounds = window.getBounds();
     const workArea = screen.getDisplayMatching(currentBounds).workArea;
     const minimum = clampMinimumSizeToWorkArea(
@@ -668,7 +706,7 @@ export async function createWindow({
     // A scale or text-size change shrinks the DIP work area in place; re-cap the
     // minimum so the OS never enforces one the display cannot show (issue #1175).
     // Keep the open work panel's reservation in the minimum; only cap it.
-    if (isLiveWindow() && !window.isFullScreen()) {
+    if (isLiveWindow() && !isWindowFullScreen(window)) {
       const minimum = clampMinimumSizeToWorkArea(
         { width: workPanelMinimumWindowWidth(), height: windowMinHeight },
         screen.getDisplayMatching(window.getBounds()).workArea,
@@ -878,7 +916,8 @@ export async function createWindow({
       !isLiveWindow() ||
       boundsGuard ||
       windowState.workPanelNativeResizeActive ||
-      windowState.workPanelChatResizeActive
+      windowState.workPanelChatResizeActive ||
+      isWindowFullScreen(window)
     ) {
       return;
     }
@@ -1903,27 +1942,13 @@ export async function createWindow({
               document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
             `);
             await new Promise((r) => setTimeout(r, 200));
-            // Plugins marketplace: the source picker lives beside the catalog,
-            // including the custom URL row that only appears for that source.
+            // Plugins marketplace uses the fixed official catalog.
             await setPage("plugins");
             await windowState.mainWindow!.webContents.executeJavaScript(
               `document.querySelector('#plugins-tab-market')?.dispatchEvent(new MouseEvent('click',{bubbles:true}))`,
             );
             await new Promise((r) => setTimeout(r, 350));
             await shot("pi-settings-extensions");
-            await windowState.mainWindow!.webContents.executeJavaScript(`
-              (() => {
-                const select = document.querySelector('.plugins-market-settings select');
-                if (!select) return;
-                const setter = Object.getOwnPropertyDescriptor(
-                  window.HTMLSelectElement.prototype, 'value',
-                )?.set;
-                setter?.call(select, 'custom');
-                select.dispatchEvent(new Event('change', { bubbles: true }));
-              })()
-            `);
-            await new Promise((r) => setTimeout(r, 350));
-            await shot("pi-settings-extensions-custom");
             await setPage("chat");
             await setTheme("light");
             await new Promise((r) => setTimeout(r, 250));
