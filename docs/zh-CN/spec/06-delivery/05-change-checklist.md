@@ -6,18 +6,19 @@
 > 代理在完成工作之前必须运行一份实用的清单。
 > 交叉引用：[ai-development-workflow](/zh-CN/spec/06-delivery/03-ai-development-workflow) · [e2e-test-plan](/zh-CN/spec/06-delivery/04-e2e-test-plan) · [决策日志](/zh-CN/spec/08-meta/decisions-log) · [ADR 索引](/adr/README) · [BOARD](/project/BOARD)
 
-## Parallel stage development exception
+## 两阶段并行开发例外
 
-For fork stage-two experiments, the parallel-stage policy in
+Fork 的阶段二实验遵循
 [AGENTS.md](../../../../AGENTS.md#parallel-stage-development-fork-exception)
-and [the branch guide](../../../project/parallel-stage-development.md) overrides
-the main-only task-start, PR-target and task-cleanup wording below.
-Record the exploration base and main revision, validate the actual
-exploration integration candidate, and retain active stage worktrees.
-Promotion to stable main still requires a fresh main-based delivery branch,
-latest-main ancestry and the normal validation/PR gates. This exception
-does not authorize commits, publishing, merging or live-instance testing.
-
+及[分支说明](../../../project/parallel-stage-development.md)；下文仅允许从
+main 启动任务、以 main 为 PR 目标和清理工作树的条款，对实验路线采用此例外。
+第一次实验前，阶段分支必须包含已合入 main 的本规则。
+实验验证或更新 PR 前，先用最新 origin/main 更新阶段目标分支，再让任务候选
+包含目标分支最新提交，并运行
+`node scripts/check-pr-base-main.mjs --base <latest-stage-head>`。
+记录实验基线与 main 版本，验证真实集成候选；活跃阶段工作树继续保留。
+成熟功能交付 main 时，仍须新建 main 基线的交付分支并通过通常门禁。
+本例外不自动授权提交、推送、合并或使用用户运行实例测试。
 ---
 
 ## 0. GitHub Issue 准入

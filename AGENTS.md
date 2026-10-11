@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Policy-Sync: 2026-10-11.1
+Policy-Sync: 2026-10-11.2
 
 Mandatory rules for AI coding agents working in PI-Desktop.
 
@@ -250,6 +250,13 @@ below remain mandatory for promotion.
 - Stage-one tasks start from latest origin/main and land through main PRs.
   The stage-one integration branch may collect validated task candidates
   for combined acceptance when the user authorizes that integration.
+- Before the first experiment, refresh both stage branches from the main
+  commit containing this policy. Stage-one source tags remain immutable.
+- Before experimental validation or a stage-targeted PR update, refresh the
+  stage branch from current origin/main and incorporate the latest target
+  stage head into the task candidate. Check ancestry against that target
+  with node scripts/check-pr-base-main.mjs --base <latest-stage-head>.
+  R7/latest-main E2E requirements still hold through this refreshed target.
 - Stage-two experiments start from the recorded exploration head, run
   relevant checks and target only that exploration branch when publishing
   is authorized. Record both exploration base and main revision. Check
