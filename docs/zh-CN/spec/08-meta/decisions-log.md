@@ -5357,3 +5357,12 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
 - 由 `apps/desktop/test/session-title-prompt-fallback.test.mjs`、
   `apps/desktop/test/queue-pending-actions.test.mjs`、host-core 的 `derive_session_title`
   单测与 E2E-021a 覆盖。见 ADR 0323。
+
+
+### D656 — Bounded persistence quarantine (2026-10-12; upstream #1565)
+
+Unclassified append failures receive at most five attempts with 5s exponential
+backoff capped at 60s. Quarantined payloads remain in a separate, bounded
+256-entry file and are never replayed automatically. A host-generation change
+permits an immediate retry; session deletion drops queued and quarantined rows.
+The quarantine must be durable before the queued payload is removed.

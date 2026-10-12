@@ -1712,7 +1712,16 @@ no-op against that remapped row. The outbox treats
 `UNIQUE constraint failed: messages.id` as an ack and keeps draining (D444).
 A permanently rejected append whose host error carries a `PERMISSION_DENIED:`
 prefix is likewise dropped so the FIFO can continue; `PLUGIN_PERMISSION_DENIED`
-and other host failures still pause (D597). When the 1024-entry cap remains
+and other host failures still pause while their retry budget lasts (D597). A
+failure the outbox cannot classify is retried within the same host generation
+on a bounded backoff (5s doubling to 60s) and quarantined after five
+consecutive failures into `session-message-outbox.dead-letter.json` (newest 256
+appends, oldest discarded first), carrying its payload, session id, timestamp,
+and host error, so one unclassifiable head cannot starve every session's writes
+(D656). A restarted host is a new generation and retries the head at once.
+Quarantined appends are never replayed automatically, and `session.delete`
+drops that session's quarantined appends too.
+When the 1024-entry cap remains
 full after a flush attempt, enqueue logs the rejected key/session and rejects;
 it does not report that entry as queued. Generic foreign-key errors are not
 treated as acknowledgements. Steering into a claimed collaboration delivery
@@ -1810,3 +1819,16 @@ Task remain separate optional transcript/event fields.
 数据目录迁移重写项目级技能状态的 JSON 键时，继续使用 `normalize_project_path` 的路径格式，保证迁移后仍读取同一启用/禁用状态，并在规范化后拒绝身份冲突。全局状态和原目录保留原样；不改变数据模式。
 
 Windows 重写结构化路径时保留原本的正斜杠存储格式，避免项目和项目记忆键查找失效。冷维护在 Electron ready 前将默认 `sessionData` 指向安装锚点下的 `.storage-maintenance.tmp`；该临时目录由已有维护缓存排除规则保留在迁移范围外，维护窗口仍使用非持久分区。不得初始化或锁住正在复制/清理的 Chromium 数据库。
+
+
+### Remote host registry write protection
+
+`remote-hosts.json` mutations are serialized within the registry. An unreadable
+file rejects writes with `REMOTE_REGISTRY_UNWRITABLE`; an unsupported shape or
+version rejects writes with `REMOTE_REGISTRY_VERSION_UNSUPPORTED`. Malformed
+JSON is renamed to a unique `.corrupt-<timestamp>` recovery file before a new
+registry is written. Reads remain permissive and never mutate the file.
+Existing encrypted device tokens and SSH secrets retain their storage format.
+
+Quarantined outbox payloads are persisted before removal from the queued
+outbox; a quarantine write failure leaves the original queued copy recoverable.

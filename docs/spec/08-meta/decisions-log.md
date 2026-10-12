@@ -7600,3 +7600,12 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - Covered by `apps/desktop/test/session-title-prompt-fallback.test.mjs`,
   `apps/desktop/test/queue-pending-actions.test.mjs`, the host-core
   `derive_session_title` tests, and E2E-021a. See ADR 0323.
+
+
+### D656 — Bounded persistence quarantine (2026-10-12; upstream #1565)
+
+Unclassified append failures receive at most five attempts with 5s exponential
+backoff capped at 60s. Quarantined payloads remain in a separate, bounded
+256-entry file and are never replayed automatically. A host-generation change
+permits an immediate retry; session deletion drops queued and quarantined rows.
+The quarantine must be durable before the queued payload is removed.
