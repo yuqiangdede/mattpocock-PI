@@ -493,7 +493,8 @@ impl UserSkillRegistry {
             .ok_or_else(|| anyhow::anyhow!("SKILL_INVALID: bundle directory missing"))?;
         let mut state = state_from(&directory)?;
         // Preserve the digest/manifest ownership rules of the existing Host.
-        let package = embedded.packages.into_iter().next().expect("validated package");
+        let package = embedded.packages.into_iter().next()
+            .ok_or_else(|| anyhow::anyhow!("SKILL_INVALID: empty embedded bundle"))?;
         let mut files: Vec<_> = package.files.iter()
             .map(|file| (file.path.clone(), file.content.as_bytes().to_vec()))
             .collect();
