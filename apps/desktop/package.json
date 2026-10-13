@@ -81,7 +81,7 @@
   },
   "build": {
     "appId": "net.aiuo.pi-desktop",
-    "productName": "PI-Desktop",
+    "productName": "mattpocock-PI",
     "directories": {
       "output": "release"
     },
@@ -146,7 +146,7 @@
       }
     ],
     "mac": {
-      "artifactName": "PI-Desktop-${version}-${arch}-mac.${ext}",
+      "artifactName": "mattpocock-PI-${version}-${arch}-mac.${ext}",
       "target": [
         {
           "target": "dmg"
@@ -162,8 +162,8 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {
-        "NSLocalNetworkUsageDescription": "PI-Desktop needs local network access so agents can reach OpenAI-compatible providers, Ollama, and other AI endpoints running on your LAN. / PI-Desktop 需要本地网络访问权限，以便助手请求同一局域网中的 OpenAI 兼容服务、Ollama 等本地 AI 端点。",
-        "NSMicrophoneUsageDescription": "PI-Desktop uses the microphone for Live voice calls and authorized plugin audio access. / PI-Desktop 使用麦克风进行实时语音通话，以及你已授权的插件音频访问。",
+        "NSLocalNetworkUsageDescription": "mattpocock-PI needs local network access so agents can reach OpenAI-compatible providers, Ollama, and other AI endpoints running on your LAN. / mattpocock-PI 需要本地网络访问权限，以便助手请求同一局域网中的 OpenAI 兼容服务、Ollama 等本地 AI 端点。",
+        "NSMicrophoneUsageDescription": "mattpocock-PI uses the microphone for Live voice calls and authorized plugin audio access. / mattpocock-PI 使用麦克风进行实时语音通话，以及你已授权的插件音频访问。",
         "NSBonjourServices": [
           "_http._tcp",
           "_https._tcp"
@@ -181,7 +181,7 @@
       ]
     },
     "dmg": {
-      "artifactName": "PI-Desktop-${version}-${arch}.${ext}",
+      "artifactName": "mattpocock-PI-${version}-${arch}.${ext}",
       "background": "build/dmg-background.png",
       "icon": "build/icon.icns",
       "window": {
@@ -204,8 +204,8 @@
       ]
     },
     "win": {
-      "executableName": "PI-Desktop",
-      "artifactName": "PI-Desktop-Portable-${version}.${ext}",
+      "executableName": "mattpocock-PI",
+      "artifactName": "mattpocock-PI-Portable-${version}.${ext}",
       "target": [
         {
           "target": "nsis",
@@ -241,11 +241,11 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "PI-Desktop",
-      "artifactName": "PI-Desktop-Setup-${version}.${ext}"
+      "shortcutName": "mattpocock-PI",
+      "artifactName": "mattpocock-PI-Setup-${version}.${ext}"
     },
     "portable": {
-      "artifactName": "PI-Desktop-Portable-${version}.${ext}"
+      "artifactName": "mattpocock-PI-Portable-${version}.${ext}"
     },
     "deb": {
       "packageName": "pi-desktop",
