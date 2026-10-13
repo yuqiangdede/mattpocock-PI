@@ -7,6 +7,7 @@ import type { ComposerFileReference } from "../chat/composer/model";
 import { getCodingActions, loadCodingActions } from "../extensions/coding-action-state";
 import { CodingActionContextError, executeCodingAction } from "./execute-coding-action";
 import { preparePromptAction } from "./prepare-prompt-action";
+import { visualGrillingDefaultPrompt } from "./visual-grilling-prompt";
 export function useCodingActionLauncher(options: {
   sessionId: string | null | undefined; projectPath: string; blocked: boolean; draftKey: string;
   readLiveDraft: () => string;
@@ -34,6 +35,7 @@ export function useCodingActionLauncher(options: {
         sessionId: owner.sessionId ?? "", projectPath: owner.projectPath, configuration,
         catalog: async () => (await api.composerCommands()).commands, isCurrent: () => current() && !latest.current.blocked,
         defaultPrompt: skillId => {
+          if (skillId === "grill-with-ui") return visualGrillingDefaultPrompt(t("codingActions.visualDiscussion", { defaultValue: "zh-CN" }) === "可视化讨论" ? "zh-CN" : (t("codingActions.askNext", { lng: "zh-CN" }) === t("codingActions.askNext") ? "zh-CN" : "en"));
           const shortcut = ENGINEERING_SHORTCUTS.find(entry => entry.skill === skillId);
           return shortcut ? t(`coding.prompts.${shortcut.action}`) : "";
         },
