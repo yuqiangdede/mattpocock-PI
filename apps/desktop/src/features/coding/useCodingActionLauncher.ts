@@ -7,6 +7,8 @@ import type { ComposerFileReference } from "../chat/composer/model";
 import { getCodingActions, loadCodingActions } from "../extensions/coding-action-state";
 import { CodingActionContextError, executeCodingAction } from "./execute-coding-action";
 import { preparePromptAction } from "./prepare-prompt-action";
+import { INTERACTION_IMAGE_PROMPT_ID, interactionImagePrompt } from "./interaction-image-prompt";
+import { buildCommitCodeDraft } from "./commit-code-draft";
 import { visualGrillingDefaultPrompt } from "./visual-grilling-prompt";
 export function useCodingActionLauncher(options: {
   sessionId: string | null | undefined; projectPath: string; blocked: boolean; draftKey: string;
@@ -54,6 +56,12 @@ export function useCodingActionLauncher(options: {
     if (owner.blocked || inFlight.current) return;
     owner.invalidatePromptEnhancement();
     try {
+      if (id === INTERACTION_IMAGE_PROMPT_ID) {
+        const text = buildCommitCodeDraft(interactionImagePrompt(i18n.resolvedLanguage ?? i18n.language), owner.readLiveDraft());
+        owner.applyEditorDraft(text, owner.fileReferencesRef.current, text.length);
+        setError(null);
+        return;
+      }
       preparePromptAction(id, { configuration: getCodingActions(), commitPrompt: t("codingActions.commitPrompt"),
         readLiveDraft: owner.readLiveDraft,
         applyDraft: text => owner.applyEditorDraft(text, owner.fileReferencesRef.current, text.length),

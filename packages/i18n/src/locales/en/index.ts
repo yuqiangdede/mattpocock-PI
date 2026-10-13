@@ -8,6 +8,8 @@ export const en = {
   noOtherSkills: "No other available skills",
   askNext: "Ask next step", diagnose: "Diagnose bug",
   commitCode: "Commit code",
+  interactionImage: "Interaction image prompt",
+  interactionImageHint: "When to use: After discussing requirements, when you need UI image-generation prompts.\\nExample: Design the alert search panel and ROI selection dialog.",
   promptButtons: "Plain prompt buttons",
   addPrompt: "Add prompt button",
   newPromptLabel: "New prompt",

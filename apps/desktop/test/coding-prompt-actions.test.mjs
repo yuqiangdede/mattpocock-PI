@@ -67,3 +67,15 @@ test("plain selection uses saved custom text and rejects disabled or removed but
   for (const id of ["summary", "deleted"]) assert.throws(() => preparePromptAction(id, options));
   assert.equal(applies, 1);
 });
+
+test("interaction image prompt is a localized, editable, non-executing draft", async () => {
+  const { INTERACTION_IMAGE_PROMPT_ID, interactionImagePrompt } = await import("../src/features/coding/interaction-image-prompt.ts");
+  const { buildCommitCodeDraft } = await import("../src/features/coding/commit-code-draft.ts");
+  assert.equal(INTERACTION_IMAGE_PROMPT_ID, "interaction-image-prompt");
+  const zh = interactionImagePrompt("zh-CN"), en = interactionImagePrompt("en");
+  assert.match(zh, /当前对话/);
+  assert.match(zh, /只生成提示词，不生成图片/);
+  assert.match(zh, /16:9/);
+  assert.match(en, /image-generation prompt/);
+  assert.equal(buildCommitCodeDraft(zh, "现有需求"), zh + "\n\n现有需求");
+});

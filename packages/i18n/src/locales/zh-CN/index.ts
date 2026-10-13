@@ -9,6 +9,8 @@ export const zhCN = {
   noOtherSkills: "暂无其他可用 Skill",
   askNext: "咨询下一步", diagnose: "Bug 排查",
   commitCode: "提交代码",
+  interactionImage: "交互生图",
+  interactionImageHint: "什么时候使用：需求讨论完成，需要生成页面交互效果图提示词时。\\n具体例子：根据预警查询需求生成包含 ROI 框选弹窗的 UI 生图提示词。",
   promptButtons: "纯提示词按钮",
   addPrompt: "添加提示词按钮",
   newPromptLabel: "新提示词",

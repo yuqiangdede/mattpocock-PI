@@ -10,6 +10,7 @@ import { Button, TooltipButton } from "../../components/ui";
 import { AnchoredMenu } from "../../components/settings/AnchoredMenu";
 import { useAppStore } from "../../stores/app-store";
 import { loadCodingActions, useCodingActions } from "../extensions/coding-action-state";
+import { INTERACTION_IMAGE_PROMPT_ID } from "./interaction-image-prompt";
 
 export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onSelectPrompt }: {
   disabled: boolean; error: string | null; onExecute: (actionId: string) => void; onSelectSkill: (skillId: string) => void; onSelectPrompt: (id: string) => void;
@@ -42,6 +43,9 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
     try { resolveCodingAction(action.id, new CodingActionRegistry({ schemaVersion: 1, actions: [action] }), catalog); return ""; }
     catch (cause) { return cause instanceof CodingActionError ? t(`codingActions.${cause.code === "SKILL_MISSING" ? "skillMissing" : cause.code}`, { skillId: action.skillId }) : t("codingActions.executeFailed", { detail: String(cause) }); }
   };
+  const plainActions = codingPromptActions(configuration, t("codingActions.commitCode")).filter(action => action.enabled !== false);
+  // Fixed launcher order is presentation-only: never rewrite user configuration.
+  const orderedPromptActions = [...plainActions.filter(action => action.id === "commit-code"), ...plainActions.filter(action => action.id !== "commit-code")];
   const visualSkillAvailable = !catalogError && catalog.some(command => command.kind === "skill" && command.skillId === "grill-with-ui");
   const renderAction = (shortcut: CodingShortcut, menu = false) => {
     const { action } = shortcut;
@@ -74,7 +78,8 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
     </div>
     <div className="coding-shortcuts coding-shortcuts-secondary">
       <div className="coding-prompt-actions">
-        {codingPromptActions(configuration, t("codingActions.commitCode")).filter(action => action.enabled !== false).map(action =>
+        <Button disabled={disabled} title={t("codingActions.interactionImageHint", { defaultValue: "什么时候使用：需求讨论后，需要页面交互效果图提示词时。\n具体例子：根据预警中心的查询需求生成 UI 生图提示词。" })} onClick={() => onSelectPrompt(INTERACTION_IMAGE_PROMPT_ID)}>{t("codingActions.interactionImage", { defaultValue: "交互生图" })}</Button>
+        {orderedPromptActions.map(action =>
           <Button key={action.id} disabled={disabled} title={action.id === "commit-code" && action.prompt === null ? t("codingActions.commitHint") : t("codingActions.plainPromptHint")} onClick={() => onSelectPrompt(action.id)}>{action.label}</Button>)}
       </div>
     </div>
