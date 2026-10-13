@@ -47,7 +47,7 @@
 .grill-pending, .grill-result { padding: 10px; margin: 10px 0 0; border: 1px solid var(--ds-border-default); border-radius: var(--radius-sm); }
 .grill-pending { color: var(--ds-text-secondary); font-size: var(--text-sm); }
 .grill-result { overflow-wrap: anywhere; white-space: pre-wrap; }
-.grill-error { color: var(--ds-text-danger); margin: 8px 0 0; font-size: var(--text-sm); }
+.grill-error { color: var(--ds-error); margin: 8px 0 0; font-size: var(--text-sm); }
 @media (max-width: 760px) {
   .grill-dialog { width: 98vw; height: 95dvh; padding: 10px; }
   .grill-columns { grid-template-columns: 1fr; grid-template-rows: minmax(150px, 1fr) minmax(200px, 1fr); }
