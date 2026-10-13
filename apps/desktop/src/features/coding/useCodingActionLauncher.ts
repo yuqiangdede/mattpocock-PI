@@ -15,7 +15,7 @@ export function useCodingActionLauncher(options: {
   fileReferencesRef: { current: ComposerFileReference[] };
   applyEditorDraft: (text: string, references: ComposerFileReference[], caret: number) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const latest = useRef(options); latest.current = options;
   const generation = useRef(0), inFlight = useRef(false);
   const [pending, setPending] = useState(false), [error, setError] = useState<string | null>(null);
@@ -35,7 +35,7 @@ export function useCodingActionLauncher(options: {
         sessionId: owner.sessionId ?? "", projectPath: owner.projectPath, configuration,
         catalog: async () => (await api.composerCommands()).commands, isCurrent: () => current() && !latest.current.blocked,
         defaultPrompt: skillId => {
-          if (skillId === "grill-with-ui") return visualGrillingDefaultPrompt(t("codingActions.visualDiscussion", { defaultValue: "zh-CN" }) === "可视化讨论" ? "zh-CN" : (t("codingActions.askNext", { lng: "zh-CN" }) === t("codingActions.askNext") ? "zh-CN" : "en"));
+          if (skillId === "grill-with-ui") return visualGrillingDefaultPrompt(i18n.resolvedLanguage ?? i18n.language);
           const shortcut = ENGINEERING_SHORTCUTS.find(entry => entry.skill === skillId);
           return shortcut ? t(`coding.prompts.${shortcut.action}`) : "";
         },
