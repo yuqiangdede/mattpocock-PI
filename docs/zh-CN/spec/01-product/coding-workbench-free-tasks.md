@@ -71,6 +71,7 @@ including prior markers; ordinary slash processing resolves those mentions.
 | --- | --- |
 | Initialize | `setup-matt-pocock-skills` |
 | Discuss requirements | `grill-with-docs` |
+| Visual discussion (dropdown) | `grill-with-ui` |
 | Form specification | `to-spec` |
 | Split tickets | `to-tickets` |
 | Implement | `implement` |
@@ -206,3 +207,12 @@ the corresponding skill and closes the menu without changing the primary action.
 Escape and outside clicks dismiss the menu; disabling the Composer closes it.
 The group wraps as one unit at narrow widths. Existing draft and manual-send
 semantics remain unchanged.
+
+## Stage 1 visual discussion addition (2026-10-13)
+
+The Requirements Discussion main button remains `grill-with-docs`; its dropdown
+adds `grill-with-ui`, which is shipped offline with the app and installed by Host
+for fresh and upgraded profiles. Selecting this mode prepares an editable draft
+and requires manual Send. Node.js 20+ and a functioning Pi Agent event listener
+are required for the browser round-trip. The Composer no longer displays the
+Coding Actions configuration button; configure Actions in Settings.
