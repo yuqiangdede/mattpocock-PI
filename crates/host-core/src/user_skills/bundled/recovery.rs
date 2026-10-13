@@ -91,6 +91,13 @@ impl UserSkillRegistry {
         for (id, installed) in &current.packages {
             let path = package_destination(&self.bundled_root, &installed.directory)?;
             ensure_no_symlink_path(&self.bundled_root, &path)?;
+            // A Matt Pocock backup must not roll back the independent UI Skill,
+            // even if the backup predates its addition to an existing profile.
+            if id == EMBEDDED_GRILL_ID {
+                restored.packages.insert(id.clone(), installed.clone());
+                result.preserved.push(id.clone());
+                continue;
+            }
             if files_digest(&directory, &installed.directory)?.as_deref() != Some(&installed.digest)
             {
                 restored.packages.insert(id.clone(), installed.clone());
