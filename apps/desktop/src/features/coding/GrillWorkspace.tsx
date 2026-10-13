@@ -99,7 +99,7 @@ export function GrillWorkspaceContent({ sessionId, onClose }: { sessionId: strin
     const operation = state.pending;
     const seen = latestReply(messages, operation);
     if (seen) {
-      setState(s => s?.pending?.id === operation.id ? applyGrillReply(s, seen) : s);
+      setState(s => s && s.pending?.id === operation.id ? applyGrillReply(s, seen) : s);
       setError(""); setInvalid(false);
       return;
     }
@@ -112,14 +112,20 @@ export function GrillWorkspaceContent({ sessionId, onClose }: { sessionId: strin
         const rows = result.session?.messages ?? [];
         const reply = latestReply(rows, operation);
         if (reply) {
-          setState(s => s?.pending?.id === operation.id ? applyGrillReply(s, reply) : s);
+          setState(s => s && s.pending?.id === operation.id ? applyGrillReply(s, reply) : s);
           setError(""); setInvalid(false);
           return;
         }
         // Only a completed answer to our own user turn can be called invalid.
         // An unrelated assistant message must not fail a queued action.
-        const index = rows.findLastIndex(m => m.role === "user" && typeof m.content === "string" &&
-          m.content.includes(operation.id));
+        let index = -1;
+        for (let i = rows.length - 1; i >= 0; i--) {
+          const message = rows[i];
+          if (message.role === "user" && message.content.includes(operation.id)) {
+            index = i;
+            break;
+          }
+        }
         if (!isRunning && index >= 0 &&
           rows.slice(index + 1).some(m => m.role === "assistant" && m.status === "complete")) {
           setInvalid(true);
