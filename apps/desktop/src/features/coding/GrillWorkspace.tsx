@@ -70,10 +70,10 @@ export function GrillWorkspaceContent({ sessionId, onClose }: { sessionId: strin
   const [threadInput, setThreadInput] = useState("");
   const [error, setError] = useState("");
   const [invalid, setInvalid] = useState(false);
-  const [checking, setChecking] = useState(false);
   const [tick, setTick] = useState(0);
   const [persistError, setPersistError] = useState(false);
   const inflight = useRef(false);
+  const readingHost = useRef(false);
   const frame = useRef<HTMLDivElement>(null);
   const canSend = activeSessionId === sessionId;
   const current = state?.questions.find(q => q.id === state.selectedId) ?? null;
@@ -95,34 +95,37 @@ export function GrillWorkspaceContent({ sessionId, onClose }: { sessionId: strin
     return () => window.clearInterval(timer);
   }, [state?.pending?.id]);
   useEffect(() => {
-    if (!state?.pending || checking || invalid) return;
+    if (!state?.pending || invalid) return;
     const operation = state.pending;
     const seen = latestReply(messages, operation);
     if (seen) {
-      setState(s => s ? applyGrillReply(s, seen) : s);
+      setState(s => s?.pending?.id === operation.id ? applyGrillReply(s, seen) : s);
       setError(""); setInvalid(false);
       return;
     }
-    // Historical sessions and renderer restarts may not have the latest
-    // message loaded; read the Host-owned transcript, never a browser event file.
-    let active = true;
-    setChecking(true);
+    if (readingHost.current) return;
+    // Poll the Host transcript, not an orphaned browser subprocess.
+    // A request can survive closing and reopening this workspace.
+    readingHost.current = true;
     void api.getSession(sessionId, { messageLimit: 120, contentLimit: 65_536 })
       .then(result => {
-        if (!active) return;
         const rows = result.session?.messages ?? [];
         const reply = latestReply(rows, operation);
         if (reply) {
-          setState(s => s ? applyGrillReply(s, reply) : s);
+          setState(s => s?.pending?.id === operation.id ? applyGrillReply(s, reply) : s);
           setError(""); setInvalid(false);
-        } else if (!isRunning && rows.some(m => m.role === "assistant" && Boolean(m.createdAt) &&
-          Date.parse(m.createdAt) > Date.parse(operation.submittedAt) && m.status === "complete")) {
+          return;
+        }
+        // Only a completed answer to our own user turn can be called invalid.
+        // An unrelated assistant message must not fail a queued action.
+        const index = rows.findLastIndex(m => m.role === "user" && typeof m.content === "string" &&
+          m.content.includes(operation.id));
+        if (!isRunning && index >= 0 &&
+          rows.slice(index + 1).some(m => m.role === "assistant" && m.status === "complete")) {
           setInvalid(true);
         }
-      }).catch(err => {
-        if (active) setError(String(err));
-      }).finally(() => { if (active) setChecking(false); });
-    return () => { active = false; };
+      }).catch(err => setError(String(err)))
+      .finally(() => { readingHost.current = false; });
   }, [tick, state?.pending?.id, messages, isRunning, sessionId, invalid]);
 
   const submitOperation = async (basis: GrillState, kind: GrillOperation["kind"], text = "", questionId?: string) => {
