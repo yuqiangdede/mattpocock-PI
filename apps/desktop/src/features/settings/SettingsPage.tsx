@@ -581,7 +581,7 @@ export function SettingsPage() {
                 <SettingsRow title={t("settings.application")}>
                   <div className="settings-about-meta">
                     <div className="font-medium">
-                      {version?.name || "mattpocock-PI"} {version?.version}
+                      {"mattpocock-PI"} {version?.version}
                     </div>
                     <div className="font-mono text-xs-plus text-text-muted">
                       protocol {version?.protocolVersion} · host {version?.hostVersion}
