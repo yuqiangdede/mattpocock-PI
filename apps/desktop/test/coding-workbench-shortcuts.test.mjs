@@ -33,6 +33,8 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
   assert.ok(html.includes("Discussion modes"), "requirements discussion exposes the mode dropdown");
   assert.ok(html.includes("coding-requirements-split"));
   assert.ok(html.includes(en.codingActions.commitCode));
+  assert.ok(html.includes(en.codingActions.interactionImage));
+  assert.ok(html.indexOf(`>${en.codingActions.interactionImage}</button>`) < html.indexOf(`>${en.codingActions.commitCode}</button>`), "image prompt is first, commit code second");
   assert.ok(html.includes("coding-prompt-actions"));
   assert.ok(html.indexOf(en.codingActions.diagnose) < html.indexOf(en.codingActions.more), "More follows Diagnose in the primary Skill row");
   assert.ok(html.indexOf(en.codingActions.more) < html.indexOf(en.codingActions.commitCode), "Commit code remains in the second row");
@@ -60,7 +62,10 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
     { disabled: false, error: null, onExecute() {}, onSelectSkill() {}, onSelectPrompt() {} })));
   const secondary = customized.slice(customized.indexOf('class="coding-shortcuts coding-shortcuts-secondary"'));
   assert.ok(secondary.includes("My commit"));
+  assert.ok(secondary.includes(en.codingActions.interactionImage));
+  assert.ok(secondary.indexOf(`>${en.codingActions.interactionImage}</button>`) < secondary.indexOf(">My commit</button>"), "preserve first and second positions with saved config");
   assert.ok(secondary.includes("My summary"));
+  assert.ok(secondary.indexOf(">My commit</button>") < secondary.indexOf(">My summary</button>"), "custom actions follow commit");
   assert.ok(!secondary.includes("Hidden prompt"));
   assert.ok(!secondary.includes("aria-haspopup"), "More stays in the Skill row");
   assert.match(secondary, /<button[^>]*>My commit<\/button>/);
