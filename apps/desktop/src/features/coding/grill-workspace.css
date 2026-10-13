@@ -1,0 +1,55 @@
+/* Native interview workspace. Uses the existing desktop design tokens. */
+.grill-overlay { z-index: 1100; padding: 18px; }
+.grill-dialog {
+  display: flex; flex-direction: column; gap: 0;
+  width: min(1100px, 96vw); height: min(760px, 93dvh); min-height: 420px;
+  max-width: none; max-height: none; overflow: hidden;
+  border: 1px solid var(--ds-border-default); border-radius: var(--radius-md);
+  background: var(--ds-bg-primary); color: var(--ds-text-primary);
+  box-shadow: var(--ds-shadow-composer); padding: 16px;
+}
+.grill-dialog:focus { outline: none; }
+.grill-header, .grill-meta, .grill-meta-actions, .grill-answer-actions, .grill-pending {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.grill-header { padding-bottom: 12px; border-bottom: 1px solid var(--ds-border-default); }
+.grill-header h2 { margin: 0 0 4px; font-size: var(--text-lg); }
+.grill-header p { margin: 0; color: var(--ds-text-secondary); overflow-wrap: anywhere; font-size: var(--text-sm); }
+.grill-start { margin: auto; display: flex; flex-direction: column; gap: 12px; width: min(580px, 100%); }
+.grill-meta { padding: 10px 0; color: var(--ds-text-secondary); font-size: var(--text-sm); }
+.grill-columns { display: grid; grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr); gap: 12px; flex: 1; min-height: 0; }
+.grill-questions, .grill-thread {
+  display: flex; flex-direction: column; min-width: 0; min-height: 0;
+  border: 1px solid var(--ds-border-default); border-radius: var(--radius-md);
+}
+.grill-question-nav { display: flex; flex-wrap: wrap; gap: 4px; padding: 10px; border-bottom: 1px solid var(--ds-border-default); max-height: 110px; overflow-y: auto; }
+.grill-question-nav .btn { text-align: start; font-weight: normal; max-width: 100%; overflow-wrap: anywhere; }
+.grill-question-detail { padding: 14px; overflow-y: auto; flex: 1; min-height: 0; }
+.grill-question-detail h3, .grill-thread h3 { margin: 0 0 12px; font-size: var(--text-md); }
+.grill-question-detail > p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.55; }
+.grill-options { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+.grill-options .btn { white-space: normal; text-align: start; height: auto; min-height: 38px; justify-content: flex-start; padding-block: 10px; overflow-wrap: anywhere; }
+.grill-recommend { border: 1px solid var(--ds-border-default); border-radius: var(--radius-sm); padding: 10px; color: var(--ds-text-secondary); }
+.grill-recommend strong { color: var(--ds-text-primary); }
+.grill-recommend p { white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0 0; }
+.grill-answer-actions { justify-content: flex-end; padding: 12px 0; }
+.grill-empty { padding: 18px; color: var(--ds-text-secondary); }
+.grill-thread { padding: 12px; }
+.grill-thread-log { flex: 1; overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+.grill-thread-entry { padding: 10px; background: var(--ds-bg-secondary); border-radius: var(--radius-sm); overflow-wrap: anywhere; }
+.grill-thread-entry.user { margin-left: 16px; }
+.grill-thread-entry.agent { margin-right: 16px; border: 1px solid var(--ds-border-default); }
+.grill-thread-entry > span { display: block; color: var(--ds-text-secondary); font-size: var(--text-xs); margin-bottom: 4px; }
+.grill-thread-entry p { margin: 0; white-space: pre-wrap; line-height: 1.5; }
+.grill-thread-note { margin: 8px 0; color: var(--ds-text-secondary); font-size: var(--text-xs); }
+.grill-thread form { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.grill-thread textarea { width: 100%; resize: vertical; min-height: 68px; }
+.grill-pending, .grill-result { padding: 10px; margin: 10px 0 0; border: 1px solid var(--ds-border-default); border-radius: var(--radius-sm); }
+.grill-pending { color: var(--ds-text-secondary); font-size: var(--text-sm); }
+.grill-result { overflow-wrap: anywhere; white-space: pre-wrap; }
+.grill-error { color: var(--ds-text-danger); margin: 8px 0 0; font-size: var(--text-sm); }
+@media (max-width: 760px) {
+  .grill-dialog { width: 98vw; height: 95dvh; padding: 10px; }
+  .grill-columns { grid-template-columns: 1fr; grid-template-rows: minmax(150px, 1fr) minmax(200px, 1fr); }
+  .grill-meta { flex-wrap: wrap; }
+}
