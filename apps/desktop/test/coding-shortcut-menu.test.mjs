@@ -8,6 +8,15 @@ const { codingShortcutMenu } = await import("../src/features/coding/coding-short
 const labels = { ask: "咨询下一步", diagnose: "Bug 排查" };
 const skill = skillId => ({ name: skillId, kind: "skill", skillId, title: skillId });
 
+test("Bundled visual discussion Skill is available as a complete package", () => {
+  const bundle = JSON.parse(readFileSync(new URL("../../../crates/host-core/resources/workflow-skills.json", import.meta.url), "utf8"));
+  const skillPackage = bundle.packages.find(entry => entry.id === "grill-with-ui");
+  assert.ok(skillPackage);
+  assert.deepEqual(new Set(skillPackage.files.map(file => file.path)), new Set(["SKILL.md", "server.mjs", "page.html", "LICENSE"]));
+  assert.match(skillPackage.files.find(file => file.path === "SKILL.md").content, /name: grill-with-ui/);
+  assert.match(skillPackage.files.find(file => file.path === "server.mjs").content, /events.jsonl/);
+});
+
 test("Initialize leads Ask next step and stays out of More without rewriting saved actions", () => {
   const configuration = createDefaultCodingActions();
   const original = structuredClone(configuration);

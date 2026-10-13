@@ -191,10 +191,11 @@ fn shipped_bundle_is_complete_and_restarts_preserve_disable_edit_and_delete() {
     crate::agent_capabilities::test_support::with_global_agents(&dir.path().join("agents"), || {
         let mut registry = UserSkillRegistry::new(dir.path());
         let first = registry.ensure_bundled().unwrap();
-        assert_eq!(first.updated.len(), 37);
+        assert_eq!(first.updated.len(), 38);
         let records = registry.list(CapabilityLevel::Global, None).unwrap();
         for id in [
             "grill-with-docs",
+            "grill-with-ui",
             "to-spec",
             "to-tickets",
             "implement",
@@ -217,6 +218,10 @@ fn shipped_bundle_is_complete_and_restarts_preserve_disable_edit_and_delete() {
             .unwrap()
             .iter()
             .any(|(path, _)| path == "mocking.md"));
+        let visual_files = registry.package_files("grill-with-ui", CapabilityLevel::Global, None).unwrap();
+        for required in ["SKILL.md", "server.mjs", "page.html", "LICENSE"] {
+            assert!(visual_files.iter().any(|(path, _)| path == required), "missing {required}");
+        }
         registry
             .set_enabled("retro", false, Some(CapabilityLevel::Global), None)
             .unwrap();
