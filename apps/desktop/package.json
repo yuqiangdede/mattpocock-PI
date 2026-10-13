@@ -125,6 +125,10 @@
         "to": "licenses/matt-pocock-skills-LICENSE"
       },
       {
+        "from": "../../crates/host-core/resources/grill-with-ui-LICENSE",
+        "to": "licenses/grill-with-ui-LICENSE"
+      },
+      {
         "from": "build/icon.png",
         "to": "tray-icon.png"
       },
