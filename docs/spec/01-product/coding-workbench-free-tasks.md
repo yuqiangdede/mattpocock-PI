@@ -71,6 +71,7 @@ including prior markers; ordinary slash processing resolves those mentions.
 | --- | --- |
 | Initialize | `setup-matt-pocock-skills` |
 | Discuss requirements | `grill-with-docs` |
+| Visual discussion (dropdown) | `grill-with-ui` |
 | Form specification | `to-spec` |
 | Split tickets | `to-tickets` |
 | Implement | `implement` |
@@ -93,7 +94,7 @@ as Claude Code.
 The shortcuts use two separate wrapping rows. The first row is Initialize,
 Ask next step, the first six other enabled configured actions, and Diagnose bug,
 in that order.
-The first row ends with Diagnose bug followed immediately by More, so all Skill controls stay together. The second row holds Coding Actions configuration and right-aligned plain prompt buttons. The default Commit code button prepares an editable, localized build-then-commit prompt with no Skill dependency. It preserves existing Composer text and attachments; only manual Send executes the prompt. Git (including GitLab hosting) and SVN are supported by the default instruction; failed verification forbids commit and Git Push is excluded. The Engineering Workflow entry is no longer exposed.
+The first row ends with Diagnose bug followed immediately by More, so all Skill controls stay together. The Requirements Discussion split button keeps `grill-with-docs` as its main action and offers `grill-with-ui` as Visual discussion in a dropdown. Selection prepares an editable Skill draft; it never launches a browser or submits a turn until the user presses Send. The visual choice is disabled with installation guidance only when its Skill is unavailable in the catalog. The second row holds right-aligned plain prompt buttons; Coding Actions configuration is available through Settings rather than a Composer button. The default Commit code button prepares an editable, localized build-then-commit prompt with no Skill dependency. It preserves existing Composer text and attachments; only manual Send executes the prompt. Git (including GitLab hosting) and SVN are supported by the default instruction; failed verification forbids commit and Git Push is excluded. The Engineering Workflow entry is no longer exposed.
 
 Extensions > Coding Actions includes a separate Plain prompt buttons editor.
 Names, instructions, enabled state and order are editable; buttons can be added
