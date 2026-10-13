@@ -19,6 +19,7 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
   const sessionId = useAppStore(state => state.activeSessionId);
   const { configuration, diagnostic } = useCodingActions();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [discussionOpen, setDiscussionOpen] = useState(false);
   const [taskGraphOpen, setTaskGraphOpen] = useState(false);
   const workbenchRef = useRef<HTMLElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
@@ -32,7 +33,7 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
     return () => { active = false; };
   }, [projectPath, sessionId, configuration, catalogVersion]);
   useEffect(() => { void loadCodingActions(); }, []);
-  useEffect(() => { if (disabled) setMoreOpen(false); }, [disabled]);
+  useEffect(() => { if (disabled) { setMoreOpen(false); setDiscussionOpen(false); } }, [disabled]);
   const { primary, more } = codingShortcutMenu(configuration, catalog, { ask: t("codingActions.askNext"), diagnose: t("codingActions.diagnose"), skillLabels: Object.fromEntries(ENGINEERING_SHORTCUTS.map(entry => [entry.action, t(`coding.${entry.action}`)])) });
   const actions = [...primary, ...more];
   const reason = ({ action }: CodingShortcut) => {
@@ -41,10 +42,20 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
     try { resolveCodingAction(action.id, new CodingActionRegistry({ schemaVersion: 1, actions: [action] }), catalog); return ""; }
     catch (cause) { return cause instanceof CodingActionError ? t(`codingActions.${cause.code === "SKILL_MISSING" ? "skillMissing" : cause.code}`, { skillId: action.skillId }) : t("codingActions.executeFailed", { detail: String(cause) }); }
   };
+  const visualSkillAvailable = !catalogError && catalog.some(command => command.kind === "skill" && command.skillId === "grill-with-ui");
   const renderAction = (shortcut: CodingShortcut, menu = false) => {
     const { action } = shortcut;
     const unavailable = reason(shortcut);
     const note = unavailable || codingShortcutTooltip(shortcut, catalog, t);
+    if (!menu && action.skillId === "grill-with-docs") return <div key={action.id} className="coding-requirements-split">
+      <TooltipButton disabled={disabled || Boolean(unavailable)} className="btn btn-secondary" ariaLabel={action.label} tooltip={note} onClick={() => { setDiscussionOpen(false); activateCodingShortcut(shortcut, { openTaskGraph: () => setTaskGraphOpen(true), execute: onExecute, selectSkill: onSelectSkill }); }}>{action.label}</TooltipButton>
+      <AnchoredMenu open={discussionOpen} onClose={() => setDiscussionOpen(false)} role="menu" side="top" label={action.label} menuClassName="context-menu coding-more-menu"
+        trigger={ref => <Button ref={ref} variant="secondary" disabled={disabled} aria-label={t("codingActions.visualDiscussionMenu", { defaultValue: "Discussion modes" })} aria-haspopup="menu" aria-expanded={discussionOpen} onClick={() => { setMoreOpen(false); setDiscussionOpen(value => !value); }}>▾</Button>}>
+        <Button variant="ghost" className="context-menu-item" role="menuitem" disabled={disabled || Boolean(unavailable)} onClick={() => { setDiscussionOpen(false); activateCodingShortcut(shortcut, { openTaskGraph: () => setTaskGraphOpen(true), execute: onExecute, selectSkill: onSelectSkill }); }}>{action.label}</Button>
+        <Button variant="ghost" className="context-menu-item" role="menuitem" disabled={disabled || !visualSkillAvailable} title={!visualSkillAvailable ? "Install the grill-with-ui Skill to enable this mode" : undefined} onClick={() => { setDiscussionOpen(false); onSelectSkill("grill-with-ui"); }}>{t("codingActions.visualDiscussion", { defaultValue: "可视化讨论" })}</Button>
+        {!visualSkillAvailable && <div className="coding-menu-group-label" role="status">{t("codingActions.visualDiscussionMissing", { defaultValue: "Install grill-with-ui in Skills first" })}</div>}
+      </AnchoredMenu>
+    </div>;
     return <TooltipButton key={action.id} disabled={(disabled && action.skillId !== "implement-spec") || Boolean(unavailable)} className={menu ? "btn btn-ghost context-menu-item" : "btn btn-secondary"}
       role={menu ? "menuitem" : undefined} ariaLabel={action.label} tooltip={note} aria-description={note}
       tooltipClassName="ui-tooltip-help coding-skill-tooltip" onClick={event => { if (action.skillId === "implement-spec") returnFocusRef.current = menu ? workbenchRef.current?.querySelector<HTMLButtonElement>(`button[aria-haspopup="menu"]`) ?? null : event.currentTarget; setMoreOpen(false); activateCodingShortcut(shortcut, { openTaskGraph: () => setTaskGraphOpen(true), execute: onExecute, selectSkill: onSelectSkill }); }}>{action.label}</TooltipButton>;
@@ -62,7 +73,6 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
       </AnchoredMenu>
     </div>
     <div className="coding-shortcuts coding-shortcuts-secondary">
-      <Button variant="ghost" onClick={configure}>{t("codingActions.configure")}</Button>
       <div className="coding-prompt-actions">
         {codingPromptActions(configuration, t("codingActions.commitCode")).filter(action => action.enabled !== false).map(action =>
           <Button key={action.id} disabled={disabled} title={action.id === "commit-code" && action.prompt === null ? t("codingActions.commitHint") : t("codingActions.plainPromptHint")} onClick={() => onSelectPrompt(action.id)}>{action.label}</Button>)}
