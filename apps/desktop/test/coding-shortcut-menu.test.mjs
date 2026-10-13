@@ -8,6 +8,18 @@ const { codingShortcutMenu } = await import("../src/features/coding/coding-short
 const labels = { ask: "咨询下一步", diagnose: "Bug 排查" };
 const skill = skillId => ({ name: skillId, kind: "skill", skillId, title: skillId });
 
+test("Visual grilling default prompt carries interview, recovery and non-invasive rules", async () => {
+  const { visualGrillingDefaultPrompt } = await import("../src/features/coding/visual-grilling-prompt.ts");
+  const zh = visualGrillingDefaultPrompt("zh-CN");
+  assert.match(zh, /grill-with-ui/);
+  assert.match(zh, /事件监听与断点恢复/);
+  assert.match(zh, /不要直接修改业务代码/);
+  const en = visualGrillingDefaultPrompt("en");
+  assert.match(en, /grill-with-ui/);
+  assert.match(en, /listener/);
+  assert.notEqual(zh, en);
+});
+
 test("Bundled visual discussion Skill is available as a complete package", () => {
   const bundle = JSON.parse(readFileSync(new URL("../../../crates/host-core/resources/workflow-skills.json", import.meta.url), "utf8"));
   const skillPackage = bundle.packages.find(entry => entry.id === "grill-with-ui");
