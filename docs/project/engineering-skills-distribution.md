@@ -6,8 +6,11 @@ Status: Implementation candidate; installer qualification is recorded separately
 
 Install PI-Desktop, configure a model, and use Matt Pocock engineering skills
 without a separate skill installer or a developer-machine skills directory.
-The shipped catalog contains all 37 skills and their 102 companion files,
-including the six Workflow skills and their auxiliary dependencies.
+The shipped Matt Pocock catalog contains all 37 skills and their 102 companion
+files, including the six Workflow skills and their auxiliary dependencies.
+One additional third-party skill, `grill-with-ui`, ships as a separate pinned
+first-party fallback including `SKILL.md`, `server.mjs`, `page.html`,
+`visual-brief.md`, documentation and its MIT license.
 
 The default Settings > Agent > Skills list and empty slash-suggestion list expose six
 skill entries: grill-with-docs, to-spec, to-tickets, implement, code-review and
@@ -21,7 +24,10 @@ The Rust Host ships the offline bundle inside its executable and installs it
 under the selected application profile. Existing global/project skills take
 precedence over the shipped fallback. The ordinary skill controls can disable,
 edit or remove an installed skill. Startup never re-enables, overwrites or
-reinstalls a removed skill after initial installation.
+reinstalls a removed skill after initial installation. When upgrading an older
+profile, Host adds `grill-with-ui` once without resetting the installed Matt
+revision, existing overrides or activation state. A removed `grill-with-ui`
+retains its manifest tombstone and is not reinstalled at subsequent startup.
 
 Settings offers automatic detection with manual installation (the default)
 and fully manual detection and installation. The default checks at startup
@@ -51,14 +57,31 @@ The initial bundle records upstream revision
 It preserves the locally maintained ask-matt, implement-spec and retro variants
 in this first distribution; explicit upstream updates can replace unedited
 bundled variants. The separately installed Codex skills are not modified.
-The upstream MIT license is included in the Windows package.
+The upstream MIT license is included in the Windows package. The independently
+maintained `grill-with-ui` is pinned to upstream commit
+`c8f699d3dd99eaf7af168e21acb355184a354f1b` under its own MIT license.
+Matt Pocock upstream updates and bundle restoration preserve this package,
+including local edits or removal; they do not replace it with unknown upstream
+content. Updating `grill-with-ui` requires an explicit app bundle update.
+
+`grill-with-ui` needs an available Node.js 20+ runtime and a live Agent listener
+(persistent Monitor or wait mode) to process browser submissions. Bundling the
+Skill does not bundle a standalone Node executable or guarantee Pi's listener
+stays alive across turns. The launcher prepares a normal editable Skill draft;
+opening the browser and processing its events happens only after the user sends
+that draft and the agent follows `SKILL.md`. Runtime integration must be
+validated against an installed Desktop before declaring this feature accepted.
 
 ## Acceptance
 
 - A fresh packaged Desktop, with an empty agents directory and isolated profile,
   installs the full catalog offline and exposes enabled definitions.
-- The default native skill view shows exactly six entries; Show all and search
-  expose auxiliary skills, and `/tdd` remains callable.
+- The default native skill view shows exactly six Matt Workflow entries; Show
+  all and search expose `grill-with-ui` and auxiliary skills, and `/tdd` remains callable.
+- The requirements discussion dropdown can resolve `grill-with-ui` offline
+  after fresh installation and after upgrading an existing profile.
+- The bundled Node server can serve its page, accept a Send and replay the
+  persisted event; actual Pi listener/resume behavior requires manual E2E.
 - Workflow Discovery loads the shipped grill-with-docs through the real Skill
   path after model configuration, retaining normal explicit acceptance rules.
 - Restart retains identities, disabled state, edited content and removal.
