@@ -85,7 +85,13 @@ test("the pinned grill-with-ui bundle is complete and serves a real offline conv
     run(["patch", "--session", session], JSON.stringify({ agent: { handled: 1, status: "waiting" } }));
     assert.equal(run(["pending", "--session", session]), "");
   } finally {
-    if (child?.pid) child.kill();
+    if (child?.pid && child.exitCode === null) {
+      await new Promise(resolve => {
+        const timeout = setTimeout(resolve, 2000);
+        child.once("close", () => { clearTimeout(timeout); resolve(); });
+        child.kill();
+      });
+    }
     rmSync(dir, { recursive: true, force: true });
   }
 });
