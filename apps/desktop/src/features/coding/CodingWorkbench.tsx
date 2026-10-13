@@ -11,6 +11,7 @@ import { AnchoredMenu } from "../../components/settings/AnchoredMenu";
 import { useAppStore } from "../../stores/app-store";
 import { loadCodingActions, useCodingActions } from "../extensions/coding-action-state";
 import { INTERACTION_IMAGE_PROMPT_ID } from "./interaction-image-prompt";
+import { GrillWorkspace } from "./GrillWorkspace";
 
 export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onSelectPrompt }: {
   disabled: boolean; error: string | null; onExecute: (actionId: string) => void; onSelectSkill: (skillId: string) => void; onSelectPrompt: (id: string) => void;
@@ -21,6 +22,7 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
   const { configuration, diagnostic } = useCodingActions();
   const [moreOpen, setMoreOpen] = useState(false);
   const [discussionOpen, setDiscussionOpen] = useState(false);
+  const [nativeGrillOpen, setNativeGrillOpen] = useState(false);
   const [taskGraphOpen, setTaskGraphOpen] = useState(false);
   const workbenchRef = useRef<HTMLElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
@@ -54,9 +56,10 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
     if (!menu && action.skillId === "grill-with-docs") return <div key={action.id} className="coding-requirements-split">
       <TooltipButton disabled={disabled || Boolean(unavailable)} className="btn btn-secondary" ariaLabel={action.label} tooltip={note} onClick={() => { setDiscussionOpen(false); activateCodingShortcut(shortcut, { openTaskGraph: () => setTaskGraphOpen(true), execute: onExecute, selectSkill: onSelectSkill }); }}>{action.label}</TooltipButton>
       <AnchoredMenu open={discussionOpen} onClose={() => setDiscussionOpen(false)} role="menu" side="top" label={action.label} menuClassName="context-menu coding-more-menu"
-        trigger={ref => <Button ref={ref} variant="secondary" disabled={disabled} aria-label={t("codingActions.visualDiscussionMenu", { defaultValue: "Discussion modes" })} aria-haspopup="menu" aria-expanded={discussionOpen} onClick={() => { setMoreOpen(false); setDiscussionOpen(value => !value); }}>▾</Button>}>
+        trigger={ref => <Button ref={ref} variant="secondary" disabled={!sessionId} aria-label={t("codingActions.visualDiscussionMenu", { defaultValue: "Discussion modes" })} aria-haspopup="menu" aria-expanded={discussionOpen} onClick={() => { setMoreOpen(false); setDiscussionOpen(value => !value); }}>▾</Button>}>
         <Button variant="ghost" className="context-menu-item" role="menuitem" disabled={disabled || Boolean(unavailable)} onClick={() => { setDiscussionOpen(false); activateCodingShortcut(shortcut, { openTaskGraph: () => setTaskGraphOpen(true), execute: onExecute, selectSkill: onSelectSkill }); }}>{action.label}</Button>
-        <Button variant="ghost" className="context-menu-item" role="menuitem" disabled={disabled || !visualSkillAvailable} title={!visualSkillAvailable ? "Install the grill-with-ui Skill to enable this mode" : undefined} onClick={() => { setDiscussionOpen(false); onSelectSkill("grill-with-ui"); }}>{t("codingActions.visualDiscussion", { defaultValue: "可视化讨论" })}</Button>
+        <Button variant="ghost" className="context-menu-item" role="menuitem" disabled={!sessionId} onClick={() => { setDiscussionOpen(false); setNativeGrillOpen(true); }}>{t("codingActions.visualDiscussion", { defaultValue: "可视化讨论" })}</Button>
+        <Button variant="ghost" className="context-menu-item" role="menuitem" disabled={disabled || !visualSkillAvailable} title={!visualSkillAvailable ? "Install the grill-with-ui Skill to enable this mode" : undefined} onClick={() => { setDiscussionOpen(false); onSelectSkill("grill-with-ui"); }}>{t("codingActions.visualDiscussionBrowser", { defaultValue: "浏览器模式（原 Skill）" })}</Button>
         {!visualSkillAvailable && <div className="coding-menu-group-label" role="status">{t("codingActions.visualDiscussionMissing", { defaultValue: "Install grill-with-ui in Skills first" })}</div>}
       </AnchoredMenu>
     </div>;
@@ -86,5 +89,6 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
     {actions.some(action => reason(action)) && <div role="status">{actions.filter(action => reason(action)).map(shortcut => `${shortcut.action.label}：${reason(shortcut)}`).join("；")}<Button onClick={() => setCatalogVersion(value => value + 1)}>{t("codingActions.recheck")}</Button></div>}
     {(error || diagnostic) && <div className="coding-shortcut-error" role="alert"><span>{error || t("codingActions.diagnostic", { detail: diagnostic })}</span><Button onClick={configure}>{t("codingActions.configure")}</Button></div>}
     {taskGraphOpen && <TaskGraphViewer onClose={() => setTaskGraphOpen(false)} returnFocus={returnFocusRef.current} />}
+    {nativeGrillOpen && sessionId && <GrillWorkspace key={sessionId} sessionId={sessionId} onClose={() => setNativeGrillOpen(false)} />}
   </section>;
 }
