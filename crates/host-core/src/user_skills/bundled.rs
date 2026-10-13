@@ -5,6 +5,9 @@ use std::collections::BTreeMap;
 use std::io::{Read, Write};
 
 const SHIPPED: &str = include_str!("../../resources/workflow-skills.json");
+// A separately maintained, MIT-licensed Skill. Do not conflate its revision with Matt Pocock updates.
+const EMBEDDED_GRILL: &str = include_str!("../../resources/grill-with-ui.json");
+const EMBEDDED_GRILL_ID: &str = "grill-with-ui";
 const MAX_BUNDLE_BYTES: usize = 16 * 1024 * 1024;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -123,6 +126,34 @@ fn validate(bundle: &SkillBundle) -> Result<()> {
         bail!("SKILL_LIMIT_EXCEEDED: engineering bundle too large");
     }
     Ok(())
+}
+
+// Use the same capability-rooted, immutable release mechanism for bundled Skills
+// and for one-time additions to profiles created by earlier application versions.
+fn install_package_release(
+    directory: &Dir,
+    bundled_root: &Path,
+    package: BundlePackage,
+    hash: String,
+) -> Result<Installed> {
+    let release = format!("releases/{}", Uuid::new_v4());
+    let relative = format!("{release}/{}", package.id);
+    let destination = package_destination(bundled_root, &relative)?;
+    ensure_no_symlink_path(bundled_root, &destination)?;
+    directory.create_dir_all("releases")?;
+    directory.create_dir(&release)?;
+    directory.create_dir(&relative)?;
+    let package_directory = directory.open_dir(&relative)?;
+    for file in package.files {
+        let path = PathBuf::from(&file.path);
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() {
+                package_directory.create_dir_all(parent)?;
+            }
+        }
+        write_new(&package_directory, path, file.content.as_bytes())?;
+    }
+    Ok(Installed { directory: relative, digest: hash })
 }
 
 fn bundle_file_path(root: &Path, relative: &str) -> Result<PathBuf> {
@@ -435,20 +466,55 @@ impl UserSkillRegistry {
     }
 
     pub fn ensure_bundled(&mut self) -> Result<BundleResult> {
-        let state = self.bundle_state()?;
-        if !state.revision.is_empty() {
-            return Ok(BundleResult {
-                revision: state.revision,
+        let initial = self.bundle_state()?;
+        let mut result = if initial.revision.is_empty() {
+            self.update_bundled(serde_json::from_str(
+                SHIPPED.trim_start_matches('\u{feff}'),
+            )?)?
+        } else {
+            BundleResult {
+                revision: initial.revision,
                 ..Default::default()
-            });
+            }
+        };
+        // Existing profiles already have a Matt bundle revision. Add only the new
+        // first-party fallback without resetting their skill versions or choices.
+        // A manifest entry with a deleted SKILL.md is an intentional tombstone.
+        if self.bundle_state()?.packages.contains_key(EMBEDDED_GRILL_ID) {
+            return Ok(result);
         }
-        self.update_bundled(serde_json::from_str(
-            SHIPPED.trim_start_matches('\u{feff}'),
-        )?)
+        let embedded: SkillBundle = serde_json::from_str(EMBEDDED_GRILL)?;
+        validate(&embedded)?;
+        if embedded.packages.len() != 1 || embedded.packages[0].id != EMBEDDED_GRILL_ID {
+            bail!("SKILL_INVALID: invalid embedded grill-with-ui package");
+        }
+        let directory = self
+            .open_bundle_dir(true)?
+            .ok_or_else(|| anyhow::anyhow!("SKILL_INVALID: bundle directory missing"))?;
+        let mut state = state_from(&directory)?;
+        // Preserve the digest/manifest ownership rules of the existing Host.
+        let package = embedded.packages.into_iter().next().expect("validated package");
+        let mut files: Vec<_> = package.files.iter()
+            .map(|file| (file.path.clone(), file.content.as_bytes().to_vec()))
+            .collect();
+        files.sort_by(|a, b| a.0.cmp(&b.0));
+        let installed = install_package_release(
+            &directory, &self.bundled_root, package, digest(&files),
+        )?;
+        state.packages.insert(EMBEDDED_GRILL_ID.into(), installed);
+        state.schema_version = 2;
+        let temporary = format!("state-{}.tmp", Uuid::new_v4());
+        write_new(&directory, &temporary, &serde_json::to_vec(&state)?)?;
+        directory.rename(&temporary, &directory, "state.json")?;
+        result.updated.push(EMBEDDED_GRILL_ID.into());
+        Ok(result)
     }
 
     pub fn update_bundled(&mut self, bundle: SkillBundle) -> Result<BundleResult> {
         validate(&bundle)?;
+        if bundle.packages.iter().any(|package| package.id == EMBEDDED_GRILL_ID) {
+            bail!("SKILL_INVALID: grill-with-ui is managed separately from Matt Pocock skills");
+        }
         let directory = self
             .open_bundle_dir(true)?
             .ok_or_else(|| anyhow::anyhow!("SKILL_INVALID: bundle directory missing"))?;
@@ -465,6 +531,11 @@ impl UserSkillRegistry {
             .collect();
         for (id, previous) in state.packages.clone() {
             if incoming.contains(&id) {
+                continue;
+            }
+            // A Matt Pocock update cannot uninstall independently shipped Skills.
+            if id == EMBEDDED_GRILL_ID {
+                result.preserved.push(id);
                 continue;
             }
             if files_digest(&directory, &previous.directory)?.as_deref() == Some(&previous.digest) {
@@ -501,31 +572,12 @@ impl UserSkillRegistry {
             {
                 continue;
             }
-            let release = format!("releases/{}", Uuid::new_v4());
-            let relative = format!("{release}/{}", package.id);
-            let package_path = package_destination(&self.bundled_root, &relative)?;
-            ensure_no_symlink_path(&self.bundled_root, &package_path)?;
-            directory.create_dir_all("releases")?;
-            directory.create_dir(&release)?;
-            directory.create_dir(&relative)?;
-            let package_directory = directory.open_dir(&relative)?;
-            for file in package.files {
-                let path = PathBuf::from(&file.path);
-                if let Some(parent) = path.parent() {
-                    if !parent.as_os_str().is_empty() {
-                        package_directory.create_dir_all(parent)?;
-                    }
-                }
-                write_new(&package_directory, path, file.content.as_bytes())?;
-            }
-            state.packages.insert(
-                package.id.clone(),
-                Installed {
-                    directory: relative,
-                    digest: hash,
-                },
-            );
-            result.updated.push(package.id);
+            let id = package.id.clone();
+            let installed = install_package_release(
+                &directory, &self.bundled_root, package, hash,
+            )?;
+            state.packages.insert(id.clone(), installed);
+            result.updated.push(id);
         }
         state.revision = bundle.revision;
         state.schema_version = 2;
