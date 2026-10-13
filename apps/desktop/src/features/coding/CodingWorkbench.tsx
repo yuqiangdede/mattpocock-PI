@@ -12,17 +12,27 @@ import { useAppStore } from "../../stores/app-store";
 import { loadCodingActions, useCodingActions } from "../extensions/coding-action-state";
 import { INTERACTION_IMAGE_PROMPT_ID } from "./interaction-image-prompt";
 import { GrillWorkspace } from "./GrillWorkspace";
+import { loadGrill, parseGrillReply } from "./grill-workspace-model";
+import { codingNextSteps } from "./coding-next-steps";
 
-export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onSelectPrompt }: {
-  disabled: boolean; error: string | null; onExecute: (actionId: string) => void; onSelectSkill: (skillId: string) => void; onSelectPrompt: (id: string) => void;
+const EMPTY_GRILL_MESSAGES: Array<{ role?: string; content?: string }> = [];
+
+export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onSelectPrompt, onPrepareVisual, visualStart }: {
+  disabled: boolean; error: string | null; onExecute: (actionId: string) => void; onSelectSkill: (skillId: string, context?: string) => void; onSelectPrompt: (id: string, context?: string) => void;
+  onPrepareVisual?: () => void; visualStart?: { sessionId: string; requestId: string } | null;
 }) {
   const { t } = useTranslation();
   const projectPath = useAppStore(state => state.workspace?.path ?? "");
   const sessionId = useAppStore(state => state.activeSessionId);
+  const messages = useAppStore(state => state.messages ?? EMPTY_GRILL_MESSAGES);
+  const revealedReplies = useRef(new Set<string>());
+  const result = useAppStore(state => sessionId ? state.latestTurnResults[sessionId] : undefined);
+  const running = useAppStore(state => sessionId ? state.runningSessions[sessionId] ?? false : false);
+  const recommendation = codingNextSteps(messages, result, running);
   const { configuration, diagnostic } = useCodingActions();
   const [moreOpen, setMoreOpen] = useState(false);
-  const [discussionOpen, setDiscussionOpen] = useState(false);
   const [nativeGrillOpen, setNativeGrillOpen] = useState(false);
+  useEffect(() => { if (visualStart && visualStart.sessionId === sessionId) setNativeGrillOpen(true); }, [visualStart, sessionId]);
   const [taskGraphOpen, setTaskGraphOpen] = useState(false);
   const workbenchRef = useRef<HTMLElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
@@ -36,9 +46,20 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
     return () => { active = false; };
   }, [projectPath, sessionId, configuration, catalogVersion]);
   useEffect(() => { void loadCodingActions(); }, []);
-  useEffect(() => { if (disabled) { setMoreOpen(false); setDiscussionOpen(false); } }, [disabled]);
-  const { primary, more } = codingShortcutMenu(configuration, catalog, { ask: t("codingActions.askNext"), diagnose: t("codingActions.diagnose"), skillLabels: Object.fromEntries(ENGINEERING_SHORTCUTS.map(entry => [entry.action, t(`coding.${entry.action}`)])) });
-  const actions = [...primary, ...more];
+  useEffect(() => { if (disabled) { setMoreOpen(false); } }, [disabled]);
+  useEffect(() => {
+    if (!sessionId) return;
+    const pending = loadGrill(sessionId)?.pending;
+    if (!pending) return;
+    const key = `${sessionId}:${pending.id}`;
+    if (revealedReplies.current.has(key)) return;
+    if (!messages.some(message => message.role === "assistant" && parseGrillReply(message.content ?? "", pending))) return;
+    revealedReplies.current.add(key);
+    setNativeGrillOpen(true);
+  }, [sessionId, messages]);
+  const { primary, more: overflow } = codingShortcutMenu(configuration, catalog, { ask: t("codingActions.askNext"), diagnose: t("codingActions.diagnose"), skillLabels: Object.fromEntries(ENGINEERING_SHORTCUTS.map(entry => [entry.action, t(`coding.${entry.action}`)])) });
+  const more = [...primary.filter(shortcut => shortcut.action.skillId === "grill-with-docs"), ...overflow];
+  const actions = [...primary, ...overflow];
   const reason = ({ action }: CodingShortcut) => {
     if (action.skillId === "implement-spec") return "";
     if (catalogError) return t("codingActions.executeFailed", { detail: catalogError });
@@ -48,30 +69,27 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
   const plainActions = codingPromptActions(configuration, t("codingActions.commitCode")).filter(action => action.enabled !== false);
   // Fixed launcher order is presentation-only: never rewrite user configuration.
   const orderedPromptActions = [...plainActions.filter(action => action.id === "commit-code"), ...plainActions.filter(action => action.id !== "commit-code")];
-  const visualSkillAvailable = !catalogError && catalog.some(command => command.kind === "skill" && command.skillId === "grill-with-ui");
+  const isRecommended = (id: string) => Boolean(recommendation?.steps.some(step => step === id));
+  const recommendedMore = more.some(shortcut => isRecommended(shortcut.action.skillId));
   const renderAction = (shortcut: CodingShortcut, menu = false) => {
     const { action } = shortcut;
     const unavailable = reason(shortcut);
     const note = unavailable || codingShortcutTooltip(shortcut, catalog, t);
-    if (!menu && action.skillId === "grill-with-docs") return <div key={action.id} className="coding-requirements-split">
-      <TooltipButton disabled={disabled || Boolean(unavailable)} className="btn btn-secondary" ariaLabel={action.label} tooltip={note} onClick={() => { setDiscussionOpen(false); activateCodingShortcut(shortcut, { openTaskGraph: () => setTaskGraphOpen(true), execute: onExecute, selectSkill: onSelectSkill }); }}>{action.label}</TooltipButton>
-      <AnchoredMenu open={discussionOpen} onClose={() => setDiscussionOpen(false)} role="menu" side="top" label={action.label} menuClassName="context-menu coding-more-menu"
-        trigger={ref => <Button ref={ref} variant="secondary" disabled={!sessionId} aria-label={t("codingActions.visualDiscussionMenu", { defaultValue: "Discussion modes" })} aria-haspopup="menu" aria-expanded={discussionOpen} onClick={() => { setMoreOpen(false); setDiscussionOpen(value => !value); }}>▾</Button>}>
-        <Button variant="ghost" className="context-menu-item" role="menuitem" disabled={disabled || Boolean(unavailable)} onClick={() => { setDiscussionOpen(false); activateCodingShortcut(shortcut, { openTaskGraph: () => setTaskGraphOpen(true), execute: onExecute, selectSkill: onSelectSkill }); }}>{action.label}</Button>
-        <Button variant="ghost" className="context-menu-item" role="menuitem" disabled={!sessionId} onClick={() => { setDiscussionOpen(false); setNativeGrillOpen(true); }}>{t("codingActions.visualDiscussion", { defaultValue: "可视化讨论" })}</Button>
-        <Button variant="ghost" className="context-menu-item" role="menuitem" disabled={disabled || !visualSkillAvailable} title={!visualSkillAvailable ? "Install the grill-with-ui Skill to enable this mode" : undefined} onClick={() => { setDiscussionOpen(false); onSelectSkill("grill-with-ui"); }}>{t("codingActions.visualDiscussionBrowser", { defaultValue: "浏览器模式（原 Skill）" })}</Button>
-        {!visualSkillAvailable && <div className="coding-menu-group-label" role="status">{t("codingActions.visualDiscussionMissing", { defaultValue: "Install grill-with-ui in Skills first" })}</div>}
-      </AnchoredMenu>
-    </div>;
-    return <TooltipButton key={action.id} disabled={(disabled && action.skillId !== "implement-spec") || Boolean(unavailable)} className={menu ? "btn btn-ghost context-menu-item" : "btn btn-secondary"}
-      role={menu ? "menuitem" : undefined} ariaLabel={action.label} tooltip={note} aria-description={note}
-      tooltipClassName="ui-tooltip-help coding-skill-tooltip" onClick={event => { if (action.skillId === "implement-spec") returnFocusRef.current = menu ? workbenchRef.current?.querySelector<HTMLButtonElement>(`button[aria-haspopup="menu"]`) ?? null : event.currentTarget; setMoreOpen(false); activateCodingShortcut(shortcut, { openTaskGraph: () => setTaskGraphOpen(true), execute: onExecute, selectSkill: onSelectSkill }); }}>{action.label}</TooltipButton>;
+    if (!menu && action.skillId === "grill-with-docs") return <Button key={action.id} variant="secondary" disabled={onPrepareVisual ? disabled : !sessionId} onClick={() => onPrepareVisual ? onPrepareVisual() : setNativeGrillOpen(true)}>{t("codingActions.visualRequirements")}</Button>;
+    return <TooltipButton key={action.id} disabled={(disabled && action.skillId !== "implement-spec") || Boolean(unavailable)} className={(menu ? "btn btn-ghost context-menu-item" : "btn btn-secondary") + (isRecommended(action.skillId) ? " coding-action-recommended" : "")}
+      role={menu ? "menuitem" : undefined} ariaLabel={action.label} tooltip={isRecommended(action.skillId) ? t("codingActions.recommendedNext") + " · " + note : note} aria-description={isRecommended(action.skillId) ? t("codingActions.recommendedNext") + " · " + note : note}
+      tooltipClassName="ui-tooltip-help coding-skill-tooltip" onClick={event => { if (action.skillId === "implement-spec") returnFocusRef.current = menu ? workbenchRef.current?.querySelector<HTMLButtonElement>(`button[aria-haspopup="menu"]`) ?? null : event.currentTarget; setMoreOpen(false); if (isRecommended(action.skillId)) { onSelectSkill(action.skillId, recommendation?.context); return; } activateCodingShortcut(shortcut, { openTaskGraph: () => setTaskGraphOpen(true), execute: onExecute, selectSkill: onSelectSkill }); }}>{action.label}</TooltipButton>;
   };
   const configure = () => { const store = useAppStore.getState(); store.setSettingsTab("codingActions"); store.setPage("settings"); };
   return <section ref={workbenchRef} className="coding-workbench" aria-label={t("codingActions.title")}>
-    <div className="coding-shortcuts coding-shortcuts-primary">{primary.map(action => renderAction(action))}
+    <div className="coding-shortcuts coding-shortcuts-primary">{primary.filter(shortcut => ["setup-matt-pocock-skills", "ask-matt", "grill-with-docs"].includes(shortcut.action.skillId)).map(action => renderAction(action))}
+        <Button disabled={disabled} title={t("codingActions.interactionImageHint", { defaultValue: "什么时候使用：需求讨论后，需要页面交互效果图提示词时。\n具体例子：根据预警中心的查询需求生成 UI 生图提示词。" })} onClick={() => onSelectPrompt(INTERACTION_IMAGE_PROMPT_ID)}>{t("codingActions.interactionImage", { defaultValue: "交互生图" })}</Button>
+      {primary.filter(shortcut => !["setup-matt-pocock-skills", "ask-matt", "grill-with-docs"].includes(shortcut.action.skillId)).map(action => renderAction(action))}
+        {orderedPromptActions.map(action =>
+          <Button key={action.id} className={isRecommended(action.id) ? "coding-action-recommended" : undefined} aria-description={isRecommended(action.id) ? t("codingActions.recommendedNext") : undefined} disabled={disabled} title={action.id === "commit-code" && action.prompt === null ? t("codingActions.commitHint") : t("codingActions.plainPromptHint")} onClick={() => onSelectPrompt(action.id, isRecommended(action.id) ? recommendation?.context : undefined)}>{action.label}</Button>)}
+
       <AnchoredMenu open={moreOpen} onClose={() => setMoreOpen(false)} role="menu" side="top" restoreFocus={!disabled || more.some(shortcut => shortcut.action.skillId === "implement-spec")} label={t("codingActions.more")} menuClassName="context-menu coding-more-menu"
-        trigger={ref => <Button ref={ref} variant="ghost" disabled={disabled && !more.some(shortcut => shortcut.action.skillId === "implement-spec")} aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(value => !value)}>{t("codingActions.more")}</Button>}>
+        trigger={ref => <Button ref={ref} variant="ghost" className={recommendedMore ? "coding-action-recommended" : undefined} aria-description={recommendedMore ? t("codingActions.recommendedNext") : undefined} disabled={disabled && !more.some(shortcut => shortcut.action.skillId === "implement-spec")} aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(value => !value)}>{t("codingActions.more")}</Button>}>
         {groupCodingShortcuts(more).map(group => <div key={group.id} role="group" aria-label={t(`codingActions.groups.${group.id}`)}>
           <div className="coding-menu-group-label" aria-hidden="true">{t(`codingActions.groups.${group.id}`)}</div>
           {group.shortcuts.map(action => renderAction(action, true))}
@@ -79,16 +97,9 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
         {!more.length && <div role="status">{t("codingActions.noOtherSkills")}</div>}
       </AnchoredMenu>
     </div>
-    <div className="coding-shortcuts coding-shortcuts-secondary">
-      <div className="coding-prompt-actions">
-        <Button disabled={disabled} title={t("codingActions.interactionImageHint", { defaultValue: "什么时候使用：需求讨论后，需要页面交互效果图提示词时。\n具体例子：根据预警中心的查询需求生成 UI 生图提示词。" })} onClick={() => onSelectPrompt(INTERACTION_IMAGE_PROMPT_ID)}>{t("codingActions.interactionImage", { defaultValue: "交互生图" })}</Button>
-        {orderedPromptActions.map(action =>
-          <Button key={action.id} disabled={disabled} title={action.id === "commit-code" && action.prompt === null ? t("codingActions.commitHint") : t("codingActions.plainPromptHint")} onClick={() => onSelectPrompt(action.id)}>{action.label}</Button>)}
-      </div>
-    </div>
     {actions.some(action => reason(action)) && <div role="status">{actions.filter(action => reason(action)).map(shortcut => `${shortcut.action.label}：${reason(shortcut)}`).join("；")}<Button onClick={() => setCatalogVersion(value => value + 1)}>{t("codingActions.recheck")}</Button></div>}
     {(error || diagnostic) && <div className="coding-shortcut-error" role="alert"><span>{error || t("codingActions.diagnostic", { detail: diagnostic })}</span><Button onClick={configure}>{t("codingActions.configure")}</Button></div>}
     {taskGraphOpen && <TaskGraphViewer onClose={() => setTaskGraphOpen(false)} returnFocus={returnFocusRef.current} />}
-    {nativeGrillOpen && sessionId && <GrillWorkspace key={sessionId} sessionId={sessionId} onClose={() => setNativeGrillOpen(false)} />}
+    {nativeGrillOpen && sessionId && <GrillWorkspace key={sessionId} sessionId={sessionId} onClose={() => setNativeGrillOpen(false)} onNext={context => { setNativeGrillOpen(false); onSelectSkill("to-spec", context); }} />}
   </section>;
 }

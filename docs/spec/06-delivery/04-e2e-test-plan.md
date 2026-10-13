@@ -59,6 +59,55 @@ does not authorize commits, publishing, merging or live-instance testing.
 
 ### E2E-CODING-ACTIONS-withdraw-workflow-entry
 
+- Verify a direct Visual requirements discussion button with no split dropdown.
+  Click it without a Session, enter a topic in the external Composer and manually
+  Send. Verify one native request, a materialized Session checkpoint and automatic
+  panel opening with the topic and first-round question response. Selection alone
+  must neither send nor open an empty modal.
+  More contains ordinary Requirements discussion, Create specification and Create
+  tickets. Selecting a Skill only prepares a draft. Next-step recommendations
+  remain available. Verify correlated reply reopening and wide responsive sizing.
+- Verify one action row ordered Initialize, Ask next step, Visual discussion,
+  Interaction image, Implement, Review, Diagnose, Commit and More. Custom plain
+  prompts remain before More. At narrow row widths, buttons wrap without overflow.
+- Restore a pending follow-up, observe an invalid intermediate reply, then deliver
+  valid bare JSON with the matching request and question IDs. Verify the answer
+  appears in that question's thread and pending state clears without retrying.
+- Return invalid payloads after completed native turns; verify exactly three
+  automatic retry sends and a persisted exhausted budget. Additional transcript
+  updates must not restart retries. Running, failed and stale turn results must
+  not qualify; valid responses clear pending state without retries.
+- Wrap a correlated follow-up JSON object in prose and Markdown with a trailing
+  comma; verify it appears in the thread without a retry. Model tests cover syntax
+  repairs, preserved escaped content, conflicting IDs, ambiguous duplicate
+  results, truncated payloads and input-size bounds.
+- With the application shell's non-selectable base styles loaded, verify question
+  text, option labels, rationale and Agent replies opt into native text selection.
+- Select Other, verify blank confirmation is blocked, enter a custom alternative,
+  confirm and reopen the panel. Verify selected custom text is retained and
+  included in downstream summaries. Multi-select may combine it with fixed options.
+- Confirm a question and request the next round. Return a correlated questions
+  payload with an empty array; verify the finish-interview guidance appears and
+  confirmed answers remain intact. No automatic finish or retry is triggered.
+- Complete a native interview and select Create specification; verify panel
+  dismissal and a draft containing the design document path. End a to-spec turn
+  successfully and verify both Create tickets and Implement recommendations.
+  Select Create tickets, preserving draft and attachments with outcome context.
+  End Code review, select Commit code and verify the configured draft with review
+  context. Selection alone must issue no Host prompt or Git operation.
+- Verify recommendations highlight existing buttons without a separate row.
+  Specification completion highlights Implement and More; opening More reveals
+  highlighted Create tickets. A completed final answer after a recovered tool
+  error still qualifies, while running and final-error states do not.
+- Use a persisted user row with expanded `content` and original `/skill:to-spec`
+  in `command`; verify existing Implement and More buttons acquire the highlight.
+  With real theme tokens loaded, verify the visible accent ring, not only a class.
+- `coding-next-steps.test.mjs` covers the full chain and failed/cancelled/running,
+  unrelated and newer-turn exclusions; `coding-prompt-user-path.test.mjs` covers
+  the native panel and Composer handoffs with real launcher wiring.
+- Coverage: `coding-prompt-user-path.test.mjs` with the real CodingWorkbench
+  and AnchoredMenu in an isolated Electron renderer.
+
 - Composer and the work-panel launcher expose no native Workflow entry. Restore
   a legacy Workflow tab alongside Review; retain Review and select it when the
   removed Workflow tab was active. A Workflow-only context restores empty.

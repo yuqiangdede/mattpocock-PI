@@ -1,14 +1,21 @@
 /* Native interview workspace. Uses the existing desktop design tokens. */
+.coding-next-steps { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-block: 8px; }
 .grill-overlay { z-index: 1100; padding: 18px; }
-.grill-dialog {
+.dialog.grill-dialog {
   display: flex; flex-direction: column; gap: 0;
-  width: min(1100px, 96vw); height: min(760px, 93dvh); min-height: 420px;
+  width: min(1280px, calc(100vw - 36px)); height: min(860px, 93dvh); min-height: 420px;
   max-width: none; max-height: none; overflow: hidden;
   border: 1px solid var(--ds-border-default); border-radius: var(--radius-md);
   background: var(--ds-bg-primary); color: var(--ds-text-primary);
   box-shadow: var(--ds-shadow-composer); padding: 16px;
 }
 .grill-dialog:focus { outline: none; }
+.grill-dialog,
+.grill-options .btn,
+.grill-question-nav .btn {
+  -webkit-user-select: text;
+  user-select: text;
+}
 .grill-header, .grill-meta, .grill-meta-actions, .grill-answer-actions, .grill-pending {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
 }
@@ -49,7 +56,7 @@
 .grill-result { overflow-wrap: anywhere; white-space: pre-wrap; }
 .grill-error { color: var(--ds-error); margin: 8px 0 0; font-size: var(--text-sm); }
 @media (max-width: 760px) {
-  .grill-dialog { width: 98vw; height: 95dvh; padding: 10px; }
+  .dialog.grill-dialog { width: calc(100vw - 36px); height: 95dvh; padding: 10px; }
   .grill-columns { grid-template-columns: 1fr; grid-template-rows: minmax(150px, 1fr) minmax(200px, 1fr); }
   .grill-meta { flex-wrap: wrap; }
 }

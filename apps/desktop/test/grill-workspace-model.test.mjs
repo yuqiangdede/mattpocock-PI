@@ -17,6 +17,8 @@ try {
   const {
     newGrill, parseGrillReply, applyGrillReply, decideGrillQuestion,
     loadGrill, saveGrill, grillPrompt,
+    canAutoRetryGrill,
+    setGrillCustomAnswer, summaries,
   } = domain;
 
   const op = (kind = "round", questionId) => ({
@@ -34,16 +36,63 @@ try {
     state.pending = op();
     return applyGrillReply(state, parseGrillReply(questions(), op()));
   };
+  test("automatic retries require a completed current attempt and stop after three", () => {
+    const attempt = op();
+    const result = {status:"completed",finishedAt:Date.parse(attempt.submittedAt)+1};
+    for (const retryCount of [0,1,2]) assert.equal(canAutoRetryGrill({...attempt,retryCount},result,false),true);
+    assert.equal(canAutoRetryGrill({...attempt,retryCount:3},result,false),false);
+    assert.equal(canAutoRetryGrill(attempt,result,true),false);
+    assert.equal(canAutoRetryGrill(attempt,{...result,status:"failed"},false),false);
+    assert.equal(canAutoRetryGrill(attempt,{...result,finishedAt:0},false),false);
+    assert.equal(canAutoRetryGrill(attempt,undefined,false),false);
+  });
 
-  test("model responses require a matching action id and strict envelope", () => {
+  test("model responses require a matching action id and validated payload", () => {
     assert.equal(parseGrillReply(questions(), { ...op(), id: "another" }), null);
-    assert.equal(parseGrillReply(questions().replace("<grill-workspace-result>", ""), op()), null);
+    assert.equal(parseGrillReply(questions().replace("<grill-workspace-result>", ""), op()).kind, "questions");
     assert.equal(parseGrillReply(payload({ requestId: "req-123", kind: "questions", questions: [
       { title: "Invalid", body: "...", options: [{ key: "A", label: "Only" }], recommended: ["A"] },
     ] }), op()), null);
     const result = parseGrillReply(questions(), op());
     assert.equal(result.kind, "questions");
     assert.equal(result.questions.length, 2);
+  });
+
+  test("bare JSON follow-up replies retain request and question correlation", () => {
+    const body = { requestId: "req-123", kind: "discussion", questionId: "q1", reply: "Database field: event_serial_no" };
+    assert.deepEqual(parseGrillReply(JSON.stringify(body), op("discuss", "q1")), body);
+    assert.equal(parseGrillReply(JSON.stringify(body), { ...op("discuss", "q1"), id: "other" }), null);
+    assert.equal(parseGrillReply(JSON.stringify(body), op("discuss", "q2")), null);
+    assert.deepEqual(parseGrillReply("Prose " + JSON.stringify(body), op("discuss", "q1")), body);
+    assert.equal(parseGrillReply(JSON.stringify({ ...body, reply: "" }), op("discuss", "q1")), null);
+  });
+  test("minor formatting errors are repaired without changing reply content", () => {
+    const expected = op("discuss", "q1");
+    const body = {requestId:"req-123",kind:"discussion",questionId:"q1",reply:"Field {event_serial_no}, path C:\\data\\file.json"};
+    const json = JSON.stringify(body);
+    for (const text of ["```json\n"+json+"\n```", "Explanation before\n"+json+"\nExplanation after",
+      json.replace(/}$/,",}"), "<grill-workspace-result>"+json,
+      "{request_id:'req-123', question_id:'q1', reply:'数据库字段是 event_serial_no',}"] ) {
+      const actual = parseGrillReply(text,expected);
+      assert.ok(actual,text);
+      assert.equal(actual.requestId,"req-123"); assert.equal(actual.questionId,"q1");
+    }
+    assert.deepEqual(parseGrillReply("```json\n"+json+"\n```",expected),body);
+    assert.equal(parseGrillReply('{"requestId":"req-123","questionId":"q1","reply":"First line\nSecond line"}',expected).reply,"First line\nSecond line");
+    const scalar = questions().replace('"recommended":["B"]','"recommended":"B"');
+    assert.deepEqual(parseGrillReply(scalar,op()).questions[0].recommended,["B"]);
+  });
+  test("repair rejects ambiguous, conflicting, truncated and uncorrelated payloads", () => {
+    const expected = op("discuss", "q1");
+    const json = JSON.stringify({requestId:"req-123",kind:"discussion",questionId:"q1",reply:"Answer"});
+    assert.equal(parseGrillReply(json+"\n"+json,expected),null);
+    assert.equal(parseGrillReply(json.slice(0,-1),expected),null);
+    assert.equal(parseGrillReply("{request_id:'wrong',question_id:'q1',reply:'Answer',}",expected),null);
+    assert.equal(parseGrillReply("{requestId:'req-123',request_id:'wrong',questionId:'q1',reply:'Answer'}",expected),null);
+    assert.equal(parseGrillReply("{requestId:'req-123',questionId:'q1',question_id:'q2',reply:'Answer'}",expected),null);
+    assert.equal(parseGrillReply("{questionId:'q1',reply:'Answer'}",expected),null);
+    assert.equal(parseGrillReply("{requestId:'req-123',questionId:'q1',reply:process.exit()}",expected),null);
+    assert.equal(parseGrillReply("x".repeat(65_537)+json,expected),null);
   });
 
   test("new questions get stable unique identifiers and preserve previous state", () => {
@@ -54,6 +103,28 @@ try {
     assert.deepEqual(s.questions[0].recommended, ["B"]);
     assert.deepEqual(s.questions[1].recommended, ["A", "B"]);
     assert.equal(applyGrillReply(s, parseGrillReply(questions(), op())), s);
+  });
+  test("custom alternatives require text, survive confirmation and cannot be overridden by discussion", () => {
+    let state = decideGrillQuestion(ready(),"q1","select",["OTHER"]);
+    assert.equal(decideGrillQuestion(state,"q1","confirm").questions[0].status,"open");
+    state = setGrillCustomAnswer(state,"q1","Search both fields with separate controls");
+    state = decideGrillQuestion(state,"q1","confirm");
+    assert.equal(state.questions[0].status,"confirmed");
+    assert.match(summaries(state),/Other: Search both fields/);
+    assert.equal(setGrillCustomAnswer(state,"q1","Overwrite").questions[0].customAnswer,state.questions[0].customAnswer);
+    const multi = decideGrillQuestion(state,"q2","select",["A","OTHER"]);
+    assert.deepEqual(multi.questions[1].selected,["A","OTHER"]);
+    assert.equal(multi.questions[0].customAnswer,state.questions[0].customAnswer);
+  });
+  test("empty next rounds explicitly record no more questions and retain decisions", () => {
+    const original = ready();
+    const state = {...original,pending:op()};
+    const exhausted = applyGrillReply(state,{requestId:op().id,kind:"questions",questions:[]});
+    assert.equal(exhausted.noMoreQuestions,true);
+    assert.equal(exhausted.pending,null);
+    assert.deepEqual(exhausted.questions,original.questions);
+    const renewed = applyGrillReply({...exhausted,pending:op()},parseGrillReply(questions(),op()));
+    assert.equal(renewed.noMoreQuestions,false);
   });
 
   test("choices are not confirmed by selecting or discussing", () => {

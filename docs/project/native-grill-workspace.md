@@ -2,9 +2,17 @@
 
 ## Scope
 
-Stage 1 adds a native visual interview to the existing **Requirements discussion** dropdown.
-It deliberately leaves the original browser-based `grill-with-ui` Skill available as
-"Browser mode (original Skill)". Both modes are independent.
+Stage 1 exposes a direct Visual requirements discussion button. Ordinary
+Requirements discussion, Create specification and Create tickets live in More.
+There is no discussion-mode dropdown or browser-mode entry. Installed Skills
+remain available through the normal catalog.
+The primary button prepares topic entry in the external Composer. Manual Send
+submits the first round and opens the panel with the topic already loaded, using
+the existing native Session admission path. A saved interview can be reopened
+using Open existing discussion without another send. The panel automatically reopens when
+a matching pending interview response arrives in the active Session. Unrelated
+responses do not open it, and closing an already handled result is respected.
+Its wide two-column layout overrides generic dialog sizing and stacks on narrow screens.
 
 The native view implements:
 - A first round of 1–3 Agent-proposed, option-based questions, with recommendations.
@@ -45,7 +53,14 @@ silently treated as durable persistence.
 
 - The native mode does not yet include Visualize, per-option deep comparisons,
   or a cross-device synchronized interview state.
-- Model responses must obey the structured envelope; a malformed response
+- Model responses may use the structured envelope or a complete bare JSON object,
+  both with the same bounded schema, request and question identity validation.
+- Minor syntax deviations are repaired locally before the same schema validation:
+  Markdown/prose wrappers, missing outer tags, trailing commas, single quotes,
+  unquoted property names and raw string newlines. Matching IDs remain mandatory;
+  ambiguous, conflicting or incomplete objects are rejected without inventing data.
+  An invalid response does not stop subsequent reconciliation; a late valid reply
+  clears the error and appears in its question's thread. A malformed response
   produces an explicit recoverable error, not a silently accepted decision.
 - The renderer cache may be cleared by deleting application browser storage;
   the original prompts and replies remain available in the Host transcript.
@@ -56,8 +71,8 @@ silently treated as durable persistence.
 
 ## Manual acceptance
 
-1. Start an ordinary Pi session, open "Requirements discussion" -> "Visual discussion"
-   and enter a topic. Verify 1–3 options with recommendations arrive in the left pane.
+1. Start an ordinary Pi session, click "Visual requirements discussion"
+   then enter a topic in the external Composer and Send. Verify 1–3 options with recommendations arrive in the left pane.
 2. Select Q1, send two follow-ups from the right pane. Verify Q1 contains both
    user messages and Agent replies; Q2 remains untouched.
 3. Confirm a non-recommended answer in Q1; send another follow-up.
@@ -72,7 +87,10 @@ silently treated as durable persistence.
    than silently target the new session.
 8. Deliberately return invalid JSON or an incorrect request ID.
    The panel must display a recoverable error and leave decisions intact.
-9. Use the original browser Skill option to verify backwards compatibility.
+9. Verify the direct visual entry and the three relocated More entries.
+   Close a pending interview, receive its matching response and verify automatic
+   reopening. Unrelated responses must not open it; closing the handled result
+   must remain effective. At desktop width, verify the dialog exceeds 440px.
 10. Repeat the common path in local and remote sessions, then finish the
     interview and verify any document path reported is actually present.
 

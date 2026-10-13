@@ -57,6 +57,8 @@ import { ComposerToolbar } from "../features/chat/composer/ComposerToolbar";
 import { ComposerStatus } from "../features/chat/composer/ComposerStatus";
 import { CodingWorkbench } from "../features/coding/CodingWorkbench";
 import { useCodingActionLauncher } from "../features/coding/useCodingActionLauncher";
+import { useGrillComposer } from "../features/coding/useGrillComposer";
+import { Button } from "./ui";
 
 const EMPTY_QUEUED_PROMPTS: QueuedPrompt[] = [];
 
@@ -425,6 +427,7 @@ export function Composer({
   });
   composerTransformInvalidateRef.current = composerTransformController.invalidate;
 
+  const visualDiscussion = useGrillComposer(sendPrompt, draftKey, () => showToast(t("codingActions.visualStorageError"), { variant: "error" }), activeSessionId);
   const submitController = useComposerSubmit({
     value,
     draftKey,
@@ -435,7 +438,7 @@ export function Composer({
     pasting,
     activeFileReferences,
     t,
-    sendPrompt,
+    sendPrompt: visualDiscussion.sendPrompt,
     steerPrompt,
     showToast,
     recordHistory: inputHistory.record,
@@ -524,9 +527,12 @@ export function Composer({
           disabled={inputBlocked || composing || codingAction.pending}
           error={codingAction.error}
           onExecute={actionId => void codingAction.execute(actionId)}
-          onSelectSkill={skillId => void codingAction.selectSkill(skillId)}
+          onSelectSkill={(skillId, context) => void codingAction.selectSkill(skillId, context)}
           onSelectPrompt={codingAction.selectPrompt}
+          onPrepareVisual={() => { visualDiscussion.prepare(); ref.current?.focus(); }}
+          visualStart={visualDiscussion.visualStart}
         />
+        {visualDiscussion.preparing && <div className="coding-next-steps" role="status"><span>{visualDiscussion.hint}</span>{visualDiscussion.canResume && <Button onClick={visualDiscussion.resume}>{t("codingActions.visualResume")}</Button>}<Button onClick={visualDiscussion.cancel}>{t("common.cancel")}</Button></div>}
         {activeSessionId ? <TodoDock sessionId={activeSessionId} /> : null}
         {planCheckpoint?.status === "pending" ? (
           <PlanApprovalBar proposal={planCheckpoint} />

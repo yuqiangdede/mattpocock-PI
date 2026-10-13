@@ -1,6 +1,6 @@
 # Configurable Plain Prompt Buttons
 
-Unreleased: Extensions > Coding Actions now configures the second-row prompt
+Unreleased: Extensions > Coding Actions now configures the plain prompt
 button names and instructions, including Commit code. Users can also add,
 disable, reorder or delete these buttons. Selection prepares an editable draft;
 only manual Send runs it. The default commit instruction still requires a

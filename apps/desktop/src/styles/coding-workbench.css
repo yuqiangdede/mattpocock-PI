@@ -2,16 +2,14 @@
 .coding-skill-tooltip { max-width: min(420px, calc(100vw - 16px)); white-space: pre-line; font-size: var(--text-xs); }
 .coding-shortcuts, .coding-shortcut-error { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .coding-shortcuts .btn { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
-.coding-requirements-split { display: inline-flex; align-items: stretch; max-width: 100%; }
-.coding-requirements-split > .btn { border-top-right-radius: 0; border-bottom-right-radius: 0; }
-.coding-requirements-split > div { display: flex; flex-shrink: 0; }
-.coding-requirements-split > div > .btn { border-top-left-radius: 0; border-bottom-left-radius: 0; }
 .coding-shortcut-error { margin-top: 6px; color: var(--ds-text-secondary); overflow-wrap: anywhere; }
 
-.coding-shortcuts + .coding-shortcuts { margin-top: 6px; }
-.coding-prompt-actions { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; max-width: 100%; margin-left: auto; margin-right: 8%; }
-@media (max-width: 560px) { .coding-prompt-actions { margin-right: 0; } }
 .coding-shortcuts .btn { font-weight: 400; }
+.btn.coding-action-recommended {
+  border-color: var(--ds-accent);
+  background: color-mix(in oklab, var(--ds-accent) 16%, var(--ds-bg-secondary));
+  box-shadow: inset 0 0 0 1px var(--ds-accent);
+}
 .coding-requirements-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
 .requirements-confirmation-dialog { width: min(680px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 20px; border: 1px solid var(--ds-border-default); border-radius: var(--radius-md); background: var(--ds-bg-primary); color: var(--ds-text-primary); }
 .requirements-confirmation-dialog::backdrop { background: var(--ds-scrim); }

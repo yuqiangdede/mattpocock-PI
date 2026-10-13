@@ -4,6 +4,15 @@ import { engineeringSkillGuides } from "./engineering-skill-guides.js";
 export const en = {
   taskGraph, skillGates,
   codingActions: {
+    recommendedNext: "Recommended next step",
+    visualRequirements: "Visual requirements discussion",
+    visualTopicHint: "Enter the discussion topic below, then Send to open the visual interview.",
+    visualStorageError: "The interview request was sent, but its local checkpoint could not be saved.",
+    visualResume: "Open existing discussion",
+    visualOther: "Other (write your own)",
+    visualNoMoreQuestions: "No further questions. Please finish the interview.",
+    visualOtherAnswer: "Describe your alternative",
+    visualRetryExhausted: "Three automatic retries failed to produce a valid result. Review the original replies or retry manually.",
     groups: { exploration: "Requirements and exploration", design: "Design and planning", development: "Development and testing", maintenance: "Review and maintenance", delivery: "Collaboration and delivery", custom: "Custom actions" },
   noOtherSkills: "No other available skills",
   askNext: "Ask next step", diagnose: "Diagnose bug",
