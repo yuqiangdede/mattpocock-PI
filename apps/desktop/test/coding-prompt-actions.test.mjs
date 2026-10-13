@@ -77,5 +77,5 @@ test("interaction image prompt is a localized, editable, non-executing draft", a
   assert.match(zh, /只生成提示词，不生成图片/);
   assert.match(zh, /16:9/);
   assert.match(en, /image-generation prompt/);
-  assert.equal(buildCommitCodeDraft(zh, "现有需求"), zh + "\\n\\n现有需求");
+  assert.equal(buildCommitCodeDraft(zh, "现有需求"), zh + "\n\n现有需求");
 });
