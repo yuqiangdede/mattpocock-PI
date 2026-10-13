@@ -191,9 +191,10 @@ fn shipped_bundle_is_complete_and_restarts_preserve_disable_edit_and_delete() {
     crate::agent_capabilities::test_support::with_global_agents(&dir.path().join("agents"), || {
         let mut registry = UserSkillRegistry::new(dir.path());
         let first = registry.ensure_bundled().unwrap();
-        assert_eq!(first.updated.len(), 37);
+        assert_eq!(first.updated.len(), 38);
         let records = registry.list(CapabilityLevel::Global, None).unwrap();
         for id in [
+            "grill-with-ui",
             "grill-with-docs",
             "to-spec",
             "to-tickets",
@@ -246,6 +247,71 @@ fn shipped_bundle_is_complete_and_restarts_preserve_disable_edit_and_delete() {
             .unwrap()
             .ends_with("User notes."));
     });
+}
+
+
+#[test]
+fn existing_profile_receives_full_visual_grilling_skill_once_and_preserves_user_choices() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::agent_capabilities::test_support::with_global_agents(&dir.path().join("agents"), || {
+        let mut registry = UserSkillRegistry::new(dir.path());
+        // Simulate an installation created by the older application version.
+        let upstream: SkillBundle = serde_json::from_str(SHIPPED).unwrap();
+        assert_eq!(registry.update_bundled(upstream.clone()).unwrap().updated.len(), 37);
+        registry
+            .set_enabled("retro", false, Some(CapabilityLevel::Global), None)
+            .unwrap();
+
+        let upgraded = registry.ensure_bundled().unwrap();
+        assert_eq!(upgraded.updated, vec!["grill-with-ui"]);
+        assert!(registry.ensure_bundled().unwrap().updated.is_empty());
+
+        let record = registry
+            .list(CapabilityLevel::Global, None).unwrap()
+            .into_iter().find(|item| item.id == EMBEDDED_GRILL_ID).unwrap();
+        assert!(record.enabled);
+        assert_eq!(record.source, "bundled");
+        let resources = registry
+            .package_files(EMBEDDED_GRILL_ID, CapabilityLevel::Global, None).unwrap();
+        for required in ["SKILL.md", "server.mjs", "page.html", "visual-brief.md", "LICENSE"] {
+            // SKILL.md is the entry point; package_files may omit it from companion resources.
+            if required == "SKILL.md" {
+                assert!(Path::new(&record.path).exists());
+            } else {
+                assert!(resources.iter().any(|(path, _)| path == required), "missing {required}");
+            }
+        }
+        let server = resources.iter().find(|(path, _)| path == "server.mjs").unwrap();
+        assert!(String::from_utf8_lossy(&server.1).contains("127.0.0.1"));
+        assert!(!registry.list(CapabilityLevel::Global, None).unwrap()
+            .into_iter().find(|item| item.id == "retro").unwrap().enabled);
+
+        // Matt updates, backup restore and restarts do not remove or alter this package.
+        let upstream_update = registry.update_bundled(upstream.clone()).unwrap();
+        assert!(upstream_update.preserved.contains(&EMBEDDED_GRILL_ID.to_string()));
+        let restored = registry.restore_bundled().unwrap();
+        assert!(restored.preserved.contains(&EMBEDDED_GRILL_ID.to_string()));
+        assert!(registry.ensure_bundled().unwrap().updated.is_empty());
+
+        // A user's removal remains a tombstone, not an invitation to reinstall.
+        assert!(registry.remove(EMBEDDED_GRILL_ID, Some(CapabilityLevel::Global), None).unwrap());
+        assert!(registry.ensure_bundled().unwrap().updated.is_empty());
+        assert!(registry.read(EMBEDDED_GRILL_ID, Some(CapabilityLevel::Global), None).unwrap().is_none());
+        assert!(registry.update_bundled(upstream).unwrap().preserved
+            .contains(&EMBEDDED_GRILL_ID.to_string()));
+        assert!(registry.read(EMBEDDED_GRILL_ID, Some(CapabilityLevel::Global), None).unwrap().is_none());
+    });
+}
+
+#[test]
+fn matt_upstream_cannot_overwrite_the_embedded_visual_grilling_skill() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut registry = UserSkillRegistry::new(dir.path());
+    registry.ensure_bundled().unwrap();
+    let before = fs::read(registry.bundled_root.join("state.json")).unwrap();
+    let embedded: SkillBundle = serde_json::from_str(EMBEDDED_GRILL).unwrap();
+    assert!(registry.update_bundled(embedded).is_err());
+    assert_eq!(fs::read(registry.bundled_root.join("state.json")).unwrap(), before);
 }
 
 #[test]
