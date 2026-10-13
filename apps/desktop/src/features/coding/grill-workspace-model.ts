@@ -155,9 +155,23 @@ export function loadGrill(sessionId: string): GrillState | null {
     if (!raw || raw.length > 500_000) return null;
     const s: unknown = JSON.parse(raw);
     if (!plain(s) || s.version !== 1 || s.sessionId !== sessionId || !bounded(s.topic, 200) || !Array.isArray(s.questions) || s.questions.length > 100) return null;
-    // Only accept our own schema. Missing/invalid fields never become executable actions.
-    if (!s.questions.every(q => plain(q) && typeof q.id === "string" && typeof q.title === "string" && Array.isArray(q.options) && Array.isArray(q.thread) && ["open", "confirmed", "deferred"].includes(String(q.status)))) return null;
-    return s as GrillState;
+    // Reject corrupted or manually edited workflow state before rendering it.
+    if (!Number.isSafeInteger(s.round) || (s.round as number) < 0 ||
+        (s.selectedId !== null && typeof s.selectedId !== "string") ||
+        typeof s.finished !== "boolean" || typeof s.finishNote !== "string") return null;
+    if (s.pending !== null && (!plain(s.pending) || typeof s.pending.id !== "string" ||
+        !["round", "discuss", "finish"].includes(String(s.pending.kind)) ||
+        typeof s.pending.text !== "string" || typeof s.pending.submittedAt !== "string")) return null;
+    if (!s.questions.every(q => plain(q) && typeof q.id === "string" &&
+      typeof q.title === "string" && typeof q.body === "string" &&
+      typeof q.why === "string" && typeof q.multi === "boolean" &&
+      Array.isArray(q.options) && q.options.every(validOption) &&
+      Array.isArray(q.selected) && q.selected.every((key: unknown) => typeof key === "string" && q.options.some((o: GrillOption) => o.key === key)) &&
+      Array.isArray(q.recommended) && q.recommended.every((key: unknown) => typeof key === "string") &&
+      Array.isArray(q.thread) && q.thread.every((m: unknown) => plain(m) && typeof m.id === "string" &&
+        (m.who === "user" || m.who === "agent") && typeof m.text === "string" && typeof m.at === "string") &&
+      ["open", "confirmed", "deferred"].includes(String(q.status)))) return null;
+    return s as unknown as GrillState;
   } catch { return null; }
 }
 export function saveGrill(state: GrillState): boolean {
