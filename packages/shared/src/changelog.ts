@@ -29,7 +29,16 @@ export type ChangelogEntry = {
 };
 
 const enEntries: ChangelogEntry[] = [
-{
+  {
+    version: "0.19.0",
+    date: "2026-10-13",
+    highlights: [
+      "Clarify requirements with the native visual interview workspace from the requirements menu, featuring structured questions, per-question agent discussions, and persistent decisions.",
+      "Generate interaction UI image prompts with the built-in generator and route editable drafts directly to the Composer.",
+      "Unify fork identity across desktop surfaces, installer, and about screens, with enhanced shortcut layout and reliability fixes.",
+    ],
+  },
+  {
     version: "0.18.0",
     date: "2026-10-09",
     highlights: [
@@ -947,7 +956,16 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
-{
+  {
+    version: "0.19.0",
+    date: "2026-10-13",
+    highlights: [
+      "通过需求讨论菜单开启原生可视化需求研讨工作台，支持结构化问答卡片、单题独立讨论线程与决策持久化。",
+      "内置交互界面图片提示词生成器，一键生成并将可编辑草稿直接填入 Composer。",
+      "统一窗口、关于页面及安装包的定制版品牌标识，优化提示词快捷入口布局与稳定性修复。",
+    ],
+  },
+  {
     version: "0.18.0",
     date: "2026-10-09",
     highlights: [
@@ -1865,7 +1883,16 @@ const zhCNEntries: ChangelogEntry[] = [
 ];
 
 const zhTWEntries: ChangelogEntry[] = [
-{
+  {
+    version: "0.19.0",
+    date: "2026-10-13",
+    highlights: [
+      "透過需求討論選單開啟原生視覺化需求研討工作台，支援結構化問答卡片、單題獨立討論對話串與決策持久化。",
+      "內建互動介面圖片提示詞生成器，一鍵生成並將可編輯草稿直接填入 Composer。",
+      "統一視窗、關於頁面及安裝程式的自訂版品牌標識，最佳化提示詞捷徑版面配置與穩定性修正。",
+    ],
+  },
+  {
     version: "0.18.0",
     date: "2026-10-09",
     highlights: [

@@ -2,6 +2,15 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const trEntries: ChangelogEntry[] = [
   {
+    version: "0.19.0",
+    date: "2026-10-13",
+    highlights: [
+      "Gereksinimler menüsündeki yerel görsel mülakat çalışma alanı ile yapılandırılmış sorular ve kalıcı kararlarla gereksinimleri netleştirin.",
+      "Yerleşik etkileşimli kullanıcı arayüzü görsel istem oluşturucu ile düzenlenebilir taslakları doğrudan Composer'a yönlendirin.",
+      "Masaüstü yüzeylerinde, yükleyicide ve Hakkında ekranında çatal kimliğini birleştirin, kısayol düzeni ve kararlılık düzeltmelerini iyileştirin.",
+    ],
+  },
+  {
     "version": "0.18.0",
     "date": "2026-10-09",
     "highlights": [
