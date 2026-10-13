@@ -42,6 +42,7 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
     try { resolveCodingAction(action.id, new CodingActionRegistry({ schemaVersion: 1, actions: [action] }), catalog); return ""; }
     catch (cause) { return cause instanceof CodingActionError ? t(`codingActions.${cause.code === "SKILL_MISSING" ? "skillMissing" : cause.code}`, { skillId: action.skillId }) : t("codingActions.executeFailed", { detail: String(cause) }); }
   };
+  const tooltipLine = (when: string, example: string) => `${t("codingActions.tooltipWhen", { defaultValue: "什么时候使用" })}：${when}\n${t("codingActions.tooltipExample", { defaultValue: "具体例子" })}：${example}`;
   const visualSkillAvailable = !catalogError && catalog.some(command => command.kind === "skill" && command.skillId === "grill-with-ui");
   const renderAction = (shortcut: CodingShortcut, menu = false) => {
     const { action } = shortcut;
@@ -52,7 +53,7 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
       <AnchoredMenu open={discussionOpen} onClose={() => setDiscussionOpen(false)} role="menu" side="top" label={action.label} menuClassName="context-menu coding-more-menu"
         trigger={ref => <Button ref={ref} variant="secondary" disabled={disabled} aria-label={t("codingActions.visualDiscussionMenu", { defaultValue: "Discussion modes" })} aria-haspopup="menu" aria-expanded={discussionOpen} onClick={() => { setMoreOpen(false); setDiscussionOpen(value => !value); }}>▾</Button>}>
         <Button variant="ghost" className="context-menu-item" role="menuitem" disabled={disabled || Boolean(unavailable)} onClick={() => { setDiscussionOpen(false); activateCodingShortcut(shortcut, { openTaskGraph: () => setTaskGraphOpen(true), execute: onExecute, selectSkill: onSelectSkill }); }}>{action.label}</Button>
-        <Button variant="ghost" className="context-menu-item" role="menuitem" disabled={disabled || !visualSkillAvailable} title={!visualSkillAvailable ? "Install the grill-with-ui Skill to enable this mode" : undefined} onClick={() => { setDiscussionOpen(false); onSelectSkill("grill-with-ui"); }}>{t("codingActions.visualDiscussion", { defaultValue: "可视化讨论" })}</Button>
+        <Button variant="ghost" className="context-menu-item" role="menuitem" disabled={disabled || !visualSkillAvailable} title={tooltipLine(t("codingActions.visualTooltipWhen"), t("codingActions.visualTooltipExample"))} onClick={() => { setDiscussionOpen(false); onSelectSkill("grill-with-ui"); }}>{t("codingActions.visualDiscussion", { defaultValue: "可视化讨论" })}</Button>
         {!visualSkillAvailable && <div className="coding-menu-group-label" role="status">{t("codingActions.visualDiscussionMissing", { defaultValue: "Install grill-with-ui in Skills first" })}</div>}
       </AnchoredMenu>
     </div>;
@@ -64,7 +65,7 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
   return <section ref={workbenchRef} className="coding-workbench" aria-label={t("codingActions.title")}>
     <div className="coding-shortcuts coding-shortcuts-primary">{primary.map(action => renderAction(action))}
       <AnchoredMenu open={moreOpen} onClose={() => setMoreOpen(false)} role="menu" side="top" restoreFocus={!disabled || more.some(shortcut => shortcut.action.skillId === "implement-spec")} label={t("codingActions.more")} menuClassName="context-menu coding-more-menu"
-        trigger={ref => <Button ref={ref} variant="ghost" disabled={disabled && !more.some(shortcut => shortcut.action.skillId === "implement-spec")} aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(value => !value)}>{t("codingActions.more")}</Button>}>
+        trigger={ref => <Button ref={ref} variant="ghost" title={tooltipLine(t("codingActions.moreTooltipWhen"), t("codingActions.moreTooltipExample"))} disabled={disabled && !more.some(shortcut => shortcut.action.skillId === "implement-spec")} aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(value => !value)}>{t("codingActions.more")}</Button>}>
         {groupCodingShortcuts(more).map(group => <div key={group.id} role="group" aria-label={t(`codingActions.groups.${group.id}`)}>
           <div className="coding-menu-group-label" aria-hidden="true">{t(`codingActions.groups.${group.id}`)}</div>
           {group.shortcuts.map(action => renderAction(action, true))}
@@ -75,7 +76,7 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
     <div className="coding-shortcuts coding-shortcuts-secondary">
       <div className="coding-prompt-actions">
         {codingPromptActions(configuration, t("codingActions.commitCode")).filter(action => action.enabled !== false).map(action =>
-          <Button key={action.id} disabled={disabled} title={action.id === "commit-code" && action.prompt === null ? t("codingActions.commitHint") : t("codingActions.plainPromptHint")} onClick={() => onSelectPrompt(action.id)}>{action.label}</Button>)}
+          <Button key={action.id} disabled={disabled} title={tooltipLine(t(action.id === "commit-code" ? "codingActions.commitTooltipWhen" : "codingActions.promptTooltipWhen"), t(action.id === "commit-code" ? "codingActions.commitTooltipExample" : "codingActions.promptTooltipExample"))} onClick={() => onSelectPrompt(action.id)}>{action.label}</Button>)}
       </div>
     </div>
     {actions.some(action => reason(action)) && <div role="status">{actions.filter(action => reason(action)).map(shortcut => `${shortcut.action.label}：${reason(shortcut)}`).join("；")}<Button onClick={() => setCatalogVersion(value => value + 1)}>{t("codingActions.recheck")}</Button></div>}
