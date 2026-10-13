@@ -11,6 +11,7 @@ import {
 import "./grill-workspace.css";
 
 type Language = "zh" | "en";
+const EMPTY_MESSAGES: Array<{ role?: string; content?: string; createdAt?: string }> = [];
 const copy = {
   zh: {
     title: "可视化需求讨论", close: "关闭", topic: "讨论主题", topicHint: "例如：预警中心三色区域配置及报警关联逻辑",
@@ -59,10 +60,11 @@ function latestReply(messages: Array<{ role?: string; content?: string; createdA
 export function GrillWorkspaceContent({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {
   useBlockingOverlay();
   const { i18n } = useTranslation();
-  const t = copy[i18n.resolvedLanguage?.startsWith("zh") || i18n.language.startsWith("zh") ? "zh" : "en" as Language];
+  const language: Language = (i18n.resolvedLanguage ?? i18n.language).startsWith("zh") ? "zh" : "en";
+  const t = copy[language];
   const activeSessionId = useAppStore(s => s.activeSessionId);
   const isRunning = useAppStore(s => s.runningSessions[sessionId] ?? false);
-  const messages = useAppStore(s => s.activeSessionId === sessionId ? s.messages : s.retainedTranscripts[sessionId] ?? []);
+  const messages = useAppStore(s => s.activeSessionId === sessionId ? s.messages : s.retainedTranscripts[sessionId] ?? EMPTY_MESSAGES);
   const [state, setState] = useState<GrillState | null>(() => loadGrill(sessionId));
   const [topic, setTopic] = useState("");
   const [threadInput, setThreadInput] = useState("");
@@ -206,7 +208,7 @@ export function GrillWorkspaceContent({ sessionId, onClose }: { sessionId: strin
         <div className="grill-columns">
           <section className="grill-questions" aria-label={t.title}>
             <nav className="grill-question-nav" aria-label={t.progress}>
-              {state.questions.map(q => <Button key={q.id} variant={q.id === current?.id ? "secondary" : "ghost"} onClick={() => { mutate(s => ({ ...s, selectedId: q.id })); setThreadInput(""); }} title={q.title}>
+              {state.questions.map(q => <Button key={q.id} variant={q.id === current?.id ? "secondary" : "ghost"} onClick={() => { setState(s => s ? { ...s, selectedId: q.id } : s); setThreadInput(""); }} title={q.title}>
                 {q.id} · {q.title} · {t[q.status]}
               </Button>)}
             </nav>
