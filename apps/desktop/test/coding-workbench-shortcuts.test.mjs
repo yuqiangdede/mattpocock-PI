@@ -32,6 +32,11 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
   assert.ok(!html.includes(`>${en.codingActions.configure}</button>`), "configuration is available through Settings only");
   assert.ok(html.includes("Discussion modes"), "requirements discussion exposes the mode dropdown");
   assert.ok(html.includes("coding-requirements-split"));
+  assert.ok(html.includes(en.codingActions.moreTooltipWhen), "More has concise help");
+  assert.ok(html.includes(en.codingActions.commitTooltipWhen), "Commit code has concise help");
+  assert.ok(html.includes(en.codingActions.visualTooltipWhen), "Discussion dropdown has concise help");
+  assert.ok(html.includes(en.codingActions.tooltipWhen), "Skill shortcuts include usage");
+  assert.ok(html.includes(en.codingActions.tooltipExample), "Skill shortcuts include examples");
   assert.ok(html.includes(en.codingActions.commitCode));
   assert.ok(html.includes("coding-prompt-actions"));
   assert.ok(html.indexOf(en.codingActions.diagnose) < html.indexOf(en.codingActions.more), "More follows Diagnose in the primary Skill row");
