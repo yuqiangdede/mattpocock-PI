@@ -29,12 +29,13 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
   const html = renderToStaticMarkup(createElement(I18nextProvider, { i18n },
     createElement(CodingWorkbench, { disabled: false, error: null, onExecute: () => { executions++; }, onSelectSkill: () => { executions++; }, onSelectPrompt: () => { executions++; } })));
   for (const label of Object.values(en.codingActions.defaults)) assert.ok(html.includes(label));
-  assert.ok(html.includes(en.codingActions.configure));
+  assert.ok(!html.includes(`>${en.codingActions.configure}</button>`), "configuration is available through Settings only");
+  assert.ok(html.includes("Discussion modes"), "requirements discussion exposes the mode dropdown");
+  assert.ok(html.includes("coding-requirements-split"));
   assert.ok(html.includes(en.codingActions.commitCode));
   assert.ok(html.includes("coding-prompt-actions"));
   assert.ok(html.indexOf(en.codingActions.diagnose) < html.indexOf(en.codingActions.more), "More follows Diagnose in the primary Skill row");
-  assert.ok(html.indexOf(en.codingActions.more) < html.indexOf(en.codingActions.configure), "Configuration follows the Skill row");
-  assert.ok(html.indexOf(en.codingActions.configure) < html.indexOf(en.codingActions.commitCode), "Commit code follows configuration");
+  assert.ok(html.indexOf(en.codingActions.more) < html.indexOf(en.codingActions.commitCode), "Commit code remains in the second row");
   assert.ok(html.includes(en.codingActions.askNext));
   assert.ok(html.includes(en.coding.initialize));
   assert.ok(html.indexOf(`aria-label="${en.coding.initialize}"`) < html.indexOf(`aria-label="${en.codingActions.askNext}"`));

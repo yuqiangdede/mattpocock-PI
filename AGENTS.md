@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Policy-Sync: 2026-10-11.3
+Policy-Sync: 2026-10-13.1
 
 Mandatory rules for AI coding agents working in PI-Desktop.
 
@@ -208,6 +208,17 @@ regression tests. Obtain user approval for the architecture exception and
 record the decision in an ADR. Keep any approved core touchpoints small,
 isolated, and independently reviewable. Do not silently expand feature scope.
 
+
+### Skill / Agent / UI / State separation (mandatory)
+
+**Skill defines the method; Agent performs reasoning; UI handles interaction; independent state persists the process.**
+
+- Skills specify workflows, questions, decision criteria and output contracts; they do not own desktop UI or authoritative session lifecycles.
+- Agent Runtime performs reasoning and executes Skills; the renderer never becomes a second agent executor.
+- UI presents questions, recommendations, decisions, progress and feedback, and sends user actions through existing permission-gated interfaces.
+- Durable workflow state (such as Work Item decisions, question status, evidence and resume checkpoints) has explicit ownership, stable identifiers and versioned persistence. Use existing Host-owned persistence or an approved independent state store; never bypass Host/SQLite boundaries or duplicate Session ownership.
+- Keep workflow state recoverable and traceable across conversations. Prefer incremental, validated updates over rewriting entire histories. Derived previews must not silently override confirmed decisions.
+- Implement fork features through extensions or independent modules first; do not alter PI-Desktop core lifecycles merely to add a workflow UI.
 
 ### ADR discipline
 
