@@ -24,6 +24,8 @@
 .grill-header p { margin: 0; color: var(--ds-text-secondary); overflow-wrap: anywhere; font-size: var(--text-sm); }
 .grill-start { margin: auto; display: flex; flex-direction: column; gap: 12px; width: min(580px, 100%); }
 .grill-meta { padding: 10px 0; color: var(--ds-text-secondary); font-size: var(--text-sm); }
+.grill-meta-actions { flex-wrap: wrap; justify-content: flex-end; }
+.grill-guidance { margin: 0 0 10px; color: var(--ds-text-secondary); font-size: var(--text-sm); }
 .grill-columns { display: grid; grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr); gap: 12px; flex: 1; min-height: 0; }
 .grill-questions, .grill-thread {
   display: flex; flex-direction: column; min-width: 0; min-height: 0;
@@ -31,14 +33,16 @@
 }
 .grill-question-nav { display: flex; flex-wrap: wrap; gap: 4px; padding: 10px; border-bottom: 1px solid var(--ds-border-default); max-height: 110px; overflow-y: auto; }
 .grill-question-nav .btn { text-align: start; font-weight: normal; max-width: 100%; overflow-wrap: anywhere; }
-.grill-question-detail { padding: 14px; overflow-y: auto; flex: 1; min-height: 0; }
+.grill-question-detail { display: flex; flex-direction: column; overflow: hidden; flex: 1; min-height: 0; }
+.grill-question-scroll { padding: 14px; overflow-y: auto; flex: 1; min-height: 0; }
+.grill-question-footer { flex-shrink: 0; padding: 12px 14px 0; border-top: 1px solid var(--ds-border-default); background: var(--ds-bg-primary); }
 .grill-question-detail h3, .grill-thread h3 { margin: 0 0 12px; font-size: var(--text-md); }
-.grill-question-detail > p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.55; }
+.grill-question-scroll > p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.55; }
 .grill-options { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
 .grill-options .btn { white-space: normal; text-align: start; height: auto; min-height: 38px; justify-content: flex-start; padding-block: 10px; overflow-wrap: anywhere; }
 .grill-recommend { border: 1px solid var(--ds-border-default); border-radius: var(--radius-sm); padding: 10px; color: var(--ds-text-secondary); }
 .grill-recommend strong { color: var(--ds-text-primary); }
-.grill-recommend p { white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0 0; }
+.grill-recommend p { white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0 0; max-height: 12dvh; overflow-y: auto; }
 .grill-answer-actions { justify-content: flex-end; padding: 12px 0; }
 .grill-empty { padding: 18px; color: var(--ds-text-secondary); }
 .grill-thread { padding: 12px; }

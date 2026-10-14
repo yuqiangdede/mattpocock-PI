@@ -37,6 +37,23 @@ decisions. Waiting, failed/cancelled turns, storage/send errors and other Sessio
 never trigger retries. Exhaustion remains visible with an explicit manual retry.
 Native interview text, question choices, recommendations and discussion replies
 support native text selection and copying; action controls retain shell behavior.
+Long question descriptions and options scroll independently in the left pane.
+The Agent recommendation and confirm/defer/reopen controls remain in a fixed
+footer below that scroller. Long recommendation rationale scrolls within the
+recommendation card so the decision controls remain visible.
+Interview navigation follows the settled-question state: Finish is disabled
+until an empty questions response confirms exhaustion; Next round is disabled
+after exhaustion. Open questions must be confirmed or deferred before either
+action. At the existing 100-question safety limit, settling the round enables
+Finish instead of another round. Inline guidance describes the available action.
+Accept all recommendations (automatic) explicitly authorizes accepting pending
+and deferred recommendations, requesting subsequent rounds, and finishing when
+no further questions remain. Already confirmed decisions remain unchanged.
+Single/multiple recommendations must reference valid options. Invalid cached
+recommendations, send/storage errors, exhausted response retries and a Session
+switch stop automation. Stop automatic interview or closing the panel prevents
+future automatic actions; an already submitted request may still complete.
+Automatic mode is panel-local and does not silently resume on reopening.
 Each native question always offers Other (write your own), independently of
 Agent-provided options. Selecting it reveals a per-question answer editor; blank
 text cannot be confirmed. Single-select replaces the selected fixed option,
@@ -51,13 +68,26 @@ does not automatically finish the interview.
 
 Completed native interviews recommend Create specification. A successfully ended
 to-spec turn recommends Create tickets or Implement; to-tickets recommends
-Implement; implement recommends Code review; code-review recommends Commit code.
+Implement; implement recommends Code review. Code review findings or an unclear
+outcome recommend Fix code review findings in More, highlighting both More and
+the entry. Only an explicit clear review (an empty structured findings array,
+without an incorrect verdict, or a standalone English/Chinese no-findings
+conclusion) recommends Commit code. Priority-tagged findings take precedence
+over a clear conclusion. Unknown prose is never assumed to be a clean review.
+Fix code review findings is an independent built-in plain prompt: verify the
+latest report, fix confirmed defects minimally, add regression coverage and
+report rejected/unresolved findings. It carries the recommendation context,
+retains existing draft/attachments, closes More and waits for manual Send.
+Completed repair requests recommend Code review again. The localized leading
+repair heading identifies this plain-prompt action; editing that heading may
+remove the optional next-step hint. Saved Skill/prompt configuration is retained.
 These are optional next actions, not workflow prerequisites or acceptance claims.
 Recommendations highlight the existing action buttons rather than add another
 row. When a recommended Skill lives in More, both More and its menu item receive
 the highlight and an accessible recommendation description. Existing labels,
 availability checks and saved configuration remain unchanged.
-Only the latest user turn's leading native Skill command qualifies.
+Only the latest user turn's leading native Skill command or built-in repair
+heading qualifies.
 Skill identity is read from the persisted original `command` when present;
 expanded model-facing `content` is used only for legacy rows without a command.
 Successful native turn results qualify; running, failed, cancelled or unrelated turns do not qualify.
@@ -85,9 +115,10 @@ disabled entries). Matt labels and guidance are localized; imagegen and unrelate
 catalog skills are excluded. Existing configured common
 entries retain their labels, prompts and enabled state; no profile rewrite is
 required to restore the entry points. Missing skills remain visibly unavailable. Known engineering skills use localized
-timing, purpose and example tooltips on both primary and More entries; raw catalog
-descriptions are fallback only for unknown skills. Explicit configured descriptions
-remain verbatim.
+two-line launcher tooltips with “When to use” and “Example” labels on primary
+and More entries; raw catalog descriptions are fallback only for unknown skills.
+Configured descriptions remain verbatim in settings and provide the launcher
+tooltip's usage line when present.
 Except for the `implement-spec` viewer entry, selecting an action prepares an editable Composer draft and never
 submits. Undefined/null instructions use the localized engineering prompt matched
 by skill id; explicit empty instructions retain marker-only insertion. Custom
@@ -155,11 +186,13 @@ as Claude Code.
 
 
 The shortcuts share one wrapping row: Initialize, Ask next step, Visual
-requirements discussion, Interaction image prompt, Implement, Code review,
+requirements discussion, Implement, Code review,
 Diagnose bug, Commit code, optional custom plain prompts, then More.
-Ordinary discussion, Create specification and Create tickets remain in More.
+Interaction image prompt, Ordinary discussion, Create specification and Create
+tickets live in More. Selecting Interaction image prompt closes More and inserts
+an editable prompt, preserving the existing Composer draft and attachments.
 Settings remain accessible through Extensions.
-The default Commit code button prepares an editable, localized build-then-commit prompt with no Skill dependency. It preserves existing Composer text and attachments; only manual Send executes the prompt. Git (including GitLab hosting) and SVN are supported by the default instruction; failed verification forbids commit and Git Push is excluded. The Engineering Workflow entry is no longer exposed.
+The default Commit code button prepares an editable, localized build-then-commit prompt with no Skill dependency. It preserves existing Composer text and attachments; only manual Send executes the prompt. Git (including GitLab hosting) and SVN are supported by the default instruction; failed verification forbids commit. Git push is permitted only when the user explicitly requests it. The Engineering Workflow entry is no longer exposed.
 
 Extensions > Coding Actions includes a separate Plain prompt buttons editor.
 Names, instructions, enabled state and order are editable; buttons can be added
@@ -190,13 +223,14 @@ draft-only behavior described above.
 
 ## Global instruction settings
 
-Composer skill buttons, including the requirements and More menu entries,
-show the same localized usage timing, purpose and example on pointer hover
-or keyboard focus. Guidance uses the shared portal tooltip so menu clipping
-does not hide it; it wraps within the viewport. Reading a tooltip does not
-change the draft or execute a skill. Clicking dismisses it and retains the
-existing draft insertion behavior. Buttons retain short accessible names
-and expose their guidance as accessible descriptions.
+Composer skill buttons, More, visual requirements, and prompt/Commit actions
+show concise localized tooltips with exactly two labeled lines: “When to use”
+and “Example”. They use the shared portal tooltip on pointer hover and keyboard
+focus; it wraps within the viewport. Reading a tooltip does not change the
+draft or execute a skill. Clicking dismisses it and retains the existing draft
+insertion behavior. Buttons retain short accessible names and expose their
+guidance as accessible descriptions. Missing-Skill and runtime errors remain in
+the separate status/error area rather than the concise hover text.
 
 For every one of the 26 engineering entries, the instruction editor shows
 localized guidance before the prompt: when to use the skill, what it does,
@@ -309,7 +343,8 @@ dependencies are all done. It is informational, never a dispatch queue.
 
 The viewer has no scheduler, issue-write path, automatic task closure, model
 execution, or persisted task graph. Updating input clears stale results. Closing
-is explicit; no task completion event closes the viewer. Key engineering Skill
-tooltips and the viewer show separate descriptive gate metadata. Actual safety
+is explicit; no task completion event closes the viewer. The viewer shows
+separate descriptive gate metadata; concise Skill tooltips omit gate details.
+Actual safety
 constraints remain enforced by CLI permissions or Hooks; metadata grants no
 permission and does not change the CodingAction schema.

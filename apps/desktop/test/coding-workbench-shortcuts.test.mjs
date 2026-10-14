@@ -32,9 +32,13 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
   assert.ok(!html.includes(`>${en.codingActions.configure}</button>`), "configuration is available through Settings only");
   assert.ok(html.includes(en.codingActions.visualRequirements), "direct visual requirements entry");
   assert.ok(!html.includes("coding-requirements-split"));
+  assert.ok(html.includes(en.codingActions.moreTooltipWhen), "More has concise help");
+  assert.ok(html.includes(en.codingActions.commitTooltipWhen), "Commit code has concise help");
+  assert.ok(html.includes(en.codingActions.visualTooltipWhen), "Visual requirements entry has concise help");
+  assert.ok(html.includes(en.codingActions.tooltipWhen), "Skill shortcuts include usage");
+  assert.ok(html.includes(en.codingActions.tooltipExample), "Skill shortcuts include examples");
   assert.ok(html.includes(en.codingActions.commitCode));
-  assert.ok(html.includes(en.codingActions.interactionImage));
-  assert.ok(html.indexOf(`>${en.codingActions.interactionImage}</button>`) < html.indexOf(`>${en.codingActions.commitCode}</button>`), "image prompt is first, commit code second");
+  assert.ok(!html.includes(`>${en.codingActions.interactionImage}</button>`), "image prompt lives in the closed More menu");
   assert.ok(!html.includes("coding-shortcuts-secondary"), "one wrapping action row");
   assert.ok(html.indexOf(en.codingActions.diagnose) < html.indexOf(en.codingActions.more), "More follows Diagnose in the primary Skill row");
   assert.ok(html.indexOf(`>${en.codingActions.commitCode}</button>`) < html.indexOf(`>${en.codingActions.more}</button>`), "Commit precedes More in the unified row");
@@ -44,7 +48,7 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
   assert.ok(html.includes(en.codingActions.diagnose));
   assert.ok(html.includes(en.codingActions.more));
   const orderedLabels = [en.coding.initialize, en.codingActions.askNext, en.codingActions.visualRequirements,
-    en.codingActions.interactionImage, en.codingActions.defaults.implement, en.codingActions.defaults["code-review"],
+    en.codingActions.defaults.implement, en.codingActions.defaults["code-review"],
     en.codingActions.diagnose, en.codingActions.commitCode, en.codingActions.more];
   const positions = orderedLabels.map(label => html.indexOf(`>${label}</button>`));
   assert.ok(positions.every((position, index) => position >= 0 && (index === 0 || position > positions[index - 1])), "Unified actions follow the engineering order");
@@ -67,8 +71,7 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
     { disabled: false, error: null, onExecute() {}, onSelectSkill() {}, onSelectPrompt() {} })));
   const secondary = customized.slice(customized.indexOf('class="coding-shortcuts coding-shortcuts-primary"'));
   assert.ok(secondary.includes("My commit"));
-  assert.ok(secondary.includes(en.codingActions.interactionImage));
-  assert.ok(secondary.indexOf(`>${en.codingActions.interactionImage}</button>`) < secondary.indexOf(">My commit</button>"), "preserve first and second positions with saved config");
+  assert.ok(!secondary.includes(`>${en.codingActions.interactionImage}</button>`), "saved configuration keeps image prompt in More");
   assert.ok(secondary.includes("My summary"));
   assert.ok(secondary.indexOf(">My commit</button>") < secondary.indexOf(">My summary</button>"), "custom actions follow commit");
   assert.ok(!secondary.includes("Hidden prompt"));

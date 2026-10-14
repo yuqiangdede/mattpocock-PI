@@ -43,6 +43,17 @@ does not authorize commits, publishing, merging or live-instance testing.
 
 ## 1. Goals
 
+### E2E-clipboard-copy-without-live-voice
+
+- With Live Voice disabled and no microphone reservation, copy a transcript
+  message, code block and error detail, then paste into a text editor. Expect
+  the selected text and no copy-failure toast. Repeat with Live Voice idle.
+- Clipboard reads and writes from external frames/windows remain denied;
+  microphone access without a reservation remains denied.
+- Automated permission-boundary regression:
+  `node --test apps/desktop/test/live-voice-permission.test.mjs`.
+  Native clipboard/focus behavior requires separate isolated Electron validation.
+
 ### E2E-DEV-package-guard-first-start
 
 - In an isolated checkout with package sources and no guard snapshot, execute
@@ -91,8 +102,11 @@ does not authorize commits, publishing, merging or live-instance testing.
   tickets. Selecting a Skill only prepares a draft. Next-step recommendations
   remain available. Verify correlated reply reopening and wide responsive sizing.
 - Verify one action row ordered Initialize, Ask next step, Visual discussion,
-  Interaction image, Implement, Review, Diagnose, Commit and More. Custom plain
+  Implement, Review, Diagnose, Commit and More. Custom plain
   prompts remain before More. At narrow row widths, buttons wrap without overflow.
+- Open More and select Interaction image. Verify it is absent from the primary
+  row, closes the menu and inserts an editable image-generation prompt while
+  retaining the existing draft and attachments; selection must not send.
 - Restore a pending follow-up, observe an invalid intermediate reply, then deliver
   valid bare JSON with the matching request and question IDs. Verify the answer
   appears in that question's thread and pending state clears without retrying.
@@ -106,6 +120,20 @@ does not authorize commits, publishing, merging or live-instance testing.
   results, truncated payloads and input-size bounds.
 - With the application shell's non-selectable base styles loaded, verify question
   text, option labels, rationale and Agent replies opt into native text selection.
+- Load a long native question, scroll its description/options to the bottom,
+  and verify the recommendation and confirm/defer controls remain visible at
+  the same position. Defer, reopen and confirm a custom answer from that footer.
+  Coverage: `apps/desktop/test/coding-prompt-user-path.test.mjs`.
+- While questions remain, verify Finish is disabled. Settle the round and verify
+  Next round is available. After an empty response, verify Next round is disabled
+  and Finish is enabled, with matching inline guidance.
+- Click Accept all recommendations (automatic): preserve an existing confirmed
+  answer, accept a deferred recommendation and new questions from the next round,
+  then receive an empty round and finish once. Stop during a pending round and
+  verify its reply does not trigger another request. Reject a send and verify
+  automatic mode stops with an error rather than looping. Coverage:
+  `apps/desktop/test/coding-prompt-user-path.test.mjs`; model tests cover valid
+  single/multiple recommendations, invalid cached choices and navigation gates.
 - Select Other, verify blank confirmation is blocked, enter a custom alternative,
   confirm and reopen the panel. Verify selected custom text is retained and
   included in downstream summaries. Multi-select may combine it with fixed options.
@@ -116,8 +144,17 @@ does not authorize commits, publishing, merging or live-instance testing.
   dismissal and a draft containing the design document path. End a to-spec turn
   successfully and verify both Create tickets and Implement recommendations.
   Select Create tickets, preserving draft and attachments with outcome context.
-  End Code review, select Commit code and verify the configured draft with review
-  context. Selection alone must issue no Host prompt or Git operation.
+  End Code review with an explicit no-findings conclusion, select Commit code and verify the configured draft with review
+  context. The default prompt requires successful checks and permits Git push
+  only when explicitly requested. Selection alone must issue no Host prompt or
+  Git operation.
+- Return a Code review finding and verify Commit loses its highlight while More
+  and Fix code review findings are highlighted. Select the repair entry, verify
+  a plain editable draft carrying the review, previous text and attachments;
+  the menu closes without submission. End that repair turn and verify Code
+  review is highlighted again. Unknown review prose recommends verification
+  through the repair entry rather than Commit. Model tests cover structured
+  findings, explicit clear conclusions and contradictory/ambiguous outcomes.
 - Verify recommendations highlight existing buttons without a separate row.
   Specification completion highlights Implement and More; opening More reveals
   highlighted Create tickets. A completed final answer after a recovered tool
@@ -17347,7 +17384,7 @@ without horizontal overflow; order stays fixed across task states.
 | --- | --- |
 | E2E-CODING-insert-and-manual-send | Select all eight actions (Spec and Tickets through the requirements menu), Ask, and every More item with localized editable default instructions with empty input; preserve text/files; prove no automatic prompt or Free Task; manually send and compare with typed slash input. |
 | E2E-CODING-requirements-menu | Main action remains Discuss requirements after selecting Spec or Tickets; keyboard opening, Escape, outside click, and disabling close the menu; secondary actions stay out of the toolbar. |
-| E2E-CODING-skill-guidance | Hover a primary skill or focus a requirements/More entry; read localized timing, purpose and example without changing the draft or executing a skill. Menu closure removes its tooltip; Chinese guidance wraps inside a narrow viewport. Covered by `--requirements-menu`. |
+| E2E-CODING-skill-guidance | Hover or focus a primary Skill, More, visual requirements, and prompt/Commit action; read exactly two localized lines labeled When to use and Example without changing the draft or executing a Skill. Settings retain the full editable description independently of launcher formatting. Missing-Skill and runtime errors remain available in the separate status/error area. Tooltips close with their trigger/menu and Chinese guidance wraps inside a narrow viewport. Covered by `--requirements-menu` plus the Coding Actions settings component test. |
 | E2E-CODING-engineering-setup | Insert and send `/setup-matt-pocock-skills`, read its actual body; no native initialization task or preview. |
 | E2E-CODING-catalog-recovery | Disable the installed skill, preserve input and navigate to Skills; enable and retry. Fail the catalog read, preserve input and retry without silent installation. |
 | E2E-CODING-session-ownership | Hold catalog response, switch conversations and release it; only the intended current draft changes. Preserve edits made during the catalog wait. |
