@@ -3,7 +3,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
 
-test("Live Voice media permission requires the trusted main frame and an active microphone lease", async (t) => {
+test("Main renderer copy works without a voice lease while media remains lease-gated", async (t) => {
   const previousRendererUrl = process.env.ELECTRON_RENDERER_URL;
   process.env.ELECTRON_RENDERER_URL = "http://localhost:5173/";
   t.after(() => {
@@ -57,6 +57,22 @@ test("Live Voice media permission requires the trusted main frame and an active 
   assert.equal(requestDecision({ requestingUrl: trustedUrl, isMainFrame: true, mediaTypes: ["audio"] }, "notifications"), false);
   assert.equal(requestDecision({ requestingUrl: trustedUrl, isMainFrame: true, mediaTypes: ["audio"] }, "media", {}), false);
   leaseActive = false;
+  // Explicit transcript copy must work without starting a voice call.
+  assert.equal(requestDecision({ requestingUrl: trustedUrl, isMainFrame: true }, "clipboard-sanitized-write"), true);
+  const copyDetails = { requestingUrl: trustedUrl, isMainFrame: true };
+  assert.equal(checkDecision(copyDetails, "http://localhost:5173", "clipboard-sanitized-write"), true);
+  for (const permission of ["clipboard-read", "deprecated-sync-clipboard-read", "notifications"]) {
+    assert.equal(requestDecision(copyDetails, permission), false);
+    assert.equal(checkDecision(copyDetails, "http://localhost:5173", permission), false);
+  }
+  assert.equal(requestDecision({ ...copyDetails, isMainFrame: false }, "clipboard-sanitized-write"), false);
+  assert.equal(checkDecision({ ...copyDetails, isMainFrame: false }, "http://localhost:5173", "clipboard-sanitized-write"), false);
+  assert.equal(requestDecision({ ...copyDetails, requestingUrl: "https://outside.example" }, "clipboard-sanitized-write"), false);
+  assert.equal(checkDecision(copyDetails, "https://outside.example", "clipboard-sanitized-write"), false);
+  assert.equal(checkDecision({ ...copyDetails, requestingUrl: "http://localhost:5173/other" }, "http://localhost:5173", "clipboard-sanitized-write"), false);
+  assert.equal(requestDecision(copyDetails, "clipboard-sanitized-write", {}), false);
+  assert.equal(checkDecision(copyDetails, "http://localhost:5173", "clipboard-sanitized-write", null), false);
+  assert.equal(checkDecision(copyDetails, "http://localhost:5173", "clipboard-sanitized-write", {}), false);
   assert.equal(requestDecision({ requestingUrl: trustedUrl, isMainFrame: true, mediaTypes: ["audio"] }), false);
   assert.equal(checkDecision({ mediaType: "audio" }), false);
 });
