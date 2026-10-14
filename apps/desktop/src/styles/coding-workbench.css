@@ -3,6 +3,7 @@
 .coding-shortcuts, .coding-shortcut-error { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .coding-shortcuts .btn { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .coding-shortcut-error { margin-top: 6px; color: var(--ds-text-secondary); overflow-wrap: anywhere; }
+.coding-shortcuts + .coding-shortcuts { margin-top: 6px; }
 
 .coding-shortcuts .btn { font-weight: 400; }
 .btn.coding-action-recommended {

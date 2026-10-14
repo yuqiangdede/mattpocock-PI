@@ -191,9 +191,10 @@ fn shipped_bundle_is_complete_and_restarts_preserve_disable_edit_and_delete() {
     crate::agent_capabilities::test_support::with_global_agents(&dir.path().join("agents"), || {
         let mut registry = UserSkillRegistry::new(dir.path());
         let first = registry.ensure_bundled().unwrap();
-        assert_eq!(first.updated.len(), 38);
+        assert_eq!(first.updated.len(), 39);
         let records = registry.list(CapabilityLevel::Global, None).unwrap();
         for id in [
+            "requirements-spec",
             "grill-with-docs",
             "grill-with-ui",
             "to-spec",
@@ -219,9 +220,11 @@ fn shipped_bundle_is_complete_and_restarts_preserve_disable_edit_and_delete() {
             .iter()
             .any(|(path, _)| path == "mocking.md"));
         let visual_files = registry.package_files("grill-with-ui", CapabilityLevel::Global, None).unwrap();
-        for required in ["SKILL.md", "server.mjs", "page.html", "LICENSE"] {
+        for required in ["server.mjs", "page.html", "LICENSE"] {
             assert!(visual_files.iter().any(|(path, _)| path == required), "missing {required}");
         }
+        let spec_files = registry.package_files("requirements-spec", CapabilityLevel::Global, None).unwrap();
+        assert!(spec_files.iter().any(|(path, _)| path.replace('\\', "/").ends_with("document-flow.md")));
         registry
             .set_enabled("retro", false, Some(CapabilityLevel::Global), None)
             .unwrap();
@@ -408,7 +411,7 @@ fn bundled_fallback_does_not_consume_user_skill_capacity() {
                 .iter()
                 .filter(|record| record.source == "bundled")
                 .count(),
-            37
+            39
         );
     });
 }

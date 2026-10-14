@@ -39,6 +39,7 @@ export function useCodingActionLauncher(options: {
         catalog: async () => (await api.composerCommands()).commands, isCurrent: () => current() && !latest.current.blocked,
         defaultPrompt: skillId => {
           if (skillId === "grill-with-ui") return visualGrillingDefaultPrompt(i18n.resolvedLanguage ?? i18n.language);
+          if (skillId === "requirements-spec") return t("coding.prompts.requirementsSpec");
           const shortcut = ENGINEERING_SHORTCUTS.find(entry => entry.skill === skillId);
           return shortcut ? t(`coding.prompts.${shortcut.action}`) : "";
         },
