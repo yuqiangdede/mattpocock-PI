@@ -11,6 +11,7 @@ import { AnchoredMenu } from "../../components/settings/AnchoredMenu";
 import { useAppStore } from "../../stores/app-store";
 import { loadCodingActions, useCodingActions } from "../extensions/coding-action-state";
 import { INTERACTION_IMAGE_PROMPT_ID } from "./interaction-image-prompt";
+import { REVIEW_FIX_PROMPT_ID } from "./review-fix-prompt";
 import { GrillWorkspace } from "./GrillWorkspace";
 import { loadGrill, parseGrillReply } from "./grill-workspace-model";
 import { codingNextSteps } from "./coding-next-steps";
@@ -70,7 +71,7 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
   // Fixed launcher order is presentation-only: never rewrite user configuration.
   const orderedPromptActions = [...plainActions.filter(action => action.id === "commit-code"), ...plainActions.filter(action => action.id !== "commit-code")];
   const isRecommended = (id: string) => Boolean(recommendation?.steps.some(step => step === id));
-  const recommendedMore = more.some(shortcut => isRecommended(shortcut.action.skillId));
+  const recommendedMore = isRecommended(REVIEW_FIX_PROMPT_ID) || more.some(shortcut => isRecommended(shortcut.action.skillId));
   const renderAction = (shortcut: CodingShortcut, menu = false) => {
     const { action } = shortcut;
     const unavailable = reason(shortcut);
@@ -83,18 +84,25 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
   const configure = () => { const store = useAppStore.getState(); store.setSettingsTab("codingActions"); store.setPage("settings"); };
   return <section ref={workbenchRef} className="coding-workbench" aria-label={t("codingActions.title")}>
     <div className="coding-shortcuts coding-shortcuts-primary">{primary.filter(shortcut => ["setup-matt-pocock-skills", "ask-matt", "grill-with-docs"].includes(shortcut.action.skillId)).map(action => renderAction(action))}
-        <Button disabled={disabled} title={t("codingActions.interactionImageHint", { defaultValue: "什么时候使用：需求讨论后，需要页面交互效果图提示词时。\n具体例子：根据预警中心的查询需求生成 UI 生图提示词。" })} onClick={() => onSelectPrompt(INTERACTION_IMAGE_PROMPT_ID)}>{t("codingActions.interactionImage", { defaultValue: "交互生图" })}</Button>
       {primary.filter(shortcut => !["setup-matt-pocock-skills", "ask-matt", "grill-with-docs"].includes(shortcut.action.skillId)).map(action => renderAction(action))}
         {orderedPromptActions.map(action =>
           <Button key={action.id} className={isRecommended(action.id) ? "coding-action-recommended" : undefined} aria-description={isRecommended(action.id) ? t("codingActions.recommendedNext") : undefined} disabled={disabled} title={action.id === "commit-code" && action.prompt === null ? t("codingActions.commitHint") : t("codingActions.plainPromptHint")} onClick={() => onSelectPrompt(action.id, isRecommended(action.id) ? recommendation?.context : undefined)}>{action.label}</Button>)}
 
       <AnchoredMenu open={moreOpen} onClose={() => setMoreOpen(false)} role="menu" side="top" restoreFocus={!disabled || more.some(shortcut => shortcut.action.skillId === "implement-spec")} label={t("codingActions.more")} menuClassName="context-menu coding-more-menu"
         trigger={ref => <Button ref={ref} variant="ghost" className={recommendedMore ? "coding-action-recommended" : undefined} aria-description={recommendedMore ? t("codingActions.recommendedNext") : undefined} disabled={disabled && !more.some(shortcut => shortcut.action.skillId === "implement-spec")} aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(value => !value)}>{t("codingActions.more")}</Button>}>
+        <TooltipButton className="btn btn-ghost context-menu-item" role="menuitem" disabled={disabled}
+          ariaLabel={t("codingActions.interactionImage")} tooltip={t("codingActions.interactionImageHint")}
+          tooltipClassName="ui-tooltip-help coding-skill-tooltip"
+          onClick={() => { setMoreOpen(false); onSelectPrompt(INTERACTION_IMAGE_PROMPT_ID); }}>{t("codingActions.interactionImage")}</TooltipButton>
+        <TooltipButton className={"btn btn-ghost context-menu-item" + (isRecommended(REVIEW_FIX_PROMPT_ID) ? " coding-action-recommended" : "")}
+          role="menuitem" disabled={disabled} ariaLabel={t("codingActions.reviewFix")}
+          aria-description={isRecommended(REVIEW_FIX_PROMPT_ID) ? t("codingActions.recommendedNext") : undefined}
+          tooltip={t("codingActions.reviewFixHint")} tooltipClassName="ui-tooltip-help coding-skill-tooltip"
+          onClick={() => { setMoreOpen(false); onSelectPrompt(REVIEW_FIX_PROMPT_ID, isRecommended(REVIEW_FIX_PROMPT_ID) ? recommendation?.context : undefined); }}>{t("codingActions.reviewFix")}</TooltipButton>
         {groupCodingShortcuts(more).map(group => <div key={group.id} role="group" aria-label={t(`codingActions.groups.${group.id}`)}>
           <div className="coding-menu-group-label" aria-hidden="true">{t(`codingActions.groups.${group.id}`)}</div>
           {group.shortcuts.map(action => renderAction(action, true))}
         </div>)}
-        {!more.length && <div role="status">{t("codingActions.noOtherSkills")}</div>}
       </AnchoredMenu>
     </div>
     {actions.some(action => reason(action)) && <div role="status">{actions.filter(action => reason(action)).map(shortcut => `${shortcut.action.label}：${reason(shortcut)}`).join("；")}<Button onClick={() => setCatalogVersion(value => value + 1)}>{t("codingActions.recheck")}</Button></div>}

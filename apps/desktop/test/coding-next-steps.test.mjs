@@ -29,8 +29,32 @@ try {
   });
   const messages = skill => [{role:"user",content:`/skill:${skill} Do this`,createdAt:new Date(1000).toISOString()}, {role:"assistant",content:"docs/spec.md"}];
   const completed = {status:"completed",finishedAt:2000};
+  test("review findings and unknown outcomes guide repair; only explicit clear reviews guide commit", () => {
+    for (const [content, step] of [
+      ["[P1] Lost updates", "review-fix"], ["Review outcome", "review-fix"],
+      ["No findings.", "commit-code"], ["未发现可操作的问题。", "commit-code"],
+      [JSON.stringify({findings:[],overall_correctness:"patch is correct"}), "commit-code"],
+      [JSON.stringify({findings:[],overall_correctness:"patch is incorrect"}), "review-fix"],
+      [JSON.stringify({findings:[],overall_correctness:"unknown"}), "review-fix"],
+      [JSON.stringify({findings:[{title:"Missing cleanup"}]}), "review-fix"],
+      ["No findings.\n[P2] Broken cancellation", "review-fix"],
+      ["未发现严重问题，但需要修复取消逻辑。", "review-fix"],
+      ["No findings.\nReview remains incomplete", "review-fix"],
+    ]) {
+      const transcript = [messages("code-review")[0], {role:"assistant",status:"complete",content}];
+      assert.deepEqual(codingNextSteps(transcript, completed).steps, [step], content);
+    }
+  });
+  test("plain review-fix requests return to review without accepting quoted or unrelated requests", () => {
+    for (const heading of ["修复审查问题", "Fix code review findings"]) {
+      const transcript = [{role:"user",content:heading+"\n\nVerify the findings"}, {role:"assistant",status:"complete",content:"Fixed and checked"}];
+      assert.deepEqual(codingNextSteps(transcript,completed).steps,["code-review"]);
+      assert.equal(codingNextSteps(transcript,completed,true),null);
+      assert.equal(codingNextSteps([{...transcript[0],content:"Quoted: "+transcript[0].content},transcript[1]],completed),null);
+    }
+  });
   test("completed engineering actions expose the requested optional chain and outcome context", () => {
-    for (const [skill, expected] of Object.entries({"to-spec":["to-tickets","implement"],"to-tickets":["implement"],implement:["code-review"],"code-review":["commit-code"]})) {
+    for (const [skill, expected] of Object.entries({"to-spec":["to-tickets","implement"],"to-tickets":["implement"],implement:["code-review"],"code-review":["review-fix"]})) {
       assert.deepEqual(codingNextSteps(messages(skill), completed), {steps:expected,context:"docs/spec.md"});
     }
   });
