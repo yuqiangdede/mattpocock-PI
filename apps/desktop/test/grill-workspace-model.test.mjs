@@ -19,6 +19,7 @@ try {
     loadGrill, saveGrill, grillPrompt,
     canAutoRetryGrill,
     setGrillCustomAnswer, summaries,
+    grillNavigation, acceptGrillRecommendations,
   } = domain;
 
   const op = (kind = "round", questionId) => ({
@@ -45,6 +46,35 @@ try {
     assert.equal(canAutoRetryGrill(attempt,{...result,status:"failed"},false),false);
     assert.equal(canAutoRetryGrill(attempt,{...result,finishedAt:0},false),false);
     assert.equal(canAutoRetryGrill(attempt,undefined,false),false);
+  });
+  test("navigation guides settled rounds to next and exhausted rounds to finish", () => {
+    let state = ready();
+    assert.deepEqual(grillNavigation(state), { next: false, finish: false });
+    state = acceptGrillRecommendations(state);
+    assert.deepEqual(grillNavigation(state), { next: true, finish: false });
+    assert.deepEqual(grillNavigation({ ...state, noMoreQuestions: true }), { next: false, finish: true });
+    for (const blocked of [{ ...state, pending: op() }, { ...state, finished: true }]) {
+      assert.deepEqual(grillNavigation(blocked), { next: false, finish: false });
+    }
+    assert.deepEqual(grillNavigation({ ...state, noMoreQuestions: true, questions: ready().questions }), { next: false, finish: false });
+    assert.deepEqual(grillNavigation({ ...state, questions: Array.from({ length: 100 }, (_, index) => ({ ...state.questions[0], id: `q${index + 1}` })) }), { next: false, finish: true });
+  });
+  test("automatic acceptance preserves confirmed decisions and accepts valid single and multiple recommendations", () => {
+    const original = ready();
+    const accepted = acceptGrillRecommendations(original);
+    assert.deepEqual(accepted.questions.map(q => q.selected), [["B"], ["A", "B"]]);
+    assert.ok(accepted.questions.every(q => q.status === "confirmed"));
+    const manual = decideGrillQuestion(decideGrillQuestion(original, "q1", "select", ["A"]), "q1", "confirm");
+    assert.deepEqual(acceptGrillRecommendations(manual).questions[0].selected, ["A"]);
+    const deferred = decideGrillQuestion(original, "q1", "defer");
+    assert.equal(acceptGrillRecommendations(deferred).questions[0].status, "confirmed");
+    for (const recommended of [[], ["OTHER"], ["Z"], ["A", "B"]]) {
+      const invalid = { ...original, questions: [{ ...original.questions[0], recommended }] };
+      assert.equal(acceptGrillRecommendations(invalid), invalid);
+    }
+    for (const blocked of [{ ...original, pending: op() }, { ...original, finished: true }]) {
+      assert.equal(acceptGrillRecommendations(blocked), blocked);
+    }
   });
 
   test("model responses require a matching action id and validated payload", () => {

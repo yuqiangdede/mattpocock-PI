@@ -7,7 +7,9 @@ import { Button, Textarea, Input, portalOverlay } from "../../components/ui";
 import {
   applyGrillReply, decideGrillQuestion, grillPrompt, loadGrill, newGrill,
   parseGrillReply, saveGrill, summaries, canAutoRetryGrill, setGrillCustomAnswer, type GrillOperation, type GrillQuestion, type GrillState,
+  grillNavigation,
 } from "./grill-workspace-model";
+import { useGrillAutomation } from "./useGrillAutomation";
 import "./grill-workspace.css";
 
 type Language = "zh" | "en";
@@ -74,6 +76,7 @@ export function GrillWorkspaceContent({ sessionId, onClose, onNext }: { sessionI
   const [invalid, setInvalid] = useState(false);
   const [tick, setTick] = useState(0);
   const [persistError, setPersistError] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const inflight = useRef(false);
   const readingHost = useRef(false);
   const frame = useRef<HTMLDivElement>(null);
@@ -150,6 +153,7 @@ export function GrillWorkspaceContent({ sessionId, onClose, onNext }: { sessionI
     // Save before submission: reopening the workspace can reconcile late results.
     if (!saveGrill(next)) { setError(t.storeError); setState(basis); return; }
     inflight.current = true;
+    setSubmitting(true);
     try {
       const accepted = await useAppStore.getState().sendPrompt(grillPrompt(next, operation), undefined, sessionId);
       if (!accepted) {
@@ -163,6 +167,7 @@ export function GrillWorkspaceContent({ sessionId, onClose, onNext }: { sessionI
       setError(String(cause));
     } finally {
       inflight.current = false;
+      setSubmitting(false);
     }
   };
   const start = (event: FormEvent) => {
@@ -198,7 +203,15 @@ export function GrillWorkspaceContent({ sessionId, onClose, onNext }: { sessionI
   useEffect(() => {
     if (invalid && state?.pending && canSend && !error && !inflight.current && canAutoRetryGrill(state.pending, turnResult, isRunning)) retry();
   }, [invalid, state?.pending?.id, turnResult, isRunning, canSend, error]);
-  const allSettled = state?.questions.every(q => q.status !== "open") ?? false;
+  const automation = useGrillAutomation({
+    state, canSend, busy: submitting || isRunning || inflight.current,
+    failed: Boolean(error) || persistError,
+    retryExhausted: Boolean(invalid && state?.pending && (state.pending.retryCount ?? 0) >= 3),
+    update: setState, submit: submitOperation,
+    invalidRecommendation: () => setError(translate("codingActions.visualAutoInvalid")),
+  });
+  const autoAccept = automation.enabled;
+  const navigation = state ? grillNavigation(state) : { next: false, finish: false };
   const confirmed = state?.questions.filter(q => q.status === "confirmed").length ?? 0;
   return <div className="overlay grill-overlay">
     <div ref={frame} tabIndex={-1} className="dialog grill-dialog" role="dialog" aria-modal="true" aria-labelledby="grill-dialog-title">
@@ -217,10 +230,14 @@ export function GrillWorkspaceContent({ sessionId, onClose, onNext }: { sessionI
         <div className="grill-meta">
           <span>{t.progress} {confirmed}/{state.questions.length} · {state.round}</span>
           <div className="grill-meta-actions">
-            <Button variant="ghost" disabled={Boolean(state.pending) || !allSettled || state.finished || state.questions.length >= 100 || !canSend} onClick={() => void submitOperation(state, "round")}>{t.next}</Button>
-            <Button variant="secondary" disabled={Boolean(state.pending) || state.finished || !canSend} onClick={() => void submitOperation(state, "finish")}>{state.finished ? t.finished : t.finish}</Button>
+            <Button variant="secondary" disabled={!autoAccept && (Boolean(state.pending) || state.finished || !canSend || isRunning || submitting)} onClick={() => { setError(""); automation.toggle(); }}>
+              {translate(autoAccept ? "codingActions.visualAutoStop" : "codingActions.visualAutoAccept")}
+            </Button>
+            <Button variant={navigation.next ? "secondary" : "ghost"} disabled={!navigation.next || !canSend || autoAccept || submitting || isRunning} onClick={() => void submitOperation(state, "round")}>{t.next}</Button>
+            <Button variant="secondary" disabled={!navigation.finish || !canSend || autoAccept || submitting || isRunning} onClick={() => void submitOperation(state, "finish")}>{state.finished ? t.finished : t.finish}</Button>
           </div>
         </div>
+        {!state.finished && !state.pending && <p className="grill-guidance" role="status">{translate(autoAccept ? "codingActions.visualAutoActive" : navigation.finish ? state.noMoreQuestions ? "codingActions.visualNoMoreQuestions" : "codingActions.visualQuestionLimit" : navigation.next ? "codingActions.visualNextHint" : "codingActions.visualDecideHint")}</p>}
         <div className="grill-columns">
           <section className="grill-questions" aria-label={t.title}>
             <nav className="grill-question-nav" aria-label={t.progress}>
@@ -229,32 +246,36 @@ export function GrillWorkspaceContent({ sessionId, onClose, onNext }: { sessionI
               </Button>)}
             </nav>
             {current ? <article className="grill-question-detail">
-              <h3>{current.title}</h3><p>{current.body}</p>
-              <div className="grill-options" role={current.multi ? "group" : "radiogroup"}>
-                {current.options.map(opt => <Button key={opt.key} variant={current.selected.includes(opt.key) ? "secondary" : "ghost"}
-                  disabled={Boolean(state.pending) || state.finished || current.status !== "open"}
-                  role={current.multi ? "checkbox" : "radio"}
-                  aria-checked={current.selected.includes(opt.key)}
-                  onClick={() => answer(current, opt.key)}>{opt.key}. {opt.label}</Button>)}
-                <Button variant={current.selected.includes("OTHER") ? "secondary" : "ghost"}
-                  disabled={Boolean(state.pending) || state.finished || current.status !== "open"}
-                  role={current.multi ? "checkbox" : "radio"} aria-checked={current.selected.includes("OTHER")}
-                  onClick={() => answer(current, "OTHER")}>{translate("codingActions.visualOther")}</Button>
+              <div className="grill-question-scroll">
+                <h3>{current.title}</h3><p>{current.body}</p>
+                <div className="grill-options" role={current.multi ? "group" : "radiogroup"}>
+                  {current.options.map(opt => <Button key={opt.key} variant={current.selected.includes(opt.key) ? "secondary" : "ghost"}
+                    disabled={(Boolean(state.pending) || autoAccept) || state.finished || current.status !== "open"}
+                    role={current.multi ? "checkbox" : "radio"}
+                    aria-checked={current.selected.includes(opt.key)}
+                    onClick={() => answer(current, opt.key)}>{opt.key}. {opt.label}</Button>)}
+                  <Button variant={current.selected.includes("OTHER") ? "secondary" : "ghost"}
+                    disabled={(Boolean(state.pending) || autoAccept) || state.finished || current.status !== "open"}
+                    role={current.multi ? "checkbox" : "radio"} aria-checked={current.selected.includes("OTHER")}
+                    onClick={() => answer(current, "OTHER")}>{translate("codingActions.visualOther")}</Button>
+                </div>
+                {current.selected.includes("OTHER") && <Textarea aria-label={translate("codingActions.visualOtherAnswer")}
+                  placeholder={translate("codingActions.visualOtherAnswer")} value={current.customAnswer ?? ""} maxLength={3000}
+                  disabled={(Boolean(state.pending) || autoAccept) || state.finished || current.status !== "open"}
+                  onChange={event => mutate(s => setGrillCustomAnswer(s, current.id, event.target.value))} />}
               </div>
-              {current.selected.includes("OTHER") && <Textarea aria-label={translate("codingActions.visualOtherAnswer")}
-                placeholder={translate("codingActions.visualOtherAnswer")} value={current.customAnswer ?? ""} maxLength={3000}
-                disabled={Boolean(state.pending) || state.finished || current.status !== "open"}
-                onChange={event => mutate(s => setGrillCustomAnswer(s, current.id, event.target.value))} />}
-              <div className="grill-recommend">
-                <strong>{t.recommend}: {current.recommended.join(", ")}</strong>
-                <p>{t.reason}: {current.why}</p>
-              </div>
-              <div className="grill-answer-actions">
-                {current.status === "open" ? <>
-                  <Button disabled={!current.selected.length || Boolean(state.pending) || (current.selected.includes("OTHER") && !current.customAnswer?.trim())} onClick={() => mutate(s => decideGrillQuestion(s, current.id, "confirm"))}>{t.confirm}</Button>
-                  <Button variant="ghost" disabled={Boolean(state.pending)} onClick={() => mutate(s => decideGrillQuestion(s, current.id, "defer"))}>{t.defer}</Button>
-                </> : <Button variant="secondary" disabled={Boolean(state.pending) || state.finished} onClick={() => mutate(s => decideGrillQuestion(s, current.id, "reopen"))}>{t.reopen}</Button>}
-              </div>
+              <footer className="grill-question-footer">
+                <div className="grill-recommend">
+                  <strong>{t.recommend}: {current.recommended.join(", ")}</strong>
+                  <p>{t.reason}: {current.why}</p>
+                </div>
+                <div className="grill-answer-actions">
+                  {current.status === "open" ? <>
+                    <Button disabled={!current.selected.length || (Boolean(state.pending) || autoAccept) || (current.selected.includes("OTHER") && !current.customAnswer?.trim())} onClick={() => mutate(s => decideGrillQuestion(s, current.id, "confirm"))}>{t.confirm}</Button>
+                    <Button variant="ghost" disabled={(Boolean(state.pending) || autoAccept)} onClick={() => mutate(s => decideGrillQuestion(s, current.id, "defer"))}>{t.defer}</Button>
+                  </> : <Button variant="secondary" disabled={(Boolean(state.pending) || autoAccept) || state.finished} onClick={() => mutate(s => decideGrillQuestion(s, current.id, "reopen"))}>{t.reopen}</Button>}
+                </div>
+              </footer>
             </article> : <p className="grill-empty">{t.noQuestion}</p>}
           </section>
           <section className="grill-thread" aria-label={t.discussion}>
@@ -269,11 +290,10 @@ export function GrillWorkspaceContent({ sessionId, onClose, onNext }: { sessionI
             <form onSubmit={discuss}>
               <Textarea rows={3} value={threadInput} maxLength={8000} placeholder={t.placeholder} disabled={!current || state.finished}
                 onChange={e => setThreadInput(e.target.value)} aria-label={t.ask} />
-              <Button type="submit" disabled={!current || !canSend || !threadInput.trim() || Boolean(state.pending) || state.finished}>{t.send}</Button>
+              <Button type="submit" disabled={!current || !canSend || !threadInput.trim() || (Boolean(state.pending) || autoAccept) || state.finished}>{t.send}</Button>
             </form>
           </section>
         </div>
-        {state.noMoreQuestions && !state.finished && !state.pending && <p className="grill-result" role="status">{translate("codingActions.visualNoMoreQuestions")}</p>}
         {state.finished && <p className="grill-result"><strong>{t.finishNote}：</strong>{state.finishNote}</p>}
         {state.finished && onNext && <div className="coding-next-steps">
           <span>{translate("codingActions.recommendedNext")}</span>

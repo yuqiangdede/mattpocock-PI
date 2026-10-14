@@ -12,6 +12,7 @@ const { build } = createRequire(join(root, "packages/agent-runtime/package.json"
 const rendererSource = String.raw`
 import React, { useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { flushSync } from "react-dom";
 import { I18nextProvider, initReactI18next } from "react-i18next";
 import i18n from "i18next";
 import { zhCN } from "@pi-desktop/i18n";
@@ -24,6 +25,7 @@ import { useAppStore } from "../../apps/desktop/src/stores/app-store";
 import { newGrill, saveGrill, loadGrill } from "../../apps/desktop/src/features/coding/grill-workspace-model";
 import { api } from "../../apps/desktop/src/lib/api";
 import { useGrillComposer } from "../../apps/desktop/src/features/coding/useGrillComposer";
+import { interactionImagePrompt } from "../../apps/desktop/src/features/coding/interaction-image-prompt";
 import "../../apps/desktop/src/styles/ui-kit.css";
 import "../../apps/desktop/src/styles/base.css";
 import "../../apps/desktop/src/styles/tokens.css";
@@ -55,10 +57,10 @@ function ExternalTopicComposer() {
     <Textarea aria-label="External topic" value={topic} onChange={e=>setTopic(e.target.value)}/>
     <button onClick={()=>void visual.sendPrompt(topic,{text:topic,fileReferences:[]},undefined)}>External Send</button></>;
 }
-const render = element => root.render(<I18nextProvider i18n={i18n}>{element}</I18nextProvider>);
+const render = element => flushSync(() => root.render(<I18nextProvider i18n={i18n}>{element}</I18nextProvider>));
 const field = key => document.querySelector('[aria-label="' + i18n.t("codingActions." + key) + '"]');
-const until = async read => { const end = performance.now() + 8000; while (performance.now() < end) { const value = await read(); if (value) return value; await new Promise(requestAnimationFrame); } throw new Error("Timed out: " + document.body.textContent); };
-const click = async label => { const button = await until(() => [...document.querySelectorAll("button")].find(item => item.textContent.trim() === label && !item.disabled)); button.click(); await new Promise(requestAnimationFrame); };
+const until = async (read, description = read.toString()) => { const end = performance.now() + 8000; while (performance.now() < end) { const value = await read(); if (value) return value; await new Promise(requestAnimationFrame); } throw new Error("Timed out waiting for " + description + ": " + document.body.textContent); };
+const click = async label => { const button = await until(() => [...document.querySelectorAll("button")].find(item => item.textContent.trim() === label && !item.disabled), "enabled button: " + label); button.click(); await new Promise(requestAnimationFrame); };
 const fill = async (key, value) => { const input = await until(() => field(key)); const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(prototype, "value").set.call(input, value); input.dispatchEvent(new Event("input", { bubbles: true })); await new Promise(requestAnimationFrame); };
 const check = (value, message) => { if (!value) throw new Error(message); };
 window.promptButtonsProbe = async () => {
@@ -112,17 +114,35 @@ window.promptButtonsProbe = async () => {
   useAppStore.setState({ activeSessionId: "visual-fixture", messages: [] });
   await new Promise(requestAnimationFrame);
   check(!document.querySelector('.grill-dialog'), "No automatic opening before a correlated reply");
-  const reply = requestId => '<grill-workspace-result>' + JSON.stringify({ requestId, kind: "questions", questions: [{title:"Fixture question",body:"Choose a scope",options:[{key:"A",label:"Local"},{key:"B",label:"Remote"}],recommended:["A"],why:"Keep the first slice small",multi:false}] }) + '</grill-workspace-result>';
+  const reply = requestId => '<grill-workspace-result>' + JSON.stringify({ requestId, kind: "questions", questions: [{title:"Fixture question",body:"Choose a scope\n".repeat(160),options:[{key:"A",label:"Local"},{key:"B",label:"Remote"}],recommended:["A"],why:"Keep the first slice small",multi:false}] }) + '</grill-workspace-result>';
   useAppStore.setState({ messages: [{ role: "assistant", content: reply("unrelated") }] });
   await new Promise(requestAnimationFrame);
   check(!document.querySelector('.grill-dialog'), "Unrelated response must not open the panel");
   useAppStore.setState({ messages: [{ role: "assistant", content: reply(pending.id) }] });
   const panel = await until(() => document.querySelector('.grill-dialog'));
   await until(() => panel.textContent.includes("Fixture question"));
-  for (const selector of ['.grill-question-detail h3', '.grill-question-detail > p', '.grill-options .btn', '.grill-recommend p']) {
+  for (const selector of ['.grill-question-detail h3', '.grill-question-scroll > p', '.grill-options .btn', '.grill-recommend p']) {
     check(getComputedStyle(panel.querySelector(selector)).webkitUserSelect === "text", "Discussion text must be selectable: " + selector);
   }
   check(panel.getBoundingClientRect().width > 800, "Visual interview must override the generic 440px dialog width");
+  const interviewButton = label => [...document.querySelectorAll('.grill-meta-actions button')].find(button => button.textContent === label);
+  check(interviewButton("完成访谈").disabled, "Finish must be disabled while questions remain");
+  const scroll = panel.querySelector('.grill-question-scroll');
+  const footer = panel.querySelector('.grill-question-footer');
+  check(scroll && footer && !scroll.contains(footer), "Decision footer must be outside the question scroller");
+  check(scroll.scrollHeight > scroll.clientHeight, "Long questions must scroll independently");
+  const footerTop = footer.getBoundingClientRect().top;
+  scroll.scrollTop = scroll.scrollHeight;
+  await new Promise(requestAnimationFrame);
+  check(scroll.scrollTop > 0 && Math.abs(footer.getBoundingClientRect().top - footerTop) < 1, "Scrolling question content must not move the footer");
+  for (const label of ["确认本题", "暂缓本题"]) {
+    const bounds = [...footer.querySelectorAll('button')].find(button => button.textContent === label).getBoundingClientRect();
+    check(bounds.top >= footerTop && bounds.bottom <= panel.querySelector('.grill-questions').getBoundingClientRect().bottom, "Decision buttons remain visible: " + label);
+  }
+  await click("暂缓本题");
+  await until(() => loadGrill("visual-fixture")?.questions[0].status === "deferred");
+  await click("重新讨论");
+  await until(() => loadGrill("visual-fixture")?.questions[0].status === "open");
   await click(i18n.t("codingActions.visualOther"));
   check([...panel.querySelectorAll('button')].find(button=>button.textContent === "确认本题").disabled, "Empty custom alternative cannot be confirmed");
   const customInput = panel.querySelector('[aria-label="'+i18n.t("codingActions.visualOtherAnswer")+'"]');
@@ -172,11 +192,23 @@ window.promptButtonsProbe = async () => {
   await until(() => document.querySelector('[aria-label="Draft"]').value.startsWith("/skill:to-tickets "));
   check(document.querySelector('[aria-label="Draft"]').value.includes("Artifact: docs/requirements.md"), "Recommendation carries the artifact context");
   check(document.querySelector('[aria-label="Draft"]').value.includes(initialDraft), "Recommendation preserves the editable draft");
-  useAppStore.setState({messages:[{role:"user",content:"/skill:code-review Review changes"},{role:"assistant",content:"Review outcome"}],latestTurnResults:{"visual-fixture":{status:"completed",turnId:"review-turn",finishedAt:Date.now()}}});
+  useAppStore.setState({messages:[{role:"user",content:"/skill:code-review Review changes"},{role:"assistant",content:"No findings."}],latestTurnResults:{"visual-fixture":{status:"completed",turnId:"review-turn",finishedAt:Date.now()}}});
   await until(() => [...document.querySelectorAll('.coding-shortcuts-primary .coding-action-recommended')].some(button=>button.textContent === "My commit"));
   [...document.querySelectorAll('.coding-shortcuts-primary .coding-action-recommended')].find(button=>button.textContent === "My commit").click();
   await until(() => document.querySelector('[aria-label="Draft"]').value.startsWith("Build first, commit with Git or SVN"));
-  check(document.querySelector('[aria-label="Draft"]').value.includes("Review outcome"), "Commit draft carries review evidence");
+  check(document.querySelector('[aria-label="Draft"]').value.includes("No findings."), "Commit draft carries review evidence");
+  useAppStore.setState({messages:[{role:"user",command:"/skill:code-review Review changes",content:"Expanded review instructions"},{role:"assistant",status:"complete",content:"[P1] Lost updates in save.ts"}]});
+  await until(() => document.querySelector('.coding-shortcuts-primary .coding-action-recommended[aria-haspopup="menu"]'));
+  check(![...document.querySelectorAll('.coding-shortcuts-primary .coding-action-recommended')].some(button => button.textContent === "My commit"), "Review findings never recommend Commit");
+  await click(i18n.t("codingActions.more"));
+  const repair = await until(() => [...document.querySelectorAll('.coding-more-menu .coding-action-recommended')].find(button => button.textContent === i18n.t("codingActions.reviewFix")));
+  repair.click();
+  await until(() => document.querySelector('[aria-label="Draft"]').value.startsWith("修复审查问题\n"));
+  check(document.querySelector('[aria-label="Draft"]').value.includes("[P1] Lost updates in save.ts") && document.querySelector('[aria-label="Draft"]').value.includes(initialDraft), "Repair draft carries findings and preserves existing text");
+  check(!document.querySelector('.coding-more-menu[role="menu"]'), "Repair selection closes More without sending");
+  const repairRequest = document.querySelector('[aria-label="Draft"]').value;
+  useAppStore.setState({messages:[{role:"user",content:repairRequest},{role:"assistant",status:"complete",content:"Fixed save cancellation and regression tests pass"}]});
+  await until(() => [...document.querySelectorAll('.coding-shortcuts-primary .coding-action-recommended')].some(button => button.textContent === "Code review"));
   const finished = loadGrill("visual-fixture");
   saveGrill({...finished,pending:null,finished:true,finishNote:"Design document: docs/design.md"});
   await click(i18n.t("codingActions.visualRequirements"));
@@ -208,8 +240,59 @@ window.promptButtonsProbe = async () => {
     return true;
   }});
   await click("下一轮问题");
-  await until(() => document.querySelector('.grill-result[role="status"]')?.textContent.includes("无后续问题，请完成访谈"));
+  await until(() => document.querySelector('.grill-guidance[role="status"]')?.textContent.includes("无后续问题，请完成访谈"));
   check(loadGrill("materialized-visual").questions[0].status === "confirmed", "An empty next round preserves confirmed answers");
+  check(interviewButton("下一轮问题").disabled && !interviewButton("完成访谈").disabled, "No further questions enables only Finish");
+  await click("重新讨论");
+  await until(() => loadGrill("materialized-visual").questions[0].status === "open");
+  check(interviewButton("完成访谈").disabled && document.querySelector('.grill-guidance').textContent.includes("请确认或暂缓"), "Reopened questions block Finish and show decision guidance even after exhaustion");
+  await click("确认本题");
+  useAppStore.setState({sendPrompt:nativeBeforeRound});
+  await click("关闭");
+  const baseline = loadGrill("materialized-visual");
+  const autoState = { ...baseline, sessionId:"automatic-fixture", noMoreQuestions:false,
+    questions:[baseline.questions[0], {...baseline.questions[0],id:"q2",status:"deferred",selected:[],recommended:["B"]}] };
+  saveGrill(autoState);
+  let automaticRounds = 0;
+  const automaticKinds = [];
+  useAppStore.setState({activeSessionId:"automatic-fixture",messages:[],sendPrompt:async()=>{
+    const checkpoint = loadGrill("automatic-fixture");
+    const pending = checkpoint.pending;
+    automaticKinds.push(pending.kind);
+    check(checkpoint.questions.every(q => q.status === "confirmed"), "Automatic requests carry confirmed recommendations");
+    check(checkpoint.questions[0].selected.join() === "A", "Automatic mode preserves manually confirmed answer");
+    check(checkpoint.questions[1].selected.join() === "B", "Automatic mode accepts deferred recommendation");
+    const content = pending.kind === "finish" ? JSON.stringify({requestId:pending.id,kind:"finished",note:"Automatic design outcome"})
+      : automaticRounds++ === 0 ? reply(pending.id) : JSON.stringify({requestId:pending.id,kind:"questions",questions:[]});
+    useAppStore.setState({messages:[{role:"assistant",content}]});
+    return true;
+  }});
+  render(<DraftComposer/>);
+  await click(i18n.t("codingActions.visualRequirements"));
+  await click(i18n.t("codingActions.visualAutoAccept"));
+  await until(() => loadGrill("automatic-fixture")?.finished);
+  check(automaticKinds.join() === "round,round,finish", "One click accepts future questions, checks exhaustion and finishes exactly once");
+  await until(() => interviewButton("已完成"));
+  await click("关闭");
+  saveGrill({...autoState,sessionId:"automatic-stop"});
+  let automaticSends = 0;
+  useAppStore.setState({activeSessionId:"automatic-stop",messages:[],sendPrompt:async()=>{automaticSends++;return true;}});
+  await click(i18n.t("codingActions.visualRequirements"));
+  await click(i18n.t("codingActions.visualAutoAccept"));
+  await until(() => loadGrill("automatic-stop")?.pending);
+  await click(i18n.t("codingActions.visualAutoStop"));
+  const stoppedOperation = loadGrill("automatic-stop").pending;
+  useAppStore.setState({messages:[{role:"assistant",content:JSON.stringify({requestId:stoppedOperation.id,kind:"questions",questions:[]})}]});
+  await until(() => !loadGrill("automatic-stop").pending);
+  check(automaticSends === 1 && !loadGrill("automatic-stop").finished, "Stopping prevents automatic finish after the pending reply");
+  await click("关闭");
+  saveGrill({...autoState,sessionId:"automatic-failure"});
+  useAppStore.setState({activeSessionId:"automatic-failure",messages:[],sendPrompt:async()=>false});
+  await click(i18n.t("codingActions.visualRequirements"));
+  await click(i18n.t("codingActions.visualAutoAccept"));
+  await until(() => document.querySelector('.grill-error')?.textContent.includes("未接收请求"));
+  check(!document.body.textContent.includes(i18n.t("codingActions.visualAutoStop")), "Rejected sends stop automatic mode instead of looping");
+  await click("关闭");
   useAppStore.setState({sendPrompt:nativeBeforeRound});
   const originalNativeSend = useAppStore.getState().sendPrompt;
   let autoRetries = 0;
@@ -224,18 +307,27 @@ window.promptButtonsProbe = async () => {
     useAppStore.setState({latestTurnResults:{"retry-fixture":{status:"completed",turnId:"retry-"+autoRetries,finishedAt:Date.now()}},messages:[{role:"assistant",content:"Invalid plain answer"}]});
     return true;
   }});
+  await click(i18n.t("codingActions.visualRequirements"));
   await until(() => document.querySelector('.grill-pending')?.textContent.includes("自动重试已达 3 次"));
   check(autoRetries === 3 && loadGrill("retry-fixture").pending.retryCount === 3, "Automatic retry stops at three and persists its budget");
   useAppStore.setState({messages:[{role:"assistant",content:"Another invalid answer"}]});
   await new Promise(requestAnimationFrame);
   check(autoRetries === 3, "Transcript updates cannot restart an exhausted retry budget");
   useAppStore.setState({sendPrompt:originalNativeSend});
+  render(<DraftComposer key="image-menu"/>);
+  await until(() => document.querySelector('[aria-label="Draft"]')?.value === initialDraft);
+  check(![...document.querySelectorAll('.coding-shortcuts-primary > button')].some(button => button.textContent === i18n.t("codingActions.interactionImage")), "Image prompt is absent from the primary row");
+  await click(i18n.t("codingActions.more"));
+  check([...document.querySelectorAll('.coding-more-menu [role="menuitem"]')].some(button => button.textContent === i18n.t("codingActions.interactionImage")), "Image prompt is reachable as a More menu item");
+  await click(i18n.t("codingActions.interactionImage"));
+  await until(() => document.querySelector('[aria-label="Draft"]').value === interactionImagePrompt("zh-CN") + "\n\n" + initialDraft);
+  check(!document.querySelector('.coding-more-menu[role="menu"]'), "Selecting the image prompt closes More and retains the editable draft");
   root.unmount(); return { ok: true };
 };
 `;
 
 test("Electron settings save and cancel names/prompts, reload persistence, and insert plain drafts with retained attachments", {
-  timeout: 90_000,
+  timeout: 120_000,
   skip: process.platform === "linux" && !process.env.DISPLAY ? "Electron requires a display" : false,
 }, async () => {
   const directory = await mkdtemp(join(tmpdir(), "pi-plain-prompts-"));
@@ -276,7 +368,7 @@ app.whenReady().then(async () => {
     const child = spawn(resolveElectronBinary(root).electronBinary, [join(directory, "main.mjs")], { env, stdio: ["ignore", "pipe", "pipe"] });
     let output = "";
     for (const stream of [child.stdout, child.stderr]) stream.on("data", data => { output += data; });
-    const timeout = setTimeout(() => child.kill(), 60_000);
+    const timeout = setTimeout(() => child.kill(), 100_000);
     const code = await new Promise((resolve, reject) => { child.once("error", reject); child.once("close", resolve); }).finally(() => clearTimeout(timeout));
     assert.equal(code, 0, output);
     assert.ok(output.includes('PLAIN_PROMPT_PROBE {"ok":true}'), output);

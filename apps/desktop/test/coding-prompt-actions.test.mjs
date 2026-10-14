@@ -8,6 +8,16 @@ register(new URL("./helpers/engineering-settings-imports.mjs", import.meta.url))
 const shared = await import("@pi-desktop/shared");
 const { CodingActionStore } = await import("../electron/main/extensions/coding-action-store.ts");
 const { preparePromptAction } = await import("../src/features/coding/prepare-prompt-action.ts");
+const { reviewFixPrompt, isReviewFixRequest } = await import("../src/features/coding/review-fix-prompt.ts");
+test("review fix drafts require verification, regression coverage and manual delivery in both languages", () => {
+  for (const language of ["zh-CN", "en"]) {
+    const prompt = reviewFixPrompt(language);
+    assert.ok(isReviewFixRequest(prompt));
+    assert.match(prompt, /回归测试|regression test/);
+    assert.match(prompt, /不要自动提交|Do not automatically commit/);
+    assert.match(prompt, /未解决问题|unresolved issues/);
+  }
+});
 
 test("plain prompt button names and instructions survive save, restart and Skill reordering", async t => {
   const directory = await mkdtemp(join(tmpdir(), "pi-prompt-actions-"));
