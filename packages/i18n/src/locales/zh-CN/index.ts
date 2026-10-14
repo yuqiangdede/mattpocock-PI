@@ -31,6 +31,7 @@ export const zhCN = {
   interactionImageHint: "什么时候使用：需求讨论完成，需要生成页面交互效果图提示词时。\\n具体例子：根据预警查询需求生成包含 ROI 框选弹窗的 UI 生图提示词。",
   tooltipWhen: "什么时候使用",
   tooltipExample: "具体例子",
+  tooltipFallbackExample: "使用「{{skill}}」处理当前需求。",
   moreTooltipWhen: "需要使用不常用的编码 Skill 时。",
   moreTooltipExample: "从更多中选择代码审查或架构分析。",
   visualTooltipWhen: "需要通过可视化问答讨论需求时。",

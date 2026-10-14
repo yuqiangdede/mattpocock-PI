@@ -72,11 +72,15 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
   const orderedPromptActions = [...plainActions.filter(action => action.id === "commit-code"), ...plainActions.filter(action => action.id !== "commit-code")];
   const isRecommended = (id: string) => Boolean(recommendation?.steps.some(step => step === id));
   const recommendedMore = isRecommended(REVIEW_FIX_PROMPT_ID) || more.some(shortcut => isRecommended(shortcut.action.skillId));
+  const tooltipLine = (when: string, example: string) => `${t("codingActions.tooltipWhen", { defaultValue: "什么时候使用" })}：${when}\n${t("codingActions.tooltipExample", { defaultValue: "具体例子" })}：${example}`;
   const renderAction = (shortcut: CodingShortcut, menu = false) => {
     const { action } = shortcut;
     const unavailable = reason(shortcut);
-    const note = unavailable || codingShortcutTooltip(shortcut, catalog, t);
-    if (!menu && action.skillId === "grill-with-docs") return <Button key={action.id} variant="secondary" disabled={onPrepareVisual ? disabled : !sessionId} onClick={() => onPrepareVisual ? onPrepareVisual() : setNativeGrillOpen(true)}>{t("codingActions.visualRequirements")}</Button>;
+    const note = codingShortcutTooltip(shortcut, catalog, t);
+    if (!menu && action.skillId === "grill-with-docs") {
+      const tooltip = tooltipLine(t("codingActions.visualTooltipWhen"), t("codingActions.visualTooltipExample"));
+      return <TooltipButton key={action.id} className="btn btn-secondary" ariaLabel={t("codingActions.visualRequirements")} aria-description={tooltip} tooltip={tooltip} disabled={onPrepareVisual ? disabled : !sessionId} onClick={() => onPrepareVisual ? onPrepareVisual() : setNativeGrillOpen(true)}>{t("codingActions.visualRequirements")}</TooltipButton>;
+    }
     return <TooltipButton key={action.id} disabled={(disabled && action.skillId !== "implement-spec") || Boolean(unavailable)} className={(menu ? "btn btn-ghost context-menu-item" : "btn btn-secondary") + (isRecommended(action.skillId) ? " coding-action-recommended" : "")}
       role={menu ? "menuitem" : undefined} ariaLabel={action.label} tooltip={isRecommended(action.skillId) ? t("codingActions.recommendedNext") + " · " + note : note} aria-description={isRecommended(action.skillId) ? t("codingActions.recommendedNext") + " · " + note : note}
       tooltipClassName="ui-tooltip-help coding-skill-tooltip" onClick={event => { if (action.skillId === "implement-spec") returnFocusRef.current = menu ? workbenchRef.current?.querySelector<HTMLButtonElement>(`button[aria-haspopup="menu"]`) ?? null : event.currentTarget; setMoreOpen(false); if (isRecommended(action.skillId)) { onSelectSkill(action.skillId, recommendation?.context); return; } activateCodingShortcut(shortcut, { openTaskGraph: () => setTaskGraphOpen(true), execute: onExecute, selectSkill: onSelectSkill }); }}>{action.label}</TooltipButton>;
@@ -85,11 +89,18 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
   return <section ref={workbenchRef} className="coding-workbench" aria-label={t("codingActions.title")}>
     <div className="coding-shortcuts coding-shortcuts-primary">{primary.filter(shortcut => ["setup-matt-pocock-skills", "ask-matt", "grill-with-docs"].includes(shortcut.action.skillId)).map(action => renderAction(action))}
       {primary.filter(shortcut => !["setup-matt-pocock-skills", "ask-matt", "grill-with-docs"].includes(shortcut.action.skillId)).map(action => renderAction(action))}
-        {orderedPromptActions.map(action =>
-          <Button key={action.id} className={isRecommended(action.id) ? "coding-action-recommended" : undefined} aria-description={isRecommended(action.id) ? t("codingActions.recommendedNext") : undefined} disabled={disabled} title={action.id === "commit-code" && action.prompt === null ? t("codingActions.commitHint") : t("codingActions.plainPromptHint")} onClick={() => onSelectPrompt(action.id, isRecommended(action.id) ? recommendation?.context : undefined)}>{action.label}</Button>)}
+        {orderedPromptActions.map(action => {
+          const tooltip = tooltipLine(t(action.id === "commit-code" ? "codingActions.commitTooltipWhen" : "codingActions.promptTooltipWhen"), t(action.id === "commit-code" ? "codingActions.commitTooltipExample" : "codingActions.promptTooltipExample"));
+          const description = isRecommended(action.id) ? `${t("codingActions.recommendedNext")} · ${tooltip}` : tooltip;
+          return <TooltipButton key={action.id} className={`btn btn-secondary${isRecommended(action.id) ? " coding-action-recommended" : ""}`} aria-description={description} tooltip={tooltip} disabled={disabled} onClick={() => onSelectPrompt(action.id, isRecommended(action.id) ? recommendation?.context : undefined)}>{action.label}</TooltipButton>;
+        })}
 
       <AnchoredMenu open={moreOpen} onClose={() => setMoreOpen(false)} role="menu" side="top" restoreFocus={!disabled || more.some(shortcut => shortcut.action.skillId === "implement-spec")} label={t("codingActions.more")} menuClassName="context-menu coding-more-menu"
-        trigger={ref => <Button ref={ref} variant="ghost" className={recommendedMore ? "coding-action-recommended" : undefined} aria-description={recommendedMore ? t("codingActions.recommendedNext") : undefined} disabled={disabled && !more.some(shortcut => shortcut.action.skillId === "implement-spec")} aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(value => !value)}>{t("codingActions.more")}</Button>}>
+        trigger={ref => {
+          const tooltip = tooltipLine(t("codingActions.moreTooltipWhen"), t("codingActions.moreTooltipExample"));
+          const description = recommendedMore ? `${t("codingActions.recommendedNext")} · ${tooltip}` : tooltip;
+          return <TooltipButton ref={ref} className={`btn btn-ghost${recommendedMore ? " coding-action-recommended" : ""}`} ariaLabel={t("codingActions.more")} aria-description={description} tooltip={tooltip} disabled={disabled && !more.some(shortcut => shortcut.action.skillId === "implement-spec")} aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(value => !value)}>{t("codingActions.more")}</TooltipButton>;
+        }}>
         <TooltipButton className="btn btn-ghost context-menu-item" role="menuitem" disabled={disabled}
           ariaLabel={t("codingActions.interactionImage")} tooltip={t("codingActions.interactionImageHint")}
           tooltipClassName="ui-tooltip-help coding-skill-tooltip"

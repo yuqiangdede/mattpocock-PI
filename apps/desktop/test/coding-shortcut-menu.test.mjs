@@ -107,12 +107,17 @@ test("Known Skill tooltips have exactly two localized usage and example lines", 
 
 test("Custom descriptions and unknown Skills use the same two-line format", async () => {
   const i18n = createInstance();
-  await i18n.init({ lng: "zh-CN", resources: { "zh-CN": { translation: catalogs["zh-CN"] } } });
+  await i18n.init({ lng: "zh-CN", resources: { "zh-CN": { translation: catalogs["zh-CN"] }, en: { translation: catalogs.en } } });
   const t = i18n.t.bind(i18n);
   const configured = codingShortcutTooltip({ configured: true, action: { id: "custom", skillId: "diagnosing-bugs", label: "Debug", description: "用户说明" } }, [], t);
   assert.deepEqual(configured.split("\n"), ["什么时候使用：用户说明", `具体例子：${catalogs["zh-CN"].coding.skillGuides.diagnose.example}`]);
   const unknown = codingShortcutTooltip({ configured: false, action: { id: "other", skillId: "other", label: "Other" } }, [{ ...skill("other"), description: "Original user skill description" }], t);
-  assert.deepEqual(unknown.split("\n"), ["什么时候使用：Original user skill description", "具体例子：用「Other」处理当前需求。"]);
+  assert.deepEqual(unknown.split("\n"), ["什么时候使用：Original user skill description", "具体例子：使用「Other」处理当前需求。"]);
+  await i18n.changeLanguage("en");
+  assert.deepEqual(codingShortcutTooltip({ configured: false, action: { id: "other", skillId: "other", label: "Other" } }, [], t).split("\n"), [
+    "When to use：Other",
+    "Example：Use Other for the current task.",
+  ]);
 });
 
 const { ENGINEERING_SHORTCUTS, CodingActionRegistry } = await import("@pi-desktop/shared");

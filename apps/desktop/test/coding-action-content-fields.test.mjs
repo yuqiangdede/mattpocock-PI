@@ -35,6 +35,12 @@ test("settings show effective defaults and preserve edit, clear, reset and selec
   const elements = element => element && typeof element === "object" && element.props
     ? [element, ...[].concat(element.props.children ?? []).flatMap(elements)] : [];
   const promptInput = () => elements(view()).find(element => element.props["aria-label"] === zhCN.codingActions.prompt);
+  const descriptionInput = () => elements(view()).find(element => element.props["aria-label"] === zhCN.codingActions.descriptionAria);
+  assert.equal(descriptionInput().props.value, [
+    zhCN.coding.skillGuides.spec.when,
+    zhCN.coding.skillGuides.spec.purpose,
+    zhCN.coding.skillGuides.spec.example,
+  ].join("\n\n"), "settings keep the full editable guidance, not the launcher tooltip format");
   const restoreButton = () => elements(view()).find(element => element.props.children === zhCN.codingActions.restoreDefaultPrompt);
   promptInput().props.onChange({ target: { value: "custom request" } });
   assert.ok(render().includes("custom request"));
@@ -54,9 +60,10 @@ test("settings show effective defaults and preserve edit, clear, reset and selec
   assert.ok(render().includes("Custom guidance"));
   assert.ok(render().includes("Keep this"));
   const { codingShortcutTooltip } = await server.ssrLoadModule("/src/features/coding/coding-shortcut-tooltip.ts");
-  const descriptionInput = () => elements(view()).find(element => element.props["aria-label"] === zhCN.codingActions.descriptionAria);
   assert.equal(descriptionInput().props.value, "Custom guidance");
-  assert.ok(codingShortcutTooltip({ action, configured: true }, catalog, i18n.t.bind(i18n)).includes(zhCN.skillGates.description));
+  const tooltip = codingShortcutTooltip({ action, configured: true }, catalog, i18n.t.bind(i18n));
+  assert.deepEqual(tooltip.split("\n"), ["什么时候使用：Custom guidance", `具体例子：${zhCN.coding.skillGuides.spec.example}`]);
+  assert.ok(!tooltip.includes(zhCN.skillGates.description), "gate details stay outside concise launcher tooltips");
   descriptionInput().props.onChange({ target: { value: "" } });
   assert.ok(descriptionInput().props.value.includes(zhCN.coding.skillGuides.spec.purpose));
   assert.ok(!descriptionInput().props.value.includes(zhCN.skillGates.description));

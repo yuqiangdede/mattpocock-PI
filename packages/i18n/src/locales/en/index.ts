@@ -30,6 +30,7 @@ export const en = {
   interactionImageHint: "When to use: After discussing requirements, when you need UI image-generation prompts.\\nExample: Design the alert search panel and ROI selection dialog.",
   tooltipWhen: "When to use",
   tooltipExample: "Example",
+  tooltipFallbackExample: "Use {{skill}} for the current task.",
   moreTooltipWhen: "When you need a less common coding Skill.",
   moreTooltipExample: "Open More and select code review or architecture analysis.",
   visualTooltipWhen: "When requirements need a visual question-and-answer interview.",
