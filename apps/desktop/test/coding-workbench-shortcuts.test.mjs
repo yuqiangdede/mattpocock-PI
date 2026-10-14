@@ -28,21 +28,26 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
   const i18n = createInstance(); await i18n.init({ lng: "en", resources: { en: { translation: en } } });
   const html = renderToStaticMarkup(createElement(I18nextProvider, { i18n },
     createElement(CodingWorkbench, { disabled: false, error: null, onExecute: () => { executions++; }, onSelectSkill: () => { executions++; }, onSelectPrompt: () => { executions++; } })));
-  for (const label of Object.values(en.codingActions.defaults)) assert.ok(html.includes(label));
+  for (const key of ["implement", "code-review"]) assert.ok(html.includes(en.codingActions.defaults[key]));
   assert.ok(!html.includes(`>${en.codingActions.configure}</button>`), "configuration is available through Settings only");
-  assert.ok(html.includes("Discussion modes"), "requirements discussion exposes the mode dropdown");
-  assert.ok(html.includes("coding-requirements-split"));
+  assert.ok(html.includes(en.codingActions.visualRequirements), "direct visual requirements entry");
+  assert.ok(!html.includes("coding-requirements-split"));
   assert.ok(html.includes(en.codingActions.commitCode));
   assert.ok(html.includes(en.codingActions.interactionImage));
   assert.ok(html.indexOf(`>${en.codingActions.interactionImage}</button>`) < html.indexOf(`>${en.codingActions.commitCode}</button>`), "image prompt is first, commit code second");
-  assert.ok(html.includes("coding-prompt-actions"));
+  assert.ok(!html.includes("coding-shortcuts-secondary"), "one wrapping action row");
   assert.ok(html.indexOf(en.codingActions.diagnose) < html.indexOf(en.codingActions.more), "More follows Diagnose in the primary Skill row");
-  assert.ok(html.indexOf(en.codingActions.more) < html.indexOf(en.codingActions.commitCode), "Commit code remains in the second row");
+  assert.ok(html.indexOf(`>${en.codingActions.commitCode}</button>`) < html.indexOf(`>${en.codingActions.more}</button>`), "Commit precedes More in the unified row");
   assert.ok(html.includes(en.codingActions.askNext));
   assert.ok(html.includes(en.coding.initialize));
   assert.ok(html.indexOf(`aria-label="${en.coding.initialize}"`) < html.indexOf(`aria-label="${en.codingActions.askNext}"`));
   assert.ok(html.includes(en.codingActions.diagnose));
   assert.ok(html.includes(en.codingActions.more));
+  const orderedLabels = [en.coding.initialize, en.codingActions.askNext, en.codingActions.visualRequirements,
+    en.codingActions.interactionImage, en.codingActions.defaults.implement, en.codingActions.defaults["code-review"],
+    en.codingActions.diagnose, en.codingActions.commitCode, en.codingActions.more];
+  const positions = orderedLabels.map(label => html.indexOf(`>${label}</button>`));
+  assert.ok(positions.every((position, index) => position >= 0 && (index === 0 || position > positions[index - 1])), "Unified actions follow the engineering order");
   assert.ok(!html.includes(en.coding.requirements.action), "Composer must not expose requirements confirmation");
   assert.ok(!html.includes(en.coding.formal), "不再显示工程流程面板入口");
   assert.doesNotMatch(html, /当前阶段|下一阶段|完成百分比/);
@@ -60,14 +65,14 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
   await loadCodingActions(true);
   const customized = renderToStaticMarkup(createElement(I18nextProvider, { i18n }, createElement(CodingWorkbench,
     { disabled: false, error: null, onExecute() {}, onSelectSkill() {}, onSelectPrompt() {} })));
-  const secondary = customized.slice(customized.indexOf('class="coding-shortcuts coding-shortcuts-secondary"'));
+  const secondary = customized.slice(customized.indexOf('class="coding-shortcuts coding-shortcuts-primary"'));
   assert.ok(secondary.includes("My commit"));
   assert.ok(secondary.includes(en.codingActions.interactionImage));
   assert.ok(secondary.indexOf(`>${en.codingActions.interactionImage}</button>`) < secondary.indexOf(">My commit</button>"), "preserve first and second positions with saved config");
   assert.ok(secondary.includes("My summary"));
   assert.ok(secondary.indexOf(">My commit</button>") < secondary.indexOf(">My summary</button>"), "custom actions follow commit");
   assert.ok(!secondary.includes("Hidden prompt"));
-  assert.ok(!secondary.includes("aria-haspopup"), "More stays in the Skill row");
+  assert.ok(secondary.includes("aria-haspopup"), "More shares the unified row");
   assert.match(secondary, /<button[^>]*>My commit<\/button>/);
   assert.ok(!secondary.match(/<button[^>]*disabled[^>]*>My commit<\/button>/), "plain prompts remain available with an empty Skill catalog");
 });

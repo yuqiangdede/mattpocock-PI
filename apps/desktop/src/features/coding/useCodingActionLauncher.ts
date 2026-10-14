@@ -22,7 +22,7 @@ export function useCodingActionLauncher(options: {
   const generation = useRef(0), inFlight = useRef(false);
   const [pending, setPending] = useState(false), [error, setError] = useState<string | null>(null);
   useEffect(() => { generation.current += 1; inFlight.current = false; setPending(false); setError(null); return () => { generation.current += 1; }; }, [options.draftKey, options.sessionId, options.projectPath]);
-  const select = async (target: { actionId: string } | { skillId: string }) => {
+  const select = async (target: { actionId: string } | { skillId: string }, context = "") => {
     const owner = latest.current;
     if (owner.blocked || inFlight.current) return;
     owner.invalidatePromptEnhancement();
@@ -41,7 +41,7 @@ export function useCodingActionLauncher(options: {
           const shortcut = ENGINEERING_SHORTCUTS.find(entry => entry.skill === skillId);
           return shortcut ? t(`coding.prompts.${shortcut.action}`) : "";
         },
-        readLiveDraft: () => latest.current.readLiveDraft(),
+        readLiveDraft: () => [context, latest.current.readLiveDraft()].filter(Boolean).join("\n\n"),
         applyDraft: text => {
           const draft = latest.current;
           draft.invalidatePromptEnhancement();
@@ -51,7 +51,7 @@ export function useCodingActionLauncher(options: {
     } catch (cause) { if (current()) setError(cause instanceof CodingActionContextError ? t(`codingActions.${cause.code}`) : cause instanceof CodingActionError ? t(`codingActions.${cause.code === "SKILL_MISSING" ? "skillMissing" : cause.code}`, { skillId: "skillId" in target ? target.skillId : getCodingActions().actions.find(action => action.id === target.actionId)?.skillId }) : t("codingActions.executeFailed", { detail: cause instanceof Error ? cause.message : String(cause) })); }
     finally { if (current()) { inFlight.current = false; setPending(false); } }
   };
-  const selectPrompt = (id: string) => {
+  const selectPrompt = (id: string, context = "") => {
     const owner = latest.current;
     if (owner.blocked || inFlight.current) return;
     owner.invalidatePromptEnhancement();
@@ -63,7 +63,7 @@ export function useCodingActionLauncher(options: {
         return;
       }
       preparePromptAction(id, { configuration: getCodingActions(), commitPrompt: t("codingActions.commitPrompt"),
-        readLiveDraft: owner.readLiveDraft,
+        readLiveDraft: () => [context, owner.readLiveDraft()].filter(Boolean).join("\n\n"),
         applyDraft: text => owner.applyEditorDraft(text, owner.fileReferencesRef.current, text.length),
       });
       setError(null);
@@ -71,5 +71,5 @@ export function useCodingActionLauncher(options: {
       setError(cause instanceof CodingActionError ? t(`codingActions.${cause.code}`) : t("codingActions.executeFailed", { detail: String(cause) }));
     }
   };
-  return { execute: (actionId: string) => select({ actionId }), selectSkill: (skillId: string) => select({ skillId }), selectPrompt, pending, error };
+  return { execute: (actionId: string) => select({ actionId }), selectSkill: (skillId: string, context?: string) => select({ skillId }, context), selectPrompt, pending, error };
 }

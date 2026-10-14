@@ -5,6 +5,15 @@ import { engineeringSkillGuides } from "./engineering-skill-guides.js";
 export const zhCN = {
   taskGraph, skillGates,
   codingActions: {
+    recommendedNext: "推荐下一步",
+    visualRequirements: "可视化需求讨论",
+    visualTopicHint: "在下方输入讨论主题，发送后自动打开可视化讨论面板。",
+    visualStorageError: "讨论请求已发送，但本地恢复状态保存失败。",
+    visualResume: "打开已有讨论",
+    visualOther: "其他（自行填写）",
+    visualNoMoreQuestions: "无后续问题，请完成访谈。",
+    visualOtherAnswer: "请填写您的其他方案",
+    visualRetryExhausted: "自动重试已达 3 次，仍未收到有效结果。请检查原始回复，或手动重试。",
     groups: { exploration: "需求与探索", design: "设计与规划", development: "开发与测试", maintenance: "审查与维护", delivery: "协作与交付", custom: "自定义动作" },
   noOtherSkills: "暂无其他可用 Skill",
   askNext: "咨询下一步", diagnose: "Bug 排查",

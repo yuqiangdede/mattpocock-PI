@@ -7,6 +7,70 @@
 
 ## Current Coding Actions contract
 
+The primary requirements entry is Visual requirements discussion and directly
+prepares topic entry in the external Composer. Manual Send submits the initial
+interview through the existing native prompt path, materializing a new Session
+when necessary, then opens the panel with the topic and pending operation already
+loaded. Selection alone neither sends nor opens an empty topic dialog. Cancel
+returns to ordinary Composer mode without changing the draft. No split dropdown remains.
+Ordinary Requirements discussion, Create specification and Create tickets live
+in More, preserving saved Skill configuration and draft-only execution.
+The optional next-step recommendations remain available independently.
+A correlated pending native interview response in the active Session reveals
+the wide responsive panel once; unrelated replies never trigger it.
+Native follow-up replies accept tagged or complete bare JSON under the same
+request/question identity and schema checks. Invalid intermediate replies do not
+stop listening for a later valid response; matching answers appear in the selected
+question's thread without altering confirmed decisions.
+Bounded reply parsing also extracts objects from Markdown fences or surrounding
+prose and repairs trailing commas, single-quoted strings, unquoted property names
+and raw control characters inside strings. Missing outer tags are tolerated.
+Snake-case request/question IDs and scalar recommended-option strings normalize
+to the existing schema; missing kind is inferred only from an existing payload
+field. IDs, answers and decisions are never invented. Conflicting aliases,
+multiple matching objects, truncated content and invalid schemas remain rejected.
+After an invalid structured result, the panel automatically retries only when
+the matching native attempt has ended successfully and is no longer running.
+At most three additional automatic attempts are allowed. Each uses a new request
+ID with a persisted retry count, retaining the topic, question and confirmed
+decisions. Waiting, failed/cancelled turns, storage/send errors and other Sessions
+never trigger retries. Exhaustion remains visible with an explicit manual retry.
+Native interview text, question choices, recommendations and discussion replies
+support native text selection and copying; action controls retain shell behavior.
+Each native question always offers Other (write your own), independently of
+Agent-provided options. Selecting it reveals a per-question answer editor; blank
+text cannot be confirmed. Single-select replaces the selected fixed option,
+while multi-select permits combining Other with fixed options. Custom text is
+bounded, persisted as optional question metadata and included in summaries,
+follow-up context and specification handoffs. It requires explicit confirmation
+and cannot be overwritten after confirmation without reopening the question.
+When a questions response contains an empty list, retain previous questions and
+decisions and display No further questions. Please finish the interview. This
+state survives panel reopening, clears when a later round adds questions, and
+does not automatically finish the interview.
+
+Completed native interviews recommend Create specification. A successfully ended
+to-spec turn recommends Create tickets or Implement; to-tickets recommends
+Implement; implement recommends Code review; code-review recommends Commit code.
+These are optional next actions, not workflow prerequisites or acceptance claims.
+Recommendations highlight the existing action buttons rather than add another
+row. When a recommended Skill lives in More, both More and its menu item receive
+the highlight and an accessible recommendation description. Existing labels,
+availability checks and saved configuration remain unchanged.
+Only the latest user turn's leading native Skill command qualifies.
+Skill identity is read from the persisted original `command` when present;
+expanded model-facing `content` is used only for legacy rows without a command.
+Successful native turn results qualify; running, failed, cancelled or unrelated turns do not qualify.
+An explicitly complete, non-error final assistant answer also qualifies after
+recovered tool failures or history restoration without a live turn result. A
+final error, streaming reply or running Session never qualifies. This fallback
+offers navigation only and does not certify the generated artifact or review.
+Selecting a recommendation carries the preceding outcome (bounded to 8000
+characters), or the interview's decisions and finish note, into an editable draft.
+Existing draft text and attachments survive. Only manual Send executes it.
+Commit uses the configured plain-prompt action and its existing build/verification
+requirements; recommendations never send, commit or push automatically.
+
 More groups available Matt skills by Requirements and exploration, Design and planning, Development and testing, Review and maintenance, and Collaboration and delivery. Unknown configured overflow appears under Custom actions. Empty groups are hidden. Grouping is presentation only: no stage prerequisites, execution order, or persisted configuration changes.
 
 The configurable Registry presents six default actions: Discuss requirements,
@@ -90,10 +154,12 @@ manual-Send contract, including skills whose eventual execution requires an exte
 as Claude Code.
 
 
-The shortcuts use two separate wrapping rows. The first row is Initialize,
-Ask next step, the first six other enabled configured actions, and Diagnose bug,
-in that order.
-The first row ends with Diagnose bug followed immediately by More, so all Skill controls stay together. The second row holds Coding Actions configuration and right-aligned plain prompt buttons. The default Commit code button prepares an editable, localized build-then-commit prompt with no Skill dependency. It preserves existing Composer text and attachments; only manual Send executes the prompt. Git (including GitLab hosting) and SVN are supported by the default instruction; failed verification forbids commit and Git Push is excluded. The Engineering Workflow entry is no longer exposed.
+The shortcuts share one wrapping row: Initialize, Ask next step, Visual
+requirements discussion, Interaction image prompt, Implement, Code review,
+Diagnose bug, Commit code, optional custom plain prompts, then More.
+Ordinary discussion, Create specification and Create tickets remain in More.
+Settings remain accessible through Extensions.
+The default Commit code button prepares an editable, localized build-then-commit prompt with no Skill dependency. It preserves existing Composer text and attachments; only manual Send executes the prompt. Git (including GitLab hosting) and SVN are supported by the default instruction; failed verification forbids commit and Git Push is excluded. The Engineering Workflow entry is no longer exposed.
 
 Extensions > Coding Actions includes a separate Plain prompt buttons editor.
 Names, instructions, enabled state and order are editable; buttons can be added
@@ -111,7 +177,7 @@ containing `promptActions`; the saved pre-edit backup supports downgrade recover
 More groups skills into Requirements and exploration, Design and planning,
 Development and testing, Review and maintenance, and Collaboration and delivery
 (including Retrospective). Every skill remains available exactly once.
-All shortcuts use regular text. At narrow widths each row wraps independently
+All shortcuts use regular text. At narrow widths the unified row wraps
 without horizontal overflow; order stays fixed across task states.
 
 ## Requirements confirmation

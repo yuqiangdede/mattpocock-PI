@@ -2,6 +2,15 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const frEntries: ChangelogEntry[] = [
   {
+    version: "0.19.0",
+    date: "2026-10-13",
+    highlights: [
+      "Clarifiez les exigences avec l'espace de travail d'entretien visuel natif depuis le menu des exigences, avec des questions structurées et des décisions persistantes.",
+      "Générez des invites d'images d'interface utilisateur avec le générateur intégré et dirigez les brouillons modifiables directement vers le Composer.",
+      "Harmonisez l'identité visuelle du fork sur toutes les surfaces, l'installateur et l'écran À propos, avec des améliorations de raccourcis et de stabilité.",
+    ],
+  },
+  {
     "version": "0.18.0",
     "date": "2026-10-09",
     "highlights": [

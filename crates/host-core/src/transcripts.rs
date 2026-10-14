@@ -24,12 +24,14 @@
 //! their session, never by an age or orphan sweep.
 
 use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, BufWriter, Read, Seek, SeekFrom, Write};
+use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+mod utf8;
 
 /// Bumped when the line format changes shape incompatibly.
 pub const TRANSCRIPT_SCHEMA: i64 = 1;
@@ -211,6 +213,11 @@ fn load_layout_cache(data_dir: &Path, session_id: &str) -> Result<Option<Transcr
         Ok(meta) => meta,
         Err(_) => return Ok(None),
     };
+    // Zero means file identity is unavailable, not that two files are identical.
+    // A rewrite may retain the first record while moving all later offsets.
+    if file_identity(&meta) == 0 {
+        return Ok(None);
+    }
     if meta.len() < LAYOUT_CACHE_MIN_LEN {
         return Ok(None);
     }
@@ -315,6 +322,9 @@ fn store_layout_cache(data_dir: &Path, session_id: &str, layout: &TranscriptLayo
     let Ok(meta) = fs::metadata(&path) else {
         return Ok(());
     };
+    if file_identity(&meta) == 0 {
+        return Ok(());
+    }
     if meta.len() != layout.file_len {
         return Ok(());
     }
@@ -389,7 +399,7 @@ pub fn find_message_position(
     for (position, offset) in layout.message_offsets.iter().enumerate().rev() {
         reader.seek(SeekFrom::Start(*offset))?;
         line.clear();
-        reader.read_line(&mut line)?;
+        utf8::read_line(&mut reader, &mut line)?;
         if serde_json::from_str::<Identity>(&line).is_ok_and(|identity| identity.id == message_id) {
             return Ok(Some(position));
         }
@@ -425,7 +435,7 @@ pub fn read_tool_call(
     for offset in layout.message_offsets.iter().rev() {
         reader.seek(SeekFrom::Start(*offset))?;
         line.clear();
-        reader.read_line(&mut line)?;
+        utf8::read_line(&mut reader, &mut line)?;
         if verbatim && !line.contains(call_id) {
             continue;
         }
@@ -477,7 +487,7 @@ pub fn transcript_contains_id(data_dir: &Path, session_id: &str, message_id: &st
     let mut line = String::new();
     loop {
         line.clear();
-        if reader.read_line(&mut line)? == 0 {
+        if utf8::read_line(&mut reader, &mut line)? == 0 {
             return Ok(false);
         }
         let trimmed = line.trim();
@@ -653,7 +663,7 @@ fn scan_layout(path: &Path, mut layout: TranscriptLayout) -> Result<TranscriptLa
     let mut line = String::new();
     loop {
         line.clear();
-        let read = reader.read_line(&mut line)?;
+        let read = utf8::read_line(&mut reader, &mut line)?;
         if read == 0 {
             break;
         }
@@ -1180,7 +1190,7 @@ pub fn read_transcript_window_with_layout(
             .seek(SeekFrom::Start(offset))
             .with_context(|| format!("seek {}", path.display()))?;
         line.clear();
-        if reader.read_line(&mut line)? == 0 {
+        if utf8::read_line(&mut reader, &mut line)? == 0 {
             continue;
         }
         let trimmed = line.trim();
@@ -1229,7 +1239,7 @@ pub fn read_transcript_window(
     let mut out = TranscriptRead::default();
     loop {
         line.clear();
-        if reader.read_line(&mut line)? == 0 {
+        if utf8::read_line(&mut reader, &mut line)? == 0 {
             break;
         }
         // Classify by a bounded prefix scan: a full parse here walks every byte
@@ -1391,7 +1401,7 @@ pub fn update_message(data_dir: &Path, session_id: &str, record: &MessageRecord)
     // layout refresh handles by itself — and dropping that invalidation is what
     // keeps the next read of a long session from scanning all of it again.
     crate::sessions::invalidate_transcript_layout(session_id);
-    let raw = match fs::read_to_string(&path) {
+    let raw = match fs::read(&path) {
         Ok(raw) => raw,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
         Err(e) => return Err(e).with_context(|| format!("read {}", path.display())),
@@ -1402,7 +1412,13 @@ pub fn update_message(data_dir: &Path, session_id: &str, record: &MessageRecord)
     {
         let file = File::create(&tmp)?;
         let mut writer = BufWriter::new(file);
-        for line in raw.lines() {
+        for raw_line in raw.split_inclusive(|byte| *byte == b'\n') {
+            let line_bytes = if let Some(line) = raw_line.strip_suffix(b"\n") {
+                line.strip_suffix(b"\r").unwrap_or(line)
+            } else {
+                raw_line
+            };
+            let line = utf8::decode(line_bytes.to_vec())?;
             let trimmed = line.trim();
             let is_target = !trimmed.is_empty()
                 && serde_json::from_str::<Value>(trimmed).is_ok_and(|value| {
@@ -1418,7 +1434,8 @@ pub fn update_message(data_dir: &Path, session_id: &str, record: &MessageRecord)
                 writer.write_all(replacement.as_bytes())?;
                 rewrote = true;
             } else {
-                writer.write_all(line.as_bytes())?;
+                // Only the target record is replaced; retain other records' raw bytes.
+                writer.write_all(line_bytes)?;
             }
             writer.write_all(b"\n")?;
         }
@@ -1657,7 +1674,7 @@ pub fn read_revision(
             line = String::new();
         }
         line.clear();
-        let read = reader.read_line(&mut line)?;
+        let read = utf8::read_line(&mut reader, &mut line)?;
         if read == 0 {
             break;
         }
@@ -1681,7 +1698,7 @@ pub fn read_revision(
         }
         line.clear();
         reader.seek(SeekFrom::Start(*offset))?;
-        if reader.read_line(&mut line)? == 0 {
+        if utf8::read_line(&mut reader, &mut line)? == 0 {
             continue;
         }
         let body = line.trim();
@@ -1734,6 +1751,106 @@ mod tests {
     use super::*;
     use serde_json::json;
     use tempfile::tempdir;
+
+    #[test]
+    fn invalid_utf8_in_review_output_does_not_block_followup_or_rewrite() {
+        let dir = tempdir().unwrap();
+        let created = "2026-07-26T00:00:00Z";
+        append_message(dir.path(), "s1", created, &record("user", "review")).unwrap();
+        let mut review = record("review", "你好😀\u{fffd}");
+        review.role = "tool".into();
+        review.tool_name = Some("Task".into());
+        review.blocks[0]["callId"] = json!("call-review");
+        let mut line = tagged("message", &review).unwrap().into_bytes();
+        let position = line
+            .windows("好".len())
+            .position(|bytes| bytes == "好".as_bytes())
+            .unwrap();
+        line.splice(position..position, [0xff, 0xe2, 0x82]);
+        line.push(b'\n');
+        let path = transcript_path(dir.path(), "s1").unwrap();
+        OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .unwrap()
+            .write_all(&line)
+            .unwrap();
+        append_message(dir.path(), "s1", created, &record("answer", "done")).unwrap();
+        let original = fs::read(&path).unwrap();
+        let read = read_transcript(dir.path(), "s1").unwrap();
+        assert_eq!(read[1].blocks, review.blocks);
+        assert_eq!(
+            fs::read(&path).unwrap(),
+            original,
+            "reads must not repair user data on disk"
+        );
+        assert!(transcript_contains_id(dir.path(), "s1", "answer").unwrap());
+        let layout = refresh_layout(dir.path(), "s1", TranscriptLayout::default()).unwrap();
+        let window =
+            read_transcript_window_with_layout(dir.path(), "s1", &layout, 1, Some(2)).unwrap();
+        assert_eq!(window.messages[0].blocks, review.blocks);
+        assert_eq!(window.messages[1].id, "answer");
+        assert_eq!(
+            find_message_position(dir.path(), "s1", &layout, "review").unwrap(),
+            Some(1)
+        );
+        assert_eq!(
+            read_tool_call(dir.path(), "s1", &layout, "call-review")
+                .unwrap()
+                .unwrap()
+                .blocks,
+            review.blocks
+        );
+        assert!(update_message(dir.path(), "s1", &record("user", "review again")).unwrap());
+        assert!(fs::read(&path)
+            .unwrap()
+            .windows(line.len())
+            .any(|bytes| bytes == line));
+        append_message(dir.path(), "s1", created, &record("followup", "fix these")).unwrap();
+        let read = read_transcript(dir.path(), "s1").unwrap();
+        assert_eq!(read.last().unwrap().id, "followup");
+    }
+
+    #[cfg(not(unix))]
+    #[test]
+    fn rewritten_review_message_rebuilds_layout_before_followup() {
+        let dir = tempdir().unwrap();
+        let created = "2026-07-26T00:00:00Z";
+        append_message(dir.path(), "s1", created, &record("user", "review")).unwrap();
+        let mut review = record("review", &"a".repeat(LAYOUT_CACHE_MIN_LEN as usize));
+        review.role = "tool".into();
+        review.tool_name = Some("Task".into());
+        append_message(dir.path(), "s1", created, &review).unwrap();
+        let mut answer = record("answer", "done");
+        answer.role = "assistant".into();
+        append_message(dir.path(), "s1", created, &answer).unwrap();
+        let old = refresh_layout(dir.path(), "s1", TranscriptLayout::default()).unwrap();
+        // Reproduce a legacy Windows cache, whose unavailable file identity was zero.
+        let cache = format!(
+            "0 {}\n3 0\n{}\n{}\n{}\n",
+            old.file_len, old.message_offsets[0], old.message_offsets[1], old.message_offsets[2]
+        );
+        fs::write(layout_cache_path(dir.path(), "s1").unwrap(), cache).unwrap();
+        // Updating a non-tail tool result atomically replaces the transcript.
+        review.blocks =
+            json!([{ "type": "text", "text": "中".repeat(LAYOUT_CACHE_MIN_LEN as usize) }]);
+        assert!(update_message(dir.path(), "s1", &review).unwrap());
+        let layout = refresh_layout(dir.path(), "s1", TranscriptLayout::default()).unwrap();
+        append_message(dir.path(), "s1", created, &record("followup", "fix these")).unwrap();
+        let layout = refresh_layout(dir.path(), "s1", layout).unwrap();
+        let read = read_transcript_window_with_layout(dir.path(), "s1", &layout, 0, None).unwrap();
+        let ids: Vec<_> = read
+            .messages
+            .iter()
+            .map(|message| message.id.as_str())
+            .collect();
+        assert_eq!(ids, ["user", "review", "answer", "followup"]);
+        assert_eq!(read.messages[1].blocks, review.blocks);
+        let reopened = refresh_layout(dir.path(), "s1", TranscriptLayout::default()).unwrap();
+        let tail =
+            read_transcript_window_with_layout(dir.path(), "s1", &reopened, 3, Some(1)).unwrap();
+        assert_eq!(tail.messages[0].id, "followup");
+    }
 
     #[test]
     fn append_after_torn_tail_terminates_the_torn_line_first() {

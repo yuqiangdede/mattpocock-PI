@@ -2,6 +2,15 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const ptBREntries: ChangelogEntry[] = [
   {
+    version: "0.19.0",
+    date: "2026-10-13",
+    highlights: [
+      "Esclareça requisitos com o espaço de trabalho de entrevista visual nativo no menu de requisitos, com perguntas estruturadas e decisões persistentes.",
+      "Gere prompts de imagem de interface de usuário com o gerador integrado e envie rascunhos editáveis diretamente ao Composer.",
+      "Unifique a identidade da marca do fork nas superfícies, instalador e telas Sobre, com melhorias no layout de atalhos e correções de estabilidade.",
+    ],
+  },
+  {
     "version": "0.18.0",
     "date": "2026-10-09",
     "highlights": [

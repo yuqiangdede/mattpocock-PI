@@ -45,12 +45,12 @@ test("Existing six-action profiles regain common shortcuts without changing pers
   const configuration = createDefaultCodingActions();
   const snapshot = structuredClone(configuration);
   const { primary, more } = codingShortcutMenu(configuration, [skill("retro"), skill("retro"), skill("ask-matt"), skill("implement"), { name: "help", kind: "builtin", title: "Help" }], labels);
-  assert.equal(primary.length, 8);
+  assert.equal(primary.length, 6);
   assert.equal(primary[0].action.skillId, "setup-matt-pocock-skills");
   assert.equal(primary[1].action.skillId, "ask-matt");
   assert.equal(primary.at(-1).action.skillId, "diagnosing-bugs");
   assert.ok(!primary.some(row => row.action.skillId === "codebase-design"));
-  assert.deepEqual(more.map(row => row.action.skillId), ["codebase-design", "retro", "implement-spec"]);
+  assert.deepEqual(more.map(row => row.action.skillId), ["to-spec", "codebase-design", "to-tickets", "retro", "implement-spec"]);
   assert.deepEqual(configuration, snapshot);
 });
 
@@ -77,7 +77,7 @@ test("Disabled actions are not silently reintroduced through the Skill catalog",
   const { primary, more } = codingShortcutMenu(configuration, [skill("implement"), skill("diagnosing-bugs"), skill("custom-skill")], labels);
   assert.equal(primary.at(-1).action.enabled, false);
   assert.ok(!more.some(row => row.action.skillId === "implement"));
-  assert.deepEqual(more.map(row => row.action.skillId), []);
+  assert.deepEqual(more.map(row => row.action.skillId), ["to-spec", "to-tickets"]);
 });
 
 const { codingShortcutTooltip } = await import("../src/features/coding/coding-shortcut-tooltip.ts");
@@ -111,7 +111,7 @@ test("All installed Matt shortcuts have localized labels and prepare editable dr
     const copy = catalogs[locale];
     const skillLabels = Object.fromEntries(ENGINEERING_SHORTCUTS.map(entry => [entry.action, copy.coding[entry.action]]));
     const menu = codingShortcutMenu(configuration, catalog, { ...labels, skillLabels });
-    assert.equal(menu.primary.length, 8);
+    assert.equal(menu.primary.length, 6);
     assert.equal(menu.more.length, ENGINEERING_SHORTCUTS.length - menu.primary.length);
     assert.ok(!menu.primary.some(row => row.action.skillId === "codebase-design"));
     assert.ok(menu.more.some(row => row.action.skillId === "codebase-design"));

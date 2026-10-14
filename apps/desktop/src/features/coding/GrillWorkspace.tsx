@@ -6,7 +6,7 @@ import { useAppStore } from "../../stores/app-store";
 import { Button, Textarea, Input, portalOverlay } from "../../components/ui";
 import {
   applyGrillReply, decideGrillQuestion, grillPrompt, loadGrill, newGrill,
-  parseGrillReply, saveGrill, type GrillOperation, type GrillQuestion, type GrillState,
+  parseGrillReply, saveGrill, summaries, canAutoRetryGrill, setGrillCustomAnswer, type GrillOperation, type GrillQuestion, type GrillState,
 } from "./grill-workspace-model";
 import "./grill-workspace.css";
 
@@ -57,13 +57,15 @@ function latestReply(messages: Array<{ role?: string; content?: string; createdA
   return null;
 }
 
-export function GrillWorkspaceContent({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {
+export function GrillWorkspaceContent({ sessionId, onClose, onNext }: { sessionId: string; onClose: () => void; onNext?: (context: string) => void }) {
   useBlockingOverlay();
   const { i18n } = useTranslation();
+  const { t: translate } = useTranslation();
   const language: Language = (i18n.resolvedLanguage ?? i18n.language).startsWith("zh") ? "zh" : "en";
   const t = copy[language];
   const activeSessionId = useAppStore(s => s.activeSessionId);
   const isRunning = useAppStore(s => s.runningSessions[sessionId] ?? false);
+  const turnResult = useAppStore(s => s.latestTurnResults[sessionId]);
   const messages = useAppStore(s => s.activeSessionId === sessionId ? s.messages : s.retainedTranscripts[sessionId] ?? EMPTY_MESSAGES);
   const [state, setState] = useState<GrillState | null>(() => loadGrill(sessionId));
   const [topic, setTopic] = useState("");
@@ -95,7 +97,7 @@ export function GrillWorkspaceContent({ sessionId, onClose }: { sessionId: strin
     return () => window.clearInterval(timer);
   }, [state?.pending?.id]);
   useEffect(() => {
-    if (!state?.pending || invalid) return;
+    if (!state?.pending) { setInvalid(false); return; }
     const operation = state.pending;
     const seen = latestReply(messages, operation);
     if (seen) {
@@ -107,8 +109,10 @@ export function GrillWorkspaceContent({ sessionId, onClose }: { sessionId: strin
     // Poll the Host transcript, not an orphaned browser subprocess.
     // A request can survive closing and reopening this workspace.
     readingHost.current = true;
+    let active = true;
     void api.getSession(sessionId, { messageLimit: 120, contentLimit: 65_536 })
       .then(result => {
+        if (!active) return;
         const rows = result.session?.messages ?? [];
         const reply = latestReply(rows, operation);
         if (reply) {
@@ -130,13 +134,14 @@ export function GrillWorkspaceContent({ sessionId, onClose }: { sessionId: strin
           rows.slice(index + 1).some(m => m.role === "assistant" && m.status === "complete")) {
           setInvalid(true);
         }
-      }).catch(err => setError(String(err)))
+      }).catch(err => { if (active) setError(String(err)); })
       .finally(() => { readingHost.current = false; });
-  }, [tick, state?.pending?.id, messages, isRunning, sessionId, invalid]);
+    return () => { active = false; };
+  }, [tick, state?.pending?.id, messages, isRunning, sessionId]);
 
-  const submitOperation = async (basis: GrillState, kind: GrillOperation["kind"], text = "", questionId?: string) => {
+  const submitOperation = async (basis: GrillState, kind: GrillOperation["kind"], text = "", questionId?: string, retryCount = 0) => {
     if (inflight.current || basis.pending || !canSend) { setError(!canSend ? t.noSession : t.pendingWarning); return; }
-    const operation: GrillOperation = { id: crypto.randomUUID(), kind, questionId, text, submittedAt: new Date().toISOString() };
+    const operation: GrillOperation = { id: crypto.randomUUID(), kind, questionId, text, submittedAt: new Date().toISOString(), retryCount };
     const next: GrillState = { ...basis, pending: operation };
     if (kind === "discuss" && questionId) next.questions = basis.questions.map(q => q.id === questionId
       ? { ...q, thread: [...q.thread, { id: operation.id, who: "user" as const, text, at: operation.submittedAt }].slice(-100) }
@@ -182,15 +187,17 @@ export function GrillWorkspaceContent({ sessionId, onClose }: { sessionId: strin
   };
   const retry = () => {
     if (!state?.pending) return;
-    // A rejected/invalid response might already be in flight; make the retry
-    // explicit and preserve the original user thread for audit.
+    // Each attempt has a new correlation ID; keep the bounded budget across reopen.
     const op = state.pending;
     const base = { ...state, pending: null };
     if (op.kind === "discuss") base.questions = state.questions.map(q =>
       q.id === op.questionId ? { ...q, thread: q.thread.filter(m => m.id !== op.id) } : q);
     setInvalid(false);
-    void submitOperation(base, op.kind, op.text, op.questionId);
+    void submitOperation(base, op.kind, op.text, op.questionId, (op.retryCount ?? 0) + 1);
   };
+  useEffect(() => {
+    if (invalid && state?.pending && canSend && !error && !inflight.current && canAutoRetryGrill(state.pending, turnResult, isRunning)) retry();
+  }, [invalid, state?.pending?.id, turnResult, isRunning, canSend, error]);
   const allSettled = state?.questions.every(q => q.status !== "open") ?? false;
   const confirmed = state?.questions.filter(q => q.status === "confirmed").length ?? 0;
   return <div className="overlay grill-overlay">
@@ -229,14 +236,22 @@ export function GrillWorkspaceContent({ sessionId, onClose }: { sessionId: strin
                   role={current.multi ? "checkbox" : "radio"}
                   aria-checked={current.selected.includes(opt.key)}
                   onClick={() => answer(current, opt.key)}>{opt.key}. {opt.label}</Button>)}
+                <Button variant={current.selected.includes("OTHER") ? "secondary" : "ghost"}
+                  disabled={Boolean(state.pending) || state.finished || current.status !== "open"}
+                  role={current.multi ? "checkbox" : "radio"} aria-checked={current.selected.includes("OTHER")}
+                  onClick={() => answer(current, "OTHER")}>{translate("codingActions.visualOther")}</Button>
               </div>
+              {current.selected.includes("OTHER") && <Textarea aria-label={translate("codingActions.visualOtherAnswer")}
+                placeholder={translate("codingActions.visualOtherAnswer")} value={current.customAnswer ?? ""} maxLength={3000}
+                disabled={Boolean(state.pending) || state.finished || current.status !== "open"}
+                onChange={event => mutate(s => setGrillCustomAnswer(s, current.id, event.target.value))} />}
               <div className="grill-recommend">
                 <strong>{t.recommend}: {current.recommended.join(", ")}</strong>
                 <p>{t.reason}: {current.why}</p>
               </div>
               <div className="grill-answer-actions">
                 {current.status === "open" ? <>
-                  <Button disabled={!current.selected.length || Boolean(state.pending)} onClick={() => mutate(s => decideGrillQuestion(s, current.id, "confirm"))}>{t.confirm}</Button>
+                  <Button disabled={!current.selected.length || Boolean(state.pending) || (current.selected.includes("OTHER") && !current.customAnswer?.trim())} onClick={() => mutate(s => decideGrillQuestion(s, current.id, "confirm"))}>{t.confirm}</Button>
                   <Button variant="ghost" disabled={Boolean(state.pending)} onClick={() => mutate(s => decideGrillQuestion(s, current.id, "defer"))}>{t.defer}</Button>
                 </> : <Button variant="secondary" disabled={Boolean(state.pending) || state.finished} onClick={() => mutate(s => decideGrillQuestion(s, current.id, "reopen"))}>{t.reopen}</Button>}
               </div>
@@ -258,9 +273,14 @@ export function GrillWorkspaceContent({ sessionId, onClose }: { sessionId: strin
             </form>
           </section>
         </div>
+        {state.noMoreQuestions && !state.finished && !state.pending && <p className="grill-result" role="status">{translate("codingActions.visualNoMoreQuestions")}</p>}
         {state.finished && <p className="grill-result"><strong>{t.finishNote}：</strong>{state.finishNote}</p>}
+        {state.finished && onNext && <div className="coding-next-steps">
+          <span>{translate("codingActions.recommendedNext")}</span>
+          <Button disabled={!canSend} onClick={() => onNext([state.topic, state.finishNote, summaries(state)].join("\n\n"))}>{translate("codingActions.defaults.create-spec")}</Button>
+        </div>}
         {state.pending && <div className="grill-pending" role="status">
-          <span>{invalid ? t.invalid : isRunning ? t.waiting : t.noReply}</span>
+          <span>{invalid && (state.pending.retryCount ?? 0) >= 3 ? translate("codingActions.visualRetryExhausted") : invalid ? t.invalid : isRunning ? t.waiting : t.noReply}{(state.pending.retryCount ?? 0) > 0 && ` (${Math.min(state.pending.retryCount ?? 0, 3)}/3)`}</span>
           {invalid && <Button variant="secondary" onClick={retry} disabled={!canSend}>{t.retry}</Button>}
         </div>}
       </>}
@@ -268,6 +288,6 @@ export function GrillWorkspaceContent({ sessionId, onClose }: { sessionId: strin
     </div>
   </div>;
 }
-export function GrillWorkspace({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {
-  return portalOverlay(<GrillWorkspaceContent sessionId={sessionId} onClose={onClose} />);
+export function GrillWorkspace({ sessionId, onClose, onNext }: { sessionId: string; onClose: () => void; onNext?: (context: string) => void }) {
+  return portalOverlay(<GrillWorkspaceContent sessionId={sessionId} onClose={onClose} onNext={onNext} />);
 }

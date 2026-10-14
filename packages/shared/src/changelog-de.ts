@@ -2,6 +2,15 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const deEntries: ChangelogEntry[] = [
   {
+    version: "0.19.0",
+    date: "2026-10-13",
+    highlights: [
+      "Klären Sie Anforderungen mit dem nativen visuellen Interview-Arbeitsbereich im Anforderungsmenü mit strukturierten Fragen und persistenten Entscheidungen.",
+      "Erstellen Sie UI-Bild-Prompts mit dem integrierten Generator und leiten Sie bearbeitbare Entwürfe direkt in den Composer weiter.",
+      "Vereinheitlichen Sie die Fork-Markenidentität auf Oberflächen, im Installer und im About-Fenster, mit optimiertem Shortcut-Layout und Stabilitätskorrekturen.",
+    ],
+  },
+  {
     "version": "0.18.0",
     "date": "2026-10-09",
     "highlights": [

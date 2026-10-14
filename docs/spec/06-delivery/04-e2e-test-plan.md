@@ -4,6 +4,29 @@
 > Status: Accepted (protocol/Electron automation is active; full desktop Playwright remains planned)
 > Cross-references: [acceptance-criteria](02-acceptance-criteria.md) · [milestones](01-mvp-milestones.md) · [ai-development-workflow](03-ai-development-workflow.md) · [change-checklist](05-change-checklist.md)
 
+### E2E-SESSION-review-followup-layout-recovery
+
+- Preconditions: Windows; a session above 2 MiB with a legacy zero-identity
+  `.jsonl.layout` cache and a completed review response after a tool message.
+- Steps: update the non-tail review tool message with longer Chinese content;
+  reload the session; send a follow-up asking to fix the findings; reload again.
+- Expected: all messages remain readable and the follow-up is persisted without
+  `stream did not contain valid UTF-8`. The obsolete cache is ignored; transcript
+  bodies and the persistence format are preserved.
+- Compatibility variant: inject invalid UTF-8 bytes within a review message text;
+  open it, update another message and send a follow-up. Invalid bytes are omitted
+  from the view, valid Chinese/emoji remain, and unrelated source bytes survive
+  the update. Physical window offsets still locate the correct messages.
+- Specs: `03-runtime/04-data-storage.md`; acceptance: lossless session recovery;
+  milestone: maintenance.
+- Status: host integration regression automated in
+  `transcripts::tests::rewritten_review_message_rebuilds_layout_before_followup`;
+  invalid-byte recovery is covered by
+  `transcripts::tests::invalid_utf8_in_review_output_does_not_block_followup_or_rewrite`;
+  `node scripts/e2e-transcript-utf8.mjs` covers a real Host RPC process, old cache,
+  invalid-byte reads, message updates, follow-up persistence and restart using
+  isolated storage. Native Desktop/provider execution is not covered.
+
 ## Parallel stage development exception
 
 For fork stage-two experiments, the parallel-stage policy in
@@ -58,6 +81,55 @@ does not authorize commits, publishing, merging or live-instance testing.
   installed taskbar/Dock behavior remains a release qualification check.
 
 ### E2E-CODING-ACTIONS-withdraw-workflow-entry
+
+- Verify a direct Visual requirements discussion button with no split dropdown.
+  Click it without a Session, enter a topic in the external Composer and manually
+  Send. Verify one native request, a materialized Session checkpoint and automatic
+  panel opening with the topic and first-round question response. Selection alone
+  must neither send nor open an empty modal.
+  More contains ordinary Requirements discussion, Create specification and Create
+  tickets. Selecting a Skill only prepares a draft. Next-step recommendations
+  remain available. Verify correlated reply reopening and wide responsive sizing.
+- Verify one action row ordered Initialize, Ask next step, Visual discussion,
+  Interaction image, Implement, Review, Diagnose, Commit and More. Custom plain
+  prompts remain before More. At narrow row widths, buttons wrap without overflow.
+- Restore a pending follow-up, observe an invalid intermediate reply, then deliver
+  valid bare JSON with the matching request and question IDs. Verify the answer
+  appears in that question's thread and pending state clears without retrying.
+- Return invalid payloads after completed native turns; verify exactly three
+  automatic retry sends and a persisted exhausted budget. Additional transcript
+  updates must not restart retries. Running, failed and stale turn results must
+  not qualify; valid responses clear pending state without retries.
+- Wrap a correlated follow-up JSON object in prose and Markdown with a trailing
+  comma; verify it appears in the thread without a retry. Model tests cover syntax
+  repairs, preserved escaped content, conflicting IDs, ambiguous duplicate
+  results, truncated payloads and input-size bounds.
+- With the application shell's non-selectable base styles loaded, verify question
+  text, option labels, rationale and Agent replies opt into native text selection.
+- Select Other, verify blank confirmation is blocked, enter a custom alternative,
+  confirm and reopen the panel. Verify selected custom text is retained and
+  included in downstream summaries. Multi-select may combine it with fixed options.
+- Confirm a question and request the next round. Return a correlated questions
+  payload with an empty array; verify the finish-interview guidance appears and
+  confirmed answers remain intact. No automatic finish or retry is triggered.
+- Complete a native interview and select Create specification; verify panel
+  dismissal and a draft containing the design document path. End a to-spec turn
+  successfully and verify both Create tickets and Implement recommendations.
+  Select Create tickets, preserving draft and attachments with outcome context.
+  End Code review, select Commit code and verify the configured draft with review
+  context. Selection alone must issue no Host prompt or Git operation.
+- Verify recommendations highlight existing buttons without a separate row.
+  Specification completion highlights Implement and More; opening More reveals
+  highlighted Create tickets. A completed final answer after a recovered tool
+  error still qualifies, while running and final-error states do not.
+- Use a persisted user row with expanded `content` and original `/skill:to-spec`
+  in `command`; verify existing Implement and More buttons acquire the highlight.
+  With real theme tokens loaded, verify the visible accent ring, not only a class.
+- `coding-next-steps.test.mjs` covers the full chain and failed/cancelled/running,
+  unrelated and newer-turn exclusions; `coding-prompt-user-path.test.mjs` covers
+  the native panel and Composer handoffs with real launcher wiring.
+- Coverage: `coding-prompt-user-path.test.mjs` with the real CodingWorkbench
+  and AnchoredMenu in an isolated Electron renderer.
 
 - Composer and the work-panel launcher expose no native Workflow entry. Restore
   a legacy Workflow tab alongside Review; retain Review and select it when the
@@ -9884,6 +9956,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 | Acceptance | Scenarios |
 |---|---|
+| Lossless session recovery after review updates | E2E-SESSION-review-followup-layout-recovery |
 | C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
 | AC-01–AC-16 / AC-18–AC-20 — Engineering Workflow Runs | E2E-WORKFLOW-project-owned-runs, E2E-WORKFLOW-discovery, E2E-WORKFLOW-recovery, E2E-WORKFLOW-six-stages, E2E-WORKFLOW-reopen |
 | AC-17 — Engineering artifact references | E2E-WORKFLOW-artifacts |

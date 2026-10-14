@@ -2,6 +2,15 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const esEntries: ChangelogEntry[] = [
   {
+    version: "0.19.0",
+    date: "2026-10-13",
+    highlights: [
+      "Aclare los requisitos con el espacio de trabajo de entrevista visual nativo desde el menú de requisitos, con preguntas estructuradas y decisiones persistentes.",
+      "Genere prompts de imagen de interfaz de usuario con el generador integrado y dirija borradores editables directamente al Composer.",
+      "Unifique la identidad de marca del fork en la interfaz, el instalador y la ventana Acerca de, con mejoras en los atajos y correcciones de estabilidad.",
+    ],
+  },
+  {
     "version": "0.18.0",
     "date": "2026-10-09",
     "highlights": [

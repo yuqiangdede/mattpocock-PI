@@ -1418,6 +1418,16 @@ instead of parsing the history in front of it, so the cost of opening a session
 is proportional to the window rather than to the conversation. Consequences:
 
 - The layout is derived data, cached in memory and rebuilt by scanning the file.
+  Persisted layout caches require a verifiable, nonzero file identity. Platforms
+  without one (including Windows) neither load nor write these caches; legacy
+  zero-identity caches are ignored and the transcript is scanned instead. This
+  preserves valid UTF-8 reads after a non-tail message rewrite moves offsets.
+  Transcript/revision line readers omit invalid UTF-8 byte sequences from their
+  decoded view and log the skipped byte count without message content. Valid
+  Unicode (including literal U+FFFD) is retained, and offsets always count the
+  original bytes. Reading does not rewrite source files; a message update keeps
+  unrelated records' payload bytes with the existing newline normalization.
+  JSON/schema errors retain existing handling.
   `file_len` is its validity token: the transcript is append-only between atomic
   rewrites, so a longer file is scanned from the previous end and a shorter or
   replaced file is rescanned in full. Every rewrite and delete path also drops

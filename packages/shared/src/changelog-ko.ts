@@ -2,6 +2,15 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const koEntries: ChangelogEntry[] = [
   {
+    version: "0.19.0",
+    date: "2026-10-13",
+    highlights: [
+      "요구사항 메뉴의 네이티브 시각적 인터뷰 워크스페이스를 통해 구조화된 질문 카드와 결정 유지 기능으로 요구사항을 구체화합니다.",
+      "내장된 상호작용 UI 이미지 프롬프트 생성기를 사용하여 편집 가능한 초안을 Composer에 바로 입력합니다.",
+      "데스크톱 표면, 설치 프로그램 및 정보 화면 전반에서 포크 브랜드 정체성을 통일하고 바로가기 레이아웃 및 안정성을 개선했습니다.",
+    ],
+  },
+  {
     "version": "0.18.0",
     "date": "2026-10-09",
     "highlights": [
