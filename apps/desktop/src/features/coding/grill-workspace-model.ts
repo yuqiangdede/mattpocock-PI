@@ -127,6 +127,21 @@ export function decideGrillQuestion(state: GrillState, id: string, type: "select
     return q.status === "open" && q.selected.length && (!q.selected.includes("OTHER") || Boolean(q.customAnswer?.trim())) ? { ...q, status: "confirmed" } : q;
   }) };
 }
+export function grillNavigation(state: GrillState): { next: boolean; finish: boolean } {
+  const settled = !state.pending && !state.finished && state.questions.every(q => q.status !== "open");
+  const exhausted = state.noMoreQuestions === true || state.questions.length >= 100;
+  return { next: settled && !exhausted, finish: settled && exhausted };
+}
+export function acceptGrillRecommendations(state: GrillState): GrillState {
+  if (state.pending || state.finished) return state;
+  const undecided = state.questions.filter(q => q.status !== "confirmed");
+  if (!undecided.length || undecided.some(q => !q.recommended.length ||
+      (!q.multi && q.recommended.length !== 1) ||
+      q.recommended.some(key => !q.options.some(option => option.key === key)))) return state;
+  return { ...state, questions: state.questions.map(q => q.status === "confirmed" ? q : {
+    ...q, selected: [...new Set(q.recommended)], status: "confirmed",
+  }) };
+}
 export function summaries(state: GrillState): string {
   return state.questions.map(q => {
     const picked = q.selected.map(k => k === "OTHER" ? `Other: ${q.customAnswer?.trim() ?? ""}` : q.options.find(o => o.key === k)?.label ?? k).join(" / ");

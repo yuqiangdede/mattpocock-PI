@@ -21,6 +21,12 @@ The native view implements:
 - Follow-up answers that **never silently confirm or override an answer**.
 - An explicit "Next round" action once all open questions are settled.
 - An explicit Finish action asking the Agent to write a design document.
+- Guided navigation: settle the current round before Next; Finish is available
+  only after no further questions remain (or the existing 100-question cap).
+- An explicit automatic acceptance action that preserves confirmed decisions,
+  accepts remaining recommendations and advances rounds through Finish. Stop,
+  close, Session switch or failures prevent further automatic actions; opening
+  the panel again never implicitly resumes automatic mode.
 - Local versioned state for interview drafts and question threads, including
   a pending operation identifier so results can be reconciled after reopening.
 

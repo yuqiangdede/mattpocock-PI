@@ -1,9 +1,11 @@
-export type CodingNextStep = "to-spec" | "to-tickets" | "implement" | "code-review" | "commit-code";
+import { isReviewFixRequest } from "./review-fix-prompt";
+import { reviewOutcome } from "./review-outcome";
+export type CodingNextStep = "to-spec" | "to-tickets" | "implement" | "code-review" | "commit-code" | "review-fix";
 const next: Readonly<Record<string, readonly CodingNextStep[]>> = {
   "to-spec": ["to-tickets", "implement"],
   "to-tickets": ["implement"],
   implement: ["code-review"],
-  "code-review": ["commit-code"],
+  "review-fix": ["code-review"],
 };
 
 /** A successful native turn offers navigation, never proof of release acceptance. */
@@ -14,7 +16,8 @@ export function codingNextSteps(messages: readonly { role?: string; content?: st
   while (index >= 0 && messages[index].role !== "user") index--;
   if (index < 0) return null;
   const user = messages[index];
-  const skill = (user.command ?? user.content)?.match(/^\s*\/(?:skill:)?(to-spec|to-tickets|implement|code-review)(?=\s|$)/)?.[1];
+  const request = user.command ?? user.content ?? "";
+  const skill = isReviewFixRequest(request) ? "review-fix" : request.match(/^\s*\/(?:skill:)?(to-spec|to-tickets|implement|code-review)(?=\s|$)/)?.[1];
   if (!skill) return null;
   const replies = messages.slice(index + 1).filter(message => message.role === "assistant" && message.content);
   if (!replies.length) return null;
@@ -23,5 +26,6 @@ export function codingNextSteps(messages: readonly { role?: string; content?: st
   if (last.isError || last.status === "error" || last.status === "aborted" || last.status === "streaming") return null;
   // A final persisted answer also qualifies after recovered tool errors or history reload.
   if (result?.status !== "completed" && last.status !== "complete") return null;
-  return { steps: next[skill], context: replies.map(message => message.content).join("\n\n").slice(-8000) };
+  const steps: readonly CodingNextStep[] = skill === "code-review" ? [reviewOutcome(last.content ?? "") === "clear" ? "commit-code" : "review-fix"] : next[skill];
+  return { steps, context: replies.map(message => message.content).join("\n\n").slice(-8000) };
 }

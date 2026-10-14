@@ -37,6 +37,23 @@ decisions. Waiting, failed/cancelled turns, storage/send errors and other Sessio
 never trigger retries. Exhaustion remains visible with an explicit manual retry.
 Native interview text, question choices, recommendations and discussion replies
 support native text selection and copying; action controls retain shell behavior.
+Long question descriptions and options scroll independently in the left pane.
+The Agent recommendation and confirm/defer/reopen controls remain in a fixed
+footer below that scroller. Long recommendation rationale scrolls within the
+recommendation card so the decision controls remain visible.
+Interview navigation follows the settled-question state: Finish is disabled
+until an empty questions response confirms exhaustion; Next round is disabled
+after exhaustion. Open questions must be confirmed or deferred before either
+action. At the existing 100-question safety limit, settling the round enables
+Finish instead of another round. Inline guidance describes the available action.
+Accept all recommendations (automatic) explicitly authorizes accepting pending
+and deferred recommendations, requesting subsequent rounds, and finishing when
+no further questions remain. Already confirmed decisions remain unchanged.
+Single/multiple recommendations must reference valid options. Invalid cached
+recommendations, send/storage errors, exhausted response retries and a Session
+switch stop automation. Stop automatic interview or closing the panel prevents
+future automatic actions; an already submitted request may still complete.
+Automatic mode is panel-local and does not silently resume on reopening.
 Each native question always offers Other (write your own), independently of
 Agent-provided options. Selecting it reveals a per-question answer editor; blank
 text cannot be confirmed. Single-select replaces the selected fixed option,
@@ -51,13 +68,26 @@ does not automatically finish the interview.
 
 Completed native interviews recommend Create specification. A successfully ended
 to-spec turn recommends Create tickets or Implement; to-tickets recommends
-Implement; implement recommends Code review; code-review recommends Commit code.
+Implement; implement recommends Code review. Code review findings or an unclear
+outcome recommend Fix code review findings in More, highlighting both More and
+the entry. Only an explicit clear review (an empty structured findings array,
+without an incorrect verdict, or a standalone English/Chinese no-findings
+conclusion) recommends Commit code. Priority-tagged findings take precedence
+over a clear conclusion. Unknown prose is never assumed to be a clean review.
+Fix code review findings is an independent built-in plain prompt: verify the
+latest report, fix confirmed defects minimally, add regression coverage and
+report rejected/unresolved findings. It carries the recommendation context,
+retains existing draft/attachments, closes More and waits for manual Send.
+Completed repair requests recommend Code review again. The localized leading
+repair heading identifies this plain-prompt action; editing that heading may
+remove the optional next-step hint. Saved Skill/prompt configuration is retained.
 These are optional next actions, not workflow prerequisites or acceptance claims.
 Recommendations highlight the existing action buttons rather than add another
 row. When a recommended Skill lives in More, both More and its menu item receive
 the highlight and an accessible recommendation description. Existing labels,
 availability checks and saved configuration remain unchanged.
-Only the latest user turn's leading native Skill command qualifies.
+Only the latest user turn's leading native Skill command or built-in repair
+heading qualifies.
 Skill identity is read from the persisted original `command` when present;
 expanded model-facing `content` is used only for legacy rows without a command.
 Successful native turn results qualify; running, failed, cancelled or unrelated turns do not qualify.
@@ -155,9 +185,11 @@ as Claude Code.
 
 
 The shortcuts share one wrapping row: Initialize, Ask next step, Visual
-requirements discussion, Interaction image prompt, Implement, Code review,
+requirements discussion, Implement, Code review,
 Diagnose bug, Commit code, optional custom plain prompts, then More.
-Ordinary discussion, Create specification and Create tickets remain in More.
+Interaction image prompt, Ordinary discussion, Create specification and Create
+tickets live in More. Selecting Interaction image prompt closes More and inserts
+an editable prompt, preserving the existing Composer draft and attachments.
 Settings remain accessible through Extensions.
 The default Commit code button prepares an editable, localized build-then-commit prompt with no Skill dependency. It preserves existing Composer text and attachments; only manual Send executes the prompt. Git (including GitLab hosting) and SVN are supported by the default instruction; failed verification forbids commit. The Engineering Workflow entry is no longer exposed.
 
