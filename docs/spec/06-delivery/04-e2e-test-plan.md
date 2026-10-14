@@ -43,6 +43,17 @@ does not authorize commits, publishing, merging or live-instance testing.
 
 ## 1. Goals
 
+### E2E-clipboard-copy-without-live-voice
+
+- With Live Voice disabled and no microphone reservation, copy a transcript
+  message, code block and error detail, then paste into a text editor. Expect
+  the selected text and no copy-failure toast. Repeat with Live Voice idle.
+- Clipboard reads and writes from external frames/windows remain denied;
+  microphone access without a reservation remains denied.
+- Automated permission-boundary regression:
+  `node --test apps/desktop/test/live-voice-permission.test.mjs`.
+  Native clipboard/focus behavior requires separate isolated Electron validation.
+
 ### E2E-DEV-package-guard-first-start
 
 - In an isolated checkout with package sources and no guard snapshot, execute
