@@ -10,7 +10,7 @@ export const APP_DISPLAY_NAME = forkConfig.displayName;
 export const APP_REPOSITORY = forkConfig.repository;
 export const UPSTREAM_REPOSITORY = forkConfig.upstreamRepository;
 export const APP_MANUAL_UPDATES_ONLY = forkConfig.manualUpdatesOnly;
-export const APP_VERSION = "0.19.0";
+export const APP_VERSION = "0.19.1";
 
 export const APP_MENU_COMMANDS = [
   "newTask",

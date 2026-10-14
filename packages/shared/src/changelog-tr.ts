@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const trEntries: ChangelogEntry[] = [
   {
+    version: "0.19.1",
+    date: "2026-10-14",
+    highlights: [
+      "Görünür kararlarla görüşme turları ilerler; sonraki adım önerileri onaylanmış kararların üzerine asla yazmaz.",
+      "Kod incelemesi bulgularını, yalnızca temiz bir incelemenin ardından commit öneren odaklı bir taslakla düzeltin.",
+      "Transkript geçmişinde geçersiz UTF-8 baytları bulunan oturumları, inceleme takiplerini veya yeniden başlatma kurtarmayı kaybetmeden yeniden açın.",
+      "Güvenilir renderer'ın pano yazmalarını koruyun ve commit isteminden eski git push kısıtlamasını kaldırın.",
+    ],
+  },
+  {
     version: "0.19.0",
     date: "2026-10-13",
     highlights: [

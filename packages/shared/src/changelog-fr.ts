@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const frEntries: ChangelogEntry[] = [
   {
+    version: "0.19.1",
+    date: "2026-10-14",
+    highlights: [
+      "Les tours d'entretien avancent avec des décisions visibles ; les recommandations de prochaine étape n'écrasent jamais les décisions confirmées.",
+      "Corrigez les constats de revue de code avec un brouillon ciblé qui ne recommande un commit qu'après une revue propre.",
+      "Rouvrez les sessions dont l'historique de transcription contient des octets UTF-8 invalides sans perdre les relances de revue ni la récupération au redémarrage.",
+      "Conservez les écritures presse-papiers du renderer approuvé et supprimez l'ancienne restriction git push de l'invite de commit.",
+    ],
+  },
+  {
     version: "0.19.0",
     date: "2026-10-13",
     highlights: [

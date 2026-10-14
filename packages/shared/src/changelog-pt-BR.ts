@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const ptBREntries: ChangelogEntry[] = [
   {
+    version: "0.19.1",
+    date: "2026-10-14",
+    highlights: [
+      "As rodadas de entrevista avançam com decisões visíveis; as recomendações de próxima etapa nunca sobrescrevem decisões confirmadas.",
+      "Corrija os apontamentos da revisão de código com um rascunho focado que recomenda commit apenas após uma revisão limpa.",
+      "Reabra sessões cujo histórico de transcrição contenha bytes UTF-8 inválidos sem perder os acompanhamentos de revisão nem a recuperação ao reiniciar.",
+      "Mantenha as gravações de área de transferência do renderizador confiável e remova a restrição desatualizada de git push do prompt de commit.",
+    ],
+  },
+  {
     version: "0.19.0",
     date: "2026-10-13",
     highlights: [
