@@ -1,0 +1,99 @@
+diff --git a/out/electron/electronWin.js b/out/electron/electronWin.js
+index 8af583d32f8143bb2b873e27a7fd56224427ba5b..e4ff6ff1ee78004e4eb69f02cce3e76274369d2b 100644
+--- a/out/electron/electronWin.js
++++ b/out/electron/electronWin.js
+@@ -32,7 +32,27 @@ async function addWinAsarIntegrity(executablePath, asarIntegrity) {
+         codepage: languages[0].codepage,
+     });
+     resource.outputResource(executable);
+-    await (0, promises_1.writeFile)(executablePath, Buffer.from(executable.generate()));
++    const output = Buffer.from(executable.generate());
++    let handle;
++    for (let retry = 0; ; retry++) {
++        try {
++            // Acquire write access without truncating the original executable.
++            handle = await (0, promises_1.open)(executablePath, "r+");
++            break;
++        } catch (error) {
++            if (process.platform !== "win32" || !["EPERM", "EBUSY", "UNKNOWN"].includes(error.code) || retry >= 5) {
++                throw error;
++            }
++            builder_util_1.log.warn({ attempt: retry + 1, retries: 5, code: error.code }, "retrying Electron executable write access for asar integrity");
++            await new Promise(resolve => setTimeout(resolve, 1000));
++        }
++    }
++    try {
++        await handle.writeFile(output);
++        await handle.truncate(output.length);
++    } finally {
++        await handle.close();
++    }
+     builder_util_1.log.info({ executablePath: builder_util_1.log.filePath(executablePath) }, "updating asar integrity executable resource");
+ }
+ //# sourceMappingURL=electronWin.js.map
+diff --git a/out/util/electronGet.js b/out/util/electronGet.js
+index a941f9d20c10ca58a84b9a600b0df468631aae01..e4912033928cbbc42d4dd947c1888995e0aa27cd 100644
+--- a/out/util/electronGet.js
++++ b/out/util/electronGet.js
+@@ -184,7 +184,28 @@ async function extractArchive(file, dir) {
+             throw new Error(`Extraction of ${path.basename(file)} produced no files`);
+         }
+         await fs.rm(dir, { recursive: true, force: true });
+-        await fs.rename(tmpDir, dir);
++        // Windows can briefly retain handles after extraction. Retry only the rename,
++        // preserving the staged files and the extraction lock until it completes.
++        for (let retry = 0; ; retry++) {
++            try {
++                await fs.rename(tmpDir, dir);
++                break;
++            } catch (error) {
++                if (process.platform !== "win32" || !["EPERM", "EBUSY"].includes(error.code)) {
++                    throw error;
++                }
++                if (retry >= 5) {
++                    builder_util_1.log.warn({ code: error.code }, "copying Electron extraction directory after rename retries failed");
++                    // Keep staging until every file has been copied. A copy failure
++                    // remains fatal and leaves staging available for diagnosis.
++                    await fs.cp(tmpDir, dir, { recursive: true, force: false, errorOnExist: true, verbatimSymlinks: true });
++                    await fs.rm(tmpDir, { recursive: true, force: true });
++                    break;
++                }
++                builder_util_1.log.warn({ attempt: retry + 1, retries: 5, code: error.code }, "retrying Electron extraction directory rename");
++                await new Promise(resolve => setTimeout(resolve, 1000));
++            }
++        }
+     }
+     finally {
+         await release().catch(err => builder_util_1.log.warn({ err }, "failed to release lockfile"));
+diff --git a/out/util/resEdit.js b/out/util/resEdit.js
+index 7a5cbc14a9044363d360e44e1dcc5746e52064ac..cb83782ca78768c42c93bee97a95396beef81edc 100644
+--- a/out/util/resEdit.js
++++ b/out/util/resEdit.js
+@@ -29,7 +29,26 @@ async function editWindowsResources(opts) {
+         patchManifestExecutionLevel(res, opts.requestedExecutionLevel, opts.file);
+     }
+     res.outputResource(executable);
+-    await (0, promises_1.writeFile)(opts.file, Buffer.from(executable.generate()));
++    const output = Buffer.from(executable.generate());
++    let handle;
++    for (let retry = 0; ; retry++) {
++        try {
++            handle = await (0, promises_1.open)(opts.file, "r+");
++            break;
++        } catch (error) {
++            if (process.platform !== "win32" || !["EPERM", "EBUSY", "UNKNOWN"].includes(error.code) || retry >= 5) {
++                throw error;
++            }
++            builder_util_1.log.warn({ attempt: retry + 1, retries: 5, code: error.code }, "retrying Electron executable write access for resource editing");
++            await new Promise(resolve => setTimeout(resolve, 1000));
++        }
++    }
++    try {
++        await handle.writeFile(output);
++        await handle.truncate(output.length);
++    } finally {
++        await handle.close();
++    }
+ }
+ function patchManifestExecutionLevel(res, level, file) {
+     const manifestEntry = res.entries.find(e => e.type === 24 && e.id === 1);
