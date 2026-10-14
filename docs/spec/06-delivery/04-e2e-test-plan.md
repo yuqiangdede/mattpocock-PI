@@ -145,7 +145,9 @@ does not authorize commits, publishing, merging or live-instance testing.
   successfully and verify both Create tickets and Implement recommendations.
   Select Create tickets, preserving draft and attachments with outcome context.
   End Code review with an explicit no-findings conclusion, select Commit code and verify the configured draft with review
-  context. Selection alone must issue no Host prompt or Git operation.
+  context. The default prompt requires successful checks and permits Git push
+  only when explicitly requested. Selection alone must issue no Host prompt or
+  Git operation.
 - Return a Code review finding and verify Commit loses its highlight while More
   and Fix code review findings are highlighted. Select the repair entry, verify
   a plain editable draft carrying the review, previous text and attachments;
