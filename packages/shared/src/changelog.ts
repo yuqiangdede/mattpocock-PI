@@ -30,6 +30,16 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.19.1",
+    date: "2026-10-14",
+    highlights: [
+      "Guide interview rounds with visible decisions and next-step recommendations that never overwrite confirmed decisions.",
+      "Repair code-review findings with a focused draft that recommends committing only after a clean review.",
+      "Reopen sessions whose transcript history contains invalid UTF-8 bytes without losing review follow-ups or restart recovery.",
+      "Keep trusted renderer clipboard writes working and remove the outdated Git push restriction from the commit prompt.",
+    ],
+  },
+  {
     version: "0.19.0",
     date: "2026-10-13",
     highlights: [
@@ -957,6 +967,16 @@ const enEntries: ChangelogEntry[] = [
 
 const zhCNEntries: ChangelogEntry[] = [
   {
+    version: "0.19.1",
+    date: "2026-10-14",
+    highlights: [
+      "访谈轮次全程决策可见，下一步建议只推进推荐项，绝不覆盖已确认的决策。",
+      "用聚焦的修复草稿处理代码评审发现，仅在评审完全通过后才建议提交。",
+      "转录历史包含无效 UTF-8 字节的会话也能重新打开，评审跟进与重启恢复不受影响。",
+      "保留受信任渲染进程的剪贴板写入能力，并移除提交提示中过时的 Git 推送限制。",
+    ],
+  },
+  {
     version: "0.19.0",
     date: "2026-10-13",
     highlights: [
@@ -1883,6 +1903,16 @@ const zhCNEntries: ChangelogEntry[] = [
 ];
 
 const zhTWEntries: ChangelogEntry[] = [
+  {
+    version: "0.19.1",
+    date: "2026-10-14",
+    highlights: [
+      "訪談輪次全程決策可見，下一步建議只推進推薦項，絕不覆蓋已確認的決策。",
+      "用聚焦的修復草稿處理程式碼評審發現，僅在評審完全通過後才建議提交。",
+      "轉錄歷史包含無效 UTF-8 位元組的會話也能重新開啟，評審跟進與重啟恢復不受影響。",
+      "保留受信任渲染程序的剪貼簿寫入能力，並移除提交提示中過時的 Git 推送限制。",
+    ],
+  },
   {
     version: "0.19.0",
     date: "2026-10-13",

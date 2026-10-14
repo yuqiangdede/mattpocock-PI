@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const esEntries: ChangelogEntry[] = [
   {
+    version: "0.19.1",
+    date: "2026-10-14",
+    highlights: [
+      "Las rondas de entrevista avanzan con decisiones visibles; las recomendaciones de siguiente paso nunca sobrescriben decisiones confirmadas.",
+      "Repare los hallazgos de revisión de código con un borrador centrado que recomienda confirmar solo tras una revisión limpia.",
+      "Vuelva a abrir sesiones cuyo historial de transcripción contenga bytes UTF-8 no válidos sin perder el seguimiento de revisiones ni la recuperación al reiniciar.",
+      "Conserve las escrituras de portapapeles del renderizador de confianza y elimine la restricción obsoleta de git push del aviso de confirmación.",
+    ],
+  },
+  {
     version: "0.19.0",
     date: "2026-10-13",
     highlights: [
