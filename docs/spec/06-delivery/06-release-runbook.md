@@ -7,6 +7,24 @@
 
 ## 1. Build lanes
 
+Windows Electron extraction retries the final temporary-directory rename up to
+five times after the initial attempt, with a one-second delay, for `EPERM` or
+`EBUSY` only. The staged files and extraction lock are retained during retries.
+After exhausted retries, Windows copies the staged directory to the destination
+without overwriting existing files, then removes staging only after the complete
+copy succeeds. A failed copy remains fatal and preserves staging for diagnosis.
+Other errors and other platforms retain the original failure.
+This is maintained by the pnpm patch for `app-builder-lib@26.15.3`;
+`node --test scripts/windows-electron-rename.test.mjs` covers the extraction path.
+
+Windows ASAR integrity and executable resource updates likewise retry opening
+the executable up to five times, at one-second intervals, for `EPERM`, `EBUSY`,
+or `UNKNOWN`. The executable is opened with `r+` so denied access cannot truncate
+it. Once opened, the resource is written and the length adjusted; write failures
+remain fatal, without retrying partial writes, and the handle is always closed.
+Run `node --test scripts/windows-electron-integrity.test.mjs` and
+`node --test scripts/windows-electron-resedit.test.mjs` for the regression checks.
+
 | Lane | Command | Signing | Use |
 |---|---|---|---|
 | Dev | `pnpm dev` | none | daily development |
