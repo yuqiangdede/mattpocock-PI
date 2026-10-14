@@ -32,6 +32,11 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
   assert.ok(!html.includes(`>${en.codingActions.configure}</button>`), "configuration is available through Settings only");
   assert.ok(html.includes(en.codingActions.visualRequirements), "direct visual requirements entry");
   assert.ok(!html.includes("coding-requirements-split"));
+  assert.ok(html.includes(en.codingActions.moreTooltipWhen), "More has concise help");
+  assert.ok(html.includes(en.codingActions.commitTooltipWhen), "Commit code has concise help");
+  assert.ok(html.includes(en.codingActions.visualTooltipWhen), "Visual requirements entry has concise help");
+  assert.ok(html.includes(en.codingActions.tooltipWhen), "Skill shortcuts include usage");
+  assert.ok(html.includes(en.codingActions.tooltipExample), "Skill shortcuts include examples");
   assert.ok(html.includes(en.codingActions.commitCode));
   assert.ok(!html.includes(`>${en.codingActions.interactionImage}</button>`), "image prompt lives in the closed More menu");
   assert.ok(!html.includes("coding-shortcuts-secondary"), "one wrapping action row");

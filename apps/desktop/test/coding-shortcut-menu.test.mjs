@@ -83,22 +83,41 @@ test("Disabled actions are not silently reintroduced through the Skill catalog",
 const { codingShortcutTooltip } = await import("../src/features/coding/coding-shortcut-tooltip.ts");
 const { createInstance } = await import("i18next");
 const { catalogs } = await import("@pi-desktop/i18n");
-test("Known skill tooltips use localized timing, purpose and example instead of raw English catalog descriptions", async () => {
+test("Known Skill tooltips have exactly two localized usage and example lines", async () => {
   const i18n = createInstance();
   await i18n.init({ lng: "zh-CN", resources: { "zh-CN": { translation: catalogs["zh-CN"] }, en: { translation: catalogs.en } } });
-  const row = { configured: false, action: { id: "catalog:diagnosing-bugs", skillId: "diagnosing-bugs", label: "Bug 排查", description: "Raw English description" } };
-  const catalog = [{ ...skill("diagnosing-bugs"), description: "Raw English description" }];
-  const tooltip = codingShortcutTooltip(row, catalog, i18n.t.bind(i18n));
-  for (const part of Object.values(catalogs["zh-CN"].coding.skillGuides.diagnose)) assert.ok(tooltip.includes(part));
-  assert.ok(!tooltip.includes("Raw English"));
-  await i18n.changeLanguage("en");
-  assert.ok(codingShortcutTooltip(row, catalog, i18n.t.bind(i18n)).includes(catalogs.en.coding.skillGuides.diagnose.when));
+  const { ENGINEERING_SHORTCUTS } = await import("@pi-desktop/shared");
+  const catalog = ENGINEERING_SHORTCUTS.map(entry => ({ ...skill(entry.skill), description: "Raw English description" }));
+  for (const locale of ["zh-CN", "en"]) {
+    await i18n.changeLanguage(locale);
+    const copy = catalogs[locale];
+    for (const entry of ENGINEERING_SHORTCUTS) {
+      const shortcut = { configured: false, action: { id: `catalog:${entry.skill}`, skillId: entry.skill, label: entry.skill } };
+      const lines = codingShortcutTooltip(shortcut, catalog, i18n.t.bind(i18n)).split("\n");
+      assert.equal(lines.length, 2, `${locale}: ${entry.skill}`);
+      assert.ok(lines[0].startsWith(`${copy.codingActions.tooltipWhen}：`));
+      assert.ok(lines[1].startsWith(`${copy.codingActions.tooltipExample}：`));
+      assert.ok(lines[0].includes(copy.coding.skillGuides[entry.action].when));
+      assert.ok(lines[1].includes(copy.coding.skillGuides[entry.action].example));
+      assert.ok(!lines.join(" ").includes("Raw English description"));
+      assert.ok(!lines.join(" ").includes(copy.coding.skillGuides[entry.action].purpose));
+    }
+  }
 });
 
-test("Explicit configured descriptions and unknown native skill descriptions remain verbatim", () => {
-  const t = () => { throw new Error("No built-in guide expected"); };
-  assert.equal(codingShortcutTooltip({ configured: true, action: { id: "custom", skillId: "diagnosing-bugs", label: "Debug", description: "用户说明" } }, [], t), "用户说明");
-  assert.equal(codingShortcutTooltip({ configured: false, action: { id: "other", skillId: "other", label: "Other" } }, [{ ...skill("other"), description: "Original user skill description" }], t), "Original user skill description");
+test("Custom descriptions and unknown Skills use the same two-line format", async () => {
+  const i18n = createInstance();
+  await i18n.init({ lng: "zh-CN", resources: { "zh-CN": { translation: catalogs["zh-CN"] }, en: { translation: catalogs.en } } });
+  const t = i18n.t.bind(i18n);
+  const configured = codingShortcutTooltip({ configured: true, action: { id: "custom", skillId: "diagnosing-bugs", label: "Debug", description: "用户说明" } }, [], t);
+  assert.deepEqual(configured.split("\n"), ["什么时候使用：用户说明", `具体例子：${catalogs["zh-CN"].coding.skillGuides.diagnose.example}`]);
+  const unknown = codingShortcutTooltip({ configured: false, action: { id: "other", skillId: "other", label: "Other" } }, [{ ...skill("other"), description: "Original user skill description" }], t);
+  assert.deepEqual(unknown.split("\n"), ["什么时候使用：Original user skill description", "具体例子：使用「Other」处理当前需求。"]);
+  await i18n.changeLanguage("en");
+  assert.deepEqual(codingShortcutTooltip({ configured: false, action: { id: "other", skillId: "other", label: "Other" } }, [], t).split("\n"), [
+    "When to use：Other",
+    "Example：Use Other for the current task.",
+  ]);
 });
 
 const { ENGINEERING_SHORTCUTS, CodingActionRegistry } = await import("@pi-desktop/shared");

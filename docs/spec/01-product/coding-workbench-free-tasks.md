@@ -115,9 +115,10 @@ disabled entries). Matt labels and guidance are localized; imagegen and unrelate
 catalog skills are excluded. Existing configured common
 entries retain their labels, prompts and enabled state; no profile rewrite is
 required to restore the entry points. Missing skills remain visibly unavailable. Known engineering skills use localized
-timing, purpose and example tooltips on both primary and More entries; raw catalog
-descriptions are fallback only for unknown skills. Explicit configured descriptions
-remain verbatim.
+two-line launcher tooltips with “When to use” and “Example” labels on primary
+and More entries; raw catalog descriptions are fallback only for unknown skills.
+Configured descriptions remain verbatim in settings and provide the launcher
+tooltip's usage line when present.
 Except for the `implement-spec` viewer entry, selecting an action prepares an editable Composer draft and never
 submits. Undefined/null instructions use the localized engineering prompt matched
 by skill id; explicit empty instructions retain marker-only insertion. Custom
@@ -222,13 +223,14 @@ draft-only behavior described above.
 
 ## Global instruction settings
 
-Composer skill buttons, including the requirements and More menu entries,
-show the same localized usage timing, purpose and example on pointer hover
-or keyboard focus. Guidance uses the shared portal tooltip so menu clipping
-does not hide it; it wraps within the viewport. Reading a tooltip does not
-change the draft or execute a skill. Clicking dismisses it and retains the
-existing draft insertion behavior. Buttons retain short accessible names
-and expose their guidance as accessible descriptions.
+Composer skill buttons, More, visual requirements, and prompt/Commit actions
+show concise localized tooltips with exactly two labeled lines: “When to use”
+and “Example”. They use the shared portal tooltip on pointer hover and keyboard
+focus; it wraps within the viewport. Reading a tooltip does not change the
+draft or execute a skill. Clicking dismisses it and retains the existing draft
+insertion behavior. Buttons retain short accessible names and expose their
+guidance as accessible descriptions. Missing-Skill and runtime errors remain in
+the separate status/error area rather than the concise hover text.
 
 For every one of the 26 engineering entries, the instruction editor shows
 localized guidance before the prompt: when to use the skill, what it does,
@@ -341,7 +343,8 @@ dependencies are all done. It is informational, never a dispatch queue.
 
 The viewer has no scheduler, issue-write path, automatic task closure, model
 execution, or persisted task graph. Updating input clears stale results. Closing
-is explicit; no task completion event closes the viewer. Key engineering Skill
-tooltips and the viewer show separate descriptive gate metadata. Actual safety
+is explicit; no task completion event closes the viewer. The viewer shows
+separate descriptive gate metadata; concise Skill tooltips omit gate details.
+Actual safety
 constraints remain enforced by CLI permissions or Hooks; metadata grants no
 permission and does not change the CodingAction schema.
