@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const deEntries: ChangelogEntry[] = [
   {
+    version: "0.19.1",
+    date: "2026-10-14",
+    highlights: [
+      "Interviewrunden bleiben mit sichtbaren Entscheidungen geführt; Nächste-Schritte-Empfehlungen überschreiben niemals bestätigte Entscheidungen.",
+      "Beheben Sie Code-Review-Ergebnisse mit einem fokussierten Entwurf, der ein Committen erst nach einer sauberen Review empfiehlt.",
+      "Öffnen Sie Sitzungen mit ungültigen UTF-8-Bytes im Transkriptverlauf erneut, ohne Review-Follow-ups oder Neustart-Wiederherstellung zu verlieren.",
+      "Behalten Sie vertrauenswürdige Zwischenablage-Schreibvorgänge des Renderers bei und entfernen Sie die veraltete Git-Push-Einschränkung aus dem Commit-Dialog.",
+    ],
+  },
+  {
     version: "0.19.0",
     date: "2026-10-13",
     highlights: [

@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const koEntries: ChangelogEntry[] = [
   {
+    version: "0.19.1",
+    date: "2026-10-14",
+    highlights: [
+      "결정이 항상 보이는 상태로 인터뷰 라운드를 진행하며, 다음 단계 권장은 확정된 결정을 덮어쓰지 않습니다.",
+      "집중된 초안으로 코드 리뷰 결과를 수정하고, 깨끗한 리뷰 통과 후에만 커밋을 권장합니다.",
+      "트랜스크립트 기록에 잘못된 UTF-8 바이트가 포함된 세션도 리뷰 후속 조치와 재시작 복구를 잃지 않고 다시 열립니다.",
+      "신뢰할 수 있는 렌더러의 클립보드 쓰기를 유지하고 커밋 프롬프트에서 오래된 git push 제한을 제거합니다.",
+    ],
+  },
+  {
     version: "0.19.0",
     date: "2026-10-13",
     highlights: [
