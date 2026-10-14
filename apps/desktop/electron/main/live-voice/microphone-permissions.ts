@@ -26,6 +26,12 @@ export function installLiveMicrophonePermissionHandlers(input: {
 }): void {
   input.targetSession.setPermissionRequestHandler((contents, permission, callback, details) => {
     const owner = requestOwner(input.getMainWindow(), contents, details.requestingUrl, details.isMainFrame);
+    // This session-wide handler also receives explicit renderer copy requests.
+    // Clipboard writes do not require a microphone reservation.
+    if (permission === "clipboard-sanitized-write") {
+      callback(owner !== null);
+      return;
+    }
     const allowed = allowsLiveMicrophonePermission({
       permission,
       ownerValid: owner !== null,
@@ -38,6 +44,9 @@ export function installLiveMicrophonePermissionHandlers(input: {
 
   input.targetSession.setPermissionCheckHandler((contents, permission, requestingOrigin, details) => {
     const owner = contents ? checkOwner(input.getMainWindow(), contents, requestingOrigin) : null;
+    if (permission === "clipboard-sanitized-write") {
+      return owner !== null && details.isMainFrame && details.requestingUrl === owner.url;
+    }
     return allowsLiveMicrophonePermission({
       permission,
       ownerValid: owner !== null,

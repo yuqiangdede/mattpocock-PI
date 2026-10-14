@@ -42,3 +42,42 @@ test("built Live Voice trusts only the main window's actual packaged renderer en
   contents.mainFrame = { ...frame, url: pathToFileURL(join(root, "out/renderer/other.html")).href };
   assert.equal(liveOwnerFrame(window, owner), null);
 });
+
+test("packaged main renderer can copy text without granting clipboard reads or media", async (t) => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), "pi-copy-permission-")));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const output = join(root, "out/main/index.mjs");
+  await build({
+    entryPoints: [fileURLToPath(new URL("../electron/main/live-voice/microphone-permissions.ts", import.meta.url))],
+    outfile: output,
+    bundle: true,
+    platform: "node",
+    format: "esm",
+  });
+  const { installLiveMicrophonePermissionHandlers } = await import(pathToFileURL(output).href);
+  const url = pathToFileURL(join(root, "out/renderer/index.html")).href;
+  const contents = {
+    id: 4, isDestroyed: () => false, getURL: () => url,
+    mainFrame: { url, processId: 5, routingId: 6 },
+  };
+  const handlers = {};
+  installLiveMicrophonePermissionHandlers({
+    targetSession: {
+      setPermissionRequestHandler: (handler) => { handlers.request = handler; },
+      setPermissionCheckHandler: (handler) => { handlers.check = handler; },
+    },
+    getMainWindow: () => ({ isDestroyed: () => false, webContents: contents }),
+    hasReservation: () => false,
+  });
+  const details = { requestingUrl: url, isMainFrame: true };
+  let decision;
+  handlers.request(contents, "clipboard-sanitized-write", (allowed) => { decision = allowed; }, details);
+  assert.equal(decision, true);
+  for (const origin of ["file://", "null"]) {
+    assert.equal(handlers.check(contents, "clipboard-sanitized-write", origin, details), true);
+    assert.equal(handlers.check(contents, "clipboard-read", origin, details), false);
+    assert.equal(handlers.check(contents, "media", origin, { ...details, mediaType: "audio" }), false);
+    assert.equal(handlers.check(contents, "clipboard-sanitized-write", origin, { ...details, isMainFrame: false }), false);
+  }
+  assert.equal(handlers.check(contents, "clipboard-sanitized-write", "https://outside.example", details), false);
+});

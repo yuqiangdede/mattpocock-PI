@@ -28,6 +28,12 @@ defined in [Live Voice Work Session Integration](live-work-session.md).
 
 ## Ownership and security
 
+The default-session permission handlers preserve explicit main-renderer copy:
+`clipboard-sanitized-write` is allowed only for the trusted main window's main
+frame and does not require a microphone lease. Clipboard reads, subframes,
+external origins and other windows remain denied. Media access still requires
+the existing audio-only reservation checks.
+
 Electron Main owns the one-call slot, selected account, credential resolution,
 provider invalidation, capture lease, cancellation, protocol adapters, network
 transport and terminal cleanup. Renderer owns user interaction, WebRTC/PCM
