@@ -24,7 +24,8 @@ test("Localized commit instructions require successful verification and support 
   assert.match(zhCN.codingActions.commitPrompt, /GitLab\/SVN/);
   assert.match(zhCN.codingActions.commitPrompt, /编译/);
   assert.match(zhCN.codingActions.commitPrompt, /验证通过后/);
-  assert.match(zhCN.codingActions.commitPrompt, /不执行 Push/);
+  assert.doesNotMatch(zhCN.codingActions.commitPrompt, /Git 仓库不执行 Push/);
   assert.match(en.codingActions.commitPrompt, /GitLab/);
   assert.match(en.codingActions.commitPrompt, /SVN/);
+  assert.doesNotMatch(en.codingActions.commitPrompt, /do not push Git commits/i);
 });
