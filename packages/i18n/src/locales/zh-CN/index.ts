@@ -29,7 +29,7 @@ export const zhCN = {
   enablePrompt: "启用提示词按钮",
   plainPromptHint: "准备可编辑的提示词，需手动发送后执行。",
   commitHint: "准备 Git（含 GitLab）或 SVN 的编译验证与提交提示词，需手动发送后执行。",
-  commitPrompt: "自动识别项目的构建方式及版本管理工具（Git/GitLab/SVN），检查本次代码变更并执行编译和项目必要验证；失败时只进行最小范围修复并重新验证。仅在全部验证通过后自动生成提交说明并提交本次相关代码，否则停止并说明原因；不提交无关文件，Git 仓库不执行 Push。",
+  commitPrompt: "自动识别项目的构建方式及版本管理工具（Git/GitLab/SVN），检查本次代码变更并执行编译和项目必要验证；失败时只进行最小范围修复并重新验证。仅在全部验证通过后自动生成提交说明并提交本次相关代码，否则停止并说明原因；不提交无关文件。",
   "navLabel": "扩展设置",
   "settingsTitle": "扩展设置 · Coding Actions",
   "defaults": {"discuss-requirements": "需求讨论", "create-spec": "固化需求", "design": "技术设计", "create-tickets": "拆分任务", "implement": "实现", "code-review": "代码审查"},

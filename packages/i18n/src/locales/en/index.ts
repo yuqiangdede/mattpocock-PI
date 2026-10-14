@@ -28,7 +28,7 @@ export const en = {
   enablePrompt: "Enable prompt button",
   plainPromptHint: "Prepare an editable prompt. Sending remains manual.",
   commitHint: "Prepare a build-verified Git/GitLab or SVN commit prompt. Sending remains manual.",
-  commitPrompt: "Detect the project build process and version control (Git, including GitLab hosting, or SVN), inspect task-related changes, and run compilation and required checks; if verification fails, attempt minimal fixes and re-run the checks. Only commit the relevant changes with a meaningful message after all checks pass; otherwise stop and explain why, never include unrelated files, and do not push Git commits.",
+  commitPrompt: "Detect the project build process and version control (Git, including GitLab hosting, or SVN), inspect task-related changes, and run compilation and required checks; if verification fails, attempt minimal fixes and re-run the checks. Only commit the relevant changes with a meaningful message after all checks pass; otherwise stop and explain why, never include unrelated files.",
   "navLabel": "Extensions",
   "settingsTitle": "Extensions · Coding Actions",
   "defaults": {"discuss-requirements": "Discuss requirements", "create-spec": "Create specification", "design": "Technical design", "create-tickets": "Create tickets", "implement": "Implement", "code-review": "Code review"},
