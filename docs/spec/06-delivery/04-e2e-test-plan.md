@@ -4,6 +4,29 @@
 > Status: Accepted (protocol/Electron automation is active; full desktop Playwright remains planned)
 > Cross-references: [acceptance-criteria](02-acceptance-criteria.md) · [milestones](01-mvp-milestones.md) · [ai-development-workflow](03-ai-development-workflow.md) · [change-checklist](05-change-checklist.md)
 
+### E2E-SESSION-review-followup-layout-recovery
+
+- Preconditions: Windows; a session above 2 MiB with a legacy zero-identity
+  `.jsonl.layout` cache and a completed review response after a tool message.
+- Steps: update the non-tail review tool message with longer Chinese content;
+  reload the session; send a follow-up asking to fix the findings; reload again.
+- Expected: all messages remain readable and the follow-up is persisted without
+  `stream did not contain valid UTF-8`. The obsolete cache is ignored; transcript
+  bodies and the persistence format are preserved.
+- Compatibility variant: inject invalid UTF-8 bytes within a review message text;
+  open it, update another message and send a follow-up. Invalid bytes are omitted
+  from the view, valid Chinese/emoji remain, and unrelated source bytes survive
+  the update. Physical window offsets still locate the correct messages.
+- Specs: `03-runtime/04-data-storage.md`; acceptance: lossless session recovery;
+  milestone: maintenance.
+- Status: host integration regression automated in
+  `transcripts::tests::rewritten_review_message_rebuilds_layout_before_followup`;
+  invalid-byte recovery is covered by
+  `transcripts::tests::invalid_utf8_in_review_output_does_not_block_followup_or_rewrite`;
+  `node scripts/e2e-transcript-utf8.mjs` covers a real Host RPC process, old cache,
+  invalid-byte reads, message updates, follow-up persistence and restart using
+  isolated storage. Native Desktop/provider execution is not covered.
+
 ## Parallel stage development exception
 
 For fork stage-two experiments, the parallel-stage policy in
@@ -9933,6 +9956,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 | Acceptance | Scenarios |
 |---|---|
+| Lossless session recovery after review updates | E2E-SESSION-review-followup-layout-recovery |
 | C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
 | AC-01–AC-16 / AC-18–AC-20 — Engineering Workflow Runs | E2E-WORKFLOW-project-owned-runs, E2E-WORKFLOW-discovery, E2E-WORKFLOW-recovery, E2E-WORKFLOW-six-stages, E2E-WORKFLOW-reopen |
 | AC-17 — Engineering artifact references | E2E-WORKFLOW-artifacts |
