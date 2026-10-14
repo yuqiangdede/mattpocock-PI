@@ -191,7 +191,7 @@ Interaction image prompt, Ordinary discussion, Create specification and Create
 tickets live in More. Selecting Interaction image prompt closes More and inserts
 an editable prompt, preserving the existing Composer draft and attachments.
 Settings remain accessible through Extensions.
-The default Commit code button prepares an editable, localized build-then-commit prompt with no Skill dependency. It preserves existing Composer text and attachments; only manual Send executes the prompt. Git (including GitLab hosting) and SVN are supported by the default instruction; failed verification forbids commit. The Engineering Workflow entry is no longer exposed.
+The default Commit code button prepares an editable, localized build-then-commit prompt with no Skill dependency. It preserves existing Composer text and attachments; only manual Send executes the prompt. Git (including GitLab hosting) and SVN are supported by the default instruction; failed verification forbids commit. Git push is permitted only when the user explicitly requests it. The Engineering Workflow entry is no longer exposed.
 
 Extensions > Coding Actions includes a separate Plain prompt buttons editor.
 Names, instructions, enabled state and order are editable; buttons can be added

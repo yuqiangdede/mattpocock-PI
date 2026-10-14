@@ -4,7 +4,8 @@ Unreleased: Extensions > Coding Actions now configures the plain prompt
 button names and instructions, including Commit code. Users can also add,
 disable, reorder or delete these buttons. Selection prepares an editable draft;
 only manual Send runs it. The default commit instruction requires a
-successful build and verification before Git or SVN commit.
+successful build and verification before Git or SVN commit; Git push is allowed
+only when the user explicitly requests it.
 
 Existing configurations keep the localized default without being rewritten.
 Saving plain prompt changes adds `promptActions` to `coding-actions.json`.
