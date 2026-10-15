@@ -1,3 +1,4 @@
+import { readMattSkillBundle } from "../lib/matt-skills.mjs";
 import { createEngineeringSkillChecks } from "../../apps/desktop/electron/main/engineering-skill-checks";
 import { createEngineeringSkillUpdater } from "../../apps/desktop/electron/main/engineering-skill-update";
 import { join } from "node:path";
@@ -20,7 +21,7 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
   const updateRevision = "b".repeat(40);
   const updater = createEngineeringSkillUpdater({ getHost, fetchBundle: async () => {
     if (updateOffline) throw new Error("offline fixture");
-    const bundle = JSON.parse(await readFile(join(root, "crates/host-core/resources/workflow-skills.json"), "utf8"));
+    const bundle = readMattSkillBundle(join(root, "apps/desktop/resources/skills/matt"));
     bundle.revision = updateRevision; return bundle;
   }, notify: () => {} });
   const checks = createEngineeringSkillChecks({ getHost, fetchRevision: async () => { if (updateOffline) throw new Error("offline fixture"); return updateRevision; }, update: updater, report: () => {} });

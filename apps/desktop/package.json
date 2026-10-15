@@ -121,7 +121,7 @@
     ],
     "extraResources": [
       {
-        "from": "../../crates/host-core/resources/workflow-skills-LICENSE",
+        "from": "resources/skills/matt/LICENSE",
         "to": "licenses/matt-pocock-skills-LICENSE"
       },
       {
@@ -134,7 +134,8 @@
       },
       {
         "from": "resources/skills",
-        "to": "skills"
+        "to": "skills",
+        "filter": ["**/*", "!.matt-update-*/**"]
       },
       {
         "from": "resources/plugins",

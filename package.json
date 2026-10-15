@@ -9,6 +9,7 @@
     "pnpm": ">=10"
   },
   "scripts": {
+    "skills:matt:update": "node scripts/update-matt-skills.mjs",
     "upstream:check": "node scripts/update-upstream.mjs",
     "upstream:verify": "node scripts/verify-upstream.mjs",
     "guard:snapshot": "node scripts/guard-packages.mjs snapshot",

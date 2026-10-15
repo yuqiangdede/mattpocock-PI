@@ -64,3 +64,11 @@ Unmodified upstream-removed packages leave the active catalog; edited or locally
 removed packages stay protected. Their retained directories remain available
 for recovery. Update and restore require idle Host task state under the same
 mutex as the manifest mutation.
+
+## Amendment: directory source (2026-10-15)
+
+The checked-in source is now `apps/desktop/resources/skills/matt`, with one
+complete folder per skill plus REVISION and LICENSE. The Host build embeds
+these files directly using generated Rust include_str declarations; there is
+no workflow-skills JSON asset. Runtime profile ownership, update RPC payloads,
+manifest compatibility and backup/recovery semantics are unchanged.

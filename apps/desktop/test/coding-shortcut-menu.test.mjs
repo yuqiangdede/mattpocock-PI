@@ -1,3 +1,4 @@
+import { readMattSkillBundle } from "../../../scripts/lib/matt-skills.mjs";
 import assert from "node:assert/strict";
 import { register } from "node:module";
 import test from "node:test";
@@ -21,7 +22,7 @@ test("Visual grilling default prompt carries interview, recovery and non-invasiv
 });
 
 test("Bundled visual discussion Skill is available as a complete package", () => {
-  const bundle = JSON.parse(readFileSync(new URL("../../../crates/host-core/resources/workflow-skills.json", import.meta.url), "utf8"));
+  const bundle = readMattSkillBundle(new URL("../resources/skills/matt", import.meta.url));
   const skillPackage = bundle.packages.find(entry => entry.id === "grill-with-ui");
   assert.ok(skillPackage);
   assert.deepEqual(new Set(skillPackage.files.map(file => file.path)), new Set(["SKILL.md", "server.mjs", "page.html", "LICENSE"]));
@@ -158,7 +159,7 @@ test("All installed Matt shortcuts have localized labels and prepare editable dr
 
 const { groupCodingShortcuts } = await import("../src/features/coding/coding-shortcut-menu.ts");
 test("Curated Matt skills have localized launcher entries while pruned skills remain catalog-only", () => {
-  const bundle = JSON.parse(readFileSync(new URL("../../../crates/host-core/resources/workflow-skills.json", import.meta.url), "utf8"));
+  const bundle = readMattSkillBundle(new URL("../resources/skills/matt", import.meta.url));
   const catalog = bundle.packages.map(entry => skill(entry.id));
   const menu = codingShortcutMenu(createDefaultCodingActions(), catalog, labels);
   const ids = [...menu.primary, ...menu.more].map(row => row.action.skillId);

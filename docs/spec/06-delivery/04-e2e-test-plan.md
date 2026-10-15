@@ -17794,3 +17794,17 @@ host-created files. The full app's file-preview viewer is covered separately.
   scripts/e2e-task-graph-viewer.mjs. Upstream parent-error/stop/edit-isolation
   suites exercise explicit subagent recovery and mutation ownership.
 - Real models and paid APIs are excluded without explicit authorization.
+
+### Matt skill directory distribution
+
+- Shipped source: `apps/desktop/resources/skills/matt`; the Rust build embeds
+  each complete skill directory, preserving offline profile installation.
+- Source maintenance: run `pnpm skills:matt:update`; verify a complete pinned
+  revision, companion resources and retained previous source. Simulate a
+  partial download and confirm the existing source remains unchanged.
+- Automated coverage: `node --test apps/desktop/test/matt-skills-source.test.mjs`, Host
+  `user_skills` tests, and the existing coding shortcut and engineering update
+  tests. `node scripts/e2e-matt-skill-directory.mjs` exercises a real isolated
+  Host process: exact installation of every source file, restart persistence,
+  explicit updates, local edit/removal protection and backup restore. Packaged
+  Windows startup remains a separate qualification gate.

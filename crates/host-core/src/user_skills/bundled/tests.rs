@@ -7,7 +7,7 @@ fn update_backup_restore_and_upstream_removal_preserve_user_changes() {
     let mut registry = UserSkillRegistry::new(&root.path().join("profile"));
     registry.ensure_bundled().unwrap();
     let before = registry.bundle_state().unwrap();
-    let mut bundle: SkillBundle = serde_json::from_str(SHIPPED).unwrap();
+    let mut bundle: SkillBundle = shipped_bundle();
     bundle.revision = "b".repeat(40);
     let removed = bundle.packages.pop().unwrap().id;
     let changed = bundle.packages[0].id.clone();
@@ -52,7 +52,7 @@ fn invalid_update_keeps_active_state_and_existing_backup() {
     fs::create_dir(root.path().join("profile")).unwrap();
     let mut registry = UserSkillRegistry::new(&root.path().join("profile"));
     registry.ensure_bundled().unwrap();
-    let mut bundle: SkillBundle = serde_json::from_str(SHIPPED).unwrap();
+    let mut bundle: SkillBundle = shipped_bundle();
     bundle.revision = "b".repeat(40);
     registry.update_bundled(bundle.clone()).unwrap();
     let state = fs::read(registry.bundled_root.join("state.json")).unwrap();
@@ -219,12 +219,21 @@ fn shipped_bundle_is_complete_and_restarts_preserve_disable_edit_and_delete() {
             .unwrap()
             .iter()
             .any(|(path, _)| path == "mocking.md"));
-        let visual_files = registry.package_files("grill-with-ui", CapabilityLevel::Global, None).unwrap();
+        let visual_files = registry
+            .package_files("grill-with-ui", CapabilityLevel::Global, None)
+            .unwrap();
         for required in ["server.mjs", "page.html", "LICENSE"] {
-            assert!(visual_files.iter().any(|(path, _)| path == required), "missing {required}");
+            assert!(
+                visual_files.iter().any(|(path, _)| path == required),
+                "missing {required}"
+            );
         }
-        let spec_files = registry.package_files("requirements-spec", CapabilityLevel::Global, None).unwrap();
-        assert!(spec_files.iter().any(|(path, _)| path.replace('\\', "/").ends_with("document-flow.md")));
+        let spec_files = registry
+            .package_files("requirements-spec", CapabilityLevel::Global, None)
+            .unwrap();
+        assert!(spec_files
+            .iter()
+            .any(|(path, _)| path.replace('\\', "/").ends_with("document-flow.md")));
         registry
             .set_enabled("retro", false, Some(CapabilityLevel::Global), None)
             .unwrap();
@@ -236,9 +245,7 @@ fn shipped_bundle_is_complete_and_restarts_preserve_disable_edit_and_delete() {
             .unwrap();
         let mut restarted = UserSkillRegistry::new(dir.path());
         assert!(restarted.ensure_bundled().unwrap().updated.is_empty());
-        let updated = restarted
-            .update_bundled(serde_json::from_str(SHIPPED).unwrap())
-            .unwrap();
+        let updated = restarted.update_bundled(shipped_bundle()).unwrap();
         assert!(updated.preserved.contains(&"grilling".into()));
         assert!(updated.preserved.contains(&"teach".into()));
         assert!(
@@ -260,7 +267,7 @@ fn shipped_bundle_is_complete_and_restarts_preserve_disable_edit_and_delete() {
 fn invalid_bundle_is_rejected_before_installation() {
     let dir = tempfile::tempdir().unwrap();
     let mut registry = UserSkillRegistry::new(dir.path());
-    let mut bundle: SkillBundle = serde_json::from_str(SHIPPED).unwrap();
+    let mut bundle: SkillBundle = shipped_bundle();
     bundle.packages[0].files.push(BundleFile {
         path: "../escape".into(),
         content: "unsafe".into(),
@@ -302,7 +309,7 @@ fn updates_resources_preserves_user_overrides_and_detects_new_nested_documents()
         let nested = Path::new(&grilling.path).parent().unwrap().join("custom");
         fs::create_dir(&nested).unwrap();
         fs::write(nested.join("SKILL.md"), "User companion.").unwrap();
-        let mut bundle: SkillBundle = serde_json::from_str(SHIPPED).unwrap();
+        let mut bundle: SkillBundle = shipped_bundle();
         bundle.revision = "fixture-new".into();
         bundle
             .packages

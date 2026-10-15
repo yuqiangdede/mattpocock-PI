@@ -191,7 +191,7 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
   // in agent-runtime-bundle-package.test.mjs.
   assert.deepEqual(packageJson.build.extraResources, [
     {
-      from: "../../crates/host-core/resources/workflow-skills-LICENSE",
+      from: "resources/skills/matt/LICENSE",
       to: "licenses/matt-pocock-skills-LICENSE",
     },
     {
@@ -206,6 +206,7 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
     {
       from: "resources/skills",
       to: "skills",
+      filter: ["**/*", "!.matt-update-*/**"],
     },
     // Bundled first-party plugins, for the same reason: host-core reads their
     // manifests from disk and the views are loaded as file:// pages (ADR 0105).

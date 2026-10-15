@@ -1,3 +1,4 @@
+import { readMattSkillBundle } from "./lib/matt-skills.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -52,7 +53,7 @@ let debugPort, vitePort;
 try {
   await host.start();
   const original=await host.call("skills.ensureBundled");
-  const bundle=JSON.parse(await readFile(join(root,"crates/host-core/resources/workflow-skills.json"),"utf8"));
+  const bundle=readMattSkillBundle(join(root, "apps/desktop/resources/skills/matt"));
   bundle.revision="c".repeat(40);
   bundle.packages[0].files.find(f=>f.path==="SKILL.md").content+="\nUpdate E2E fixture.";
   const {session}=await host.call("session.create",{title:"Update gate fixture",mode:"agent"});

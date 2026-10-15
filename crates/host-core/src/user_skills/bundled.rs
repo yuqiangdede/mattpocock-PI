@@ -4,7 +4,7 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
 
-const SHIPPED: &str = include_str!("../../resources/workflow-skills.json");
+include!(concat!(env!("OUT_DIR"), "/matt-skills.rs"));
 const MAX_BUNDLE_BYTES: usize = 16 * 1024 * 1024;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -442,9 +442,7 @@ impl UserSkillRegistry {
                 ..Default::default()
             });
         }
-        self.update_bundled(serde_json::from_str(
-            SHIPPED.trim_start_matches('\u{feff}'),
-        )?)
+        self.update_bundled(shipped_bundle())
     }
 
     pub fn update_bundled(&mut self, bundle: SkillBundle) -> Result<BundleResult> {

@@ -6,7 +6,7 @@ Status: Implementation candidate; installer qualification is recorded separately
 
 Install PI-Desktop, configure a model, and use Matt Pocock engineering skills
 without a separate skill installer or a developer-machine skills directory.
-The shipped catalog contains all 37 skills and their 102 companion files,
+The shipped catalog contains 39 skills and 115 skill files,
 including the six Workflow skills and their auxiliary dependencies.
 
 The default Settings > Agent > Skills list and empty slash-suggestion list expose six
@@ -67,3 +67,37 @@ The upstream MIT license is included in the Windows package.
 - Packaged resources resolve from the installation and profile, with no Codex
   home or worktree dependency. Installer/application startup is exercised on
   Windows; cross-platform release qualification remains a separate gate.
+
+## Maintaining the shipped source
+
+The sole checked-in Matt skill source is `apps/desktop/resources/skills/matt`.
+Each skill has its complete folder, including SKILL.md and companion resources.
+REVISION identifies the snapshot and LICENSE retains upstream MIT terms. The
+Host build embeds this directory directly; no workflow-skills JSON file is
+required. The existing desktop resources rule also packages the directory.
+
+Run `pnpm skills:matt:update` from the repository root (Node >=22.19) to fetch
+one immutable revision from https://github.com/mattpocock/skills and replace
+the shipped source. This is an explicit upstream refresh, including locally
+maintained variants. It applies the existing GLOSSARY-to-CONTEXT adaptation,
+stages the complete download before replacement, and prints the retained
+previous source path under `.matt-update-*` for comparison and recovery. These
+backup folders are ignored by Git and packaging. Review the diff before
+committing or building a release; do not commit retained backups. Download
+failure leaves the source intact. This command does not commit or push.
+
+The application settings update continues to install into the selected user
+profile, preserving edits, removals, enablement and backups. It does not write
+to installation resources or a developer checkout. Existing profile manifests
+require no migration. Separate Codex skill installations are untouched.
+
+On Node 24, a process-local proxy can be used with the source updater:
+
+```cmd
+set "HTTPS_PROXY=http://127.0.0.1:12080"
+set "NODE_USE_ENV_PROXY=1"
+pnpm skills:matt:update
+```
+
+Restore the previous environment values afterward. No system or Git proxy
+configuration is changed by the updater.
