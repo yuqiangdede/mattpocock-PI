@@ -6,6 +6,7 @@ import importlib.util
 import json
 import math
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -21,19 +22,36 @@ NS = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
       'r': 'http://schemas.openxmlformats.org/package/2006/relationships'}
 
 
+def windows_batch_command(argv, comspec=None):
+    """Build cmd.exe's own command line (not MSVC list2cmdline quoting).
+
+    Batch launchers are needed for npm's Windows .cmd shims. Quote all paths
+    and reject characters that cmd.exe can expand or interpret unexpectedly.
+    """
+    argv = [str(x) for x in argv]
+    if not argv:
+        raise ValueError('Missing batch launcher')
+    if any(not arg or any(c in arg for c in '\r\n\0"%&|<>^!') for arg in argv):
+        raise ValueError('Unsafe Windows batch argument; use paths without cmd metacharacters')
+    comspec = comspec or os.environ.get('COMSPEC', 'cmd.exe')
+    if any(c in comspec for c in '\r\n\0"'):
+        raise ValueError('Unsafe COMSPEC path')
+    return f'"{comspec}" /d /s /c "' + ' '.join(f'"{arg}"' for arg in argv) + '"'
+
+
 def run(argv, text=None, cwd=None):
     argv = [str(x) for x in argv]
+    kw = {}
     if os.name == 'nt' and Path(argv[0]).suffix.lower() in {'.cmd', '.bat'}:
-        # Pass as one command string through cmd; never use shell=True.
-        if any(any(c in x for c in '\r\n%&|<>^!') for x in argv):
-            raise ValueError('Unsafe cmd launcher argument; use paths without shell metacharacters')
-        argv = [os.environ.get('COMSPEC', 'cmd.exe'), '/d', '/s', '/c',
-                '"' + subprocess.list2cmdline(argv) + '"']
+        # Passing a list would apply MSVC quoting to cmd.exe's /c argument a
+        # second time. Pass a complete command line with an explicit launcher.
+        kw['executable'] = os.environ.get('COMSPEC', 'cmd.exe')
+        argv = windows_batch_command(argv, kw['executable'])
     result = subprocess.run(argv, input=text, encoding='utf-8', errors='strict',
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                            cwd=cwd, timeout=180, check=False)
+                            cwd=cwd, timeout=180, check=False, **kw)
     if result.returncode:
-        raise RuntimeError(f'{Path(str(argv[0])).name} failed: {result.stderr[-6000:]}')
+        raise RuntimeError(f'{argv if isinstance(argv, str) else argv[0]} failed: {result.stderr[-6000:]}')
     return result.stdout
 
 
@@ -137,8 +155,50 @@ def reject_external_vega(value):
             reject_external_vega(child)
 
 
+def mermaid_render_flags(help_text, puppeteer_config=None):
+    """Select options actually advertised by this mmdc installation."""
+    options = set()
+    for line in help_text.splitlines():
+        # Only parse an option declaration, not option names in descriptions.
+        spec = re.split(r'\s{2,}', line.strip(), maxsplit=1)[0]
+        if spec.startswith('-'):
+            options.update(re.findall(
+                r'(?<![\w-])--[A-Za-z][\w-]*|(?<![\w-])-[A-Za-z](?![\w-])', spec))
+    if not ({'-i', '--input'} & options) or not ({'-o', '--output'} & options):
+        raise RuntimeError('Mermaid CLI help does not declare input/output flags')
+    input_flag = '--input' if '--input' in options else '-i'
+    output_flag = '--output' if '--output' in options else '-o'
+    if '--size' in options:
+        flags = ['--size', '1600']
+    elif '--width' in options:
+        flags = ['--width', '1600']
+    elif '-w' in options:
+        flags = ['-w', '1600']
+    else:
+        raise RuntimeError('Mermaid CLI does not advertise --size or --width')
+    if '--scale' in options:
+        flags.extend(['--scale', '2'])
+    elif '-s' in options:
+        flags.extend(['-s', '2'])
+    if '--backgroundColor' in options:
+        flags.extend(['--backgroundColor', 'white'])
+    elif '-b' in options:
+        flags.extend(['-b', 'white'])
+    if puppeteer_config:
+        if '--puppeteerConfigFile' in options:
+            flags.extend(['--puppeteerConfigFile', str(Path(puppeteer_config).resolve())])
+        elif '-p' in options:
+            flags.extend(['-p', str(Path(puppeteer_config).resolve())])
+        else:
+            raise RuntimeError('Mermaid CLI does not advertise Puppeteer config option')
+    return input_flag, output_flag, flags
+
+
 def transform(ast, base, work, args):
     counter = Counter()
+    mermaid_cli = None
+    mermaid_flags = None
+    input_flag = output_flag = None
     for node in nodes(ast):
         kind, content = node['t'], node.get('c')
         if kind == 'CodeBlock':
@@ -151,11 +211,11 @@ def transform(ast, base, work, args):
             if language == 'mermaid':
                 source = output.with_suffix('.mmd')
                 source.write_text(content[1], encoding='utf-8')
-                cmd = [executable(args.mmdc), '-i', source, '-o', output,
-                       '-w', '1600', '-s', '2', '-b', 'white']
-                if args.puppeteer_config:
-                    cmd += ['-p', Path(args.puppeteer_config).resolve()]
-                run(cmd)
+                if mermaid_flags is None:
+                    mermaid_cli = executable(args.mmdc)
+                    input_flag, output_flag, mermaid_flags = mermaid_render_flags(
+                        run([mermaid_cli, '--help']), args.puppeteer_config)
+                run([mermaid_cli, input_flag, source, output_flag, output, *mermaid_flags])
             elif language == 'chart':
                 render_chart(json.loads(content[1]), output)
             else:
