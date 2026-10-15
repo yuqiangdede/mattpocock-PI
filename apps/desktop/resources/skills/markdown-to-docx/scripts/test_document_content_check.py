@@ -1,5 +1,8 @@
 """Regression cases for Markdown AST -> DOCX body parity checks."""
 import tempfile
+import json
+import shutil
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -97,6 +100,26 @@ class DocumentContentComparisonTests(unittest.TestCase):
         ast['blocks'].append({'t': 'Para', 'c': [{'t': 'Math', 'c': [
             {'t': 'InlineMath'}, 'x^2']} ]})
         self.assertGreater(compare(ast, file)['excluded_from_text_comparison']['math'], 0)
+
+
+    @unittest.skipUnless(shutil.which('pandoc'), 'Pandoc is not installed')
+    def test_real_pandoc_markdown_docx_content(self):
+        markdown = self.root / '中文 源文档.md'
+        markdown.write_text(
+            '# 报告\n\n## 一 说明\n\n这是正文示例。\n\n'
+            '- 第一项\n- 第二项\n\n'
+            '| 字段 | 说明 |\n| --- | --- |\n| id | 设备编号 |\n\n'
+            '## 二 结论\n\n内容结束。\n', encoding='utf-8')
+        docx = self.root / '实际 转换.docx'
+        reader = 'markdown+pipe_tables+task_lists+tex_math_dollars+footnotes+raw_html'
+        ast = json.loads(subprocess.check_output(
+            ['pandoc', str(markdown), '-f', reader, '-t', 'json'], text=True))
+        subprocess.run(['pandoc', str(markdown), '-f', reader,
+                        '-t', 'docx', '--standalone', '-o', str(docx)],
+                       check=True, timeout=60)
+        result = compare(ast, docx)
+        self.assertTrue(result['passed'], result)
+        self.assertEqual(result['tables_expected'], 1)
 
 
 if __name__ == '__main__':
