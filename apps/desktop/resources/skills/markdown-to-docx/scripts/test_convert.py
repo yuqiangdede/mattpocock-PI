@@ -2,12 +2,15 @@
 import argparse
 import copy
 import importlib.util
+import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from convert import (local_image, reject_external_vega, style_docx, transform,
-                     validate_chart, verify_docx, PROFILES)
+                     validate_chart, verify_docx, mermaid_render_flags,
+                     windows_batch_command, run, PROFILES)
 
 
 class ConversionTests(unittest.TestCase):
@@ -132,6 +135,96 @@ class ConversionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             style_docx(output, None, 'formal', '')
 
+
+    def test_mermaid_adapts_to_cli_flags(self):
+        legacy = (
+            'Options:\n'
+            '  -i, --input <input>        Input file\n'
+            '  -o, --output <output>      Output file\n'
+            '  -w, --width <width>       Width\n'
+            '  -s, --scale <scale>       Scale\n'
+            '  -b, --backgroundColor <background>  Background\n'
+            '  -p, --puppeteerConfigFile <file>    Browser config\n'
+        )
+        modern = (
+            'Options:\n'
+            '  --input <input>    Input file\n'
+            '  --output <output>  Output file\n'
+            '  --size <size>     Output size\n'
+            '  --backgroundColor <color> Background\n'
+        )
+        self.assertEqual(
+            mermaid_render_flags(legacy),
+            ('--input', '--output',
+             ['--width', '1600', '--scale', '2', '--backgroundColor', 'white']))
+        self.assertEqual(
+            mermaid_render_flags(modern),
+            ('--input', '--output',
+             ['--size', '1600', '--backgroundColor', 'white']))
+        self.assertIn('--puppeteerConfigFile',
+                      mermaid_render_flags(legacy, self.root / 'browser.json')[2])
+        with self.assertRaisesRegex(RuntimeError, 'Puppeteer'):
+            mermaid_render_flags(modern, self.root / 'browser.json')
+        with self.assertRaisesRegex(RuntimeError, '--size or --width'):
+            mermaid_render_flags(
+                '--input <input>  Input\n--output <output>  Output\n'
+                '--other <arg>  See --size in online docs\n')
+        with self.assertRaisesRegex(RuntimeError, 'input/output'):
+            mermaid_render_flags('--size <size>  Size')
+
+    def test_mermaid_help_only_once_for_multiple_diagrams(self):
+        help_text = (
+            '  -i, --input <input>    Input\n'
+            '  -o, --output <output>  Output\n'
+            '  --size <size>         Size\n'
+        )
+        seen = []
+
+        def fake_run(argv, **kwargs):
+            seen.append([str(arg) for arg in argv])
+            if '--help' in argv:
+                return help_text
+            output_opt = '--output' if '--output' in argv else '-o'
+            image = Path(argv[argv.index(output_opt) + 1])
+            image.write_bytes(b'fake-png-output')
+            return ''
+
+        ast = {'blocks': [
+            {'t': 'CodeBlock', 'c': [['', ['mermaid'], []], 'flowchart TD; A-->B']},
+            {'t': 'CodeBlock', 'c': [['', ['mermaid'], []], 'flowchart TD; B-->C']},
+        ]}
+        with patch('convert.executable', return_value='fake-mmdc'), \
+                patch('convert.run', side_effect=fake_run):
+            transform(ast, self.root, self.root, self.args)
+        self.assertEqual(sum('--help' in argv for argv in seen), 1)
+        self.assertEqual(len(seen), 3)
+        self.assertTrue(all('--size' in argv and '--output' in argv for argv in seen[1:]))
+        self.assertTrue(all(block['t'] == 'Para' for block in ast['blocks']))
+
+    def test_windows_batch_command_is_quoted_and_restricts_metacharacters(self):
+        cmd = windows_batch_command(
+            [r'C:\Program Files\npm\mmdc.cmd', '-i',
+             r'C:\中文 路径\输入 文件.mmd', '-o', r'C:\output\图.png'],
+            r'C:\Windows\System32\cmd.exe')
+        self.assertIn('/d /s /c ""C:\\Program Files\\npm\\mmdc.cmd"', cmd)
+        self.assertIn('"C:\\中文 路径\\输入 文件.mmd"', cmd)
+        for arg in ['bad&whoami', '%COMSPEC%', 'a!b', 'a"b', 'a\nb']:
+            with self.subTest(arg=arg), self.assertRaisesRegex(ValueError, 'Unsafe'):
+                windows_batch_command(['safe.cmd', arg])
+
+    @unittest.skipUnless(os.name == 'nt', 'Requires real Windows cmd.exe')
+    def test_windows_real_batch_launcher_unicode_and_spaces(self):
+        directory = self.root / '含空格 的工具'
+        directory.mkdir()
+        batch = directory / 'check.cmd'
+        batch.write_text(
+            '@echo off\n'
+            'if not exist "%~1" exit /b 5\n'
+            'if not "%~2"=="two words" exit /b 6\n'
+            'echo batch-ok\n', encoding='ascii')
+        source = directory / '中文 文件.mmd'
+        source.write_text('flowchart TD; A-->B', encoding='utf-8')
+        self.assertIn('batch-ok', run([batch, source, 'two words']))
 
 if __name__ == '__main__':
     unittest.main()

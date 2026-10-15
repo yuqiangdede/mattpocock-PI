@@ -18,6 +18,8 @@ YAML 元数据按 Pandoc 规则处理，不能编造作者、日期或审批。`
 
 使用 `mermaid` 围栏。通过现有 Mermaid CLI（mmdc）渲染高分辨率 PNG，覆盖流程、时序、状态、ER、甘特、饼图等当前安装版本支持的类型。需要 Node、Mermaid CLI 和可用 Chromium；使用 `--puppeteer-config` 指定浏览器路径等配置，不硬编码 Linux 路径，不关闭沙箱作为默认措施。
 
+批量渲染前先检查当前 `mmdc --version` 和 `--help`、实际可用 Chromium/Edge 路径及 Puppeteer 配置，再对本次图形跑最小端到端探针。不同 mmdc 版本的尺寸选项可能不兼容，不能假定旧 `-w` 或新 `--size` 恒成立；转换脚本内置参数与实际版本不符时应停止并如实说明需适配，不通过盲目重试或换文档掩盖。Windows 通过 `.cmd` 启动时额外验证空格和中文路径的引号处理；ASCII scratch 只用于定位问题和制作临时产物，不改变用户交付路径。
+
 缺依赖时经授权可安装到项目或指定工具目录，例如 `npm install --prefix <tools> @mermaid-js/mermaid-cli`，并说明可能下载浏览器。渲染不使用外部托管服务；不执行文档附带的 shell 命令。
 
 ## 数据图表
