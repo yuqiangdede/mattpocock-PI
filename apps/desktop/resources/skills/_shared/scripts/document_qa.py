@@ -3,15 +3,27 @@ import argparse
 import json
 import re
 from pathlib import Path
+from collections import Counter
 from urllib.parse import unquote, urlsplit
 
 FENCE = re.compile(r'^ {0,3}(`{3,}|~{3,})(.*)$')
 LINK = re.compile(r'!?\[[^\]\n]*\]\((<?[^)\n]+>?)\)')
 
 
-def inspect_text(content: str, path: Path, *, check_links=True):
+def expected_headings(path: Path) -> list[str]:
+    headings = [line.strip() for line in path.read_text(encoding='utf-8-sig').splitlines()
+                if line.strip()]
+    if not headings or any(not re.match(r'^#{1,6}\s+\S', line) for line in headings):
+        raise ValueError('heading manifest must contain nonempty Markdown heading lines')
+    if len(set(headings)) != len(headings):
+        raise ValueError('heading manifest contains duplicate entries')
+    return headings
+
+
+def inspect_text(content: str, path: Path, *, check_links=True, headings=None):
     errors = []
     stats = {'headings': 0, 'json_blocks': 0, 'links_checked': 0}
+    actual_headings = []
     if '\ufffd' in content:
         errors.append('Replacement character U+FFFD found')
     fence = None
@@ -39,6 +51,7 @@ def inspect_text(content: str, path: Path, *, check_links=True):
             continue
         if re.match(r'^ {0,3}#{1,6}\s+\S', line):
             stats['headings'] += 1
+            actual_headings.append(line.strip())
         elif re.match(r'^ {4,}#{1,6}\s+\S', line):
             errors.append(f'Line {i}: indented heading; check accidental leading spaces')
         if not check_links:
@@ -58,15 +71,32 @@ def inspect_text(content: str, path: Path, *, check_links=True):
                 errors.append(f'Line {i}: missing local link: {parts.path}')
     if fence:
         errors.append(f'Line {start}: unclosed {fence[1] or "text"} code fence')
+    if headings is not None:
+        required = list(headings)
+        counts = Counter(actual_headings)
+        desired = set(required)
+        for heading in required:
+            if counts[heading] == 0:
+                errors.append(f'missing required heading: {heading}')
+            elif counts[heading] > 1:
+                errors.append(f'duplicate required heading: {heading} (count={counts[heading]})')
+        observed = [heading for heading in actual_headings if heading in desired]
+        if observed != required and all(counts[h] == 1 for h in required):
+            errors.append('required heading order mismatch')
+        extras = [heading for heading in actual_headings if heading not in desired]
+        if extras:
+            errors.append(f'unexpected heading(s) outside manifest: {extras[:8]}')
+        stats['required_headings'] = len(required)
+        stats['heading_order_checked'] = True
     return errors, stats
 
 
-def inspect(path: Path):
+def inspect(path: Path, headings=None):
     try:
         content = path.read_text(encoding='utf-8-sig')
     except (UnicodeError, OSError) as exc:
         return {'file': str(path), 'errors': [f'UTF-8/read error: {exc}'], 'stats': {}}
-    errors, stats = inspect_text(content, path)
+    errors, stats = inspect_text(content, path, headings=headings)
     return {'file': str(path), 'errors': errors, 'stats': stats}
 
 
@@ -74,11 +104,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('paths', nargs='+', type=Path, help='Markdown files or directories')
     parser.add_argument('--report', type=Path, help='Write UTF-8 JSON report')
+    parser.add_argument('--headings-file', type=Path, help='Complete ordered Markdown headings, one per line')
     args = parser.parse_args()
     paths = sorted({p.resolve() for arg in args.paths for p in (arg.rglob('*.md') if arg.is_dir() else [arg])})
     if not paths:
         parser.error('no Markdown files found')
-    results = [inspect(p) for p in paths]
+    required = expected_headings(args.headings_file) if args.headings_file else None
+    results = [inspect(p, headings=required) for p in paths]
     output = {'files': len(results), 'failed_files': sum(bool(r['errors']) for r in results), 'results': results}
     encoded = json.dumps(output, ensure_ascii=False, indent=2)
     if args.report:

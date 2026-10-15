@@ -472,9 +472,15 @@ def main():
         cmd += ['--reference-doc', args.reference_doc.resolve()]
     run(cmd, cwd=source.parent)
     style_docx(temporary, args.reference_doc, args.profile, args.title)
+    from document_content_check import compare
+    content_check = compare(ast, temporary)
     report = {'source': str(source), 'output': str(output), 'source_elements': counts,
               'profile': args.profile, 'title': args.title,
-              'rendered': render_counts, 'docx': verify_docx(temporary)}
+              'rendered': render_counts, 'docx': verify_docx(temporary),
+              'content_comparison': content_check}
+    if not content_check['passed']:
+        raise ValueError(f'DOCX content mismatch: {content_check["errors"][:5]}; '
+                         f'missing: {content_check["missing_or_out_of_order"][:3]}')
     expected = sum(n['t'] == 'Image' for n in nodes(ast))
     if report['docx']['drawings'] != expected:
         raise ValueError(f'Image count mismatch: AST {expected}, DOCX {report["docx"]["drawings"]}')
