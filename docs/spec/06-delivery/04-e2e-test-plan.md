@@ -17808,3 +17808,22 @@ host-created files. The full app's file-preview viewer is covered separately.
   Host process: exact installation of every source file, restart persistence,
   explicit updates, local edit/removal protection and backup restore. Packaged
   Windows startup remains a separate qualification gate.
+
+### E2E-coding-bundled-document-actions
+
+- Start a packaged app with a fresh profile and a project with no imported skills.
+  Expect six documentation buttons in the specified second-row order.
+- Select Requirements, Overall design, High-level design, API documentation and
+  Database design in turn. Expect the
+  corresponding `pi-desktop:` native Skill draft with existing text/attachments
+  preserved. No turn starts until manual Send.
+- Select Merge and convert. Expect a merge-first draft explicitly loading the
+  bundled converter only after merge and content review. Both Skill bodies and
+  relative resources resolve within packaged resources.
+- Expect Test plan and Test report to be absent. API documentation and Database
+  design prepare their dedicated bundled Skill drafts without submitting a turn.
+- Repeat with an existing profile and custom user skills. Expect the built-in
+  document actions to remain available without imports; custom skills stay intact.
+- Automated service/resource coverage: `document-shortcuts.test.mjs`; localized
+  row order: `coding-workbench-shortcuts.test.mjs`. Native window/provider execution
+  and actual document conversion are separate acceptance checks.

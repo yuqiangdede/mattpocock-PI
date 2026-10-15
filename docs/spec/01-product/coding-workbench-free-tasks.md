@@ -348,3 +348,39 @@ separate descriptive gate metadata; concise Skill tooltips omit gate details.
 Actual safety
 constraints remain enforced by CLI permissions or Hooks; metadata grants no
 permission and does not change the CodingAction schema.
+
+
+## Bundled document actions
+
+The second row is fixed in this order: Requirements document, Overall design,
+High-level design, API documentation, Database design, and Merge and convert
+format. Test plan and Test report are removed from this row; no placeholders
+remain. API documentation uses `api-integration-docs` and Database design uses
+`database-design-doc`.
+Chinese labels are defined by the shipped i18n catalog.
+
+Requirements, overall design, high-level design, API documentation, database
+design, merge and conversion use the
+application-owned `pi-desktop:` Skill IDs. Complete Skill directories (including
+front matter descriptions, references, agent metadata and conversion scripts)
+ship under `resources/skills`, recursively included in every desktop package.
+The existing built-in Skill catalog and Skill-tool loader expose them immediately,
+including existing profiles, without imports, downloads or paths on the author's
+machine. User-owned skills and profile-managed engineering bundles remain intact.
+
+Selection prepares an editable native Skill draft, preserves existing text and
+attachments, and requires manual Send. Overall/high-level design collect missing
+source paths and references according to their bundled workflows. Merge and
+convert first collects the document inputs, user-specified title and template or
+format, then merges and reviews content before loading
+`pi-desktop:markdown-to-docx` for conversion and verification. Selection does not
+execute a conversion or install tools. Converter runtime dependencies (Python,
+Pandoc and applicable diagram/render tools) are checked when conversion is
+requested; missing tools remain observable and installation requires permission.
+
+API documentation reconciles source code, project requirements/designs and
+references into Markdown suitable for independent third-party integration.
+Database design reads project SQL (preferring `_pkg/linux/bin/*db`), migration
+chains and supporting source to reconstruct the documented database baseline.
+Both actions only prepare drafts; their workflows generate documentation without
+changing APIs, connecting to databases or executing SQL.

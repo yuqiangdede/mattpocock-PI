@@ -58,8 +58,7 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
     en.codingActions.detailedDesign,
     en.codingActions.apiSpec,
     en.codingActions.databaseDesign,
-    en.codingActions.testPlan,
-    en.codingActions.testReport,
+    en.codingActions.mergeConvert,
   ];
   for (const label of secondaryLabels) {
     assert.ok(html.includes(`>${label}</button>`), `Second row contains ${label}`);
@@ -127,10 +126,11 @@ test("Coding Actions zh-CN 两排按钮呈现与顺序正确", async t => {
   assert.equal(zhCN.codingActions.visualRequirements, "需求讨论");
 
   // 第二排：需求文档、总体设计文档、概要设计文档、接口文档、数据库设计、测试方案、测试报告
-  const row2Expected = ["需求文档", "总体设计文档", "概要设计文档", "接口文档", "数据库设计", "测试方案", "测试报告"];
+  const row2Expected = ["需求文档", "总设文档", "概设文档", "接口文档", "数据库设计", "合并并转换格式"];
   for (const label of row2Expected) {
     assert.ok(html.includes(`>${label}</button>`), `Row 2 should include ${label}`);
   }
+  for (const label of ["测试方案", "测试报告"]) assert.ok(!html.includes(`>${label}</button>`), `${label} must be removed`);
   const row2Positions = row2Expected.map(label => html.indexOf(`>${label}</button>`));
   assert.ok(row2Positions.every((pos, idx) => pos >= 0 && (idx === 0 || pos > row2Positions[idx - 1])), "Row 2 buttons follow exact sequence");
 });

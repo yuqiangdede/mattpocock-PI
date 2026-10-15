@@ -11,6 +11,8 @@ import { INTERACTION_IMAGE_PROMPT_ID, interactionImagePrompt } from "./interacti
 import { buildCommitCodeDraft } from "./commit-code-draft";
 import { visualGrillingDefaultPrompt } from "./visual-grilling-prompt";
 import { REVIEW_FIX_PROMPT_ID, reviewFixPrompt } from "./review-fix-prompt";
+import { documentPromptKey } from "./document-shortcuts";
+
 export function useCodingActionLauncher(options: {
   sessionId: string | null | undefined; projectPath: string; blocked: boolean; draftKey: string;
   readLiveDraft: () => string;
@@ -39,6 +41,8 @@ export function useCodingActionLauncher(options: {
         catalog: async () => (await api.composerCommands()).commands, isCurrent: () => current() && !latest.current.blocked,
         defaultPrompt: skillId => {
           if (skillId === "grill-with-ui") return visualGrillingDefaultPrompt(i18n.resolvedLanguage ?? i18n.language);
+          const documentKey = documentPromptKey(skillId);
+          if (documentKey) return t(documentKey);
           if (skillId === "requirements-spec") return t("coding.prompts.requirementsSpec");
           const shortcut = ENGINEERING_SHORTCUTS.find(entry => entry.skill === skillId);
           return shortcut ? t(`coding.prompts.${shortcut.action}`) : "";
