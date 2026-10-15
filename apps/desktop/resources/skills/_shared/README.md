@@ -1,8 +1,6 @@
 # 文档 Skill 共用执行工具
 
-供同一 skills 资源包中的文档技能使用。此目录没有 SKILL.md，不作为独立 Skill 注入。各 Skill 仍是专业方法、证据判断和交付范围的权威入口；这里的工具只处理确定性操作。以下脚本仅需 Python 3.10+ 标准库，不自动安装依赖。
-
-工具选型、推荐安装授权及分级排版验收统一执行 [TOOLING_POLICY.md](TOOLING_POLICY.md)。先根据任务评估最合适的工具，再检查是否已安装；选定工具之后，对可确定性实现的操作仍优先使用脚本/CLI。各业务 Skill 的内容与结构检查仍是必检项。
+供同一 skills 资源包中的文档技能使用。此目录没有 SKILL.md，不作为独立 Skill 注入。各 Skill 仍是专业方法、证据判断和交付范围的权威入口；这里的工具只处理确定性操作。仅需 Python 3.10+ 标准库，不自动安装依赖。
 
 ## 任务开始与中断恢复
 
@@ -70,6 +68,21 @@ python -m unittest discover -s apps/desktop/resources/skills/_shared/scripts -p 
 - 按失败原因分类：临时故障可在有证据时有限重试；参数/依赖/输入错误先纠正；同一故障条件未变禁止原样重试或只放大超时。更换 Office 导出范围但仍调用同一挂起 API，不算更换执行路径。具有副作用的步骤不自动重试。
 - 验证分层：**内容事实/覆盖、文件结构、MD→DOCX 转换一致性、目录域/分页、实际视觉排版**须分别记账。脚本只证明它实际检查的层级；逐接口字段、SQL 最终结构、需求/架构语义仍由相应 Skill 核对。不得用短语命中、标题存在或 ZIP 正常代替全量内容与视觉审查。
 - 用户必需的验收项没通过不能宣称完成；仅可选的视觉/PDF 辅助检查失败时，保留已有效的 MD/DOCX，按需求给出实际产物和明确的未检查项，不让额外验证无期限阻塞交付。
+
+## 可选检查点脚本（当前已实现）
+
+`job_checkpoint.py` 是本目录内不依赖第三方包的可选命令行工具。适用于需要保留输入指纹、人工决定、阶段顺序、阶段输出和实际检查记录的**复杂文档任务**；简单单文件转换不必启用。
+
+在项目根目录执行（所有输入、输出和 manifest 必须属于此项目）：
+
+```sh
+python apps/desktop/resources/skills/_shared/scripts/job_checkpoint.py init scratch/job-manifest.json --input source.md --stage extract --stage merge --stage convert --decision format=formal
+python apps/desktop/resources/skills/_shared/scripts/job_checkpoint.py done scratch/job-manifest.json --stage extract --output scratch/extracted.md --check-result 'source inventory checked'
+python apps/desktop/resources/skills/_shared/scripts/job_checkpoint.py check scratch/job-manifest.json
+python apps/desktop/resources/skills/_shared/scripts/job_checkpoint.py fail scratch/job-manifest.json --stage convert --reason 'missing renderer'
+```
+
+完成步骤时要求前置阶段已完成、输入与已完成输出指纹未变化，并将阶段产物 SHA-256 记录到 manifest；`check` 发现过期文件时返回非零码，用户/Agent 必须重新检查磁盘并决定复用或重新生成。脚本只管理记录，**不自动执行任何内容处理、转换、部署，也不会把用户输入的“检查通过”描述当成独立证据**。不同任务不共享同一个 manifest；不允许通过重新初始化覆盖已有历史。
 
 ## 适用边界
 
