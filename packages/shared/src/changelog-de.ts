@@ -2,6 +2,13 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const deEntries: ChangelogEntry[] = [
   {
+  "version": "0.20.1",
+  "date": "2026-10-15",
+  "highlights": [
+    "PI-Desktop 0.20.1 integrieren: Remote-Arbeitsbereiche, Skill-Steuerung und Stabilitätskorrekturen; Matt-Workflows und manuelle Updates bleiben erhalten."
+  ]
+},
+  {
     version: "0.20.0",
     date: "2026-10-15",
     highlights: [

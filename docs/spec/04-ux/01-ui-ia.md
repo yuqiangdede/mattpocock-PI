@@ -174,10 +174,21 @@ destination, chat as the home surface, tools and permissions inline.
 - Empty state: a restrained hero title ("What can I help you build?" — an open
   project turns its name into a dotted-underline
   switcher that lists the sidebar's open projects, can search them, can
-  clone a git repository from a syntactically public remote (ADR 0247 / D416), and can open another local folder), an optional first-run
+  clone a git repository from a syntactically public remote (ADR 0247 / D416), and can open another local folder or a remote project on a connected host), an optional first-run
   checklist, and a bottom-reserved composer. Task entry starts directly in the composer; no
   redundant supporting paragraph, developer starter cards, or contextual
   quick-action row is rendered (D204/D206).
+- Create project uses one dialog with local folder, Git, and remote host sources.
+  The project name is editable for every source and remains locally managed.
+  Remote selection chooses a connected host and an absolute directory, without
+  a Host project catalog; Settings → Remote Hosts opens the same dialog with the
+  clicked host preselected. Browse opens a separate directory dialog with path
+  entry, parent navigation, directory rows and explicit confirmation. Cancel
+  returns to the project form and restores focus; stale host responses cannot
+  replace the current selection. The same sidebar, switcher, archive and chat
+  workflow manage created projects. Model choices and requests use local settings;
+  remote machines execute admitted workspace tools only. Actual remote paths
+  are display/execution data, never local filesystem activation paths.
 - With transcript: message stream + tool disclosure rows (D071), a contextual
   message-scoped review card immediately after each successful workspace
   Write/Edit row, docked composer, and a session-scoped permission card inline.

@@ -5,7 +5,7 @@ import {
   normalizeChangelogVersion,
   resolveChangelogLocale,
 } from "@pi-desktop/shared";
-import { Badge, cx, portalOverlay, TooltipButton } from "./ui";
+import { OverlayBackdrop, Badge, cx, portalOverlay, TooltipButton } from "./ui";
 import { IconClose } from "./icons";
 
 export function ReleaseNotesDialog({
@@ -76,7 +76,7 @@ export function ReleaseNotesDialog({
   }, [onClose]);
 
   return portalOverlay(
-    <div
+    <OverlayBackdrop
       className="overlay release-notes-overlay"
       role="presentation"
       onClick={(event) => {
@@ -155,6 +155,6 @@ export function ReleaseNotesDialog({
           })}
         </div>
       </div>
-    </div>,
+    </OverlayBackdrop>,
   );
 }

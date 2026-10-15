@@ -137,13 +137,14 @@ export function registerAgentIpc({
         errorCode: ErrorCodes.TURN_NOT_FOUND,
       });
     }
-    const context = await sidecar.call<{ projectPath?: string; supportsVision: boolean }>(
+    const context = await sidecar.call<{ projectPath?: string; remoteWorkspace?: unknown; supportsVision: boolean }>(
       "agent.steeringContext", { sessionId: req.sessionId, expectedTurnId: req.expectedTurnId },
     );
+    const localProjectPath = context.remoteWorkspace ? undefined : context.projectPath;
     const mcpExpansion = /^\/mcp:\S/.test(req.content)
       ? expandMcpInvocation(
           req.content,
-          await composerCommandService.buildComposerCommands(context.projectPath ?? null),
+          await composerCommandService.buildComposerCommands(localProjectPath ?? null),
           Boolean(req.attachments?.length),
         )
       : null;
@@ -151,7 +152,7 @@ export function registerAgentIpc({
     // shows and where each image block sits in the prompt.
     const steerContent = mcpExpansion?.expanded ?? req.content;
     const prepared = await preparePromptAttachments(
-      dataDir, req.sessionId, context.projectPath, req.attachments ?? [],
+      dataDir, req.sessionId, localProjectPath, req.attachments ?? [],
       context.supportsVision, steerContent,
     );
     const session = await host.call<{ session?: { messages?: UiMessage[] } }>("session.get", {
@@ -245,7 +246,7 @@ export function registerAgentIpc({
       ? expandMcpInvocation(
           req.content,
           await composerCommandService.buildComposerCommands(
-            typeof session.projectPath === "string" ? session.projectPath.trim() || null : null,
+            !session.remoteWorkspace && typeof session.projectPath === "string" ? session.projectPath.trim() || null : null,
           ),
           Boolean(req.attachments?.length),
         )
@@ -393,7 +394,7 @@ export function registerAgentIpc({
           ? submittedContent.slice(1, commandEnd === -1 ? undefined : commandEnd)
           : "";
         const commands = await composerCommandService.buildComposerCommands(
-          launch.projectPath ?? root,
+          session.remoteWorkspace ? null : launch.projectPath ?? root,
         );
         const command = commands.find((item) => item.name === commandName);
         const activeSkills = new Map(
@@ -456,7 +457,7 @@ export function registerAgentIpc({
       preparedAttachments = await preparePromptAttachments(
         dataDir,
         req.sessionId,
-        typeof session.projectPath === "string" && session.projectPath.trim()
+        !session.remoteWorkspace && typeof session.projectPath === "string" && session.projectPath.trim()
           ? session.projectPath.trim()
           : undefined,
         req.attachments ?? [],
@@ -697,7 +698,7 @@ export function registerAgentIpc({
     if (!sidecar) throw new Error("sidecar unavailable");
     const binding = freeTaskBindings.get(req.sessionId);
     if (!req.freeTaskId && binding && activeTurns.get(req.sessionId) === binding.turnId) req = { ...req, freeTaskId: binding.id, turnId: req.turnId ?? binding.turnId };
-    const releaseSessionOperation = req.turnId ? await acquireSessionOperation(req.sessionId) : undefined;
+    const releaseSessionOperation = await acquireSessionOperation(req.sessionId);
     try {
     const abortedTurnId = activeTurns.get(req.sessionId);
     if (req.turnId && abortedTurnId !== req.turnId) return { ok: false, aborted: false };
@@ -728,7 +729,7 @@ export function registerAgentIpc({
       // An open extension prompt resolves with its abort value (spec 16 §9).
       agentExtensions.cancelPrompts(req.sessionId);
       cancelSessionTools(req.sessionId, "Session turn was aborted");
-      result = await sidecar.call("agent.abort", req);
+      result = await sidecar.call("agent.abort", { ...req, ...(abortedTurnId ? { turnId: abortedTurnId } : {}) });
       if ((req.workflowExecutionId || req.freeTaskId) && result && typeof result === "object" &&
           ((result as { aborted?: boolean }).aborted === false || (result as { ok?: boolean }).ok === false)) {
         throw Object.assign(new Error("Workflow cancellation was not acknowledged"), { errorCode: "WORKFLOW_CANCELLATION_FAILED" });

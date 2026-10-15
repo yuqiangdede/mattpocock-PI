@@ -5,6 +5,7 @@ import { initReactI18next } from "react-i18next";
 import { catalogs, flattenCatalog, resolveLocale } from "@pi-desktop/i18n";
 import { MAC_TRAFFIC_LIGHT_EDGE_DIP } from "@pi-desktop/shared";
 import App from "./App";
+import { remoteEn, remoteZh } from "./locales/remote";
 import { PluginLauncher } from "./components/PluginLauncher";
 import { initLanguageSync, resolveOsLocale } from "./lib/app-language";
 import { installScrollbarReveal } from "./lib/scrollbar-reveal";
@@ -35,7 +36,7 @@ const locale = resolveLocale(resolveOsLocale());
 const resources = Object.fromEntries(
   Object.entries(catalogs).map(([lng, catalog]) => [
     lng,
-    { translation: flattenCatalog(catalog as unknown as Record<string, unknown>) },
+    { translation: flattenCatalog(catalog as unknown as Record<string, unknown>), remote: lng.startsWith("zh") ? remoteZh : remoteEn },
   ]),
 );
 

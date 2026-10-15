@@ -17,7 +17,7 @@ Stage-one Skill Launcher makes an engineering Skill easy to invoke. Stage-two Na
 - **Standalone page first:** deliver grouping, conversation navigation, artifact references and recovery before native sidebar changes or general graph editors.
 - **Native Pi Runtime:** reuse PI-Desktop Host-owned sessions, queues, tool permissions, cancellation and recovery; the Agent Runtime executes agents through existing Pi capabilities. Preserve existing model, command and Git paths.
 - **No enforced workflow:** users may enter diagnosis, review, implementation or discussion directly. Existing Specs/Tickets remain usable later; a finished Turn does not complete the engineering goal.
-- **Extension first:** follow [AGENTS.md](../../AGENTS.md). Prefer independent modules, plugins, existing APIs and additive data models; organizational features must not change core lifecycles.
+- **Extension first:** follow [AGENTS.md](https://github.com/yuqiangdede/mattpocock-PI/blob/main/AGENTS.md). Prefer independent modules, plugins, existing APIs and additive data models; organizational features must not change core lifecycles.
 
 The value is durable development goals and engineering context across conversations, rather than additional Skill buttons.
 

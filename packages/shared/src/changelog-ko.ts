@@ -2,6 +2,13 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const koEntries: ChangelogEntry[] = [
   {
+  "version": "0.20.1",
+  "date": "2026-10-15",
+  "highlights": [
+    "PI-Desktop 0.20.1의 원격 작업 공간, Skill 제어 및 안정성 수정을 통합하고 Matt 워크플로와 수동 업데이트를 유지합니다."
+  ]
+},
+  {
     version: "0.20.0",
     date: "2026-10-15",
     highlights: [

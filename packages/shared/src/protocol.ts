@@ -10,7 +10,7 @@ export const APP_DISPLAY_NAME = forkConfig.displayName;
 export const APP_REPOSITORY = forkConfig.repository;
 export const UPSTREAM_REPOSITORY = forkConfig.upstreamRepository;
 export const APP_MANUAL_UPDATES_ONLY = forkConfig.manualUpdatesOnly;
-export const APP_VERSION = "0.20.0";
+export const APP_VERSION = "0.20.1";
 
 export const APP_MENU_COMMANDS = [
   "newTask",
@@ -188,6 +188,7 @@ export const IPC = {
     projectMemoryGet: "pi-desktop/project/memory/get",
     projectMemorySave: "pi-desktop/project/memory/save",
     projectGroupList: "pi-desktop/project-group/list",
+    projectGroupCreateRemote: "pi-desktop/project-group/createRemote",
     projectGroupCreate: "pi-desktop/project-group/create",
     projectGroupRename: "pi-desktop/project-group/rename",
     projectGroupUpdate: "pi-desktop/project-group/update",
@@ -261,6 +262,13 @@ export const IPC = {
      * crosses this channel.
      */
     remoteHostBootstrap: "pi-desktop/remoteHost/bootstrap",
+    remoteHostReconnect: "pi-desktop/remoteHost/reconnect",
+    remoteHostProjects: "pi-desktop/remoteHost/projects",
+    remoteHostBrowseProjects: "pi-desktop/remoteHost/browseProjects",
+    remoteHostRegisterProject: "pi-desktop/remoteHost/registerProject",
+    remoteHostSessions: "pi-desktop/remoteHost/sessions",
+    remoteHostCreateSession: "pi-desktop/remoteHost/createSession",
+    remoteHostSyncProviders: "pi-desktop/remoteHost/syncProviders",
     providersList: "pi-desktop/providers/list",
     providersReorder: "pi-desktop/providers/reorder",
     providersCreate: "pi-desktop/providers/create",
@@ -360,6 +368,8 @@ export const IPC = {
     skillBundleCheck: "pi-desktop/skill/bundle/check",
     skillBundleUpdate: "pi-desktop/skill/bundle/update",
     skillBundleRestore: "pi-desktop/skill/bundle/restore",
+    skillBuiltinList: "pi-desktop/skill/builtin/list",
+    skillBuiltinSetEnabled: "pi-desktop/skill/builtin/setEnabled",
     skillCreate: "pi-desktop/skill/create",
     skillImport: "pi-desktop/skill/import",
     skillImportScan: "pi-desktop/skill/importScan",
@@ -459,6 +469,7 @@ export const IPC = {
     traySessionActivated: "pi-desktop/tray/event/sessionActivated",
     notificationChanged: "pi-desktop/notification/event/changed",
     sessionsChanged: "pi-desktop/session/event/changed",
+    remoteInteractions: "pi-desktop/remote/event/interactions",
     notificationActivated: "pi-desktop/notification/event/activated",
     notificationSound: "pi-desktop/notification/event/sound",
     plansChanged: "pi-desktop/plans/event/changed",

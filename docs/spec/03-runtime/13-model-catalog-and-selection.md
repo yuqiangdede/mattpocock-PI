@@ -26,7 +26,10 @@ entitled to it.
 
 - **Name**, **Base URL** and **API Key** are all on screen at once. An empty key
   when editing means “keep the stored one”; `secretValue` is only sent when the
-  user typed something.
+  user typed something. Custom endpoints also offer an explicit **No API key
+  required** switch, defaulting off for new rows. When enabled, the key field is
+  disabled and cleared, and the row saves with `authKind: "none"` and no
+  secret. Named cloud services keep their existing authentication defaults.
 - The models section lists what the service returned. `useProviderModels`
   debounces edits by 600 ms, guards against out-of-order replies with a
   monotonic request sequence, and needs no API key so local and no-auth
@@ -276,11 +279,32 @@ remote catalog and uses no ambient credentials. `providers.refreshModelCatalog`
 refreshes models.dev explicitly; settings metadata lookups themselves are local.
 
 For keyed endpoints, live discovery supplies IDs and models.dev enriches their
-metadata. For OAuth, the live account endpoint supplies entitled IDs, which are
-then enriched from models.dev. Successful account lists are authoritative; a
-failed list preserves the last usable IDs. A live-only ID with no models.dev
-match stays generic; pi-ai sibling metadata never supplies its chat limits,
-reasoning or price.
+metadata. A positive safe integer context/input or output limit reported on a live
+model-list row takes precedence over the catalog for that field; each field
+falls back independently to catalog metadata when the endpoint omits it. An
+omitted or non-positive value is not guessed. For OAuth, the live account
+endpoint supplies entitled IDs, which are then enriched from models.dev.
+Successful account lists are authoritative; a failed list preserves the last
+usable IDs. A live-only ID with no service or catalog capacity stays generic;
+pi-ai sibling metadata never supplies its chat limits, reasoning or price.
+
+For an unanchored OpenAI-compatible relay, a known model family may use the
+weight owner's published record when that owner names the model. This record
+outranks shared reseller matches without changing the configured wire ID.
+Lookup accepts dotted/dashed version notation, one whitelisted deployment
+label, and the owner's published canonical generation ID; semantic variants
+and unpublished generations remain distinct. The owner's own sibling keys
+(regional, token-plan and coding-plan) are consulted as added evidence when the
+public key states nothing, so a generation the vendor ships only on one of its
+keys still resolves; a sibling key never vetoes an answer the public key
+already gave. When the relay names a generation the owner publishes under
+another ID, models.dev's own canonical declaration translates the name, but
+only when at least two distinct publishers corroborate the same owner-prefixed
+target and the ordinary lookup resolved nothing — the capacity still comes from
+the owner's record for the translated ID, never from the declarers. If owner
+aliases disagree on capabilities or limits, no owner record is borrowed. When
+the owner publishes no matching record, the existing shared catalog matching
+rules still apply.
 
 `source: "cache"` reads Host caches and configured bindings without network.
 `source: "refresh"` probes the selected endpoint/account and decorates returned

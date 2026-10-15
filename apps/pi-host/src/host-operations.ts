@@ -1,3 +1,5 @@
+import { createWorkspaceFiles } from "./workspace-files.js";
+import { createWorkspaceTools } from "./workspace-tools.js";
 import { readdir, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve, relative, sep } from "node:path";
@@ -195,7 +197,7 @@ export function createProjectCatalog(deps: HostOperationsDeps): RacpProjectCatal
       return { ...projectSummary(result.project), path: result.project.path };
     },
     async browse(path) {
-      const target = path ? await canonicalDirectory(path) : browseRoot;
+      const target = await canonicalDirectory(path ?? browseRoot);
       const rootReal = await realpath(browseRoot).catch(() => browseRoot);
       const tail = relative(rootReal, target);
       if (tail === ".." || tail.startsWith(`..${sep}`) || isAbsolute(tail)) {
@@ -253,6 +255,8 @@ export function createHostOperations(deps: HostOperationsDeps): Omit<RacpHostOpe
     sessions: createSessionCatalog(deps),
     projects: createProjectCatalog(deps),
     workspace: createWorkspaceAccess(deps),
+    workspaceTools: createWorkspaceTools(deps.getHost),
+    workspaceFiles: createWorkspaceFiles(),
     ...(deps.revokeDevice ? { revokeDevice: deps.revokeDevice } : {}),
   };
 }

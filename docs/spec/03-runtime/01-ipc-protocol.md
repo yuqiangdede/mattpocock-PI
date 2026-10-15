@@ -93,8 +93,13 @@ type ProjectGroupRecord = {
 `project-group/create` is additive and does not change the active workspace.
 `project-group/list` returns one row per logical group; old path projects are
 returned as `legacy` single-root groups. Group memory and instructions are
-shared by all sessions whose primary path belongs to the group. The primary
-path is the default builtin-tool workspace. The runtime advertises all registered
+shared by all sessions whose primary path belongs to the group. The first
+selected root is primary at creation; `project-group/update` may promote any
+other selected root by naming it as `primary`, and the host then stores that
+root first. The primary path is the default builtin-tool workspace. The runtime
+advertises all registered roots; an absolute path under an additional root is
+canonicalized and executed against that root, while arbitrary external paths
+still require the ordinary permission flow.
 roots; an absolute path under an additional root is canonicalized and executed
 against that root, while arbitrary external paths still require the ordinary
 permission flow.
@@ -301,9 +306,8 @@ finalized as `completed`; the request does not abort the provider stream,
 cancel running tools, or open a second concurrent turn. An idle session returns
 `requested: false`.
 
-The renderer owns the removable, in-memory queued-prompt list per session. It
-calls this channel only for a queued item's **Send now** action and releases
-that item through the ordinary `agent/prompt` flow after the terminal event.
+The Host owns the persisted prompt queue. **Send now** uses queue promotion and
+steering into the active turn; it does not call this graceful-stop channel.
 
 ### 5.2a stop-subagents
 
@@ -588,10 +592,14 @@ entries and `IDEMPOTENCY_CONFLICT` when a key is reused with other input.
 `entries` arrive in delivery order: promoted entries first in ascending
 `priority` (the order they were promoted), then every remaining entry by
 `position`. `prioritize` appends an entry to the end of that priority block
-without touching the running turn, refuses an entry that already carries a
-priority with `CONFLICT`, and refuses a turn that is no longer queued. The
-renderer's "send now" then requests a graceful stop so the entry starts at
-the next boundary. `reorder` swaps one non-promoted entry with its adjacent
+and attempts steering delivery into the active runtime turn, refuses an entry
+that already carries a priority with `CONFLICT`, and refuses a turn that is no
+longer queued. Delivery runs outside the session admission lock, reserves only
+the input being delivered, and never requests stop or abort. A queued input
+with a different effective permission mode stays queued so its own grants are
+preserved. Immediate promotion delivers only the paired caller's own input;
+other principals retain the existing turn-boundary delivery and queue policy.
+`reorder` swaps one non-promoted entry with its adjacent
 non-promoted neighbour and reports `moved: false` for a promoted entry, a
 missing entry, or a block/queue edge; a promoted entry is never a neighbour.
 `remove` cancels an entry that has not started. A restored queue stays held
@@ -599,10 +607,11 @@ until the desktop attaches as the owner, so a reboot never starts work
 unattended.
 
 The promoted block is delivered as adjacent messages rather than as separate
-turns: the first promoted entry starts the turn at the boundary and every later
-promoted entry is injected into that same turn through the steering channel
+turns: promoted entries join the active turn through the steering channel
+when it accepts input. With no active turn, the first promoted entry starts
+the turn and every later promoted entry is injected into that same turn
 (`pi-desktop/agent/steer` with the running turn's id), so the transcript shows
-the user rows one after another and the model answers once. An injected entry
+the user rows in click order within one turn. An injected entry
 leaves the queue and its own turn is canceled because it never runs on its own.
 An entry the runtime refuses to accept stays queued and leaves at the next
 boundary as its own turn.
@@ -957,7 +966,9 @@ type UiMessage = {
  sessionMessage?: SessionMessageOrigin;
  thinking?: string; // assistant reasoning, never folded into content
  usage?: MessageUsage; // provider-reported assistant usage
- responseDurationMs?: number; // model stream duration for throughput
+ responseDurationMs?: number; // elapsed assistant response duration for throughput
+ providerWaitMs?: number; // request start to first model response event
+ modelStreamDurationMs?: number; // streamed thinking and answer duration
  responseOutputTokens?: number; // estimated partial output when stop has no final usage
  toolName?: string;
  toolCallId?: string;
@@ -1179,15 +1190,24 @@ same normalized `AppError` carried by the lifecycle `error` event to the
 assistant message before `message_end`. Error messages persist with the
 transcript but are excluded from restored model context.
 
-The context inspector consumes two additive usage signals. `MessageUsage` is
-the provider-reported assistant usage and `responseDurationMs` is the
+The context inspector consumes additive usage and timing signals. `MessageUsage`
+is the provider-reported assistant usage and `responseDurationMs` is the
 elapsed request duration used to display output tokens per second. Completed
 responses use pi-ai 1.1.0's monotonic `AssistantMessage.durationMs`; when
-that value is unavailable, the sidecar stopwatch remains the fallback. `ToolTokenUsage`
-is a runtime estimate from the tool call arguments and result; providers do not
-report per-tool allocation, so the renderer labels these rows as estimates and
-never merges them into the exact provider total. Older peers may omit all of
-these optional fields without breaking the v6 handshake.
+that value is unavailable, the sidecar stopwatch remains the fallback.
+`providerWaitMs` measures from the model request start to the first response
+event, including transport and provider-side first-response wait;
+`modelStreamDurationMs` measures streamed thinking and answer content after
+that event. Both are persisted as optional assistant-message metadata. Older
+messages without split timing keep their prior `responseDurationMs` as the
+model-duration fallback; their request-wait duration cannot be recovered. The
+inspector sums top-level model timing and tool duration against elapsed session
+time; nested delegate timings are excluded, and overlapping top-level tool
+calls count once. `ToolTokenUsage` is a runtime estimate from the tool call
+arguments and result; providers do not report per-tool allocation, so the
+renderer labels these rows as estimates and never merges them into the exact
+provider total. Older peers may omit all of these optional fields without
+breaking the v6 handshake.
 
 `turn_end.subagentUsage` is the settled subagent total since the previous
 emitted `turn_end` of the same durable turn. Parent `message.usage` stays the
@@ -1535,7 +1555,8 @@ Stopping a session aborts its in-flight user MCP tool calls. The client sends
 `notifications/cancelled` for each active request without closing a connection
 used by other sessions; a completed or canceled tool call is never replayed.
 Cancellation stops the local wait, while a server may ignore the notification
-and finish an already started side effect.
+and finish an already started side effect. A request that times out is
+cancelled the same way, with reason `timeout`; `initialize` is never cancelled.
 
 Desktop-only channels scan configuration written by other agent tools on the
 same machine — Claude Desktop (`claude_desktop_config.json` on macOS, Windows
@@ -1597,6 +1618,15 @@ one-liner.
 - `skills.read({ id, level?, projectPath? })` → `{ skill, body }`
 - `skills.remove({ id, level?, projectPath? })`
 - `skills.setEnabled({ id, enabled, level, projectPath? })`
+- `skills.disabledBuiltins()` → `{ disabled: string[] }`
+- `skills.setBuiltinEnabled({ id, enabled })` → `{ id, enabled }`
+
+Built-in skill activation is global and defaults to enabled. Host stores only
+disabled IDs in `<data>/agent-capabilities/skill-builtins.json`, separately
+from the scanned user-skill state. Renderer IPC lists bundled entries with
+their effective enabled state and sets one entry's global state. The
+corresponding Desktop channels are `pi-desktop/skill/builtin/list` and
+`pi-desktop/skill/builtin/setEnabled`.
 
 The list contains frontmatter-derived `name` and `description`, not the body.
 Only the description enters the prompt, and the body is fetched when the model
@@ -2442,22 +2472,23 @@ unchanged. See [provider configuration](12-provider-config-schema.md).
 ## 15. Cloud configuration sync
 
 The Settings → Cloud sync page uses the following renderer-to-Main channels;
-all are forwarded to the Host-owned `configSync.*` RPC methods. The page is a
-development-build-only surface for now; the channels and their Host contracts
-are unchanged:
+all are forwarded to the Host-owned `configSync.*` RPC methods. The page is
+available in all builds and carries an Experimental badge. Channel names stay
+stable; connection inputs
+and results use the S3-only contract in `types/config-sync.ts`:
 
 | IPC channel | Host method | contract |
 |---|---|---|
 | `pi-desktop/configSync/getState` | `configSync.getState` | redacted status, category selections, preview counts, and pending approval summaries |
-| `pi-desktop/configSync/test` | `configSync.test` | WebDAV capability probe using a temporary object; no configuration is persisted |
+| `pi-desktop/configSync/test` | `configSync.test` | S3 conditional-write probe and verified cleanup; returns `{ ok: true, conditionalWrites: true }` without persisting configuration |
 | `pi-desktop/configSync/configure` | `configSync.configure` | validates the endpoint, stores encrypted local sync metadata, and enables the vault |
-| `pi-desktop/configSync/syncNow` | `configSync.syncNow` | runs one Host-owned reconciliation cycle |
+| `pi-desktop/configSync/syncNow` | `configSync.syncNow` | runs one Host-owned two-way sync or local-snapshot backup, according to the saved mode |
 | `pi-desktop/configSync/pause` | `configSync.pause` | pauses or resumes this device only |
 | `pi-desktop/configSync/unlock` | `configSync.unlock` | unlocks the local vault for the current process/device |
 | `pi-desktop/configSync/approve` / `reject` | `configSync.approve` / `configSync.reject` | records a digest-bound local activation decision |
 | `pi-desktop/configSync/mapProject` | `configSync.mapProject` | binds one opaque project/group identity to one or more explicitly selected local folders, preserving primary-root order |
-| `pi-desktop/configSync/listHistory` | `configSync.listHistory` | lists redacted reachable revision metadata only |
-| `pi-desktop/configSync/restore` | `configSync.restore` | creates a new propagated revision from an explicitly acknowledged historical revision and stages local approvals/recovery |
+| `pi-desktop/configSync/listHistory` | `configSync.listHistory` | lists the saved mode's latest 30 indexed revisions; never emitted as a state-change event |
+| `pi-desktop/configSync/restore` | `configSync.restore` | sync publishes a new shared revision with propagation acknowledgment; backup restores locally without changing cloud history; both retain recovery/approvals |
 | `pi-desktop/configSync/changePassword` | `configSync.changePassword` | CAS-rewraps the vault key header without returning keys or secret values |
 | `pi-desktop/configSync/disconnect` | `configSync.disconnect` | removes local sync metadata and keys; it does not delete remote vault data |
 
@@ -2469,7 +2500,7 @@ transport/lifecycle coordinator and does not schedule, merge, encrypt, or
 apply configuration.
 
 A manual sync reports `configSync.progress` while it runs: the phase
-(`capture`, `download`, `merge`, `upload`, `apply`, or `cleanup`), the units
+(`capture`, `download`, `merge`, `upload`, or `apply`), the units
 done and total for that phase, and the bytes when they are known. A long upload
 of many resource objects is therefore not an interface with nothing to show.
 Background polls report nothing, since only the manual path has a caller

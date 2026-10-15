@@ -245,12 +245,37 @@ test("check-for-updates is reachable from the application menu", () => {
   }
 });
 
-test("packaging publishes an electron-updater feed for GitHub Releases", () => {
+test("packaging publishes an electron-updater feed for GitHub Releases", async () => {
   const pkg = JSON.parse(pkgSource);
   assert.ok(pkg.dependencies["electron-updater"], "electron-updater dependency");
   assert.equal(pkg.build.publish[0].provider, "github");
   assert.equal(pkg.build.publish[0].owner, "yuqiangdede");
   assert.equal(pkg.build.publish[0].repo, "mattpocock-PI");
+  const windowsUpdateConfigResource = pkg.build.win.extraResources.find(
+    ({ from }) => from === "resources/app-update.yml",
+  );
+  assert.deepEqual(windowsUpdateConfigResource, {
+    from: "resources/app-update.yml",
+    to: "app-update.yml",
+  }, "Windows packages carry the updater config needed by manual ZIP checks");
+  const updateConfig = Object.fromEntries(
+    (await read("../resources/app-update.yml"))
+      .trim()
+      .split(/\r?\n/)
+      .map((line) => {
+        const separator = line.indexOf(":");
+        return [
+          line.slice(0, separator),
+          line.slice(separator + 1).trim().replace(/^['"]|['"]$/g, ""),
+        ];
+      }),
+  );
+  assert.deepEqual(updateConfig, {
+    provider: pkg.build.publish[0].provider,
+    owner: pkg.build.publish[0].owner,
+    repo: pkg.build.publish[0].repo,
+    updaterCacheDirName: `${pkg.name.replaceAll("/", "")}-updater`,
+  });
   const macTargets = pkg.build.mac.target.map((entry) => entry.target);
   assert.ok(macTargets.includes("zip"), "mac zip target (Squirrel.Mac feed)");
   // electron-builder must never self-publish (implicit tag publishing would
@@ -285,13 +310,13 @@ test("packaging publishes an electron-updater feed for GitHub Releases", () => {
     "rpm build-id configuration",
   );
   // GitHub asset URLs mangle spaces; keep Windows artifact names space-free.
-  assert.equal(pkg.build.nsis.artifactName, "PI-Desktop-Setup-${version}.${ext}");
+  assert.equal(pkg.build.nsis.artifactName, "mattpocock-PI-Setup-${version}.${ext}");
   const winTargets = pkg.build.win.target.map((entry) => entry.target);
   assert.deepEqual(winTargets, ["nsis", "zip", "portable"], "Windows release targets");
-  assert.equal(pkg.build.portable.artifactName, "PI-Desktop-Portable-${version}.${ext}", "portable artifact name");
+  assert.equal(pkg.build.portable.artifactName, "mattpocock-PI-Portable-${version}.${ext}", "portable artifact name");
   assert.equal(
     pkg.build.win.artifactName,
-    "PI-Desktop-Portable-${version}.${ext}",
+    "mattpocock-PI-Portable-${version}.${ext}",
   );
   assert.equal(pkg.build.extraMetadata.piDistribution, "installed");
   assert.match(pkg.scripts["dist:win"], /build-desktop-release\.mjs win/);

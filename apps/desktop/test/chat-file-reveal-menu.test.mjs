@@ -57,6 +57,7 @@ const calls = {
 };
 
 const state = {
+  sessions: [],
   workspace: { path: "C:/project" },
   activeSessionId: "session-1",
   pluginViews: [{ pluginId: "pi.file-manager", viewId: "manager" }],
@@ -105,6 +106,9 @@ const previewTarget = loadModule("../src/hooks/use-preview-target.ts", {
   "react-i18next": { useTranslation: translate },
   "@pi-desktop/shared": sharedPackage,
   "../stores/app-store": { useAppStore },
+  "./use-chat-session-capability": { useChatSessionCapability: () => true },
+  "../lib/remote-session-safety": loadModule("../src/lib/remote-session-safety.ts", {}),
+  "../plugins/renderer-slots/use-slots": { useSlotSessionId: () => "" },
   "../lib/api": {
     api: {
       listPluginViews: async () => state.pluginViews,
@@ -129,6 +133,12 @@ const previewTarget = loadModule("../src/hooks/use-preview-target.ts", {
   "../lib/work-panel-tabs": loadModule("../src/lib/work-panel-tabs.ts", {}),
 });
 
+const nativeCapability = loadModule("../src/hooks/use-chat-session-capability.ts", {
+  "../lib/remote-session-safety": loadModule("../src/lib/remote-session-safety.ts", {}),
+  "../plugins/renderer-slots/use-slots": { useSlotSessionId: () => "" },
+  "../stores/app-store": { useAppStore },
+});
+
 const { useChatFileMenu, useChatFileMenuItems } = loadModule(
   "../src/hooks/use-chat-file-menu.tsx",
   {
@@ -144,6 +154,7 @@ const { useChatFileMenu, useChatFileMenuItems } = loadModule(
       }),
     },
     "./use-preview-target": previewTarget,
+    "./use-chat-session-capability": nativeCapability,
   },
 );
 
@@ -388,8 +399,11 @@ test("every transcript surface that names a file opens that item", () => {
   assert.match(markdown, /openFileMenu\(event, \{ path: localRef, baseDir \}\)/);
   assert.match(markdown, /onContextMenu=\{onLocalContextMenu\}/);
   // A local image that cannot be shown inline keeps a chip, and both carry the
-  // menu only when the reference actually resolved to a file.
-  assert.match(markdown, /const onLocalContextMenu =\s*localRef && openFileMenu/);
+  // menu only when local tools are allowed and the reference resolved to a file.
+  assert.match(
+    markdown,
+    /const onLocalContextMenu =\s*localToolsAllowed && localRef && openFileMenu/,
+  );
 });
 
 test("a URL never reaches the reveal", () => {
@@ -414,4 +428,14 @@ test("the reference labels ship in the catalogs the menu reads", () => {
   assert.match(zhCN, /fileRevealFailed: "无法在文件夹中打开该文件。"/);
   assert.match(zhCN, /copyFullPath: "复制完整地址"/);
   assert.match(zhCN, /copyRelativePath: "复制相对地址"/);
+});
+
+test("remote workspace references retain copy actions but never offer local OS reveal", () => {
+  const before = state.sessions;
+  state.sessions = [{ id: state.activeSessionId, remoteWorkspace: { hostKey: "ssh", path: "/work/app" } }];
+  let items;
+  function Harness() { items = useChatFileMenuItems()({ path: "README.md" }); return null; }
+  renderToStaticMarkup(React.createElement(Harness));
+  assert.deepEqual(items.map(item => item.id), ["copy-full-path", "copy-relative-path"]);
+  state.sessions = before;
 });

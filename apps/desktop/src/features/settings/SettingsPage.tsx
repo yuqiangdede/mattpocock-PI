@@ -185,7 +185,7 @@ export function SettingsPage() {
     const tryFind = (attempt: number) => {
       if (cancelled) return;
       const titles = document.querySelectorAll<HTMLElement>(
-        ".settings-content .settings-row-title, .settings-content .settings-card-heading",
+        ".settings-content .settings-row-title, .settings-content .settings-card-heading, .settings-content .about-update-title",
       );
       const match = [...titles].find(
         (node) => node.textContent?.trim() === target,

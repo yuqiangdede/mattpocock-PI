@@ -1,7 +1,11 @@
 import { IconClock } from "./icons";
+import { RemoteProjectGroups } from "./remote/RemoteProjectGroups";
+import { groupRemoteProjectSessions } from "../lib/remote-project-catalog";
+import { isRemoteSession, sessionAllows } from "../lib/remote-session-safety";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -13,11 +17,10 @@ import {
 } from "react";
 import { TooltipButton, cx } from "./ui";
 
-/** Default number of most-recent sessions shown per project group before the rest fold. */
-const MAX_VISIBLE_SESSIONS = 10;
 import { portalToBody } from "../lib/portal-visibility";
 import {
-  clampSidebarFloatingMenuTop,
+  placeSidebarFloatingMenuTop,
+  SIDEBAR_FLOATING_MENU_MAX_HEIGHT,
   SIDEBAR_MENU_VIEWPORT_PADDING,
 } from "../lib/sidebar-floating-menu";
 import { useTranslation } from "react-i18next";
@@ -32,6 +35,10 @@ import {
   sessionArchived,
   sessionPinned,
 } from "../lib/sidebar-session-groups";
+import {
+  getVisibleProjectSessions,
+  updateProjectSessionExpansion,
+} from "../lib/sidebar-project-sessions";
 import { listableSessions } from "../lib/session-origin";
 import {
   composerDropItems,
@@ -96,6 +103,7 @@ import {
 
 type ProjectEntry = {
   path: string;
+  displayPath?: string;
   key: string;
   name: string;
   sessions: SessionSummary[];
@@ -253,14 +261,12 @@ export function Sidebar({
   const refreshProject = useAppStore((s) => s.refreshProject);
   const clearProject = useAppStore((s) => s.clearProject);
   const activateProject = useAppStore((s) => s.activateProject);
-  const closeProjectAction = useAppStore((s) => s.closeProject);
   const renameProject = useAppStore((s) => s.renameProject);
   const toggleSessionPinned = useAppStore((s) => s.toggleSessionPinned);
   const archiveSessionAction = useAppStore((s) => s.archiveSession);
   const restoreSession = useAppStore((s) => s.restoreSession);
   const renameSession = useAppStore((s) => s.renameSession);
   const deleteSessionAction = useAppStore((s) => s.deleteSession);
-  const deleteProjectAction = useAppStore((s) => s.deleteProject);
   const setSessionSort = useAppStore((s) => s.setSessionSort);
   const moveSessionProject = useAppStore((s) => s.moveSessionProject);
   const setSessionArchiveVisibility = useAppStore((s) => s.setSessionArchiveVisibility);
@@ -291,6 +297,8 @@ export function Sidebar({
   const [menuPosition, setMenuPosition] = useState<{
     top: number;
     left: number;
+    anchorTop: number;
+    anchorBottom: number;
   } | null>(null);
   const {
     card: sessionHoverCard,
@@ -298,6 +306,7 @@ export function Sidebar({
     hide: hideSessionHoverCard,
     scheduleHide: scheduleSessionHoverCardHide,
     keepVisible: keepSessionHoverCardVisible,
+    registerDismissGuard: registerSessionHoverCardDismissGuard,
   } = useSessionHoverCard();
   const [expandedProjectSessions, setExpandedProjectSessions] = useState<Record<string, boolean>>({});
   const [draggingSessionId, setDraggingSessionId] = useState<string | null>(null);
@@ -310,6 +319,7 @@ export function Sidebar({
 
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const menuFirstItemRef = useRef<HTMLButtonElement | null>(null);
+  const floatingMenuRef = useRef<HTMLDivElement | null>(null);
   const sessionPrefetchTimerRef = useRef<number | undefined>(undefined);
   const sidebarResizeRef = useRef<SidebarResizeState | null>(null);
   const projectReorderRef = useRef<ProjectReorderPointerState | null>(null);
@@ -498,18 +508,32 @@ export function Sidebar({
 
   const placeMenu = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
+    const anchor = { top: rect.top, bottom: rect.bottom };
     setMenuPosition({
-      top: clampSidebarFloatingMenuTop(rect.bottom + 4, window.innerHeight),
+      top: placeSidebarFloatingMenuTop(
+        anchor,
+        SIDEBAR_FLOATING_MENU_MAX_HEIGHT,
+        window.innerHeight,
+      ),
       left: Math.max(SIDEBAR_MENU_VIEWPORT_PADDING, rect.right + 4),
+      anchorTop: anchor.top,
+      anchorBottom: anchor.bottom,
     });
   }, []);
 
   // Body-level sidebar menus always anchor their left edge to the right side
   // of the trigger or pointer; they never flip to the left at the viewport edge.
   const placeMenuAtPoint = useCallback((x: number, y: number) => {
+    const anchor = { top: y, bottom: y };
     setMenuPosition({
-      top: clampSidebarFloatingMenuTop(y + 4, window.innerHeight),
+      top: placeSidebarFloatingMenuTop(
+        anchor,
+        SIDEBAR_FLOATING_MENU_MAX_HEIGHT,
+        window.innerHeight,
+      ),
       left: Math.max(SIDEBAR_MENU_VIEWPORT_PADDING, x + 4),
+      anchorTop: anchor.top,
+      anchorBottom: anchor.bottom,
     });
   }, []);
 
@@ -578,6 +602,39 @@ export function Sidebar({
     if (!sessionMenu && !projectMenu && !sectionMenu && !sortOpen) return;
     requestAnimationFrame(() => menuFirstItemRef.current?.focus());
   }, [sessionMenu, projectMenu, sectionMenu, sortOpen]);
+
+  const menuAnchorTop = menuPosition?.anchorTop;
+  const menuAnchorBottom = menuPosition?.anchorBottom;
+
+  useLayoutEffect(() => {
+    if (menuAnchorTop === undefined || menuAnchorBottom === undefined) return;
+    const menu = floatingMenuRef.current;
+    if (!menu) return;
+
+    const reposition = () => {
+      const top = placeSidebarFloatingMenuTop(
+        { top: menuAnchorTop, bottom: menuAnchorBottom },
+        menu.getBoundingClientRect().height,
+        window.innerHeight,
+      );
+      setMenuPosition((current) =>
+        current && current.top !== top ? { ...current, top } : current,
+      );
+    };
+
+    reposition();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(reposition);
+    observer.observe(menu);
+    return () => observer.disconnect();
+  }, [
+    menuAnchorTop,
+    menuAnchorBottom,
+    sessionMenu,
+    projectMenu,
+    sectionMenu,
+    sortOpen,
+  ]);
 
   // Footer utility bar: settings / plugins / notifications + build chip.
 
@@ -703,6 +760,8 @@ export function Sidebar({
       const meta = projectMetaFor(rawPath, projectMeta);
       byPath.set(normalized, {
         path: rawPath,
+        displayPath: openProjects.find((project) => normalizeProjectPath(project.path) === normalized)?.remote?.path
+          ?? (normalizeProjectPath(workspace?.path) === normalized ? workspace?.remote?.path : undefined),
         key: normalized,
         name: projectName(rawPath, meta.name ?? name),
         sessions: [],
@@ -966,14 +1025,16 @@ export function Sidebar({
       session: { ...session, title: taskTitle(session.title) },
       target,
       temporary,
-      space: temporary ? t("nav.hoverCardTemporarySpace") : entry?.name ?? projectName(projectPath),
+      space: isRemoteSession(session)
+        ? `${session.remoteWorkspaceLabel ?? t("remote:workspace")} · ${session.remoteHostLabel ?? t("remote:remote")}`
+        : temporary ? t("nav.hoverCardTemporarySpace") : entry?.name ?? projectName(projectPath),
       branch: entry?.branch,
     });
   }, [projectEntriesByPath, revealSessionHoverCard, t, taskTitle]);
 
   const temporarySessions = useMemo(
     () => filtered
-      .filter((session) => !normalizeProjectPath(session.projectPath))
+      .filter((session) => !normalizeProjectPath(session.projectPath) && !(isRemoteSession(session) && session.remoteProjectId))
       .sort(compareSessions),
     [filtered, compareSessions],
   );
@@ -981,6 +1042,9 @@ export function Sidebar({
     () => temporarySessions.filter((session) => !pinnedSessionIds.has(session.id)),
     [temporarySessions, pinnedSessionIds],
   );
+  const remoteProjectGroups = useMemo(() => groupRemoteProjectSessions(
+    filtered.filter((session) => isRemoteSession(session) && !pinnedSessionIds.has(session.id)), compareSessions,
+  ), [filtered, pinnedSessionIds, compareSessions]);
   // Flat ordered list of every visible session id — used for Shift+click range selection.
   const flatSessionOrder = useMemo(() => {
     const ids: string[] = [];
@@ -992,10 +1056,11 @@ export function Sidebar({
         if (!pinnedSessionIds.has(s.id)) ids.push(s.id);
       }
     }
+    for (const group of remoteProjectGroups) for (const session of group.sessions) ids.push(session.id);
     // Then temporary (standalone) sessions
     for (const s of temporarySessionHistory) ids.push(s.id);
     return ids;
-  }, [pinnedSessions, projectEntries, pinnedSessionIds, temporarySessionHistory]);
+  }, [pinnedSessions, projectEntries, pinnedSessionIds, temporarySessionHistory, remoteProjectGroups]);
 
   /** Handle multi-select click on a session row. Returns true if the click was consumed by multi-select. */
   const handleMultiSelectClick = (event: React.MouseEvent, sessionId: string): boolean => {
@@ -1183,6 +1248,11 @@ export function Sidebar({
   const setCollapsed = (path: string, value: boolean) => {
     const normalized = normalizeProjectPath(path) || path;
     setProjectCollapsed(normalized, value);
+    if (value) {
+      setExpandedProjectSessions((previous) =>
+        updateProjectSessionExpansion(previous, normalized, false),
+      );
+    }
   };
 
   const setSort = (next: SessionSort) => {
@@ -1198,7 +1268,9 @@ export function Sidebar({
   };
 
   const expandProjectSessions = (projectKey: string) => {
-    setExpandedProjectSessions((prev) => ({ ...prev, [projectKey]: true }));
+    setExpandedProjectSessions((previous) =>
+      updateProjectSessionExpansion(previous, projectKey, true),
+    );
   };
 
   const toggleSessionPin = (session: SessionSummary) => {
@@ -1372,37 +1444,10 @@ export function Sidebar({
     setSelectedIds(new Set());
   };
 
-  /** Menu items of different surfaces never share an armed key. */
-  const projectDeleteKey = (entry: ProjectEntry) => `project:${entry.key}`;
-
-  /**
-   * Two-step delete for a project row that keeps the running-task safety. The
-   * second click deletes an idle project straight away; a project whose turn is
-   * still live opens the dialog that names those sessions and stops them.
-   */
-  const requestDeleteProject = async (entry: ProjectEntry) => {
-    const key = projectDeleteKey(entry);
-    if (armedDelete !== key) {
-      setArmedDelete(key);
-      return;
-    }
-    setArmedDelete(null);
+  /** Always route project deletion through the explicit confirmation dialog. */
+  const requestDeleteProject = (entry: ProjectEntry) => {
     closeMenus(false);
-    if (entry.sessions.some((session) => runningSessions[session.id] === true)) {
-      setDeleteProjectFor(entry);
-      return;
-    }
-    try {
-      await deleteProjectAction(entry.path);
-      showToast(t("project.deleted", { name: entry.name }), { variant: "success" });
-    } catch (error) {
-      // The host refuses a project whose task started after this render.
-      reportError(
-        (error as { errorCode?: unknown } | null)?.errorCode === ErrorCodes.CONFLICT
-          ? new Error(t("project.deleteRunningBlocked"))
-          : error,
-      );
-    }
+    setDeleteProjectFor(entry);
   };
 
   const openProjectFolder = async (entry: ProjectEntry) => {
@@ -1419,6 +1464,7 @@ export function Sidebar({
   };
 
   const forkSession = async (session: SessionSummary) => {
+    if (!sessionAllows(session, "canEditMessages")) return;
     closeMenus(false);
     try {
       await forkSessionAction(session.id);
@@ -1453,6 +1499,7 @@ export function Sidebar({
   };
 
   const openSessionPath = async (session: SessionSummary) => {
+    if (isRemoteSession(session)) return;
     closeMenus(false);
     try {
       await api.openSessionScratchPath(session.id);
@@ -1496,15 +1543,6 @@ export function Sidebar({
     }
   };
 
-  const closeProject = async (entry: ProjectEntry) => {
-    closeMenus();
-    try {
-      await closeProjectAction(entry.path);
-    } catch (error) {
-      reportError(error);
-    }
-  };
-
   const createSession = async (options?: { projectPath?: string | null }) => {
     try {
       await newSession(options);
@@ -1528,6 +1566,7 @@ export function Sidebar({
 
   const moveSessionToProject = useCallback(
     async (sessionId: string, projectPath: string, projectName: string) => {
+      if (sessionId.startsWith("remote:")) return;
       // A running turn owns the current project's instructions, tools, and
       // working directory; the host rejects the move as well.
       if (runningSessions[sessionId]) {
@@ -1715,9 +1754,9 @@ export function Sidebar({
         key={session.id}
         className={`thread-item ${active ? "active" : ""} ${archived ? "archived" : ""} ${draggingSessionId === session.id ? "is-dragging" : ""} ${selectedIds.has(session.id) ? "selected" : ""}`}
         data-sidebar-session-row={session.id}
-        draggable={!running}
+        draggable={!running && !isRemoteSession(session)}
         onDragStart={(event) => {
-          if (running) {
+          if (running || isRemoteSession(session)) {
             event.preventDefault();
             return;
           }
@@ -1783,6 +1822,7 @@ export function Sidebar({
           {session.source === "pi-native" ? (
             <span className="thread-item-source" title="Native Pi session">Pi</span>
           ) : null}
+          {isRemoteSession(session) && <span className="thread-item-source" title={session.remoteHostLabel}>{t("remote:remote")}</span>}
           <span className="thread-item-title">{taskTitle(session.title)}</span>
           {options?.global ? (
             <span className="thread-item-project">
@@ -1821,13 +1861,14 @@ export function Sidebar({
     const projectId = projectDomId(entry.key);
     const isMenuOpen = projectMenu === entry.key;
 
-    // Show the most recent MAX_VISIBLE_SESSIONS rows by default; the remaining
-    // sessions stay folded behind the same load-more affordance used for the
-    // time-grouped overflow and expand on click.
+    // Show the initial page by default; the remaining sessions stay folded
+    // behind the same load-more affordance used for time-group overflow.
     const sessionsExpanded = expandedProjectSessions[entry.key] ?? false;
     const history = entry.sessions.filter((session) => !pinnedSessionIds.has(session.id));
-    const visibleSessions = sessionsExpanded ? history : history.slice(0, MAX_VISIBLE_SESSIONS);
-    const hiddenCount = history.length - visibleSessions.length;
+    const { visibleSessions, hiddenCount } = getVisibleProjectSessions(
+      history,
+      sessionsExpanded,
+    );
 
     const renderTimeGroupedSessions = (sessions: SessionSummary[]) => {
       const result: React.ReactNode[] = [];
@@ -1918,7 +1959,7 @@ export function Sidebar({
             type="button"
             id={projectId}
             className="sidebar-session-group-title project-toggle"
-            tooltip={entry.path}
+            tooltip={entry.displayPath ?? entry.path}
             tooltipDelayMs={500}
             tooltipClassName="ui-tooltip-path"
             ariaLabel={entry.name}
@@ -1960,7 +2001,7 @@ export function Sidebar({
             {entry.active ? <span className="sidebar-project-active-dot" aria-label={t("project.active", { defaultValue: "Active" })} /> : null}
           </TooltipButton>
           <span id={`${projectId}-path-description`} className="sr-only">
-            {entry.path}
+            {entry.displayPath ?? entry.path}
             {". "}
             {t("project.reorder", { name: entry.name, defaultValue: "Reorder {{name}}" })}
           </span>
@@ -2031,6 +2072,7 @@ export function Sidebar({
       const Icon = isSessions ? IconNewSession : IconNewProject;
       return portalToBody(
         <div
+          ref={floatingMenuRef}
           className="sidebar-row-menu sidebar-floating-menu sidebar-section-menu"
           role="menu"
           data-sidebar-section-menu={sectionMenu}
@@ -2060,6 +2102,7 @@ export function Sidebar({
     if (sortOpen) {
       return portalToBody(
         <div
+          ref={floatingMenuRef}
           className="sidebar-popover sidebar-sort-menu sidebar-floating-menu"
           role="menu"
           onKeyDown={onMenuKeyDown}
@@ -2094,6 +2137,7 @@ export function Sidebar({
     if (!session && !entry) return null;
     return portalToBody(
       <div
+        ref={floatingMenuRef}
         className="sidebar-row-menu sidebar-floating-menu"
         role="menu"
         onKeyDown={onMenuKeyDown}
@@ -2179,7 +2223,7 @@ export function Sidebar({
                 ? t("nav.restoreTask", { defaultValue: "Restore" })
                 : t("nav.archiveTask", { defaultValue: "Archive" })}
             </button>
-            {session.source !== "pi-native" ? (
+            {session.source !== "pi-native" && sessionAllows(session, "canEditMessages") ? (
               <button
                 type="button"
                 role="menuitem"
@@ -2200,7 +2244,7 @@ export function Sidebar({
               <IconCopy size={14} />
               {t("nav.copySessionLink")}
             </button>
-            {settings?.developerMode === true ? (
+            {settings?.developerMode === true && !isRemoteSession(session) ? (
               <>
                 <button
                   type="button"
@@ -2291,26 +2335,13 @@ export function Sidebar({
             <button
               type="button"
               role="menuitem"
-              className={cx("danger", armedDelete === projectDeleteKey(entry) && "is-armed")}
+              className="danger"
               data-action="delete-project"
-              data-armed={armedDelete === projectDeleteKey(entry) ? "true" : undefined}
-              onClick={() => void requestDeleteProject(entry)}
+              onClick={() => requestDeleteProject(entry)}
             >
               <IconTrash size={14} />
-              {armedDelete === projectDeleteKey(entry)
-                ? t("project.deleteMenuConfirm", { defaultValue: "Delete?" })
-                : t("project.delete", { defaultValue: "Delete project" })}
+              {t("project.delete", { defaultValue: "Delete project" })}
             </button>
-            {entry.open ? (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => void closeProject(entry)}
-              >
-                <IconX size={14} />
-                {t("project.close")}
-              </button>
-            ) : null}
           </>
         ) : null}
       </div>,
@@ -2511,6 +2542,8 @@ export function Sidebar({
               </div>
             </section>
           )}
+          <RemoteProjectGroups groups={remoteProjectGroups}
+            renderSessions={(sessions) => renderSessionRows(sessions, { temporary: false })} />
         </div>
 
         <div className="sidebar-footer no-drag">
@@ -2588,6 +2621,7 @@ export function Sidebar({
           onOpenSession={openSessionFromHover}
           keepVisible={keepSessionHoverCardVisible}
           scheduleHide={scheduleSessionHoverCardHide}
+          registerDismissGuard={registerSessionHoverCardDismissGuard}
         />
       ) : null}
       {renameFor ? (
@@ -2602,7 +2636,17 @@ export function Sidebar({
         <ProjectEditDialog
           project={editProjectFor}
           onClose={() => setEditProjectFor(null)}
-          onSaved={(group) => editProjectEntry(editProjectFor, group.name)}
+          onSaved={(group) => {
+            editProjectEntry(editProjectFor, group.name);
+            // A promoted primary owns the group name from now on, so the entry
+            // that opens there later already carries it.
+            if (
+              normalizeProjectPath(editProjectFor.path) !==
+              normalizeProjectPath(group.primaryPath)
+            ) {
+              renameProject(group.primaryPath, group.name);
+            }
+          }}
           onError={reportError}
         />
       ) : null}

@@ -42,7 +42,9 @@ test("engineering preferences survive both settings boundaries without rewinding
   assert.deepEqual(result.engineeringShortcutPrompts, input.engineeringShortcutPrompts);
   assert.equal(result.engineeringSkillUpdateMode, "manual");
   assert.equal(result.engineeringSkillCheck, undefined);
-  for (const invalid of [{ engineeringShortcutPrompts: { unknown: "x" } }, { engineeringSkillUpdateMode: "auto-install" }]) {
+  const legacy = { engineeringShortcutPrompts: { unknown: "x" } };
+  assert.doesNotThrow(() => main.validateSettingsWrite(renderer.validateSettingsWrite(legacy)));
+  for (const invalid of [{ engineeringSkillUpdateMode: "auto-install" }]) {
     assert.throws(() => renderer.validateSettingsWrite(invalid), /invalid/);
     assert.throws(() => main.validateSettingsWrite(invalid), /invalid/);
   }

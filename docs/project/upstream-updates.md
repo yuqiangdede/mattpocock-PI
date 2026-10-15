@@ -55,7 +55,7 @@ When a core change cannot be avoided, document rejected extension alternatives,
 exact upstream touchpoints, migration/compatibility impact and regression tests;
 obtain explicit architecture approval and record an ADR before implementing.
 This is the enforceable fork-maintenance rule mirrored in
-[AGENTS.md](../../AGENTS.md) and [CLAUDE.md](../../CLAUDE.md).
+[AGENTS.md](https://github.com/yuqiangdede/mattpocock-PI/blob/main/AGENTS.md) and [CLAUDE.md](https://github.com/yuqiangdede/mattpocock-PI/blob/main/CLAUDE.md).
 For a concrete example, see the
 [Work Item / standalone Navigator proposal](development-navigator-work-items.md).
 
@@ -69,3 +69,5 @@ For a concrete example, see the
 
 The 0.18.0 adoption and Desktop engineering boundaries are recorded in
 [the 0.18.0 integration report](upstream-0.18.0.md).
+
+The 0.20.1 adoption is recorded in [the 0.20.1 integration report](upstream-0.20.1.md).

@@ -75,8 +75,9 @@ test("Host restart or disposal while checking cannot publish stale revision", as
   }
 });
 
-test("settings boundaries reject unknown shortcuts, unsafe or oversized values and auto-install", () => {
-  for (const value of [{ engineeringShortcutPrompts: { unknown: "x" } }, { engineeringShortcutPrompts: { ask: "x".repeat(16001) } }, { engineeringShortcutPrompts: { ask: false } }, { engineeringSkillUpdateMode: "auto-install" }, { engineeringSkillUpdateMode: ["manual"] }, { engineeringSkillCheck: { attemptedAt: -1 } }]) assert.throws(() => validateEngineeringSettings(value));
+test("settings boundaries preserve legacy shortcut keys and reject unsafe values and auto-install", () => {
+  assert.doesNotThrow(() => validateEngineeringSettings({ engineeringShortcutPrompts: { unknown: "x" } }));
+  for (const value of [{ engineeringShortcutPrompts: { ask: "x".repeat(16001) } }, { engineeringShortcutPrompts: { ask: false } }, { engineeringSkillUpdateMode: "auto-install" }, { engineeringSkillUpdateMode: ["manual"] }, { engineeringSkillCheck: { attemptedAt: -1 } }]) assert.throws(() => validateEngineeringSettings(value));
 });
 
 

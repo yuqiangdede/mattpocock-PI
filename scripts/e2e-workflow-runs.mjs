@@ -62,6 +62,7 @@ try {
     format: "esm",
     banner: { js: 'import { createRequire as __fixtureCreateRequire } from "node:module"; import { fileURLToPath as __fixtureFilePath } from "node:url"; import { dirname as __fixtureDirectory } from "node:path"; const require = __fixtureCreateRequire(import.meta.url); const __dirname = __fixtureDirectory(__fixtureFilePath(import.meta.url));' },
     external: ["electron"],
+    define: { "process.resourcesPath": JSON.stringify(join(root, "apps/desktop/resources")) },
     alias: {
       "@pi-desktop/shared": join(root, "packages/shared/src/index.ts"),
     },

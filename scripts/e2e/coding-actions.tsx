@@ -1,3 +1,4 @@
+import { CODING_MORE_SKILLS } from "@pi-desktop/shared";
 import { createRoot } from "react-dom/client";
 import { I18nextProvider, initReactI18next } from "react-i18next";
 import i18n from "i18next";
@@ -17,6 +18,14 @@ declare global {
 }
 const fixture = (name: string, input?: unknown) => window.workflowFixture.action(name, input);
 const input = (label: string) => document.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[aria-label="${label}"]`)!;
+async function setActionEnabled(enabled: boolean) {
+  const checkbox = await until(() => {
+    const control = document.querySelector<HTMLInputElement>('[aria-label="启用 Action"]');
+    return control && !control.disabled && control;
+  });
+  if (checkbox.checked !== enabled) checkbox.click();
+  await until(() => checkbox.checked === enabled);
+}
 const editor = () => document.querySelector<HTMLElement>(".composer-input")!;
 const type = (value: string) => fixture("typeText", value);
 
@@ -93,9 +102,15 @@ globalThis.codingActionsProbe = async () => {
   check(JSON.stringify((await api.getCodingActions()).configuration) === originalConfiguration, "恢复入口改写用户配置");
   useAppStore.setState({ composerPrefill: { sessionId: view.sessionId, text: "", fileReferences: [] } });
   await until(() => readEditorValue(editor()) === "");
-  for (const action of ["implementSpec", "pr", "claudeHandoff", "loopMe", "setupTsDeepModules", "writingBeats", "writingFragments", "writingShape", "gitGuardrails", "migrateToShoehorn", "scaffoldExercises", "setupPreCommit"]) {
+  for (const { action, skill } of CODING_MORE_SKILLS) {
     await click(i18n.t("codingActions.more"));
-    const label = i18n.t(`coding.${action}`);
+    const label = initial.actions.find(item => item.skillId === skill)?.label ?? i18n.t(`coding.${action}`);
+    if (skill !== "implement-spec" && !initial.actions.some(item => item.skillId === skill) && !commands.some(command => command.kind === "skill" && command.skillId === skill)) {
+      check(![...document.querySelectorAll('[role="menuitem"]')].some(item => item.textContent?.trim() === label), `Unavailable optional Skill was exposed: ${action}`);
+      await fixture("pressKey", "Escape");
+      await until(() => !document.querySelector('[role="menuitem"]'));
+      continue;
+    }
     const button = await until(() => [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(item => item.textContent?.trim() === label));
     check(!button.disabled, `Bundled shortcut unavailable: ${action}`);
     check(button.getAttribute("aria-description")?.includes(i18n.t(`coding.skillGuides.${action}.when`)), `Missing localized guide: ${action}`);
@@ -130,8 +145,8 @@ globalThis.codingActionsProbe = async () => {
   view.composer(); await until(() => editor());
   useAppStore.setState({ composerPrefill: { sessionId: view.sessionId, text: "Keep my draft", fileReferences: [] } });
   await until(() => readEditorValue(editor()) === "Keep my draft");
-  const secondary = [...document.querySelectorAll<HTMLButtonElement>(".coding-shortcuts-secondary button")];
-  check(secondary.some(button => button.textContent?.trim() === "Verify and commit"), "Saved prompt label missing from second row");
+  const secondary = [...document.querySelectorAll<HTMLButtonElement>(".coding-shortcuts-primary button")];
+  check(secondary.some(button => button.textContent?.trim() === "Verify and commit"), "Saved prompt label missing from primary row");
   check(!document.querySelector(".coding-shortcuts-secondary [aria-haspopup='menu']"), "More left the Skill row");
   const beforePlain = (await fixture("snapshot") as { prompts: number }).prompts;
   await click("Verify and commit");
@@ -160,13 +175,13 @@ globalThis.codingActionsProbe = async () => {
   await click("上移"); await click("保存");
   await until(async () => (await api.getCodingActions()).configuration.actions.some(action => action.label === "快速审查"));
   check(!document.body.textContent?.includes("显示位置") && !document.body.textContent?.includes("更多分组"), "出现页面布局配置");
-  input("启用 Action").click(); await click("保存");
+  await setActionEnabled(false); await click("保存");
   await until(async () => (await api.getCodingActions()).configuration.actions.find(action => action.id === "code-review")?.enabled === false);
   view.composer(); await until(() => editor());
   check(![...document.querySelectorAll("button")].some(button => button.textContent?.trim() === "快速审查"), "停用 Action 仍然显示");
   view.settings(); await until(() => input("Action 名称"));
   await select("选择 Action", "code-review", "快速审查（已停用）");
-  input("启用 Action").click(); await click("保存");
+  await setActionEnabled(true); await click("保存");
   await until(async () => (await api.getCodingActions()).configuration.actions.find(action => action.id === "code-review")?.enabled !== false);
   await click("新建 Action"); await fill("Action 名称", "临时审查", type); await fill("Skill id", "code-review", type); await click("保存");
   await until(async () => (await api.getCodingActions()).configuration.actions.some(action => action.label === "临时审查"));
