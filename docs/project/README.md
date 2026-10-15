@@ -5,7 +5,7 @@
 - Stage-one plugin prevalidation: [Skill Launcher Plugin Feasibility Gate](skill-launcher-plugin-feasibility.md). Verify Composer controls, native Skill Catalog, draft/attachment preservation and configuration migration before replacing existing entries.
 
 - Work Item grouping and standalone Navigator: [planned design](development-navigator-work-items.md); explicitly associate native Pi conversations with one engineering goal without changing Session lifecycles.
-- Mandatory architecture policy: [AGENTS.md: Extension First](../../AGENTS.md); prefer plugins, independent modules, existing APIs and additive data models over core-lifecycle changes.
+- Mandatory architecture policy: [AGENTS.md: Extension First](https://github.com/yuqiangdede/mattpocock-PI/blob/main/AGENTS.md); prefer plugins, independent modules, existing APIs and additive data models over core-lifecycle changes.
 
 - Parallel stages: [branch roles and exploration/promotion workflow](parallel-stage-development.md).
 
@@ -37,3 +37,5 @@
 - 官方稳定版更新与定制维护：[`upstream-updates.md`](upstream-updates.md)
 - 官方 0.16.1 升级知识与历史验收：[`upstream-0.16.1-retrospective.md`](upstream-0.16.1-retrospective.md)
 - Official 0.17.0 source integration: [`upstream-0.17.0.md`](upstream-0.17.0.md)
+
+- Official PI-Desktop [0.20.1 source integration and validation](upstream-0.20.1.md).

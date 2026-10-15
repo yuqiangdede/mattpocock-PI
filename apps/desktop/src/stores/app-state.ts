@@ -1,4 +1,5 @@
 import type { RecentModel } from "../lib/recent-models";
+import type { RemoteProjectTarget } from "../lib/remote-project-session";
 import type {
   AgentEventEnvelope,
   BrowserState,
@@ -121,6 +122,7 @@ export type AppState = {
   openProjects: ProjectWorkspace[];
   openProjectPaths: string[];
   createProjectDialogOpen: boolean;
+  createProjectDialogRemoteHostKey?: string;
   activeProjectPath?: string;
   projectMeta: Record<string, ProjectMeta>;
   /** Kept as a flat map for lightweight consumers (Sidebar). */
@@ -206,7 +208,7 @@ export type AppState = {
     id: string,
     opts?: { record?: boolean } & NavigationOptions,
   ) => Promise<void>;
-  newSession: (options?: { projectPath?: string | null }) => Promise<void>;
+  newSession: (options?: { projectPath?: string | null; remoteProject?: RemoteProjectTarget }) => Promise<void>;
   forkSession: (id: string) => Promise<void>;
   forkAssistantMessage: (messageId: string) => Promise<void>;
   configureActiveSession: (config: {
@@ -260,8 +262,13 @@ export type AppState = {
     snapshotId: string,
   ) => Promise<ReviewRollbackResult | null>;
   abort: () => Promise<void>;
-  openProject: () => Promise<void>;
+  openProject: (options?: { remoteHostKey?: string }) => Promise<void>;
   closeProjectDialog: () => void;
+  createProjectFromRemote: (input: {
+    name: string;
+    hostKey: string;
+    path: string;
+  }) => Promise<void>;
   createProjectFromFolders: (input: {
     name: string;
     folders: string[];

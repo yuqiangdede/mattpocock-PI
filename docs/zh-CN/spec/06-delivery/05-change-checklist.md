@@ -18,7 +18,7 @@
 ## 两阶段并行开发例外
 
 Fork 的阶段二实验遵循
-[AGENTS.md](../../../../AGENTS.md#parallel-stage-development-fork-exception)
+[AGENTS.md](https://github.com/yuqiangdede/mattpocock-PI/blob/main/AGENTS.md#parallel-stage-development-fork-exception)
 及[分支说明](../../../project/parallel-stage-development.md)；下文仅允许从
 main 启动任务、以 main 为 PR 目标和清理工作树的条款，对实验路线采用此例外。
 第一次实验前，阶段分支必须包含已合入 main 的本规则。

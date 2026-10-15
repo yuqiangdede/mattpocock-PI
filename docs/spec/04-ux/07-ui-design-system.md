@@ -1204,6 +1204,15 @@ padding that under the global `border-box` would leave a 12px content box for a
 | Backdrop | rgba(0,0,0,0.5) with `z-dialog` |
 | Close | Escape key + X button top-right |
 
+**Shared dismissal primitive:** `OverlayBackdrop`, exported from
+`components/ui.tsx`, renders the existing backdrop `div` and accepts its normal
+HTML attributes and close callback. It forwards a backdrop click only after a
+primary pointer press and release both target that backdrop; capture-phase
+origin tracking protects text selection across content boundaries and nested
+layers. It does not prevent selection or capture the pointer. Callers retain
+busy/saving guards and their existing Escape/close controls. Presses cancelled
+by pointer cancellation or window blur cannot dismiss the surface.
+
 ### 11.5 Tabs
 
 | Variant | Indicator |
@@ -1294,12 +1303,26 @@ Implementation: `components/ui.tsx → Checkbox`.
 
 | Property | Value |
 |---|---|
-| CSS class | `.ui-checkbox` |
+| CSS classes | `.ui-checkbox` (label), `.ds-checkbox` (native input) |
 | Anatomy | `<label> → <input type="checkbox"> + <span>{label}</span>` |
-| Props | Extends `InputHTMLAttributes` (minus `type`) + `label: ReactNode` |
+| Props | Extends `InputHTMLAttributes` (minus `type` and `ref`) + `label: ReactNode`, `indeterminate?: boolean` |
+| Paint | 18px rounded square, 8px label gap, token-based checked fill and checkmark; mixed state uses a dash |
+| Interaction | Native label activation and Space toggling, visible keyboard focus, whole-label disabled treatment; native paint in forced-colors mode |
 
 Every standalone labeled checkbox **must** use `Checkbox`. Inline
 `<label><input type="checkbox"/>…</label>` is prohibited.
+
+### 11.11a SettingsDisclosure
+
+Implementation: `components/settings/SettingsDisclosure.tsx`.
+
+Use native `<details>` / `<summary>` for low-frequency settings, with one
+localized title and a decorative chevron. It accepts native details attributes,
+children and `className`; `open` can seed or update the native state. Collapsed
+content stays mounted to retain drafts but is not keyboard-reachable. The
+shared summary has a minimum 44px row, token-based hover/focus treatment and
+reduced-motion-compatible chevron feedback. Errors, progress and approvals
+must remain outside optional disclosures.
 
 ### 11.11b CheckboxGroup
 

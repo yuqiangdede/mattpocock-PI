@@ -28,6 +28,7 @@ import type { PluginRuntime } from "../plugin-runtime";
 import { readSessionCollaboration } from "../services/session-collaboration";
 import { searchSessionsAcrossSources } from "../services/session-search";
 import type { IpcRegistrar } from "./types";
+import { getActiveRemoteHostsBoot } from "../bootstrap/remote-hosts.js";
 
 type RuntimeSession = {
   id?: string;
@@ -160,6 +161,7 @@ export function registerSessionIpc({
           source: "desktop",
         })),
         ...native.sessions,
+        ...(getActiveRemoteHostsBoot()?.sessionSummaries() ?? []),
       ].sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt))),
     };
   });
@@ -439,6 +441,7 @@ export function registerSessionIpc({
       const sessionId = String(input?.sessionId || "");
       if (!sessionId) throw new Error("sessionId required");
       rejectNativeMutation(sessionId, "transcript replacement");
+      await persistenceOutbox.prepareSessionReplacement(sessionId, () => host);
       // Drop the live pi-agent so the next prompt reseeds from the truncated
       // transcript instead of replaying the discarded branch in memory.
       if (sidecar) {

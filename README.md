@@ -2,7 +2,7 @@
 
 mattpocock-PI 是面向软件工程的 PI-Desktop 扩展，集成 [Matt Pocock Skills](https://github.com/mattpocock/skills) 与可配置 Coding Actions。
 
-当前定制版发布线：`0.20.x`；官方源码基线：`0.18.0`。
+当前定制版发布线：`0.20.x`；官方源码基线：`0.20.1`。
 
 ## 三阶段产品路线
 

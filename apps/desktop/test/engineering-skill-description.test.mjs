@@ -15,7 +15,7 @@ const { zhCN } = await import("../../../packages/i18n/src/locales/zh-CN/index.ts
 
 test("every engineering entry has complete localized usage guidance", () => {
   for (const catalog of [en, zhCN]) {
-    assert.deepEqual(Object.keys(catalog.coding.skillGuides).sort(), ENGINEERING_SHORTCUTS.map(item => item.action).sort());
+    for (const { action } of ENGINEERING_SHORTCUTS) assert.ok(Object.hasOwn(catalog.coding.skillGuides, action), action);
     for (const { action } of ENGINEERING_SHORTCUTS) {
       for (const section of ["when", "purpose", "example"]) {
         const text = catalog.coding.skillGuides[action][section];

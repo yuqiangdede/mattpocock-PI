@@ -1,7 +1,7 @@
 # Parallel Stage Development
 
 Date: 2026-10-11. Status: parallel branch setup; policy adoption through a main-targeted PR.
-Authority: [AGENTS.md](../../AGENTS.md#parallel-stage-development-fork-exception).
+Authority: [AGENTS.md](https://github.com/yuqiangdede/mattpocock-PI/blob/main/AGENTS.md#parallel-stage-development-fork-exception).
 
 | Ref | Role |
 | --- | --- |

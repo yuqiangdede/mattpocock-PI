@@ -1,0 +1,4 @@
+provider: github
+owner: yuqiangdede
+repo: mattpocock-PI
+updaterCacheDirName: '@pi-desktopdesktop-updater'

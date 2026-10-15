@@ -81,3 +81,13 @@ test("packaged resource resolver needs no user import or source-machine director
     assert.ok(loaded.body.length > 100);
   }
 });
+
+test("document Skills share built-in catalog activation and reject stale disabled loads", async () => {
+  const { builtinSkillCatalog, assertBuiltinSkillEnabled } = await import("../electron/main/builtin-skills.ts");
+  const id = "pi-desktop:requirements-spec";
+  assert.ok(builtinSkillCatalog().some(skill => skill.id === id));
+  assert.ok(!builtinSkills({ disabledIds: [id] }).some(skill => skill.id === id));
+  await assert.rejects(assertBuiltinSkillEnabled(id, async () => [id]), /disabled in Settings/);
+  await assertBuiltinSkillEnabled(id, async () => []);
+  assert.ok(builtinSkills({}).some(skill => skill.id === id));
+});

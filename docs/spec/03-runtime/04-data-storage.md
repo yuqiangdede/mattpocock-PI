@@ -132,8 +132,9 @@ to an absolute path before it reaches host-core as a child-process variable.
  ├── pi.sqlite.v9.bak     # exact readable backup before v9→v15 destructive work
  ├── pi.sqlite.v10.bak    # exact readable backup before v10→v15 destructive work
  ├── sessions/            # transcript file store (D119) — host-core only
- │    ├── <sessionId>.jsonl           # live transcript (header + messages)
- │    ├── <sessionId>.revisions.jsonl # regenerate branches, append-only
+│    ├── <sessionId>.jsonl           # live transcript (header + messages)
+│    ├── <sessionId>.jsonl.layout    # disposable, versioned byte-offset cache
+│    ├── <sessionId>.revisions.jsonl # regenerate branches, append-only
  │    └── <sessionId>.inflight.json   # streaming reply checkpoint (D299), transient
  ├── secrets/             # encrypted secret blobs + .machine-key (unchanged)
  ├── config-sync/         # encrypted sync base/pending bundles — host-core only
@@ -163,12 +164,15 @@ by path/hash.
 
 ### 1.3 Portable configuration sync
 
-Host-core stores sync configuration in the `configSync` key-value namespace.
-The vault key reference and WebDAV password use the existing encrypted secret
-store. `config-sync/base.bin` and `config-sync/pending.bin` are authenticated
-encrypted bundles replaced with temp-file rename; they are not renderer- or
-sidecar-readable files. Sync revisions and resources remain remote immutable
-objects and do not change the SQLite schema or transcript retention.
+Host Core stores S3 configuration at `configSyncS3/config` in the key-value
+store. Credentials and the vault key use existing encrypted secret storage.
+`config-sync/s3/<state-id>/base.bin` stores shared and observed baselines;
+`pending.bin` and local recovery points are also authenticated encrypted
+bundles replaced through temp-file rename. Connection or mode changes create
+a fresh state ID. The legacy `configSync` namespace, old credentials and old
+files are preserved, not migrated or deleted. Remote immutable objects remain
+indefinitely; only the mode-specific history index is capped at 30 revisions.
+This does not change the SQLite schema or transcript retention.
 
 ### 2.0 Message-owned review snapshots (ADR 0043)
 
@@ -357,7 +361,7 @@ CREATE TABLE kv (
 
 | ns | contents |
 |---|---|
-| `app` | the settings blob (`settings.get/set`), `currentProjectId`. Optional `networkProxy` (`mode`/`url`/`bypass`) is a JSON field in that blob; no schema version bump (D340) |
+| `app` | the settings blob (`settings.get/set`), `currentProjectId`. Optional `networkProxy` (`mode`/`url`/`bypass`) is a JSON field in that blob: `url`/`bypass` survive a switch to System or Direct and are applied only in Custom mode (issue #1541); no schema version bump (D340) |
 | `ui` | non-critical UI state the renderer asks the host to keep |
 | `cache` | model-refresh stamps, recent model refs (spec 13 §3) |
 | `plugin:<id>` | per-plugin settings; uninstall = `DELETE WHERE ns = ?` |
@@ -1412,26 +1416,38 @@ relationship or index. The renderer's unified reading view is shared by ordinary
 history and search; it never becomes canonical mutation or model input.
 
 A bounded window is served through a per-session **transcript layout**: the byte
-offset of every message and compaction line, plus the file length those offsets
-were recorded against. Serving a window then seeks to its first selected line
-instead of parsing the history in front of it, so the cost of opening a session
-is proportional to the window rather than to the conversation. Consequences:
+offset of every message and compaction line, plus the file identity and complete
+prefix length those offsets describe. Serving a window seeks to its first
+selected line instead of parsing the history in front of it, so the common
+cached read is proportional to the requested page. Consequences:
 
-- The layout is derived data, cached in memory and rebuilt by scanning the file.
-  Persisted layout caches require a verifiable, nonzero file identity. Platforms
-  without one (including Windows) neither load nor write these caches; legacy
-  zero-identity caches are ignored and the transcript is scanned instead. This
-  preserves valid UTF-8 reads after a non-tail message rewrite moves offsets.
-  Transcript/revision line readers omit invalid UTF-8 byte sequences from their
-  decoded view and log the skipped byte count without message content. Valid
-  Unicode (including literal U+FFFD) is retained, and offsets always count the
-  original bytes. Reading does not rewrite source files; a message update keeps
-  unrelated records' payload bytes with the existing newline normalization.
-  JSON/schema errors retain existing handling.
-  `file_len` is its validity token: the transcript is append-only between atomic
-  rewrites, so a longer file is scanned from the previous end and a shorter or
-  replaced file is rescanned in full. Every rewrite and delete path also drops
-  the cached entry, because a rewrite can land on an identical length.
+- The layout is derived data, cached in memory and, when reliable file identity
+  is available, in the sibling `<sessionId>.jsonl.layout` file. Unix uses the
+  device and inode; Windows uses the volume serial number and file ID. If the
+  filesystem cannot provide a reliable identity, the host skips the disk cache
+  and scans the transcript normally.
+- The disk cache has an explicit format version and validates its identity,
+  checksum, counts, globally increasing in-range offsets, and the complete-line
+  prefix before reuse. Missing, old, unknown, corrupt, or mismatched caches are
+  ignored and rebuilt from the JSONL source. Cache read/write failures are
+  diagnostic only and do not make the session unreadable.
+- A matching identity and complete prefix permits append-only incremental
+  scanning. A transcript rewrite invalidates both in-memory and disk layouts
+  only after its atomic replacement succeeds; delete also removes both. Cache
+  invalidation stays in transcript rewrite/delete ownership, not the generic
+  atomic-swap helper used by unrelated files.
+- A point read that finds an invalid indexed line boundary drops both cache
+  layers, scans the complete transcript without consulting the disk cache, and
+  retries once with message counts, page ranges, and message location recomputed
+  from the rebuilt layout. A real JSON, UTF-8, or I/O error from that complete
+  scan remains an error; the transcript is never rewritten or repaired by
+  replacing bytes or skipping messages.
+- New cache files use a nonnumeric version header that older parsers safely
+  reject and rebuild. Downgrading to an older app preserves the transcript and
+  database, though that app's own cache defect may recur. No database or
+  transcript migration is involved.
+
+- Transcript/revision readers omit invalid UTF-8 bytes from the decoded view and log only byte counts; offsets count original bytes. Valid Unicode is retained.
 - A torn trailing line (crash mid-append) is excluded from both the offsets and
   `file_len`, so a later refresh picks it up once the writer completes it.
 - Line classification reads the `type` discriminator with a single depth-aware
@@ -1722,7 +1738,16 @@ no-op against that remapped row. The outbox treats
 `UNIQUE constraint failed: messages.id` as an ack and keeps draining (D444).
 A permanently rejected append whose host error carries a `PERMISSION_DENIED:`
 prefix is likewise dropped so the FIFO can continue; `PLUGIN_PERMISSION_DENIED`
-and other host failures still pause (D597). When the 1024-entry cap remains
+and other host failures still pause while their retry budget lasts (D597). A
+failure the outbox cannot classify is retried within the same host generation
+on a bounded backoff (5s doubling to 60s) and quarantined after five
+consecutive failures into `session-message-outbox.dead-letter.json` (newest 256
+appends, oldest discarded first), carrying its payload, session id, timestamp,
+and host error, so one unclassifiable head cannot starve every session's writes
+(D656). A restarted host is a new generation and retries the head at once.
+Quarantined appends are never replayed automatically, and `session.delete`
+drops that session's quarantined appends too.
+When the 1024-entry cap remains
 full after a flush attempt, enqueue logs the rejected key/session and rejects;
 it does not report that entry as queued. Generic foreign-key errors are not
 treated as acknowledgements. Steering into a claimed collaboration delivery

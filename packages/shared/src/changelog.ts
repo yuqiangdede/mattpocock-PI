@@ -30,6 +30,13 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+  "version": "0.20.1",
+  "date": "2026-10-15",
+  "highlights": [
+    "Integrate PI-Desktop 0.20.1: remote workspaces, built-in Skill controls, provider setup and transcript reliability fixes, preserving Matt workflows and manual updates."
+  ]
+},
+  {
     version: "0.20.0",
     date: "2026-10-15",
     highlights: [
@@ -974,6 +981,13 @@ const enEntries: ChangelogEntry[] = [
 
 const zhCNEntries: ChangelogEntry[] = [
   {
+  "version": "0.20.1",
+  "date": "2026-10-15",
+  "highlights": [
+    "接入 PI-Desktop 0.20.1：远程工作区、内置技能开关、模型配置与历史记录稳定性修复，保留 Matt 工作流和手动更新。"
+  ]
+},
+  {
     version: "0.20.0",
     date: "2026-10-15",
     highlights: [
@@ -1917,6 +1931,13 @@ const zhCNEntries: ChangelogEntry[] = [
 ];
 
 const zhTWEntries: ChangelogEntry[] = [
+  {
+  "version": "0.20.1",
+  "date": "2026-10-15",
+  "highlights": [
+    "接入 PI-Desktop 0.20.1：遠端工作區、內建技能開關、模型設定與歷史記錄穩定性修復，保留 Matt 工作流程和手動更新。"
+  ]
+},
   {
     version: "0.20.0",
     date: "2026-10-15",

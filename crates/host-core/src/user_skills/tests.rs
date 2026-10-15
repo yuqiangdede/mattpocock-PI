@@ -118,6 +118,62 @@ fn capability_state_is_not_written_into_skill_documents() {
 }
 
 #[test]
+fn builtin_activation_defaults_on_persists_and_is_separate_from_scanned_skills() {
+    let app = tempdir().unwrap();
+    let agents = tempdir().unwrap();
+    let mut registry = UserSkillRegistry::new(app.path());
+    assert!(registry.disabled_builtins().is_empty());
+
+    registry
+        .set_builtin_enabled("pi-desktop/imagegen", false)
+        .unwrap();
+    assert_eq!(
+        registry.disabled_builtins(),
+        vec!["pi-desktop/imagegen".to_string()]
+    );
+
+    test_support::with_global_agents(agents.path(), || {
+        registry.list(CapabilityLevel::Global, None).unwrap();
+    });
+    let mut reopened = UserSkillRegistry::new(app.path());
+    test_support::with_global_agents(agents.path(), || {
+        reopened.list(CapabilityLevel::Global, None).unwrap();
+    });
+    assert_eq!(
+        reopened.disabled_builtins(),
+        vec!["pi-desktop/imagegen".to_string()]
+    );
+    assert!(app
+        .path()
+        .join("agent-capabilities/skill-builtins.json")
+        .is_file());
+
+    reopened
+        .set_builtin_enabled("pi-desktop/imagegen", true)
+        .unwrap();
+    assert!(reopened.disabled_builtins().is_empty());
+}
+
+#[test]
+fn builtin_activation_rejects_invalid_ids() {
+    let app = tempdir().unwrap();
+    let mut registry = UserSkillRegistry::new(app.path());
+    for id in [
+        "",
+        "imagegen",
+        "PI-Desktop/imagegen",
+        "pi-desktop/",
+        "pi-desktop/imagegen/extra",
+    ] {
+        assert!(
+            registry.set_builtin_enabled(id, false).is_err(),
+            "accepted {id:?}"
+        );
+    }
+    assert!(registry.disabled_builtins().is_empty());
+}
+
+#[test]
 fn import_uses_parent_directory_when_name_is_not_ascii() {
     let app = tempdir().unwrap();
     let source_dir = app.path().join("incoming/code-review");
@@ -900,4 +956,17 @@ fn directory_skill_package_rejects_traversal() {
         .to_string();
     assert!(error.contains("SKILL_INVALID"));
     assert!(!app.path().join("outside.txt").exists());
+}
+
+#[test]
+fn document_builtin_activation_survives_restart() {
+    let dir = tempfile::tempdir().unwrap();
+    let id = "pi-desktop:requirements-spec";
+    let mut registry = UserSkillRegistry::new(dir.path());
+    registry.set_builtin_enabled(id, false).unwrap();
+    assert_eq!(registry.disabled_builtins(), vec![id.to_string()]);
+    let mut reopened = UserSkillRegistry::new(dir.path());
+    assert_eq!(reopened.disabled_builtins(), vec![id.to_string()]);
+    reopened.set_builtin_enabled(id, true).unwrap();
+    assert!(reopened.disabled_builtins().is_empty());
 }

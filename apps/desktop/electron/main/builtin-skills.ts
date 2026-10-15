@@ -88,7 +88,25 @@ export type BuiltinSkillInput = {
   workspacePath?: string | null;
   /** Directories of currently loaded plugins, used to detect a dev workspace. */
   pluginPaths?: string[];
+  /** User-disabled ids are withheld from the agent and composer catalog. */
+  disabledIds?: readonly string[];
 };
+
+const BUILTIN_SKILL_FILES = [
+  [IMAGE_GENERATION_SKILL_ID, IMAGE_GENERATION_SKILL_FILE],
+  [PLUGIN_DEV_SKILL_ID, PLUGIN_DEV_SKILL_FILE],
+  ...Object.entries(DOCUMENT_SKILL_FILES),
+] as const;
+
+/** All bundled skill entries, including ones whose applicability is conditional. */
+export function builtinSkillCatalog(): PluginSkillDef[] {
+  return BUILTIN_SKILL_FILES.flatMap(([id, file]) => {
+    const raw = readBuiltinSkill(file);
+    if (!raw?.raw.trim()) return [];
+    const parsed = parseSkillFrontmatter(raw.raw);
+    return parsed.body ? [{ id, name: parsed.name ?? id, description: parsed.description }] : [];
+  });
+}
 
 /**
  * Catalog entries for the built-in skills that apply to the given session, read
@@ -97,13 +115,22 @@ export type BuiltinSkillInput = {
 export function builtinSkills(input: BuiltinSkillInput): PluginSkillDef[] {
   const ids = [IMAGE_GENERATION_SKILL_ID, ...Object.keys(DOCUMENT_SKILL_FILES)];
   if (isPluginWorkspace(input.workspacePath, input.pluginPaths)) ids.push(PLUGIN_DEV_SKILL_ID);
-  return ids.flatMap((id) => {
-    const file = DOCUMENT_SKILL_FILES[id] ?? (id === IMAGE_GENERATION_SKILL_ID ? IMAGE_GENERATION_SKILL_FILE : PLUGIN_DEV_SKILL_FILE);
-    const raw = readBuiltinSkill(file);
-    if (!raw?.raw.trim()) return [];
-    const parsed = parseSkillFrontmatter(raw.raw);
-    return parsed.body ? [{ id, name: parsed.name ?? id, description: parsed.description }] : [];
-  });
+  const activeIds = new Set(ids);
+  const disabled = new Set(input.disabledIds ?? []);
+  return builtinSkillCatalog().filter(
+    (skill) => activeIds.has(skill.id) && !disabled.has(skill.id),
+  );
+}
+
+/** Refuse a stale on-demand load after a bundled skill has been switched off. */
+export async function assertBuiltinSkillEnabled(
+  id: string,
+  loadDisabledIds: () => Promise<string[]>,
+): Promise<void> {
+  if (!BUILTIN_SKILL_FILES.some(([skillId]) => skillId === id)) return;
+  if ((await loadDisabledIds()).includes(id)) {
+    throw new Error(`Built-in skill "${id}" is disabled in Settings`);
+  }
 }
 
 /**

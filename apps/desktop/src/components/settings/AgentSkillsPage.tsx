@@ -4,6 +4,7 @@ import {
   GLOBAL_SCOPE,
   showEngineeringSkillEntry,
   type AgentCapabilityLevel,
+  type BuiltinSkillRecord,
   type UserSkillRecord,
 } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
@@ -62,18 +63,20 @@ type SkillEditorState = {
 };
 
 type SkillCollection = {
+  builtins: BuiltinSkillRecord[];
   global: UserSkillRecord[];
   project: UserSkillRecord[];
 };
 
-const EMPTY_SKILL_COLLECTION: SkillCollection = { global: [], project: [] };
+const EMPTY_SKILL_COLLECTION: SkillCollection = { builtins: [], global: [], project: [] };
 
 export function AgentSkillsPage() {
   const { t } = useTranslation();
   const showToast = useAppStore((state) => state.showToast);
   const { selectedProjectPath, setSelectedProjectPath, options } = useAgentProjects();
   const fetchSkills = useCallback(async (): Promise<SkillCollection> => {
-    const [global, project] = await Promise.all([
+    const [builtins, global, project] = await Promise.all([
+      api.listBuiltinSkills(),
       api.listUserSkills({
         level: "global",
         ...(selectedProjectPath ? { projectPath: selectedProjectPath } : {}),
@@ -82,10 +85,14 @@ export function AgentSkillsPage() {
         ? api.listUserSkills({ level: "project", projectPath: selectedProjectPath })
         : Promise.resolve({ skills: [] as UserSkillRecord[] }),
     ]);
-    return { global: global.skills ?? [], project: project.skills ?? [] };
+    return {
+      builtins: builtins.builtins ?? [],
+      global: global.skills ?? [],
+      project: project.skills ?? [],
+    };
   }, [selectedProjectPath]);
   const {
-    data: { global: globalSkills, project: projectSkills },
+    data: { builtins: builtinSkills, global: globalSkills, project: projectSkills },
     setData: setSkills,
     loading,
     refreshing,
@@ -105,6 +112,14 @@ export function AgentSkillsPage() {
   const { armed, setArmed } = useArmedDelete();
 
   const rowKey = (level: AgentCapabilityLevel, id: string) => `${level}:${id}`;
+  const builtinRowKey = (id: string) => `builtin:${id}`;
+
+  const patchBuiltin = (id: string, patch: Partial<BuiltinSkillRecord>) => {
+    setSkills((current) => ({
+      ...current,
+      builtins: current.builtins.map((row) => (row.id === id ? { ...row, ...patch } : row)),
+    }));
+  };
 
   const patchRow = (
     level: AgentCapabilityLevel,
@@ -142,6 +157,28 @@ export function AgentSkillsPage() {
       );
     } catch (error) {
       patchRow(level, skill.id, { enabled: skill.enabled });
+      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const toggleBuiltin = async (skill: BuiltinSkillRecord) => {
+    const key = builtinRowKey(skill.id);
+    if (busyId === key) return;
+    const next = !skill.enabled;
+    setBusyId(key);
+    patchBuiltin(skill.id, { enabled: next });
+    try {
+      await api.setBuiltinSkillEnabled(skill.id, next);
+      showToast(
+        t(next ? "settings.capabilityEnabled" : "settings.capabilityDisabled", {
+          name: skill.name || skill.id,
+        }),
+        { variant: "success" },
+      );
+    } catch (error) {
+      patchBuiltin(skill.id, { enabled: skill.enabled });
       showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
     } finally {
       setBusyId(null);
@@ -289,15 +326,19 @@ export function AgentSkillsPage() {
   const visible = useMemo(() => {
     const match = (skill: UserSkillRecord) =>
       showEngineeringSkillEntry(skill.id, search, showAllSkills) && matchesCapabilitySearch(search, skill.name, skill.id, skill.description);
+    const matchBuiltin = (skill: BuiltinSkillRecord) =>
+      matchesCapabilitySearch(search, skill.name, skill.id, skill.description);
     return {
+      builtins: builtinSkills.filter(matchBuiltin),
       global: globalSkills.filter(match),
       project: projectSkills.filter(match),
     };
-  }, [globalSkills, projectSkills, search, showAllSkills]);
+  }, [builtinSkills, globalSkills, projectSkills, search, showAllSkills]);
+
 
   const counts = {
-    all: visible.global.length + visible.project.length,
-    global: visible.global.length,
+    all: visible.builtins.length + visible.global.length + visible.project.length,
+    global: visible.builtins.length + visible.global.length,
     project: visible.project.length,
   };
 
@@ -467,6 +508,34 @@ export function AgentSkillsPage() {
     );
   };
 
+  const renderBuiltinRow = (skill: BuiltinSkillRecord) => {
+    const key = builtinRowKey(skill.id);
+    const name = skill.name || skill.id;
+    const busy = busyId === key;
+    return (
+      <CapabilityRow
+        key={key}
+        glyph={<IconBookOpen size={16} />}
+        name={name}
+        off={!skill.enabled}
+        badges={
+          <span className="agent-capability-badge is-level">
+            {t("settings.builtin")}
+          </span>
+        }
+        description={skill.description || t("settings.noCapabilityDescription")}
+        actions={
+          <CapabilityToggle
+            checked={skill.enabled}
+            busy={busy}
+            label={t("settings.toggleCapability", { name })}
+            onChange={() => void toggleBuiltin(skill)}
+          />
+        }
+      />
+    );
+  };
+
   const showGlobal = filter !== "project";
   const showProject = filter !== "global";
   const newSkillTitle =
@@ -600,6 +669,11 @@ export function AgentSkillsPage() {
           <>
             {showGlobal ? (
               <>
+                <CapabilityGroupHeader
+                  label={t("settings.builtinSkills")}
+                  count={visible.builtins.length}
+                />
+                {visible.builtins.map(renderBuiltinRow)}
                 <CapabilityGroupHeader
                   label={t("settings.globalLevel")}
                   path={visible.global.some((skill) => skill.source === "bundled") ? undefined : GLOBAL_SKILLS_PATH}

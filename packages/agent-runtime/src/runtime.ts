@@ -18,6 +18,7 @@ import { todoWriteDescription, todoWriteParameters } from "./todo-tool.js";
 import { createJevClassifierTool } from "./jev-classifier-tool.js";
 import { scheduledToolParameters, scheduledToolDescriptions } from "./scheduled-tools.js";
 import { withPiFileOpToolNames } from "./pi-file-ops.js";
+import { remoteMutationIdentity } from "./remote-workspace.js";
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import {
@@ -110,7 +111,9 @@ import {
   formatSessionMessage,
   hostedSearchFromMessage,
   isCommandShellOption,
+  isAskToolQuestionWithinLimit,
   isToolsOutputParams,
+  MAX_ASK_TOOL_QUESTION_CHARS,
   MAX_SUBAGENT_CONCURRENCY,
   normalizeAskToolOption,
   normalizeSubagentName,
@@ -977,6 +980,8 @@ export type AgentRuntimeOptions = {
   customSystemPrompt?: CustomSystemPrompt;
   /** Session-bound workspace root used for path-scoped instruction requests. */
   projectPath?: string;
+  /** Remote tool root. Model requests and runtime state remain on this machine. */
+  remoteWorkspace?: { hostKey: string; path: string };
   /** Instructions resolved from the session's workspace. */
   projectInstructions?: ProjectInstructions;
   /** Durable project context loaded from host-owned project memory. */
@@ -1044,6 +1049,8 @@ export type RuntimeMatchConfig = {
   projectInstructions?: ProjectInstructions;
   projectMemory?: string;
   projectPath?: string;
+  /** Remote tool root. Model requests and runtime state remain on this machine. */
+  remoteWorkspace?: { hostKey: string; path: string };
   commandShell: CommandShellOption;
   subagents?: SubagentDefinition[];
   subagentProviders?: Record<string, RuntimeProviderConfig>;
@@ -1503,6 +1510,58 @@ function selectRetainedUserMessages(
   return selected.reverse();
 }
 
+/**
+ * Model-visible text for one host tool content block. Besides plain `text`
+ * blocks, MCP servers return file bodies as embedded text resources and large
+ * payloads as resource links (github-mcp-server `get_file_contents` sends a
+ * status line plus one of these), so dropping them next to a sibling text
+ * block hides the actual result from the model. Binary resources and other
+ * block kinds have no text to show and stay out of the text channel.
+ */
+function hostContentBlockText(block: unknown): string | undefined {
+  if (!isRecord(block)) return undefined;
+  if (block.type === "text" && typeof block.text === "string") return block.text;
+  if (
+    block.type === "resource" &&
+    isRecord(block.resource) &&
+    typeof block.resource.text === "string"
+  ) {
+    return block.resource.text;
+  }
+  if (block.type === "resource_link" && typeof block.uri === "string") {
+    const name = typeof block.name === "string" && block.name.trim()
+      ? `${block.name.trim()}: `
+      : "";
+    return `[resource link] ${name}${block.uri}`;
+  }
+  return undefined;
+}
+
+/**
+ * JSON text fallback for a host result that produced no text blocks. Image
+ * `data` and resource `blob` bytes stay off the text channel; type, mimeType,
+ * and uri remain so the model still sees what was attached.
+ */
+function withoutInlineBinary(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((entry) => withoutInlineBinary(entry));
+  if (!isRecord(value)) return value;
+  const next: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (key === "data" && value.type === "image") continue;
+    if (key === "resource" && value.type === "resource" && isRecord(entry)) {
+      const resource: Record<string, unknown> = {};
+      for (const [resourceKey, resourceValue] of Object.entries(entry)) {
+        if (resourceKey === "blob") continue;
+        resource[resourceKey] = withoutInlineBinary(resourceValue);
+      }
+      next.resource = resource;
+      continue;
+    }
+    next[key] = withoutInlineBinary(entry);
+  }
+  return next;
+}
+
 /** Rebuild a pi-ai tool result from a persisted tool row. Rows that never
  * finished (app quit / abort mid-tool) restore as errored results so the
  * model knows the call produced nothing. Exported for tests. */
@@ -1743,6 +1802,7 @@ export class DesktopAgentRuntime {
   private activationHydrated = false;
   private scratchDir?: string;
   private projectPath?: string;
+  private remoteWorkspace?: { hostKey: string; path: string };
   private commandShell: CommandShellOption;
   private baseProjectInstructions?: ProjectInstructions;
   private projectInstructions?: ProjectInstructions;
@@ -1873,6 +1933,8 @@ export class DesktopAgentRuntime {
   private turnEpoch = 0;
   private compactionAbort?: AbortController;
   private compactionInProgress = false;
+  /** Runtime operations that own a durable turn until their async cleanup ends. */
+  private readonly activeTurnSettlements = new Map<string, Promise<void>>();
   /** The in-flight checkpoint was cut short by Stop/dispose, not by a failure. */
   private compactionAborted = false;
   /** Set by the `new_context` tool, consumed at the next turn boundary. */
@@ -1922,8 +1984,9 @@ export class DesktopAgentRuntime {
       });
     }
     this.commandShell = opts.commandShell;
-    this.scratchDir = opts.scratchDir;
-    this.projectPath = opts.projectPath?.trim() || undefined;
+    this.remoteWorkspace = opts.remoteWorkspace;
+    this.scratchDir = opts.remoteWorkspace ? undefined : opts.scratchDir;
+    this.projectPath = opts.remoteWorkspace?.path ?? (opts.projectPath?.trim() || undefined);
     this.customSystemPrompt = opts.customSystemPrompt;
     this.baseProjectInstructions = opts.projectInstructions;
     this.projectInstructions = opts.projectInstructions;
@@ -2038,6 +2101,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
                       : undefined;
                   },
                 ),
+                this.provider.authKind,
               ),
               onResponse: async (response, responseModel) => {
                 this.providerResponseStatus = response.status;
@@ -2584,7 +2648,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       safeJson(this.customSystemPrompt ?? null) ===
         safeJson(config.customSystemPrompt ?? null) &&
       (this.projectMemory ?? "") === (config.projectMemory?.trim() ?? "") &&
-      (this.projectPath ?? "") === (config.projectPath?.trim() ?? "") &&
+      (this.projectPath ?? "") === (config.remoteWorkspace?.path ?? config.projectPath?.trim() ?? "") &&
+      safeJson(this.remoteWorkspace ?? null) === safeJson(config.remoteWorkspace ?? null) &&
       // Editing `~/.agents/subagents/*.md` must reach the next prompt. Definition
       // bodies are part of the `Task` tool's behavior, so unlike skills they
       // are compared in full.
@@ -2753,6 +2818,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     return {
       sessionId: this.sessionId,
       cwd: this.extensionCwd(),
+      remoteWorkspace: Boolean(this.remoteWorkspace),
       getModel: () => runtime.model,
       setModel: (model, signal) => runtime.setExtensionModel(model, signal),
       modelRegistry: runtime.extensionModelRegistry(),
@@ -3133,7 +3199,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         case "TodoWrite":
           return todoWriteDescription;
         case ASK_TOOL_NAME:
-          return "Ask the user one or more questions. Use Markdown in question text and option labels when formatting helps (for example, emphasis, inline code, or lists); the desktop card renders it safely. Plain strings and existing `{ label, description? }` options are accepted; descriptions remain plain text and answers return the selected source label. The card always provides a custom user-input option.";
+          return `Ask the user one or more questions. Keep each question to ${MAX_ASK_TOOL_QUESTION_CHARS} characters or fewer. Use Markdown in question text and option labels when formatting helps (for example, emphasis, inline code, or lists); the desktop card renders it safely. Plain strings and existing { label, description? } options are accepted; descriptions remain plain text and answers return the selected source label. The card always provides a custom user-input option.`;
         case "PluginScaffold":
           return "Create a PI-Desktop plugin from a template and load it for development. `directory` is workspace-relative and must be empty or new; `template` is one of panel-basic, agent-tool-basic, skill-pack, full-demo. Use this instead of hand-writing plugin files.";
         case "PluginCheck":
@@ -3265,7 +3331,9 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         onUpdate,
       ) => {
         const mutationPath = PATH_MUTATING_TOOLS.has(toolName) && isRecord(params) && typeof params.path === "string"
-          ? await mutationFailureKey(params.path, this.projectPath ?? this.scratchDir)
+          ? this.remoteWorkspace
+            ? remoteMutationIdentity(this.remoteWorkspace, params.path)
+            : await mutationFailureKey(params.path, this.projectPath ?? this.scratchDir)
           : undefined;
         await this.loadPathInstructions(toolName, params);
         const isBash = toolName === "Bash";
@@ -3546,24 +3614,26 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           // and hand images to the model instead of stringifying (#1360).
           const textParts: string[] = [];
           for (const block of rawContent) {
-            if (isRecord(block) && block.type === "text" && typeof block.text === "string") {
-              textParts.push(block.text);
-            }
+            const blockText = hostContentBlockText(block);
+            if (blockText !== undefined) textParts.push(blockText);
           }
           collectImageBlocks(rawContent);
-          text = textParts.join("\n") || JSON.stringify(rawContent, null, 2);
+          text =
+            textParts.join("\n") ||
+            JSON.stringify(withoutInlineBinary(rawContent), null, 2);
           details = { blocks: rawContent, imageCount: imageBlocks.length };
         } else if (isRecord(rawContent) && Array.isArray(rawContent.content)) {
           // MCP tools return `content: [{ type: "image" | "text", ... }]`.
           const contentBlocks = rawContent.content;
           const textParts: string[] = [];
           for (const block of contentBlocks) {
-            if (isRecord(block) && block.type === "text" && typeof block.text === "string") {
-              textParts.push(block.text);
-            }
+            const blockText = hostContentBlockText(block);
+            if (blockText !== undefined) textParts.push(blockText);
           }
           collectImageBlocks(contentBlocks);
-          text = textParts.join("\n") || JSON.stringify(rawContent, null, 2);
+          text =
+            textParts.join("\n") ||
+            JSON.stringify(withoutInlineBinary(rawContent), null, 2);
           details = { ...rawContent, imageCount: imageBlocks.length };
         } else if (isRecord(rawContent) && Array.isArray(rawContent.images)) {
           text =
@@ -3637,7 +3707,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       parameters: Type.Object({
         questions: Type.Array(
           Type.Object({
-            question: Type.String(),
+            question: Type.String({ maxLength: MAX_ASK_TOOL_QUESTION_CHARS }),
             options: Type.Array(
               Type.Union([
                 Type.String(),
@@ -3659,7 +3729,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             content: [
               {
                 type: "text",
-                text: `${ASK_TOOL_NAME} requires one or more questions, each with a question and at least one option.`,
+                text: `${ASK_TOOL_NAME} requires 1–20 questions. Each question must contain 1–${MAX_ASK_TOOL_QUESTION_CHARS} characters and at least one option.`,
               },
             ],
             details: { errorCode: "ASKTOOL_INVALID_ARGUMENT" },
@@ -5222,7 +5292,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       name: SUBAGENT_WAIT_TOOL_NAME,
       label: "Task Wait",
       description:
-        "Wait for one or more subagents started by Task and return their reports. `delegationIds` defaults to every running subagent; use mode \"any\" with `minCompleted` to converge as soon as the first (or first N) finish. Settled delegations return immediately, so re-reading a report by id is cheap. A wait timeout is not a failure: unfinished delegates keep working and the runtime delivers their reports when they finish.",
+        "Wait for one or more subagents started by Task and return their reports. `delegationIds` defaults to every running subagent; use mode \"any\" with `minCompleted` to converge as soon as the first (or first N) finish. Settled delegations return immediately, so re-reading a report by id is cheap. New user input interrupts the wait without canceling delegates; handle it before waiting again. A wait timeout is not a failure: unfinished delegates keep working and the runtime delivers their reports when they finish.",
       parameters: Type.Object({
         delegationIds: Type.Optional(
           Type.Array(
@@ -5289,17 +5359,24 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             : Math.min(Math.max(minCompleted, 1), targets.length);
         const deadline = Date.now() + timeoutSeconds * 1000;
         this.beginDelegationWait(targets);
+        const waitAbort = new AbortController();
+        this.steeringWaitAbort = waitAbort;
         let timedOut = false;
         try {
-          timedOut = await this.waitForDelegations(
-            targets,
-            targetCompleted,
-            deadline,
-            signal,
-          );
+          if (!this.pendingSteering.size) {
+            timedOut = await this.waitForDelegations(
+              targets,
+              targetCompleted,
+              deadline,
+              signal ? AbortSignal.any([signal, waitAbort.signal]) : waitAbort.signal,
+            );
+          }
         } finally {
+          if (this.steeringWaitAbort === waitAbort) this.steeringWaitAbort = undefined;
           this.endDelegationWait();
         }
+        const interrupted = this.pendingSteering.size > 0 && !signal?.aborted &&
+          !this.runCancelled && !this.disposed && !this.turnHadError;
         // A settled report included in this bounded result reached the parent;
         // the idle resume must not deliver it a second time. Omitted reports
         // stay pending so the idle resume can deliver them later. Running
@@ -5322,14 +5399,16 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
               ? formatDelegationHeartbeat(record)
               : (record.result?.report ?? `(${record.status} without a report)`),
         }));
-        const note = timedOut
-          ? `Still running after ${timeoutSeconds}s: ${results.filter((r) => r.status !== "running").length}/${targets.length} finished. This is not a failure — unfinished delegates keep working and the runtime will deliver their reports when they finish. Call TaskStop only to cancel.\n${targets
-              .filter((record) => record.status === "running")
-              .map(formatDelegationHeartbeat)
-              .join("\n")}`
-          : mode === "any"
-            ? `Converged after ${results.filter((r) => r.status !== "running").length} of ${targets.length} finished.`
-            : undefined;
+        const note = interrupted
+          ? "Interrupted by new user input. Unfinished subagents keep working; handle the user's message before waiting again."
+          : timedOut
+            ? `Still running after ${timeoutSeconds}s: ${results.filter((r) => r.status !== "running").length}/${targets.length} finished. This is not a failure — unfinished delegates keep working and the runtime will deliver their reports when they finish. Call TaskStop only to cancel.\n${targets
+                .filter((record) => record.status === "running")
+                .map(formatDelegationHeartbeat)
+                .join("\n")}`
+            : mode === "any"
+              ? `Converged after ${results.filter((r) => r.status !== "running").length} of ${targets.length} finished.`
+              : undefined;
         const unknownNote =
           unknownIds.length > 0
             ? `Unknown delegation ids (not found in this session): ${unknownIds.join(", ")}.`
@@ -5354,7 +5433,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             },
           ],
           details: {
-            status: timedOut ? "timeout" : "completed",
+            status: interrupted ? "interrupted" : timedOut ? "timeout" : "completed",
             ...(unknownIds.length ? { unknownIds } : {}),
             delegations: results,
           },
@@ -5377,6 +5456,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     const settledCount = () =>
       targets.filter((record) => record.status !== "running").length;
     if (settledCount() >= targetCompleted) return Promise.resolve(false);
+    if (signal?.aborted) return Promise.resolve(true);
     return new Promise<boolean>((resolve) => {
       let done = false;
       const finish = (timedOut: boolean) => {
@@ -5755,6 +5835,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     for (const raw of params.questions) {
       if (!isRecord(raw)) return undefined;
       const question = typeof raw.question === "string" ? raw.question.trim() : "";
+      if (!question || !isAskToolQuestionWithinLimit(question)) return undefined;
       const options: AskToolQuestion["options"] = [];
       const seenLabels = new Set<string>();
       if (Array.isArray(raw.options)) {
@@ -5767,7 +5848,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           options.push(option);
         }
       }
-      if (!question || options.length === 0) return undefined;
+      if (options.length === 0) return undefined;
       questions.push({
         question,
         options,
@@ -5849,7 +5930,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     toolName: string,
     params: unknown,
   ): Promise<void> {
-    if (!PATH_SCOPED_INSTRUCTION_TOOLS.has(toolName)) {
+    if (this.remoteWorkspace || !PATH_SCOPED_INSTRUCTION_TOOLS.has(toolName)) {
       return undefined;
     }
     const path = isRecord(params) && typeof params.path === "string"
@@ -7732,6 +7813,15 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             this.progressTurnRerunInProgress
               ? this.currentAssistant
               : undefined;
+          const requestWaitMs =
+            this.requestStartedAt !== undefined
+              ? Math.max(0, Date.now() - this.requestStartedAt)
+              : undefined;
+          const cumulativeProviderWaitMs =
+            requestWaitMs !== undefined ||
+            retryingAssistant?.providerWaitMs !== undefined
+              ? (retryingAssistant?.providerWaitMs ?? 0) + (requestWaitMs ?? 0)
+              : undefined;
           const initialText =
             content.hasText && content.text.length > 0
               ? content.text
@@ -7749,6 +7839,12 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             status: "streaming",
             modelId: this.provider.modelId,
             providerId: this.provider.id,
+            ...(retryingAssistant?.modelStreamDurationMs !== undefined
+              ? { modelStreamDurationMs: retryingAssistant.modelStreamDurationMs }
+              : {}),
+            ...(cumulativeProviderWaitMs !== undefined
+              ? { providerWaitMs: cumulativeProviderWaitMs }
+              : {}),
           };
           if (retryingAssistant) {
             // Keep one visible assistant bubble across the bounded retry. The
@@ -7923,6 +8019,9 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             this.streamStartedAt !== undefined
               ? Math.max(0, endedAt - this.streamStartedAt)
               : undefined;
+          const modelStreamDurationMs =
+            (this.currentAssistant.modelStreamDurationMs ?? 0) +
+            (streamMs ?? 0);
           if (classifiedError) {
             classifiedError = this.providerErrorWithDiagnostics(
               classifiedError,
@@ -7970,6 +8069,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
               status: "streaming",
               modelId: this.provider.modelId,
               providerId: this.provider.id,
+              ...(streamMs !== undefined ? { modelStreamDurationMs } : {}),
               ...(usage ? { usage } : {}),
             };
             this.emit({ type: "message_update", message: this.currentAssistant });
@@ -8017,6 +8117,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
               status: "streaming",
               modelId: this.provider.modelId,
               providerId: this.provider.id,
+              ...(streamMs !== undefined ? { modelStreamDurationMs } : {}),
               ...(usage ? { usage } : {}),
             };
             this.emit({ type: "message_update", message: this.currentAssistant });
@@ -8042,6 +8143,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
               status: "streaming",
               modelId: this.provider.modelId,
               providerId: this.provider.id,
+              ...(streamMs !== undefined ? { modelStreamDurationMs } : {}),
               ...(usage ? { usage } : {}),
             };
             this.emit({ type: "message_update", message: this.currentAssistant });
@@ -8075,6 +8177,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
               status: "streaming",
               modelId: this.provider.modelId,
               providerId: this.provider.id,
+              ...(streamMs !== undefined ? { modelStreamDurationMs } : {}),
               ...(usage ? { usage } : {}),
             };
             this.emit({ type: "message_update", message: this.currentAssistant });
@@ -8112,6 +8215,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             providerId: this.provider.id,
             ...(usage ? { usage } : {}),
             ...(responseDurationMs !== undefined ? { responseDurationMs } : {}),
+            ...(streamMs !== undefined ? { modelStreamDurationMs } : {}),
             ...(responseOutputTokens !== undefined
               ? { responseOutputTokens }
               : {}),
@@ -8333,6 +8437,9 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         this.streamStartedAt !== undefined
           ? Math.max(0, Date.now() - this.streamStartedAt)
           : undefined;
+      const modelStreamDurationMs =
+        (this.currentAssistant.modelStreamDurationMs ?? 0) +
+        (responseDurationMs ?? 0);
       const responseOutputTokens =
         status === "aborted"
           ? estimateVisibleResponseOutputTokens(this.currentAssistant)
@@ -8341,6 +8448,9 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         ...this.currentAssistant,
         status,
         ...(responseDurationMs !== undefined ? { responseDurationMs } : {}),
+        ...(responseDurationMs !== undefined
+          ? { modelStreamDurationMs }
+          : {}),
         ...(responseOutputTokens !== undefined
           ? { responseOutputTokens }
           : {}),
@@ -8402,7 +8512,15 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         errorCode: "TURN_NOT_FOUND",
       });
     }
+    return this.trackTurnOperation(durableTurnId, () =>
+      this.executeApprovedPlanTurn(execution, durableTurnId),
+    );
+  }
 
+  private async executeApprovedPlanTurn(
+    execution: PlanExecution,
+    durableTurnId: string,
+  ): Promise<{ turnId: string }> {
     // Keep every new user turn small. A capability loaded for the preceding
     // turn can be searched again when the new task actually needs it.
     this.subagentOverrideProviders = {};
@@ -8513,12 +8631,23 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
   ): Promise<{ turnId: string }> {
     if (this.disposed) throw new Error("runtime disposed");
     this.assertNotRunning();
+    const turnId = durableTurnId?.trim() || randomUUID();
+    return this.trackTurnOperation(turnId, () =>
+      this.promptTurn(input, userMessageId, turnId),
+    );
+  }
+
+  private async promptTurn(
+    input: string | RuntimePrompt,
+    userMessageId: string | undefined,
+    durableTurnId: string,
+  ): Promise<{ turnId: string }> {
     const selectedTools = this.selectedMcpTools(input);
     const modelInput = typeof input !== "string" && input.sessionMessage
       ? { ...input, text: formatSessionMessage(input.text, input.sessionMessage), sessionMessage: undefined }
       : input;
     this.retainPendingSteering();
-    const nextTurnId = durableTurnId?.trim() || randomUUID();
+    const nextTurnId = durableTurnId;
     this.turnId = nextTurnId;
     this.acceptingSteering = true;
     this.gracefulStopRequested = false;
@@ -8714,7 +8843,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
   }
 
   /** Resolve attachments against the configuration of the running turn. */
-  steeringContext(expectedTurnId: string): { projectPath?: string; supportsVision: boolean } {
+  steeringContext(expectedTurnId: string): { projectPath?: string; remoteWorkspace?: { hostKey: string; path: string }; supportsVision: boolean } {
     if (
       this.disposed || !this.acceptingSteering || this.runCancelled ||
       this.turnHadError || !this.getStatus().isRunning ||
@@ -8725,7 +8854,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         errorCode: "TURN_NOT_FOUND",
       });
     }
-    return { projectPath: this.projectPath, supportsVision: this.model.input.includes("image") };
+    return { projectPath: this.projectPath, ...(this.remoteWorkspace ? { remoteWorkspace: this.remoteWorkspace } : {}), supportsVision: this.model.input.includes("image") };
   }
 
   steer(input: RuntimePrompt, expectedTurnId: string, message: UiMessage): { accepted: boolean; turnId: string } {
@@ -8785,6 +8914,10 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
   }
 
   async abort(): Promise<void> {
+    const turnId = this.turnId;
+    const settlement = turnId
+      ? this.activeTurnSettlements.get(turnId)
+      : undefined;
     this.acceptingSteering = false;
     this.gracefulStopRequested = false;
     this.runCancelled = true;
@@ -8797,6 +8930,34 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     this.providerRetryAbort?.abort();
     if (this.compactionInProgress) this.compactionAborted = true;
     this.compactionAbort?.abort();
+    await settlement;
+  }
+
+  private trackTurnOperation<T>(
+    turnId: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    let settle!: () => void;
+    const settlement = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+    this.activeTurnSettlements.set(turnId, settlement);
+    let result: Promise<T>;
+    try {
+      result = operation();
+    } catch (error) {
+      if (this.activeTurnSettlements.get(turnId) === settlement) {
+        this.activeTurnSettlements.delete(turnId);
+      }
+      settle();
+      throw error;
+    }
+    return result.finally(() => {
+      if (this.activeTurnSettlements.get(turnId) === settlement) {
+        this.activeTurnSettlements.delete(turnId);
+      }
+      settle();
+    });
   }
 
   /** Ask pi-agent-core to stop after the current assistant/tool turn. */

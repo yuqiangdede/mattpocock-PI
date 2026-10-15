@@ -84,14 +84,14 @@ window.promptButtonsProbe = async () => {
   check(!document.querySelector('.coding-requirements-split'), "No discussion dropdown remains");
   await click(i18n.t("codingActions.more"));
   const moreMenu = await until(() => document.querySelector('.coding-more-menu[role="menu"]'));
-  check(moreMenu.textContent.includes("Discuss requirements"), "Ordinary discussion belongs in More");
+  check(moreMenu.textContent.includes(i18n.t("codingActions.discussRequirementsText")), "Ordinary discussion belongs in More");
   check(moreMenu.textContent.includes("Create specification"), "Specification belongs in More");
   check(moreMenu.textContent.includes("Create tickets"), "Tickets belong in More");
   window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   await until(() => !document.querySelector('.coding-more-menu[role="menu"]'));
   await click("My commit");
   await until(() => document.querySelector('[aria-label="Draft"]').value === "Build first, commit with Git or SVN\n\n" + initialDraft);
-  check(!document.querySelector(".coding-shortcuts-secondary"), "Actions must share one wrapping row");
+  check(document.querySelector(".coding-shortcuts-secondary button"), "Document shortcuts retain their separate row");
   const actionRow = document.querySelector('.coding-shortcuts-primary');
   actionRow.style.width = "360px";
   await new Promise(requestAnimationFrame);

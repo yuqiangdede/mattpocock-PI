@@ -45,6 +45,11 @@ The Node runtime normalizes text and image content from host tool results,
 including MCP `content` blocks and bare plugin content-block arrays. Well-formed
 image blocks are passed to vision-capable models and retained when tool history
 is restored; malformed image entries are ignored without failing the tool call.
+Embedded MCP text resources contribute their `resource.text`, and MCP resource
+links contribute a one-line `[resource link]` reference, to the model-visible
+text alongside sibling text blocks; binary resources are not inlined. When no
+text block is available, the JSON fallback likewise keeps image `data` and
+resource `blob` bytes out of the model-visible text.
 
 ## 4. Runtime API (package-level)
 
@@ -65,7 +70,9 @@ loop evaluates it after `turn_end`, once the current assistant response and
 tool batch have completed, and emits a normal `agent_end` before another model
 request. It does not cancel an active provider stream or running tool. An idle
 runtime returns `{ requested: false }`; immediate `abort()` remains the
-separate cancellation path.
+separate cancellation path. `abort()` resolves only after the named active
+operation has completed its cancellation cleanup, so the same runtime can
+accept a follow-up prompt as soon as the abort request returns.
 
 ### 4.0 Active-turn steering
 
@@ -81,8 +88,11 @@ when another input arrives before the initial user message has been consumed.
 An admission after pi's last queue poll suppresses the terminal event and
 continues once pi has released the run, with the same turn identity and without
 a second public `agent_start`. Existing context/provider recovery takes
-precedence over that continuation. Steering also wakes a parent that is idle
-waiting for background delegates; it does not cancel those delegates.
+precedence over that continuation. Steering wakes both a parent that is idle
+waiting for background delegates and an active `TaskWait`; it does not cancel
+those delegates. `TaskWait` returns `details.status: "interrupted"`, includes
+the current delegation states, and tells the parent to handle the new user
+input before waiting again. The same durable turn and pending reports remain.
 
 Abort, graceful stop, fatal errors and terminal settlement close admission.
 Accepted but unconsumed input remains transcript/context history and is removed
@@ -1351,6 +1361,12 @@ boundary; checkpoints retain the effective per-entry state. Bodies remain
 on-demand and permission-checked. Different plugin tool schemas/permissions
 invalidate idle reuse even when their names are unchanged.
 
+The host-owned activation state for bundled skills is read when a session
+catalog is built. A disabled built-in is omitted from the prompt and slash
+catalog, and a stale direct load through `Skill` is refused. This switch governs
+the skill document only; associated agent tools keep their independent
+registration and activation behavior.
+
 Before model dispatch, Desktop acknowledges new system records through Host's
 existing transcript writer. Restart replays these provider-neutral records in
 order. An old history without records receives the current declaration at its
@@ -1674,6 +1690,9 @@ does not dispose, abort, or re-root a runtime belonging to another session.
   estimate visible thinking plus answer output at four Unicode code points per
   token and persist it as `responseOutputTokens` so stopped-turn throughput is
   still available and visibly approximate
+- preserve request-to-first-response wait and streamed thinking/answer duration
+  on assistant messages when available; stopped streams retain the elapsed
+  streamed duration captured before cancellation
 - renderer smart-stop transcript undo and structured Composer restoration are
   reconciliation after abort; they do not change runtime cancellation or roll
   back completed tool effects

@@ -1,4 +1,5 @@
 /** Shared public types grouped by the owning application domain. */
+import type { RemoteWorkspace } from "./workspace.js";
 import type { Mode } from "./common.js";
 import type { SessionThinkingLevel, ThinkingLevel } from "./models.js";
 import type { PermissionMode } from "./permissions.js";
@@ -21,12 +22,26 @@ export type SessionCapabilities = {
   canPrompt: boolean;
   canStop: boolean;
   canRefresh: boolean;
+  /** Absent preserves the existing local behavior. */
+  canConfigureModel?: boolean;
+  canAttach?: boolean;
+  canSteer?: boolean;
+  canEditMessages?: boolean;
+  canUseLocalTools?: boolean;
+  canUseTerminal?: boolean;
+  canReadWorkspace?: boolean;
 };
 
 export type SessionSummary = {
+  remoteWorkspace?: RemoteWorkspace;
   id: string;
   /** Transcript authority. Omitted by older hosts and normalized to `desktop`. */
   source?: SessionSource;
+  /** Display-only remote identity; never a local project path. */
+  remoteHostKey?: string;
+  remoteHostLabel?: string;
+  remoteProjectId?: string;
+  remoteWorkspaceLabel?: string;
   /** Native sessions expose only safe actions in the first continuation slice. */
   capabilities?: SessionCapabilities;
   /** Stable machine-readable reason why a native session cannot be continued. */

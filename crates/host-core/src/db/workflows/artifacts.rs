@@ -268,6 +268,7 @@ mod tests {
                 &input.project_group_id,
                 "Artifacts",
                 &[primary.clone(), secondary.to_string_lossy().into_owned()],
+                None,
             )
             .unwrap();
         input.workspace_root = updated.roots[1].path.clone();
@@ -291,7 +292,7 @@ mod tests {
         }
         let before = db.read_workflow_history(&input.project_group_id).unwrap();
         assert_eq!(before.runs[0].artifact_references.len(), 6);
-        db.update_project_group(&input.project_group_id, "Artifacts", &[primary])
+        db.update_project_group(&input.project_group_id, "Artifacts", &[primary], None)
             .unwrap();
         let list = db
             .list_workflow_artifacts(&input.project_group_id, &input.run_id)
