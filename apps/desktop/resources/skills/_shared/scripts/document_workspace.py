@@ -33,7 +33,7 @@ def state(path: Path) -> dict:
 
 
 def assemble(target: Path, parts: list[Path], snapshot: dict | None,
-             overwrite: bool, required: list[str]) -> dict:
+             overwrite: bool, required: list[str], headings=None) -> dict:
     if not parts:
         raise ValueError('at least one --part is required')
     baseline = state(target)
@@ -62,7 +62,7 @@ def assemble(target: Path, parts: list[Path], snapshot: dict | None,
     # Fail closed if a fenced code block spans a lost or incomplete part.
     try:
         from document_qa import inspect_text
-        errors, _ = inspect_text(combined, target, check_links=False)
+        errors, _ = inspect_text(combined, target, check_links=False, headings=headings)
     except ImportError:
         raise RuntimeError('document_qa.py must be installed next to document_workspace.py')
     if errors:
@@ -96,6 +96,7 @@ def main():
     ap.add_argument('--snapshot', type=Path)
     ap.add_argument('--overwrite', action='store_true')
     ap.add_argument('--required-heading', action='append', default=[])
+    ap.add_argument('--headings-file', type=Path, help='Complete ordered heading manifest')
     args = parser.parse_args()
     try:
         if args.action == 'snapshot':
@@ -104,7 +105,9 @@ def main():
             args.report.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
         else:
             old = json.loads(args.snapshot.read_text(encoding='utf-8')) if args.snapshot else None
-            result = assemble(args.target, args.part, old, args.overwrite, args.required_heading)
+            from document_qa import expected_headings
+            headings = expected_headings(args.headings_file) if args.headings_file else None
+            result = assemble(args.target, args.part, old, args.overwrite, args.required_heading, headings)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except (OSError, UnicodeError, ValueError, json.JSONDecodeError, RuntimeError) as exc:

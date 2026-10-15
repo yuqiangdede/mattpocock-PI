@@ -5,7 +5,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from document_qa import inspect_text
+from document_qa import inspect_text, expected_headings
 from document_workspace import state, assemble
 from source_inventory import scan
 from docx_text_check import check
@@ -66,6 +66,39 @@ class SharedDocumentToolTests(unittest.TestCase):
         result = check(file, ['第五章 验收报告'])
         self.assertEqual(result['matched'], 1)
         self.assertEqual(check(file, ['未出现'])['matched'], 0)
+
+
+    def test_full_heading_manifest_missing_duplicate_order_and_extras(self):
+        manifest = self.root / 'headings.txt'
+        manifest.write_text('# 完整文档\n## 1 介绍\n## 2 方案\n', encoding='utf-8')
+        expected = expected_headings(manifest)
+        good = '# 完整文档\n\n## 1 介绍\n\n' \
+               '~~~text\n## 1 介绍\n~~~\n\n## 2 方案\n'
+        errors, stats = inspect_text(good, self.root / 'doc.md',
+                                     check_links=False, headings=expected)
+        self.assertEqual(errors, [])
+        self.assertTrue(stats['heading_order_checked'])
+        examples = [
+            ('# 完整文档\n## 1 介绍\n', 'missing required heading'),
+            ('# 完整文档\n## 1 介绍\n## 1 介绍\n## 2 方案\n',
+             'duplicate required heading'),
+            ('# 完整文档\n## 2 方案\n## 1 介绍\n', 'order mismatch'),
+            ('# 完整文档\n## 1 介绍\n## 2 方案\n## 3 未登记\n',
+             'unexpected heading'),
+        ]
+        for text, fragment in examples:
+            with self.subTest(fragment=fragment):
+                errors, _ = inspect_text(text, self.root / 'doc.md',
+                                         check_links=False, headings=expected)
+                self.assertTrue(any(fragment in e for e in errors), errors)
+
+    def test_manifest_assembly_rejects_missing_section_before_write(self):
+        part = self.root / 'section.md'
+        part.write_text('# 文档\n## 1 介绍\n', encoding='utf-8')
+        target = self.root / 'output.md'
+        with self.assertRaisesRegex(ValueError, 'missing required heading'):
+            assemble(target, [part], None, False, [], ['# 文档', '## 1 介绍', '## 2 方案'])
+        self.assertFalse(target.exists())
 
 
 if __name__ == '__main__':
