@@ -50,3 +50,12 @@ python "<skill>/scripts/convert.py" "产品需求规格说明书.md" --profile f
 - [desmondc9/agent-skills · markdown-to-docx](https://github.com/desmondc9/agent-skills/tree/main/markdown-to-docx)：借鉴 Pandoc、Mermaid 渲染与 DOCX 后处理分阶段流程。
 
 本实现使用 Pandoc AST，图形失败即停止，不依赖固定 Linux 浏览器路径，不自动删除手写目录。
+
+## 执行补充：转换恢复与文本核验
+
+使用[共享文档工具](../_shared/README.md)处理前序 Markdown 的完整性和 Word 内容抽样校验，不在转换中再次融合或改写需求。
+
+- 大型合并稿的分块写入和中断恢复由上游融合 Skill 完成；开始转换前必须确认输入 MD 的当前指纹、完整章节、图片资产和内容基准，不能用中断前记录的文件大小代替读取。用 document_qa.py 检查源 Markdown 结构。
+- --check 仅报告依赖存在性，并不证明 Mermaid/浏览器/Pandoc 参数兼容；对本次实际使用的图形和中文路径先做最小探针，再批量转换，不自动安装工具。沿用已验证的参数，失败先定位解析、渲染、DOCX、域更新或排版阶段。
+- Word XML 的中文或带空格标题可能拆分为多个文本 run。可以用同包 _shared/scripts/docx_text_check.py 按段落合并 run 后核对关键标题，禁止在 document.xml 中直接查完整字符串后认定“缺失”。其通过仅代表指定内容在文档中，不代表全部内容、分页/目录或视觉检查通过。
+- 同一 Office 导出路径两次同原因失败就降级；每次只重试失败阶段并保留先前已验证成果，明确报告实际完成和未完成的结构、文字、目录及全页视觉验证。
