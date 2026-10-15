@@ -17794,3 +17794,22 @@ host-created files. The full app's file-preview viewer is covered separately.
   scripts/e2e-task-graph-viewer.mjs. Upstream parent-error/stop/edit-isolation
   suites exercise explicit subagent recovery and mutation ownership.
 - Real models and paid APIs are excluded without explicit authorization.
+
+
+### E2E-coding-bundled-document-actions
+
+- Start a packaged app with a fresh profile and a project with no imported skills.
+  Expect eight documentation buttons in the specified second-row order.
+- Select Requirements, Overall design and High-level design in turn. Expect the
+  corresponding `pi-desktop:` native Skill draft with existing text/attachments
+  preserved. No turn starts until manual Send.
+- Select Merge and convert. Expect a merge-first draft explicitly loading the
+  bundled converter only after merge and content review. Both Skill bodies and
+  relative resources resolve within packaged resources.
+- Click API documentation, Database design, Test plan and Test report. Expect an
+  informational placeholder toast and no draft replacement or submission.
+- Repeat with an existing profile and custom user skills. Expect the built-in
+  document actions to remain available without imports; custom skills stay intact.
+- Automated service/resource coverage: `document-shortcuts.test.mjs`; localized
+  row order: `coding-workbench-shortcuts.test.mjs`. Native window/provider execution
+  and actual document conversion are separate acceptance checks.

@@ -16,6 +16,8 @@ import { GrillWorkspace } from "./GrillWorkspace";
 import { loadGrill, parseGrillReply } from "./grill-workspace-model";
 import { codingNextSteps } from "./coding-next-steps";
 
+import { DOCUMENT_SHORTCUTS } from "./document-shortcuts";
+
 const EMPTY_GRILL_MESSAGES: Array<{ role?: string; content?: string }> = [];
 
 export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onSelectPrompt, onPrepareVisual, visualStart }: {
@@ -60,15 +62,11 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
   }, [sessionId, messages]);
   const { primary, more: overflow } = codingShortcutMenu(configuration, catalog, { ask: t("codingActions.askNext"), diagnose: t("codingActions.diagnose"), skillLabels: Object.fromEntries(ENGINEERING_SHORTCUTS.map(entry => [entry.action, t(`coding.${entry.action}`)])) });
   const more = [...primary.filter(shortcut => shortcut.action.skillId === "grill-with-docs"), ...overflow];
-  const reqShortcut: CodingShortcut = {
+  const documentActions: CodingShortcut[] = DOCUMENT_SHORTCUTS.map(doc => ({
     configured: false,
-    action: {
-      id: "catalog:requirements-spec",
-      skillId: "requirements-spec",
-      label: t("codingActions.requirementsSpec", { defaultValue: "需求文档" }),
-    },
-  };
-  const actions = [...primary, reqShortcut, ...overflow];
+    action: { id: `catalog:${doc.skillId}`, skillId: doc.skillId, label: t(`codingActions.${doc.labelKey}`) },
+  }));
+  const actions = [...primary, ...documentActions, ...overflow];
   const reason = ({ action }: CodingShortcut) => {
     if (action.skillId === "implement-spec") return "";
     if (catalogError) return t("codingActions.executeFailed", { detail: catalogError });
@@ -98,20 +96,21 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
   };
   const configure = () => { const store = useAppStore.getState(); store.setSettingsTab("codingActions"); store.setPage("settings"); };
 
-  const reqUnavailable = reason(reqShortcut);
-  const reqTooltip = tooltipLine(
-    t("codingActions.requirementsSpecTooltipWhen"),
-    t("codingActions.requirementsSpecTooltipExample")
-  );
-
   const STUB_DOCS = [
-    { id: "architecture-design", labelKey: "codingActions.architectureDesign", defaultLabel: "总体设计文档" },
-    { id: "detailed-design", labelKey: "codingActions.detailedDesign", defaultLabel: "概要设计文档" },
     { id: "api-spec", labelKey: "codingActions.apiSpec", defaultLabel: "接口文档" },
     { id: "database-design", labelKey: "codingActions.databaseDesign", defaultLabel: "数据库设计" },
     { id: "test-plan", labelKey: "codingActions.testPlan", defaultLabel: "测试方案" },
     { id: "test-report", labelKey: "codingActions.testReport", defaultLabel: "测试报告" },
   ] as const;
+
+  const renderDocumentAction = (shortcut: CodingShortcut, index: number) => {
+    const doc = DOCUMENT_SHORTCUTS[index];
+    const conversionMissing = doc.helpKey === "mergeConvert" && !catalog.some(command => command.kind === "skill" && command.skillId === "pi-desktop:markdown-to-docx");
+    const tooltip = tooltipLine(t(`codingActions.${doc.helpKey}TooltipWhen`), t(`codingActions.${doc.helpKey}TooltipExample`));
+    return <TooltipButton key={shortcut.action.id} className="btn btn-secondary" disabled={disabled || Boolean(reason(shortcut)) || conversionMissing}
+      ariaLabel={shortcut.action.label} aria-description={tooltip} tooltip={tooltip} tooltipClassName="ui-tooltip-help coding-skill-tooltip"
+      onClick={() => onSelectSkill(doc.skillId)}>{shortcut.action.label}</TooltipButton>;
+  };
 
   return <section ref={workbenchRef} className="coding-workbench" aria-label={t("codingActions.title")}>
     <div className="coding-shortcuts coding-shortcuts-primary">{primary.filter(shortcut => ["setup-matt-pocock-skills", "ask-matt", "grill-with-docs"].includes(shortcut.action.skillId)).map(action => renderAction(action))}
@@ -144,18 +143,7 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
       </AnchoredMenu>
     </div>
     <div className="coding-shortcuts coding-shortcuts-secondary">
-      <TooltipButton
-        key="requirements-spec"
-        className="btn btn-secondary"
-        disabled={disabled || Boolean(reqUnavailable)}
-        ariaLabel={t("codingActions.requirementsSpec", { defaultValue: "需求文档" })}
-        aria-description={reqTooltip}
-        tooltip={reqTooltip}
-        tooltipClassName="ui-tooltip-help coding-skill-tooltip"
-        onClick={() => onSelectSkill("requirements-spec")}
-      >
-        {t("codingActions.requirementsSpec", { defaultValue: "需求文档" })}
-      </TooltipButton>
+      {documentActions.slice(0, 3).map((shortcut, index) => renderDocumentAction(shortcut, index))}
       {STUB_DOCS.map(doc => {
         const title = t(doc.labelKey, { defaultValue: doc.defaultLabel });
         const tooltip = tooltipLine(
@@ -182,6 +170,7 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
           </TooltipButton>
         );
       })}
+      {renderDocumentAction(documentActions[3], 3)}
     </div>
     {actions.some(action => reason(action)) && <div role="status">{actions.filter(action => reason(action)).map(shortcut => `${shortcut.action.label}：${reason(shortcut)}`).join("；")}<Button onClick={() => setCatalogVersion(value => value + 1)}>{t("codingActions.recheck")}</Button></div>}
     {(error || diagnostic) && <div className="coding-shortcut-error" role="alert"><span>{error || t("codingActions.diagnostic", { detail: diagnostic })}</span><Button onClick={configure}>{t("codingActions.configure")}</Button></div>}

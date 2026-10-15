@@ -20,6 +20,11 @@ export const PLUGIN_DEV_SKILL_ID = "pi-desktop/plugin-development";
 export const IMAGE_GENERATION_SKILL_ID = "pi-desktop/imagegen";
 const IMAGE_GENERATION_SKILL_FILE = "image-generation.md";
 
+const DOCUMENT_SKILLS = ["requirements-spec", "overall-design", "outline-design", "component-doc-merge", "markdown-to-docx"] as const;
+const DOCUMENT_SKILL_FILES: Record<string, string> = Object.fromEntries(
+  DOCUMENT_SKILLS.map(name => [`pi-desktop:${name}`, `${name}/SKILL.md`]),
+);
+
 /** electron-builder copies `resources/skills` to `<resources>/skills`. */
 function resolveBuiltinSkillPath(fileName: string): string | null {
   const moduleDir = getModuleDirectory(import.meta.url);
@@ -90,10 +95,10 @@ export type BuiltinSkillInput = {
  * fresh so a packaged update takes effect without a restart.
  */
 export function builtinSkills(input: BuiltinSkillInput): PluginSkillDef[] {
-  const ids = [IMAGE_GENERATION_SKILL_ID];
+  const ids = [IMAGE_GENERATION_SKILL_ID, ...Object.keys(DOCUMENT_SKILL_FILES)];
   if (isPluginWorkspace(input.workspacePath, input.pluginPaths)) ids.push(PLUGIN_DEV_SKILL_ID);
   return ids.flatMap((id) => {
-    const file = id === IMAGE_GENERATION_SKILL_ID ? IMAGE_GENERATION_SKILL_FILE : PLUGIN_DEV_SKILL_FILE;
+    const file = DOCUMENT_SKILL_FILES[id] ?? (id === IMAGE_GENERATION_SKILL_ID ? IMAGE_GENERATION_SKILL_FILE : PLUGIN_DEV_SKILL_FILE);
     const raw = readBuiltinSkill(file);
     if (!raw?.raw.trim()) return [];
     const parsed = parseSkillFrontmatter(raw.raw);
@@ -106,8 +111,8 @@ export function builtinSkills(input: BuiltinSkillInput): PluginSkillDef[] {
  * host does not ship, which is the caller's cue to try the plugin registry.
  */
 export function loadBuiltinSkillBody(id: string): LoadedSkillDocument | null {
-  if (id !== PLUGIN_DEV_SKILL_ID && id !== IMAGE_GENERATION_SKILL_ID) return null;
-  const raw = readBuiltinSkill(id === IMAGE_GENERATION_SKILL_ID ? IMAGE_GENERATION_SKILL_FILE : PLUGIN_DEV_SKILL_FILE);
+  if (id !== PLUGIN_DEV_SKILL_ID && id !== IMAGE_GENERATION_SKILL_ID && !Object.hasOwn(DOCUMENT_SKILL_FILES, id)) return null;
+  const raw = readBuiltinSkill(DOCUMENT_SKILL_FILES[id] ?? (id === IMAGE_GENERATION_SKILL_ID ? IMAGE_GENERATION_SKILL_FILE : PLUGIN_DEV_SKILL_FILE));
   if (!raw?.raw.trim()) return null;
   const parsed = parseSkillFrontmatter(raw.raw);
   if (!parsed.body) return null;

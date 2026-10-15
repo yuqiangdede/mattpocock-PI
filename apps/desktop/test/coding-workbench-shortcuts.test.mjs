@@ -60,6 +60,7 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
     en.codingActions.databaseDesign,
     en.codingActions.testPlan,
     en.codingActions.testReport,
+    en.codingActions.mergeConvert,
   ];
   for (const label of secondaryLabels) {
     assert.ok(html.includes(`>${label}</button>`), `Second row contains ${label}`);
@@ -127,7 +128,7 @@ test("Coding Actions zh-CN 两排按钮呈现与顺序正确", async t => {
   assert.equal(zhCN.codingActions.visualRequirements, "需求讨论");
 
   // 第二排：需求文档、总体设计文档、概要设计文档、接口文档、数据库设计、测试方案、测试报告
-  const row2Expected = ["需求文档", "总体设计文档", "概要设计文档", "接口文档", "数据库设计", "测试方案", "测试报告"];
+  const row2Expected = ["需求文档", "总设文档", "概设文档", "接口文档", "数据库设计", "测试方案", "测试报告", "合并并转换格式"];
   for (const label of row2Expected) {
     assert.ok(html.includes(`>${label}</button>`), `Row 2 should include ${label}`);
   }

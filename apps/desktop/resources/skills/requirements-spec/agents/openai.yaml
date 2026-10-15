@@ -1,0 +1,4 @@
+interface:
+  display_name: "需求规格说明书生成"
+  short_description: "分来源生成中间需求，再融合为完整需求文档，仅生成 Markdown，支持指定输出位置"
+  default_prompt: "使用 $requirements-spec，先请我提供源码路径（含项目沉淀文档）和参考文档（Word、Excel、PDF 等，无参考时明确说明），输入收齐并核对可读取后再开始分析与编制。随后按实际来源生成参考需求文档、源码反推需求文档和根据项目文档生成的需求，再融合为一份完整需求文档。输出目录与文件名可指定，默认 docs/Requirements/。中间文档保留可信度与依据，最终文档去除分析痕迹并统一内容。仅生成 Markdown（.md），沿用已有目标与待确认选择，不提交代码。"

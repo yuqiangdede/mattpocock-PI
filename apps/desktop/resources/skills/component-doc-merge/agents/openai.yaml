@@ -1,0 +1,4 @@
+interface:
+  display_name: "组件需求与设计文档融合"
+  short_description: "按产品维度融合组件需求或设计文档，人工指定名称，并选择 Word 模板或推荐格式"
+  default_prompt: "使用 $component-doc-merge 合并指定组件文档；先收集输入、让我指定最终文档名称，并提供 Word 模板或选择推荐格式，再以产品维度融合成完整 Markdown；如需 Word，继续交给 markdown-to-docx 转换，不提交代码。"

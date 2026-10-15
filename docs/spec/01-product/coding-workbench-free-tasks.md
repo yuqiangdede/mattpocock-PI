@@ -348,3 +348,30 @@ separate descriptive gate metadata; concise Skill tooltips omit gate details.
 Actual safety
 constraints remain enforced by CLI permissions or Hooks; metadata grants no
 permission and does not change the CodingAction schema.
+
+
+## Bundled document actions
+
+The second row is fixed in this order: Requirements document, Overall design,
+High-level design, API documentation, Database design, Test plan, Test report,
+and Merge and convert format. The four API/database/test entries remain explicit
+placeholders: clicking shows an informational toast and never submits a prompt.
+Chinese labels are defined by the shipped i18n catalog.
+
+Requirements, overall design, high-level design, merge and conversion use the
+application-owned `pi-desktop:` Skill IDs. Complete Skill directories (including
+front matter descriptions, references, agent metadata and conversion scripts)
+ship under `resources/skills`, recursively included in every desktop package.
+The existing built-in Skill catalog and Skill-tool loader expose them immediately,
+including existing profiles, without imports, downloads or paths on the author's
+machine. User-owned skills and profile-managed engineering bundles remain intact.
+
+Selection prepares an editable native Skill draft, preserves existing text and
+attachments, and requires manual Send. Overall/high-level design collect missing
+source paths and references according to their bundled workflows. Merge and
+convert first collects the document inputs, user-specified title and template or
+format, then merges and reviews content before loading
+`pi-desktop:markdown-to-docx` for conversion and verification. Selection does not
+execute a conversion or install tools. Converter runtime dependencies (Python,
+Pandoc and applicable diagram/render tools) are checked when conversion is
+requested; missing tools remain observable and installation requires permission.
