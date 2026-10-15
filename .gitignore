@@ -74,3 +74,6 @@ worktrees
 
 # 项目内更新报告、验证日志与临时数据
 /cache/
+
+# Retained Matt skill source updates
+apps/desktop/resources/skills/.matt-update-*/

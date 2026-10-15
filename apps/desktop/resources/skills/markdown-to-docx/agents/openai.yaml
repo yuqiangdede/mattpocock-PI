@@ -1,0 +1,4 @@
+interface:
+  display_name: "Markdown 合并与转 Word"
+  short_description: "单文件转 Word，或按产品维度合并组件文档后转 Word，支持模板及推荐格式"
+  default_prompt: "使用 $markdown-to-docx 转换指定 Markdown；如有多个组件文档，先让我指定最终名称，并提供 Word 模板或选择推荐格式，通过 component-doc-merge 按产品维度融合后继续转为同名 Word，检查内容、结构和实际排版，不提交代码。"

@@ -1,7 +1,7 @@
 # Bundled grill-with-ui
 
 The Stage 1 Requirements Discussion dropdown can launch the `grill-with-ui` Agent Skill.
-The full upstream Skill is shipped in `crates/host-core/resources/workflow-skills.json` as package `grill-with-ui` and installed by the existing bundled-Skills lifecycle. No separate Git clone or npm install is required.
+The full upstream Skill is shipped in `apps/desktop/resources/skills/matt` as package `grill-with-ui` and installed by the existing bundled-Skills lifecycle. No separate Git clone or npm install is required.
 
 - Upstream: https://github.com/jasonku09/grill-with-ui
 - Source snapshot: `c8f699d3dd99eaf7af168e21acb355184a354f1b` (main at integration)

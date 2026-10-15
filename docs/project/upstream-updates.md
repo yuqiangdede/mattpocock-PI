@@ -41,7 +41,7 @@ Reuse compatible host dependencies and build caches for candidate validation. In
 | 官方基线与三来源检测 | `packages/shared/src/upstream.ts`、`electron/main/version-sources.ts` | 应用设置中的版本来源区域 |
 | Composer 快捷入口 | `features/coding/CodingWorkbench.tsx`、`useComposerSkillShortcut.ts`、`skill-shortcut-draft.ts` | Composer 草稿选择，不自动提交 |
 | 工程工作流 | `ipc/workflow-*.ts`、`services/workflow-execution.ts`、`features/coding`、`components/workpanel/Workflow*` | IPC 注册、工作面板、Host RPC 与数据库 |
-| Matt 技能资源 | `crates/host-core/resources/workflow-skills.json` 与工程技能模块 | 技能目录、设置与 Host 技能加载 |
+| Matt 技能资源 | `apps/desktop/resources/skills/matt` 与工程技能模块 | 技能目录、设置与 Host 技能加载 |
 
 ## Extension-first architecture rule (mandatory)
 

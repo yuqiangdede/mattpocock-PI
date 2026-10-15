@@ -2,6 +2,13 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const deEntries: ChangelogEntry[] = [
   {
+    version: "0.20.0",
+    date: "2026-10-15",
+    highlights: [
+      "Sieben Dokumentations-Skills sind sofort integriert; API- und Datenbankdokumentation sind verfügbar, die Schaltflächen für Testplan und Testbericht entfallen.",
+    ],
+  },
+  {
     version: "0.19.1",
     date: "2026-10-14",
     highlights: [

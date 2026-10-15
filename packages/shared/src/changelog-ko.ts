@@ -2,6 +2,13 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const koEntries: ChangelogEntry[] = [
   {
+    version: "0.20.0",
+    date: "2026-10-15",
+    highlights: [
+      "문서 워크플로 스킬 7개를 기본 제공하고 API 및 데이터베이스 문서를 활성화하며 테스트 계획과 테스트 보고서 버튼을 제거합니다.",
+    ],
+  },
+  {
     version: "0.19.1",
     date: "2026-10-14",
     highlights: [
