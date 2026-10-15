@@ -1,3 +1,4 @@
+import { CODING_MORE_SKILLS } from "@pi-desktop/shared";
 import { createRoot } from "react-dom/client";
 import { I18nextProvider, initReactI18next } from "react-i18next";
 import i18n from "i18next";
@@ -93,9 +94,15 @@ globalThis.codingActionsProbe = async () => {
   check(JSON.stringify((await api.getCodingActions()).configuration) === originalConfiguration, "恢复入口改写用户配置");
   useAppStore.setState({ composerPrefill: { sessionId: view.sessionId, text: "", fileReferences: [] } });
   await until(() => readEditorValue(editor()) === "");
-  for (const action of ["implementSpec", "pr", "claudeHandoff", "loopMe", "setupTsDeepModules", "writingBeats", "writingFragments", "writingShape", "gitGuardrails", "migrateToShoehorn", "scaffoldExercises", "setupPreCommit"]) {
+  for (const { action, skill } of CODING_MORE_SKILLS) {
     await click(i18n.t("codingActions.more"));
-    const label = i18n.t(`coding.${action}`);
+    const label = initial.actions.find(item => item.skillId === skill)?.label ?? i18n.t(`coding.${action}`);
+    if (skill !== "implement-spec" && !initial.actions.some(item => item.skillId === skill) && !commands.some(command => command.kind === "skill" && command.skillId === skill)) {
+      check(![...document.querySelectorAll('[role="menuitem"]')].some(item => item.textContent?.trim() === label), `Unavailable optional Skill was exposed: ${action}`);
+      await fixture("pressKey", "Escape");
+      await until(() => !document.querySelector('[role="menuitem"]'));
+      continue;
+    }
     const button = await until(() => [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(item => item.textContent?.trim() === label));
     check(!button.disabled, `Bundled shortcut unavailable: ${action}`);
     check(button.getAttribute("aria-description")?.includes(i18n.t(`coding.skillGuides.${action}.when`)), `Missing localized guide: ${action}`);
@@ -130,8 +137,8 @@ globalThis.codingActionsProbe = async () => {
   view.composer(); await until(() => editor());
   useAppStore.setState({ composerPrefill: { sessionId: view.sessionId, text: "Keep my draft", fileReferences: [] } });
   await until(() => readEditorValue(editor()) === "Keep my draft");
-  const secondary = [...document.querySelectorAll<HTMLButtonElement>(".coding-shortcuts-secondary button")];
-  check(secondary.some(button => button.textContent?.trim() === "Verify and commit"), "Saved prompt label missing from second row");
+  const secondary = [...document.querySelectorAll<HTMLButtonElement>(".coding-shortcuts-primary button")];
+  check(secondary.some(button => button.textContent?.trim() === "Verify and commit"), "Saved prompt label missing from primary row");
   check(!document.querySelector(".coding-shortcuts-secondary [aria-haspopup='menu']"), "More left the Skill row");
   const beforePlain = (await fixture("snapshot") as { prompts: number }).prompts;
   await click("Verify and commit");
