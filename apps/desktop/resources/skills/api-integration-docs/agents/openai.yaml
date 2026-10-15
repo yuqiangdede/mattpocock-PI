@@ -1,0 +1,4 @@
+interface:
+  display_name: "第三方接口文档生成"
+  short_description: "融合源码、项目需求设计及参考文档，生成含字段、报文、联调步骤和证据的 Markdown 接口文档"
+  default_prompt: "使用 $api-integration-docs，根据我提供的源码路径、项目需求与设计文档及其他参考资料，核对实际接口与文档约定，生成供第三方独立联调的 Markdown 接口文档。"

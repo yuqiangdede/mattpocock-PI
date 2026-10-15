@@ -353,12 +353,14 @@ permission and does not change the CodingAction schema.
 ## Bundled document actions
 
 The second row is fixed in this order: Requirements document, Overall design,
-High-level design, API documentation, Database design, Test plan, Test report,
-and Merge and convert format. The four API/database/test entries remain explicit
-placeholders: clicking shows an informational toast and never submits a prompt.
+High-level design, API documentation, Database design, and Merge and convert
+format. Test plan and Test report are removed from this row; no placeholders
+remain. API documentation uses `api-integration-docs` and Database design uses
+`database-design-doc`.
 Chinese labels are defined by the shipped i18n catalog.
 
-Requirements, overall design, high-level design, merge and conversion use the
+Requirements, overall design, high-level design, API documentation, database
+design, merge and conversion use the
 application-owned `pi-desktop:` Skill IDs. Complete Skill directories (including
 front matter descriptions, references, agent metadata and conversion scripts)
 ship under `resources/skills`, recursively included in every desktop package.
@@ -375,3 +377,10 @@ format, then merges and reviews content before loading
 execute a conversion or install tools. Converter runtime dependencies (Python,
 Pandoc and applicable diagram/render tools) are checked when conversion is
 requested; missing tools remain observable and installation requires permission.
+
+API documentation reconciles source code, project requirements/designs and
+references into Markdown suitable for independent third-party integration.
+Database design reads project SQL (preferring `_pkg/linux/bin/*db`), migration
+chains and supporting source to reconstruct the documented database baseline.
+Both actions only prepare drafts; their workflows generate documentation without
+changing APIs, connecting to databases or executing SQL.

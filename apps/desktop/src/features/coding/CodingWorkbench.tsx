@@ -96,13 +96,6 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
   };
   const configure = () => { const store = useAppStore.getState(); store.setSettingsTab("codingActions"); store.setPage("settings"); };
 
-  const STUB_DOCS = [
-    { id: "api-spec", labelKey: "codingActions.apiSpec", defaultLabel: "接口文档" },
-    { id: "database-design", labelKey: "codingActions.databaseDesign", defaultLabel: "数据库设计" },
-    { id: "test-plan", labelKey: "codingActions.testPlan", defaultLabel: "测试方案" },
-    { id: "test-report", labelKey: "codingActions.testReport", defaultLabel: "测试报告" },
-  ] as const;
-
   const renderDocumentAction = (shortcut: CodingShortcut, index: number) => {
     const doc = DOCUMENT_SHORTCUTS[index];
     const conversionMissing = doc.helpKey === "mergeConvert" && !catalog.some(command => command.kind === "skill" && command.skillId === "pi-desktop:markdown-to-docx");
@@ -143,34 +136,7 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
       </AnchoredMenu>
     </div>
     <div className="coding-shortcuts coding-shortcuts-secondary">
-      {documentActions.slice(0, 3).map((shortcut, index) => renderDocumentAction(shortcut, index))}
-      {STUB_DOCS.map(doc => {
-        const title = t(doc.labelKey, { defaultValue: doc.defaultLabel });
-        const tooltip = tooltipLine(
-          t("codingActions.stubTooltipWhen", { title, defaultValue: `需要编制${title}时。` }),
-          t("codingActions.stubTooltipExample", { defaultValue: "功能暂未开放（空实现）。" })
-        );
-        return (
-          <TooltipButton
-            key={doc.id}
-            className="btn btn-secondary"
-            disabled={disabled}
-            ariaLabel={title}
-            aria-description={tooltip}
-            tooltip={tooltip}
-            tooltipClassName="ui-tooltip-help coding-skill-tooltip"
-            onClick={() => {
-              useAppStore.getState().showToast(
-                t("codingActions.stubActionToast", { title, defaultValue: `${title}功能暂未开放（空实现）` }),
-                { variant: "info" }
-              );
-            }}
-          >
-            {title}
-          </TooltipButton>
-        );
-      })}
-      {renderDocumentAction(documentActions[3], 3)}
+      {documentActions.map((shortcut, index) => renderDocumentAction(shortcut, index))}
     </div>
     {actions.some(action => reason(action)) && <div role="status">{actions.filter(action => reason(action)).map(shortcut => `${shortcut.action.label}：${reason(shortcut)}`).join("；")}<Button onClick={() => setCatalogVersion(value => value + 1)}>{t("codingActions.recheck")}</Button></div>}
     {(error || diagnostic) && <div className="coding-shortcut-error" role="alert"><span>{error || t("codingActions.diagnostic", { detail: diagnostic })}</span><Button onClick={configure}>{t("codingActions.configure")}</Button></div>}

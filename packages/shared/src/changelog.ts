@@ -30,6 +30,13 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.20.0",
+    date: "2026-10-15",
+    highlights: [
+      "Bundle seven document workflow Skills for immediate use, enable API and database documentation, and remove Test plan and Test report buttons.",
+    ],
+  },
+  {
     version: "0.19.1",
     date: "2026-10-14",
     highlights: [
@@ -967,6 +974,13 @@ const enEntries: ChangelogEntry[] = [
 
 const zhCNEntries: ChangelogEntry[] = [
   {
+    version: "0.20.0",
+    date: "2026-10-15",
+    highlights: [
+      "内置七个文档工作流技能，启用接口文档和数据库设计，移除测试方案、测试报告按钮，无需人工导入。",
+    ],
+  },
+  {
     version: "0.19.1",
     date: "2026-10-14",
     highlights: [
@@ -1903,6 +1917,13 @@ const zhCNEntries: ChangelogEntry[] = [
 ];
 
 const zhTWEntries: ChangelogEntry[] = [
+  {
+    version: "0.20.0",
+    date: "2026-10-15",
+    highlights: [
+      "內建七個文件工作流程技能，啟用介面文件與資料庫設計，移除測試方案、測試報告按鈕，無需手動匯入。",
+    ],
+  },
   {
     version: "0.19.1",
     date: "2026-10-14",

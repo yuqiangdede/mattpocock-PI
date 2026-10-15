@@ -2,6 +2,13 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const trEntries: ChangelogEntry[] = [
   {
+    version: "0.20.0",
+    date: "2026-10-15",
+    highlights: [
+      "Yedi belge iş akışı Skill becerisini kullanıma hazır sunar, API ve veritabanı belgelerini etkinleştirir, test planı ve test raporu düğmelerini kaldırır.",
+    ],
+  },
+  {
     version: "0.19.1",
     date: "2026-10-14",
     highlights: [

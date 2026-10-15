@@ -1,0 +1,4 @@
+interface:
+  display_name: "数据库结构设计说明书"
+  short_description: "以项目打包 SQL 为主、源码为辅，生成覆盖表结构、分表、索引与视图的数据库设计文档"
+  default_prompt: "使用 $database-design-doc，优先分析指定项目 _pkg/linux/bin/*db 下 SQL，结合源码，生成详尽的 Markdown 数据库结构设计说明书。"

@@ -20,7 +20,7 @@ export const PLUGIN_DEV_SKILL_ID = "pi-desktop/plugin-development";
 export const IMAGE_GENERATION_SKILL_ID = "pi-desktop/imagegen";
 const IMAGE_GENERATION_SKILL_FILE = "image-generation.md";
 
-const DOCUMENT_SKILLS = ["requirements-spec", "overall-design", "outline-design", "component-doc-merge", "markdown-to-docx"] as const;
+const DOCUMENT_SKILLS = ["requirements-spec", "overall-design", "outline-design", "api-integration-docs", "database-design-doc", "component-doc-merge", "markdown-to-docx"] as const;
 const DOCUMENT_SKILL_FILES: Record<string, string> = Object.fromEntries(
   DOCUMENT_SKILLS.map(name => [`pi-desktop:${name}`, `${name}/SKILL.md`]),
 );

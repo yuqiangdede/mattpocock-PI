@@ -71,7 +71,7 @@ test("packaged resource resolver needs no user import or source-machine director
   });
   await cp(new URL("../resources/skills/", import.meta.url), join(resources, "skills"), { recursive: true });
   Object.defineProperty(process, "resourcesPath", { configurable: true, value: resources });
-  for (const name of ["requirements-spec", "overall-design", "outline-design", "component-doc-merge", "markdown-to-docx"]) {
+  for (const name of ["requirements-spec", "overall-design", "outline-design", "api-integration-docs", "database-design-doc", "component-doc-merge", "markdown-to-docx"]) {
     const id = `pi-desktop:${name}`;
     assert.ok(builtinSkills({}).some(skill => skill.id === id));
     const loaded = loadBuiltinSkillBody(id);
