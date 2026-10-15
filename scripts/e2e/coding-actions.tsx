@@ -18,6 +18,14 @@ declare global {
 }
 const fixture = (name: string, input?: unknown) => window.workflowFixture.action(name, input);
 const input = (label: string) => document.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[aria-label="${label}"]`)!;
+async function setActionEnabled(enabled: boolean) {
+  const checkbox = await until(() => {
+    const control = document.querySelector<HTMLInputElement>('[aria-label="启用 Action"]');
+    return control && !control.disabled && control;
+  });
+  if (checkbox.checked !== enabled) checkbox.click();
+  await until(() => checkbox.checked === enabled);
+}
 const editor = () => document.querySelector<HTMLElement>(".composer-input")!;
 const type = (value: string) => fixture("typeText", value);
 
@@ -167,13 +175,13 @@ globalThis.codingActionsProbe = async () => {
   await click("上移"); await click("保存");
   await until(async () => (await api.getCodingActions()).configuration.actions.some(action => action.label === "快速审查"));
   check(!document.body.textContent?.includes("显示位置") && !document.body.textContent?.includes("更多分组"), "出现页面布局配置");
-  input("启用 Action").click(); await click("保存");
+  await setActionEnabled(false); await click("保存");
   await until(async () => (await api.getCodingActions()).configuration.actions.find(action => action.id === "code-review")?.enabled === false);
   view.composer(); await until(() => editor());
   check(![...document.querySelectorAll("button")].some(button => button.textContent?.trim() === "快速审查"), "停用 Action 仍然显示");
   view.settings(); await until(() => input("Action 名称"));
   await select("选择 Action", "code-review", "快速审查（已停用）");
-  input("启用 Action").click(); await click("保存");
+  await setActionEnabled(true); await click("保存");
   await until(async () => (await api.getCodingActions()).configuration.actions.find(action => action.id === "code-review")?.enabled !== false);
   await click("新建 Action"); await fill("Action 名称", "临时审查", type); await fill("Skill id", "code-review", type); await click("保存");
   await until(async () => (await api.getCodingActions()).configuration.actions.some(action => action.label === "临时审查"));

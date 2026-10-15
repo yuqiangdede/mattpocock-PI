@@ -81,3 +81,5 @@ The upstream S3-only configuration sync uses a separate namespace; historical We
 - Plan history, storage/bootstrap migration and browser local-file E2E passed. No `verify:ui:*` command was used.
 - POSIX remote-model/tool E2E is not certified on Windows; its fixture requires a POSIX workspace and shell. Local permission/containment contracts passed nine Rust tests, and remote renderer/component suites passed in the Desktop sweep.
 - Final request head adds this evidence only. PR integration validation compares the actual merge tree with the validated request and reruns isolated acceptance before merging.
+
+The first PR integration repeat exposed an acceptance-fixture save/toggle race: it clicked a disabled checkbox before the preceding save settled. The fixture now waits for an enabled checkbox and verifies its selected state before saving. Three consecutive complete Coding Actions journeys passed with unchanged assertions and deadlines; production behavior is unchanged.
