@@ -19,8 +19,6 @@ const LEGACY_DEFAULT_TITLES = new Set([
   "yeni görev",
   "yeni sohbet",
 ]);
-/** Sidebar/topbar title budget for the local first-prompt fallback. */
-const PROMPT_FALLBACK_TITLE_LENGTH = 48;
 export function untitledTaskTitle(): string {
   return translatedTitle("chat.untitledTask");
 }
@@ -42,17 +40,10 @@ export function isDefaultSessionTitle(title?: string | null): boolean {
   );
 }
 
-/**
- * Deterministic title for the first prompt of a still-untitled session.
- * The host keeps the session eligible for an automatic plugin title, so this
- * text is only the immediate, offline-readable fallback.
- */
+/** Keep the placeholder until the title plugin supplies a semantic summary. */
 export function promptFallbackSessionTitle(
-  userPrompt: string,
+  _userPrompt: string,
   emptyTitle: string,
 ): string {
-  return (
-    userPrompt.trim().replace(/\s+/g, " ").slice(0, PROMPT_FALLBACK_TITLE_LENGTH) ||
-    emptyTitle
-  );
+  return emptyTitle;
 }

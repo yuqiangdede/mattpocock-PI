@@ -18244,3 +18244,44 @@ host-created files. The full app's file-preview viewer is covered separately.
 - Open Settings → Skills and verify that bundled document Skills appear alongside upstream built-ins. Disable Requirements specification, then verify that its Composer action cannot load the disabled Skill. Restart and verify the disabled state, re-enable it, and prepare an editable draft without submitting it automatically.
 - Coverage: `document-shortcuts.test.mjs` exercises the production Composer catalog and Skill body loader; `user_skills::tests::document_builtin_activation_survives_restart` covers Host persistence. Existing `image-generation.test.mjs` covers unchanged upstream built-in activation.
 - Remote SSH supervisor, Unix admin-socket, POSIX executable and mode-bit fixtures remain explicitly platform-scoped; Windows skips do not certify remote Linux/macOS execution or Windows ACLs.
+
+### E2E-CODING-modes-compile-and-summary-titles
+
+- Preconditions: isolated Desktop fixture; ordinary and visual requirements skills
+  available; title plugin loaded with its existing narrow permissions.
+- Steps: open Requirements; choose Text; preserve and edit the draft; reopen and
+  choose Visual; enter a topic and Send. Select Compile and inspect its draft.
+  Select Commit and verify its no-build instruction. Complete a conversation and
+  receive its title; repeat with a manual rename while generation is pending.
+- Expected: both modes share one menu; opening it sends nothing; Compile is the
+  only launcher action requesting a build; draft text and attachments survive;
+  tooltips omit fixed prefixes. Titles summarize the topic, never overwrite manual
+  names, coalesce concurrent events and ignore responses after plugin unload.
+- Specs: `01-product/coding-workbench-free-tasks.md`;
+  `03-runtime/02-agent-runtime.md`. Acceptance: independent actions and Host-owned
+  titles; milestone: fork maintenance.
+- Status: renderer interaction fixture in `coding-prompt-user-path.test.mjs`;
+  plugin lifecycle with fake model boundary in `bundled-session-title.test.mjs`.
+  Real provider generation is not exercised by these tests.
+
+### E2E-CODING-review-fix-primary-gate
+
+- Preconditions: Coding Actions visible in an isolated conversation with no review.
+- Steps: inspect the primary row; prepare Code review without sending; complete a
+  review, discuss a finding, select Fix code review findings; switch to an
+  unreviewed conversation and back. Repeat with a pending or failed review.
+- Expected: repair immediately follows Code review and is initially disabled;
+  only a completed review unlocks it. Its draft asks for a deduplicated issue
+  summary before repair, carries original findings and discussion, preserves
+  draft/attachments and never submits or compiles automatically. Availability
+  follows the active conversation; a new unfinished review locks it again.
+- Specs: `01-product/coding-workbench-free-tasks.md`; acceptance: explicit repair
+  after review; milestone: fork maintenance.
+- Status: `review-fix-context.test.mjs`, `coding-workbench-shortcuts.test.mjs` and
+  isolated Electron `coding-prompt-user-path.test.mjs`.
+
+### E2E-CODING-continue-task
+
+- Steps: retain a draft with an attachment; click Continue after Commit code.
+- Expected: the localized continuation prompt precedes the retained draft, attachments remain intact, and no turn is sent automatically. The action is disabled while the launcher is blocked.
+- Automated path: `apps/desktop/test/coding-prompt-user-path.test.mjs`.

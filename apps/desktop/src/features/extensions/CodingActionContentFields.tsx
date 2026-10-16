@@ -3,6 +3,7 @@ import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Button, Field, Textarea } from "../../components/ui";
 import { codingShortcutDescription } from "../coding/coding-shortcut-tooltip";
+import { documentPromptKey } from "../coding/document-shortcuts";
 
 type Props = {
   action: CodingAction;
@@ -18,7 +19,8 @@ export function CodingActionContentFields(props: Props) {
 
 export function CodingActionContentView({ action, catalog, disabled, onChange, t }: Props & { t: TFunction }) {
   const entry = ENGINEERING_SHORTCUTS.find(item => item.skill === action.skillId);
-  const defaultPrompt = entry ? t(`coding.prompts.${entry.action}`) : "";
+  const docKey = documentPromptKey(action.skillId);
+  const defaultPrompt = entry ? t(`coding.prompts.${entry.action}`) : docKey ? t(docKey) : "";
   const usesDefault = action.prompt == null;
   const promptStatus = usesDefault ? (defaultPrompt ? "promptDefault" : "promptNone") : action.prompt === "" ? "promptEmpty" : "promptCustom";
   const description = codingShortcutDescription({ action, configured: true }, catalog, t);
