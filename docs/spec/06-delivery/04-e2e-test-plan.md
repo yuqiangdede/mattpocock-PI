@@ -18290,3 +18290,9 @@ host-created files. The full app's file-preview viewer is covered separately.
   after review; milestone: fork maintenance.
 - Status: `review-fix-context.test.mjs`, `coding-workbench-shortcuts.test.mjs` and
   isolated Electron `coding-prompt-user-path.test.mjs`.
+
+### E2E-CODING-continue-task
+
+- Steps: retain a draft with an attachment; click Continue after Commit code.
+- Expected: the localized continuation prompt precedes the retained draft, attachments remain intact, and no turn is sent automatically. The action is disabled while the launcher is blocked.
+- Automated path: `apps/desktop/test/coding-prompt-user-path.test.mjs`.

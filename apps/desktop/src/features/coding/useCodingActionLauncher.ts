@@ -43,7 +43,6 @@ export function useCodingActionLauncher(options: {
           if (skillId === "grill-with-ui") return visualGrillingDefaultPrompt(i18n.resolvedLanguage ?? i18n.language);
           const documentKey = documentPromptKey(skillId);
           if (documentKey) return t(documentKey);
-          if (skillId === "requirements-spec") return t("coding.prompts.requirementsSpec");
           const shortcut = ENGINEERING_SHORTCUTS.find(entry => entry.skill === skillId);
           return shortcut ? t(`coding.prompts.${shortcut.action}`) : "";
         },
@@ -63,9 +62,9 @@ export function useCodingActionLauncher(options: {
     if (owner.blocked || inFlight.current) return;
     owner.invalidatePromptEnhancement();
     try {
-      if (id === "compile-project" || id === INTERACTION_IMAGE_PROMPT_ID || id === REVIEW_FIX_PROMPT_ID) {
+      if (id === "compile-project" || id === "continue-task" || id === INTERACTION_IMAGE_PROMPT_ID || id === REVIEW_FIX_PROMPT_ID) {
         const language = i18n.resolvedLanguage ?? i18n.language;
-        const prompt = id === "compile-project" ? t("codingActions.compilePrompt") : id === REVIEW_FIX_PROMPT_ID ? reviewFixPrompt(language) : interactionImagePrompt(language);
+        const prompt = id === "continue-task" ? t("codingActions.continuePrompt") : id === "compile-project" ? t("codingActions.compilePrompt") : id === REVIEW_FIX_PROMPT_ID ? reviewFixPrompt(language) : interactionImagePrompt(language);
         const text = buildCommitCodeDraft(id === "compile-project" ? prompt : `${prompt}\n\n${t("codingActions.noCompilePrompt")}`, [context, owner.readLiveDraft()].filter(Boolean).join("\n\n"));
         owner.applyEditorDraft(text, owner.fileReferencesRef.current, text.length);
         setError(null);

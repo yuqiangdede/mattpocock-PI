@@ -109,6 +109,13 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
     tooltip={t(reviewContext ? "codingActions.reviewFixHint" : "codingActions.reviewFixRequiresReview")} tooltipClassName="ui-tooltip-help coding-skill-tooltip"
     onClick={() => { if (reviewContext) onSelectPrompt(REVIEW_FIX_PROMPT_ID, reviewContext); }}>{t("codingActions.reviewFix")}</TooltipButton>;
 
+  const renderContinue = () => {
+    const tooltip = tooltipLine(t("codingActions.continueTooltipWhen"), t("codingActions.continueTooltipExample"));
+    return <TooltipButton key="continue-task" className="btn btn-secondary" disabled={disabled}
+      aria-description={tooltip} tooltip={tooltip} tooltipClassName="ui-tooltip-help coding-skill-tooltip"
+      onClick={() => onSelectPrompt("continue-task")}>{t("codingActions.continueTask")}</TooltipButton>;
+  };
+
   const renderDocumentAction = (shortcut: CodingShortcut, index: number) => {
     const doc = DOCUMENT_SHORTCUTS[index];
     const conversionMissing = doc.helpKey === "mergeConvert" && !catalog.some(command => command.kind === "skill" && command.skillId === "pi-desktop:markdown-to-docx");
@@ -125,8 +132,9 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
         {orderedPromptActions.map(action => {
           const tooltip = tooltipLine(t(action.id === "commit-code" ? "codingActions.commitTooltipWhen" : "codingActions.promptTooltipWhen"), t(action.id === "commit-code" ? "codingActions.commitTooltipExample" : "codingActions.promptTooltipExample"));
           const description = isRecommended(action.id) ? `${t("codingActions.recommendedNext")} · ${tooltip}` : tooltip;
-          return <TooltipButton key={action.id} className={`btn btn-secondary${isRecommended(action.id) ? " coding-action-recommended" : ""}`} aria-description={description} tooltip={tooltip} disabled={disabled} onClick={() => onSelectPrompt(action.id, isRecommended(action.id) ? recommendation?.context : undefined)}>{action.label}</TooltipButton>;
+          return <Fragment key={action.id}><TooltipButton className={`btn btn-secondary${isRecommended(action.id) ? " coding-action-recommended" : ""}`} aria-description={description} tooltip={tooltip} disabled={disabled} onClick={() => onSelectPrompt(action.id, isRecommended(action.id) ? recommendation?.context : undefined)}>{action.label}</TooltipButton>{action.id === "commit-code" && renderContinue()}</Fragment>;
         })}
+      {!orderedPromptActions.some(action => action.id === "commit-code") && renderContinue()}
 
       <TooltipButton className="btn btn-secondary" disabled={disabled} tooltip={tooltipLine(t("codingActions.compileTooltipWhen"), t("codingActions.compileTooltipExample"))} onClick={() => onSelectPrompt("compile-project")}>{t("codingActions.compileProject")}</TooltipButton>
       <AnchoredMenu open={moreOpen} onClose={() => setMoreOpen(false)} role="menu" side="top" restoreFocus={!disabled || more.some(shortcut => shortcut.action.skillId === "implement-spec")} label={t("codingActions.more")} menuClassName="context-menu coding-more-menu"

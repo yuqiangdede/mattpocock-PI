@@ -8,7 +8,17 @@ export const DOCUMENT_SHORTCUTS = [
   { skillId: "pi-desktop:component-doc-merge", labelKey: "mergeConvert", helpKey: "mergeConvert", promptKey: "mergeConvert" },
 ] as const;
 
+export function findDocumentShortcut(skillId: string) {
+  const document = DOCUMENT_SHORTCUTS.find(item => item.skillId === skillId || item.skillId === `pi-desktop:${skillId}` || item.skillId.replace(/^pi-desktop:/, "") === skillId);
+  if (document) return document;
+  if (skillId === "pi-desktop:markdown-to-docx" || skillId === "markdown-to-docx") {
+    return { skillId: "pi-desktop:markdown-to-docx", labelKey: "markdownToDocx", helpKey: "markdownToDocx", promptKey: "markdownToDocx" } as const;
+  }
+  return undefined;
+}
+
 export function documentPromptKey(skillId: string): string | undefined {
-  const document = DOCUMENT_SHORTCUTS.find(item => item.skillId === skillId);
-  return document ? `coding.prompts.${document.promptKey}` : undefined;
+  const document = findDocumentShortcut(skillId);
+  if (document) return `coding.prompts.${document.promptKey}`;
+  return undefined;
 }
