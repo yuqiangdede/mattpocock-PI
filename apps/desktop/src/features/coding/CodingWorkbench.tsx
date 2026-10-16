@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ENGINEERING_SHORTCUTS, CodingActionError, CodingActionRegistry, resolveCodingAction, codingPromptActions, type ComposerCommand } from "@pi-desktop/shared";
 import { TaskGraphViewer } from "./TaskGraphViewer";
@@ -15,6 +15,7 @@ import { REVIEW_FIX_PROMPT_ID } from "./review-fix-prompt";
 import { GrillWorkspace } from "./GrillWorkspace";
 import { loadGrill, parseGrillReply } from "./grill-workspace-model";
 import { codingNextSteps } from "./coding-next-steps";
+import { completedReviewContext } from "./review-fix-context";
 
 import { DOCUMENT_SHORTCUTS } from "./document-shortcuts";
 
@@ -32,8 +33,10 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
   const result = useAppStore(state => sessionId ? state.latestTurnResults[sessionId] : undefined);
   const running = useAppStore(state => sessionId ? state.runningSessions[sessionId] ?? false : false);
   const recommendation = codingNextSteps(messages, result, running);
+  const reviewContext = completedReviewContext(messages, result, running);
   const { configuration, diagnostic } = useCodingActions();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [requirementsOpen, setRequirementsOpen] = useState(false);
   const [nativeGrillOpen, setNativeGrillOpen] = useState(false);
   useEffect(() => { if (visualStart && visualStart.sessionId === sessionId) setNativeGrillOpen(true); }, [visualStart, sessionId]);
   const [taskGraphOpen, setTaskGraphOpen] = useState(false);
@@ -49,7 +52,7 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
     return () => { active = false; };
   }, [projectPath, sessionId, configuration, catalogVersion]);
   useEffect(() => { void loadCodingActions(); }, []);
-  useEffect(() => { if (disabled) { setMoreOpen(false); } }, [disabled]);
+  useEffect(() => { if (disabled) { setMoreOpen(false); setRequirementsOpen(false); } }, [disabled]);
   useEffect(() => {
     if (!sessionId) return;
     const pending = loadGrill(sessionId)?.pending;
@@ -61,7 +64,8 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
     setNativeGrillOpen(true);
   }, [sessionId, messages]);
   const { primary, more: overflow } = codingShortcutMenu(configuration, catalog, { ask: t("codingActions.askNext"), diagnose: t("codingActions.diagnose"), skillLabels: Object.fromEntries(ENGINEERING_SHORTCUTS.map(entry => [entry.action, t(`coding.${entry.action}`)])) });
-  const more = [...primary.filter(shortcut => shortcut.action.skillId === "grill-with-docs"), ...overflow];
+  const more = overflow.filter(shortcut => shortcut.action.skillId !== "grill-with-docs");
+
   const documentActions: CodingShortcut[] = DOCUMENT_SHORTCUTS.map(doc => ({
     configured: false,
     action: { id: `catalog:${doc.skillId}`, skillId: doc.skillId, label: t(`codingActions.${doc.labelKey}`) },
@@ -77,15 +81,19 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
   // Fixed launcher order is presentation-only: never rewrite user configuration.
   const orderedPromptActions = [...plainActions.filter(action => action.id === "commit-code"), ...plainActions.filter(action => action.id !== "commit-code")];
   const isRecommended = (id: string) => Boolean(recommendation?.steps.some(step => step === id));
-  const recommendedMore = isRecommended(REVIEW_FIX_PROMPT_ID) || more.some(shortcut => isRecommended(shortcut.action.skillId));
-  const tooltipLine = (when: string, example: string) => `${t("codingActions.tooltipWhen", { defaultValue: "什么时候使用" })}：${when}\n${t("codingActions.tooltipExample", { defaultValue: "具体例子" })}：${example}`;
+  const recommendedMore = more.some(shortcut => isRecommended(shortcut.action.skillId));
+  const tooltipLine = (when: string, example: string) => `${when}\n${example}`;
   const renderAction = (shortcut: CodingShortcut, menu = false) => {
     const { action } = shortcut;
     const unavailable = reason(shortcut);
     const note = codingShortcutTooltip(shortcut, catalog, t);
     if (!menu && action.skillId === "grill-with-docs") {
       const tooltip = tooltipLine(t("codingActions.visualTooltipWhen"), t("codingActions.visualTooltipExample"));
-      return <TooltipButton key={action.id} className="btn btn-secondary" ariaLabel={t("codingActions.visualRequirements")} aria-description={tooltip} tooltip={tooltip} disabled={onPrepareVisual ? disabled : !sessionId} onClick={() => onPrepareVisual ? onPrepareVisual() : setNativeGrillOpen(true)}>{t("codingActions.visualRequirements")}</TooltipButton>;
+      return <AnchoredMenu key={action.id} open={requirementsOpen} onClose={() => setRequirementsOpen(false)} role="menu" side="top" label={t("codingActions.requirementsDiscussion")} menuClassName="context-menu coding-requirements-menu"
+        trigger={ref => <TooltipButton ref={ref} className="btn btn-secondary" ariaLabel={t("codingActions.requirementsDiscussion")} aria-description={tooltip} tooltip={tooltip} disabled={disabled} aria-haspopup="menu" aria-expanded={requirementsOpen} onClick={() => { setMoreOpen(false); setRequirementsOpen(value => !value); }}>{t("codingActions.requirementsDiscussion")}</TooltipButton>}>
+        <TooltipButton className="btn btn-ghost context-menu-item" role="menuitem" disabled={disabled || Boolean(unavailable)} tooltip={note} onClick={() => { setRequirementsOpen(false); activateCodingShortcut(shortcut, { openTaskGraph: () => setTaskGraphOpen(true), execute: onExecute, selectSkill: onSelectSkill }); }}>{t("codingActions.discussRequirementsText")}</TooltipButton>
+        <TooltipButton className="btn btn-ghost context-menu-item" role="menuitem" tooltip={tooltip} disabled={disabled || (!onPrepareVisual && !sessionId)} onClick={() => { setRequirementsOpen(false); if (onPrepareVisual) onPrepareVisual(); else setNativeGrillOpen(true); }}>{t("codingActions.visualRequirements")}</TooltipButton>
+      </AnchoredMenu>;
     }
     const label = menu && action.skillId === "grill-with-docs"
       ? t("codingActions.discussRequirementsText", { defaultValue: "需求讨论-文本" })
@@ -95,6 +103,11 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
       tooltipClassName="ui-tooltip-help coding-skill-tooltip" onClick={event => { if (action.skillId === "implement-spec") returnFocusRef.current = menu ? workbenchRef.current?.querySelector<HTMLButtonElement>(`button[aria-haspopup="menu"]`) ?? null : event.currentTarget; setMoreOpen(false); if (isRecommended(action.skillId)) { onSelectSkill(action.skillId, recommendation?.context); return; } activateCodingShortcut(shortcut, { openTaskGraph: () => setTaskGraphOpen(true), execute: onExecute, selectSkill: onSelectSkill }); }}>{label}</TooltipButton>;
   };
   const configure = () => { const store = useAppStore.getState(); store.setSettingsTab("codingActions"); store.setPage("settings"); };
+
+  const renderReviewFix = () => <TooltipButton className={"btn btn-secondary" + (isRecommended(REVIEW_FIX_PROMPT_ID) ? " coding-action-recommended" : "")}
+    disabled={disabled || !reviewContext} ariaLabel={t("codingActions.reviewFix")} aria-description={t(reviewContext ? "codingActions.reviewFixHint" : "codingActions.reviewFixRequiresReview")}
+    tooltip={t(reviewContext ? "codingActions.reviewFixHint" : "codingActions.reviewFixRequiresReview")} tooltipClassName="ui-tooltip-help coding-skill-tooltip"
+    onClick={() => { if (reviewContext) onSelectPrompt(REVIEW_FIX_PROMPT_ID, reviewContext); }}>{t("codingActions.reviewFix")}</TooltipButton>;
 
   const renderDocumentAction = (shortcut: CodingShortcut, index: number) => {
     const doc = DOCUMENT_SHORTCUTS[index];
@@ -107,28 +120,25 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
 
   return <section ref={workbenchRef} className="coding-workbench" aria-label={t("codingActions.title")}>
     <div className="coding-shortcuts coding-shortcuts-primary">{primary.filter(shortcut => ["setup-matt-pocock-skills", "ask-matt", "grill-with-docs"].includes(shortcut.action.skillId)).map(action => renderAction(action))}
-      {primary.filter(shortcut => !["setup-matt-pocock-skills", "ask-matt", "grill-with-docs"].includes(shortcut.action.skillId)).map(action => renderAction(action))}
+      {primary.filter(shortcut => !["setup-matt-pocock-skills", "ask-matt", "grill-with-docs"].includes(shortcut.action.skillId)).map(action => <Fragment key={action.action.id}>{renderAction(action)}{action.action.skillId === "code-review" && renderReviewFix()}</Fragment>)}
+      {!primary.some(shortcut => shortcut.action.skillId === "code-review") && renderReviewFix()}
         {orderedPromptActions.map(action => {
           const tooltip = tooltipLine(t(action.id === "commit-code" ? "codingActions.commitTooltipWhen" : "codingActions.promptTooltipWhen"), t(action.id === "commit-code" ? "codingActions.commitTooltipExample" : "codingActions.promptTooltipExample"));
           const description = isRecommended(action.id) ? `${t("codingActions.recommendedNext")} · ${tooltip}` : tooltip;
           return <TooltipButton key={action.id} className={`btn btn-secondary${isRecommended(action.id) ? " coding-action-recommended" : ""}`} aria-description={description} tooltip={tooltip} disabled={disabled} onClick={() => onSelectPrompt(action.id, isRecommended(action.id) ? recommendation?.context : undefined)}>{action.label}</TooltipButton>;
         })}
 
+      <TooltipButton className="btn btn-secondary" disabled={disabled} tooltip={tooltipLine(t("codingActions.compileTooltipWhen"), t("codingActions.compileTooltipExample"))} onClick={() => onSelectPrompt("compile-project")}>{t("codingActions.compileProject")}</TooltipButton>
       <AnchoredMenu open={moreOpen} onClose={() => setMoreOpen(false)} role="menu" side="top" restoreFocus={!disabled || more.some(shortcut => shortcut.action.skillId === "implement-spec")} label={t("codingActions.more")} menuClassName="context-menu coding-more-menu"
         trigger={ref => {
           const tooltip = tooltipLine(t("codingActions.moreTooltipWhen"), t("codingActions.moreTooltipExample"));
           const description = recommendedMore ? `${t("codingActions.recommendedNext")} · ${tooltip}` : tooltip;
-          return <TooltipButton ref={ref} className={`btn btn-ghost${recommendedMore ? " coding-action-recommended" : ""}`} ariaLabel={t("codingActions.more")} aria-description={description} tooltip={tooltip} disabled={disabled && !more.some(shortcut => shortcut.action.skillId === "implement-spec")} aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(value => !value)}>{t("codingActions.more")}</TooltipButton>;
+          return <TooltipButton ref={ref} className={`btn btn-ghost${recommendedMore ? " coding-action-recommended" : ""}`} ariaLabel={t("codingActions.more")} aria-description={description} tooltip={tooltip} disabled={disabled && !more.some(shortcut => shortcut.action.skillId === "implement-spec")} aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => { setRequirementsOpen(false); setMoreOpen(value => !value); }}>{t("codingActions.more")}</TooltipButton>;
         }}>
         <TooltipButton className="btn btn-ghost context-menu-item" role="menuitem" disabled={disabled}
           ariaLabel={t("codingActions.interactionImage")} tooltip={t("codingActions.interactionImageHint")}
           tooltipClassName="ui-tooltip-help coding-skill-tooltip"
           onClick={() => { setMoreOpen(false); onSelectPrompt(INTERACTION_IMAGE_PROMPT_ID); }}>{t("codingActions.interactionImage")}</TooltipButton>
-        <TooltipButton className={"btn btn-ghost context-menu-item" + (isRecommended(REVIEW_FIX_PROMPT_ID) ? " coding-action-recommended" : "")}
-          role="menuitem" disabled={disabled} ariaLabel={t("codingActions.reviewFix")}
-          aria-description={isRecommended(REVIEW_FIX_PROMPT_ID) ? t("codingActions.recommendedNext") : undefined}
-          tooltip={t("codingActions.reviewFixHint")} tooltipClassName="ui-tooltip-help coding-skill-tooltip"
-          onClick={() => { setMoreOpen(false); onSelectPrompt(REVIEW_FIX_PROMPT_ID, isRecommended(REVIEW_FIX_PROMPT_ID) ? recommendation?.context : undefined); }}>{t("codingActions.reviewFix")}</TooltipButton>
         {groupCodingShortcuts(more).map(group => <div key={group.id} role="group" aria-label={t(`codingActions.groups.${group.id}`)}>
           <div className="coding-menu-group-label" aria-hidden="true">{t(`codingActions.groups.${group.id}`)}</div>
           {group.shortcuts.map(action => renderAction(action, true))}

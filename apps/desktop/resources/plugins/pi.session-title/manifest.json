@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "pi.session-title",
+  "name": "Conversation titles",
+  "version": "1.0.0",
+  "description": "Generate a short topic summary after the first completed reply, using the conversation model. Uses model tokens.",
+  "i18n": {
+    "zh-CN": {
+      "name": "对话标题",
+      "description": "首轮回复后，使用对话模型生成简短主题摘要，会消耗模型额度。"
+    }
+  },
+  "author": "mattpocock-PI",
+  "main": "main.cjs",
+  "permissions": [
+    "session.autoTitle",
+    "agent.complete"
+  ],
+  "engines": {
+    "piDesktop": ">=0.20.1"
+  }
+}

@@ -18,8 +18,6 @@ export function codingShortcutDescription(shortcut: CodingShortcut, catalog: Com
 export function codingShortcutTooltip(shortcut: CodingShortcut, catalog: ComposerCommand[], t: TFunction): string {
   const { action } = shortcut;
   const entry = ENGINEERING_SHORTCUTS.find(entry => entry.skill === action.skillId);
-  const labelWhen = t("codingActions.tooltipWhen", { defaultValue: "什么时候使用" });
-  const labelExample = t("codingActions.tooltipExample", { defaultValue: "具体例子" });
   const configuredWhen = shortcut.configured && action.description ? oneLine(action.description) : "";
   const when = configuredWhen || (entry
     ? t(`coding.skillGuides.${entry.action}.when`)
@@ -27,5 +25,5 @@ export function codingShortcutTooltip(shortcut: CodingShortcut, catalog: Compose
   const example = entry
     ? t(`coding.skillGuides.${entry.action}.example`)
     : t("codingActions.tooltipFallbackExample", { skill: action.label, defaultValue: `Use ${action.label} for the current task.` });
-  return `${labelWhen}：${oneLine(when)}\n${labelExample}：${oneLine(example)}`;
+  return `${oneLine(when)}\n${oneLine(example)}`;
 }

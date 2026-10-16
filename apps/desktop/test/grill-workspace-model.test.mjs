@@ -203,6 +203,7 @@ try {
     assert.match(prompt, /req-123/);
     assert.match(prompt, /question q1/);
     assert.match(prompt, /Never replace confirmed choices/);
+    assert.match(prompt, /Do not compile, build or package/);
     assert.match(prompt, /grill-workspace-result/);
   });
 

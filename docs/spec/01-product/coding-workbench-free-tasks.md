@@ -7,14 +7,22 @@
 
 ## Current Coding Actions contract
 
-The primary requirements entry is Visual requirements discussion and directly
-prepares topic entry in the external Composer. Manual Send submits the initial
-interview through the existing native prompt path, materializing a new Session
-when necessary, then opens the panel with the topic and pending operation already
-loaded. Selection alone neither sends nor opens an empty topic dialog. Cancel
-returns to ordinary Composer mode without changing the draft. No split dropdown remains.
-Ordinary Requirements discussion, Create specification and Create tickets live
-in More, preserving saved Skill configuration and draft-only execution.
+The primary Requirements (text / visual) button opens a menu with both modes.
+Text uses the configured `grill-with-docs` action, including its saved prompt.
+Visual prepares topic entry in the external Composer. Manual Send submits the
+initial interview through the existing native prompt path, materializing a
+Session when needed, then reveals the correlated panel. Opening the dropdown
+neither changes the draft nor submits. Escape and mode selection close the menu.
+Create specification and Create tickets remain in More.
+
+Compile is a separate built-in plain prompt button. It detects project build
+conventions and prepares compilation instructions, preserving the existing draft
+and attachments and waiting for manual Send. All other launcher actions append
+an instruction forbidding compilation, builds and packaging during that action;
+focused non-build checks remain available. Existing saved prompts are never
+rewritten. Commit prepares version-control inspection and commit instructions
+without automatically compiling. Tooltips keep their usage and example content
+without fixed “When to use” / “Example” prefixes.
 The optional next-step recommendations remain available independently.
 A correlated pending native interview response in the active Session reveals
 the wide responsive panel once; unrelated replies never trigger it.
@@ -69,15 +77,20 @@ does not automatically finish the interview.
 Completed native interviews recommend Create specification. A successfully ended
 to-spec turn recommends Create tickets or Implement; to-tickets recommends
 Implement; implement recommends Code review. Code review findings or an unclear
-outcome recommend Fix code review findings in More, highlighting both More and
-the entry. Only an explicit clear review (an empty structured findings array,
+outcome recommend the primary Fix code review findings button. Only an explicit clear review (an empty structured findings array,
 without an incorrect verdict, or a standalone English/Chinese no-findings
 conclusion) recommends Commit code. Priority-tagged findings take precedence
 over a clear conclusion. Unknown prose is never assumed to be a clean review.
-Fix code review findings is an independent built-in plain prompt: verify the
-latest report, fix confirmed defects minimally, add regression coverage and
-report rejected/unresolved findings. It carries the recommendation context,
-retains existing draft/attachments, closes More and waits for manual Send.
+Fix code review findings is an always-visible primary plain-prompt button immediately
+after Code review. It starts disabled and becomes available only after an actual
+completed code-review turn in the current conversation; clicking Review alone,
+streaming/failed replies, running turns and switching to an unreviewed conversation
+do not unlock it. The latest review supersedes earlier reviews. It includes the
+review replies and subsequent user/assistant discussion, excluding tool output,
+in a bounded context. First summarize and deduplicate the findings with severity,
+locations, impact and evidence, then verify the latest report, fix confirmed defects minimally, add regression coverage and
+report rejected/unresolved findings. It carries the review discussion context,
+retains existing draft/attachments and waits for manual Send.
 Completed repair requests recommend Code review again. The localized leading
 repair heading identifies this plain-prompt action; editing that heading may
 remove the optional next-step hint. Saved Skill/prompt configuration is retained.
@@ -98,8 +111,7 @@ offers navigation only and does not certify the generated artifact or review.
 Selecting a recommendation carries the preceding outcome (bounded to 8000
 characters), or the interview's decisions and finish note, into an editable draft.
 Existing draft text and attachments survive. Only manual Send executes it.
-Commit uses the configured plain-prompt action and its existing build/verification
-requirements; recommendations never send, commit or push automatically.
+Commit uses the configured plain-prompt action with the no-build instruction; recommendations never send, commit or push automatically.
 
 More groups available Matt skills by Requirements and exploration, Design and planning, Development and testing, Review and maintenance, and Collaboration and delivery. Unknown configured overflow appears under Custom actions. Empty groups are hidden. Grouping is presentation only: no stage prerequisites, execution order, or persisted configuration changes.
 
@@ -115,14 +127,14 @@ disabled entries). Matt labels and guidance are localized; imagegen and unrelate
 catalog skills are excluded. Existing configured common
 entries retain their labels, prompts and enabled state; no profile rewrite is
 required to restore the entry points. Missing skills remain visibly unavailable. Known engineering skills use localized
-two-line launcher tooltips with “When to use” and “Example” labels on primary
+two-line launcher tooltips without fixed usage/example labels on primary
 and More entries; raw catalog descriptions are fallback only for unknown skills.
 Configured descriptions remain verbatim in settings and provide the launcher
 tooltip's usage line when present.
 Except for the `implement-spec` viewer entry, selecting an action prepares an editable Composer draft and never
 submits. Undefined/null instructions use the localized engineering prompt matched
-by skill id; explicit empty instructions retain marker-only insertion. Custom
-instructions remain verbatim. Unknown custom skills have no built-in instruction.
+by skill id; explicit empty instructions retain the native marker plus the launcher no-build
+instruction. Custom instructions remain verbatim with that appended instruction. Unknown custom skills have no built-in instruction.
 Existing text and attachments survive. Manual Send uses the native skill path.
 
 Extension settings show the effective localized instruction in the prompt editor,
@@ -192,7 +204,7 @@ Interaction image prompt, Ordinary discussion, Create specification and Create
 tickets live in More. Selecting Interaction image prompt closes More and inserts
 an editable prompt, preserving the existing Composer draft and attachments.
 Settings remain accessible through Extensions.
-The default Commit code button prepares an editable, localized build-then-commit prompt with no Skill dependency. It preserves existing Composer text and attachments; only manual Send executes the prompt. Git (including GitLab hosting) and SVN are supported by the default instruction; failed verification forbids commit. Git push is permitted only when the user explicitly requests it. The Engineering Workflow entry is no longer exposed.
+The default Commit code button prepares an editable, localized commit prompt without compilation with no Skill dependency. It preserves existing Composer text and attachments; only manual Send executes the prompt. Git (including GitLab hosting) and SVN are supported by the default instruction; unexpected inspection failures forbid commit. Git push is permitted only when the user explicitly requests it. The Engineering Workflow entry is no longer exposed.
 
 Extensions > Coding Actions includes a separate Plain prompt buttons editor.
 Names, instructions, enabled state and order are editable; buttons can be added
@@ -224,8 +236,7 @@ draft-only behavior described above.
 ## Global instruction settings
 
 Composer skill buttons, More, visual requirements, and prompt/Commit actions
-show concise localized tooltips with exactly two labeled lines: “When to use”
-and “Example”. They use the shared portal tooltip on pointer hover and keyboard
+show concise localized tooltips with exactly two lines for usage and an example, without fixed labels. They use the shared portal tooltip on pointer hover and keyboard
 focus; it wraps within the viewport. Reading a tooltip does not change the
 draft or execute a skill. Clicking dismisses it and retains the existing draft
 insertion behavior. Buttons retain short accessible names and expose their

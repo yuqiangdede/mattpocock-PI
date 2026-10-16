@@ -74,3 +74,13 @@ model-composed title moves to the plugin.
   sessions and do not match the required boundary.
 - Run a second title flow in Electron main: rejected because title policy and
   user-configured prompts/models belong to the plugin after this change.
+
+## Fork amendment — 2026-10-16
+
+The user requested short semantic conversation summaries instead of truncated
+opening messages. Keep generation plugin-owned and the existing Host permission
+and compare-and-set boundaries. Bundle `pi.session-title` using the conversation
+model, with no core completion path or Session lifecycle changes. Keep placeholders
+until generation succeeds and preserve existing names. The bundled plugin can be
+disabled and its description discloses model usage. This supersedes the original
+first-prompt fallback and standalone-install requirement for this fork only.

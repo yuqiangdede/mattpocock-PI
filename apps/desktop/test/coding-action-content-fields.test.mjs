@@ -62,7 +62,7 @@ test("settings show effective defaults and preserve edit, clear, reset and selec
   const { codingShortcutTooltip } = await server.ssrLoadModule("/src/features/coding/coding-shortcut-tooltip.ts");
   assert.equal(descriptionInput().props.value, "Custom guidance");
   const tooltip = codingShortcutTooltip({ action, configured: true }, catalog, i18n.t.bind(i18n));
-  assert.deepEqual(tooltip.split("\n"), ["什么时候使用：Custom guidance", `具体例子：${zhCN.coding.skillGuides.spec.example}`]);
+  assert.deepEqual(tooltip.split("\n"), ["Custom guidance", `${zhCN.coding.skillGuides.spec.example}`]);
   assert.ok(!tooltip.includes(zhCN.skillGates.description), "gate details stay outside concise launcher tooltips");
   descriptionInput().props.onChange({ target: { value: "" } });
   assert.ok(descriptionInput().props.value.includes(zhCN.coding.skillGuides.spec.purpose));
