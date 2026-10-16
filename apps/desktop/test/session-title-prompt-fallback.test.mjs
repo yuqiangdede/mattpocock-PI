@@ -1,9 +1,4 @@
-/**
- * Automatic session titles have two layers: host-core derives a deterministic
- * title from the first prompt so a new session is readable offline, and an
- * optional title plugin may later upgrade it with a model-composed title.
- * These tests lock both halves and the boundary between them.
- */
+/** Semantic titles are plugin-owned; pending sessions retain a neutral placeholder. */
 import { readMainSource, readStoreSource } from "./helpers/source-contracts.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -33,15 +28,15 @@ const [api, protocol, host, rpc, queueSlice, main, store] = await Promise.all([
   readStoreSource(),
 ]);
 
-test("the first prompt becomes an immediate title, collapsed and capped", () => {
-  assert.equal(promptFallbackSessionTitle("  Fix\n the\tlogin  ", "New task"), "Fix the login");
-  assert.equal(promptFallbackSessionTitle("p".repeat(60), "New task"), "p".repeat(48));
+test("the title stays neutral until a semantic summary is generated", () => {
+  assert.equal(promptFallbackSessionTitle("  Fix\n the\tlogin  ", "New task"), "New task");
+  assert.equal(promptFallbackSessionTitle("p".repeat(60), "New task"), "New task");
   assert.equal(promptFallbackSessionTitle("   ", "New task"), "New task");
-  assert.equal(promptFallbackSessionTitle("界".repeat(60), "New task"), "界".repeat(48));
+  assert.equal(promptFallbackSessionTitle("界".repeat(60), "New task"), "New task");
 });
 
 test("the fallback only fires for a still-untitled session the owning host can title", () => {
-  assert.equal(isDefaultSessionTitle(promptFallbackSessionTitle("Fix login", "New task")), false);
+  assert.equal(isDefaultSessionTitle(promptFallbackSessionTitle("Fix login", "New task")), true);
   assert.equal(isDefaultSessionTitle(untitledTaskTitle()), true);
   // A placeholder is recognized in every shipped locale, not just the active one.
   for (const placeholder of [

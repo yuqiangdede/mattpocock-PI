@@ -210,7 +210,7 @@ test("Main 初始标签取当前语言，重启与语言切换保留保存的用
   let locale = "en";
   const store = new CodingActionStore(directory, settings => catalogs[settings?.language ?? locale].codingActions.defaults);
   const initial = await store.load(async () => ({ language: "zh-CN" }));
-  assert.equal(initial.configuration.actions[0].label, "需求讨论");
+  assert.equal(initial.configuration.actions[0].label, "需求讨论-文本");
   initial.configuration.actions[0].label = "我的讨论";
   initial.configuration.actions[0].prompt = "保持我的原文";
   await store.save(initial.configuration);

@@ -102,20 +102,20 @@ finalization. A steering failure must not terminate the active run.
 
 ### 4.1 Session title generation
 
-The core keeps new sessions readable without any model call. Sending the first
-prompt into a session whose stored title is still a recognized placeholder asks
-the host for a deterministic fallback title through `session/deriveTitle`. The
-renderer collapses whitespace and caps its request at 48 characters; host-core
-accepts it only while the stored title is still a placeholder with the `default`
-source, so the fallback never replaces a manual rename or an earlier automatic
-title, and the write does not change `updated_at`.
+Sending the first prompt into a session keeps its localized placeholder until a semantic title is
+available; the renderer no longer copies or truncates the first prompt into the
+title. Existing stored and manual titles are preserved.
 
-That fallback keeps the source `default`: the derived text is not a user choice,
-so the session stays eligible for automatic replacement. An optional standalone
-plugin may subscribe to `session:turnEnded`; with the dedicated
-`session.autoTitle` permission it can read only the first user prompt and first
-assistant reply for a session whose title is still default, then use
-`agent.complete` with its configured prompt, model, and thinking level.
+The bundled `pi.session-title` plugin subscribes to `session:turnEnded`. Using
+`session.autoTitle`, it reads bounded first-turn context for eligible default
+titles and calls `agent.complete` with that conversation's model. Its instruction
+requests 4–10 Chinese characters or 2–6 words summarizing the concrete topic,
+never a copied opening sentence. It has no full-transcript or filesystem access.
+The plugin uses model tokens when enabled, observes existing permission gates,
+and can be disabled through Plugins. Missing models/context and failed or invalid
+completions preserve the current title; failures are observable without private
+context in logs. Duplicate events are coalesced while generation is pending;
+unload removes the listener and blocks late writes.
 
 The plugin writes through a host compare-and-set that succeeds only while the
 exact title it read is still current. Manual renames and another generated

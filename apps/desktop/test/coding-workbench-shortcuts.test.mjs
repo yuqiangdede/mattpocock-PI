@@ -30,14 +30,16 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
     createElement(CodingWorkbench, { disabled: false, error: null, onExecute: () => { executions++; }, onSelectSkill: () => { executions++; }, onSelectPrompt: () => { executions++; } })));
   for (const key of ["implement", "code-review"]) assert.ok(html.includes(en.codingActions.defaults[key]));
   assert.ok(!html.includes(`>${en.codingActions.configure}</button>`), "configuration is available through Settings only");
-  assert.ok(html.includes(en.codingActions.visualRequirements), "direct visual requirements entry");
+  assert.ok(html.includes(en.codingActions.requirementsDiscussion), "direct visual requirements entry");
   assert.ok(!html.includes("coding-requirements-split"));
   assert.ok(html.includes(en.codingActions.moreTooltipWhen), "More has concise help");
   assert.ok(html.includes(en.codingActions.commitTooltipWhen), "Commit code has concise help");
   assert.ok(html.includes(en.codingActions.visualTooltipWhen), "Visual requirements entry has concise help");
-  assert.ok(html.includes(en.codingActions.tooltipWhen), "Skill shortcuts include usage");
-  assert.ok(html.includes(en.codingActions.tooltipExample), "Skill shortcuts include examples");
+  assert.ok(!html.includes(en.codingActions.tooltipWhen), "Skill shortcuts include usage");
+  assert.ok(!html.includes(en.codingActions.tooltipExample), "Skill shortcuts include examples");
   assert.ok(html.includes(en.codingActions.commitCode));
+  assert.match(html, /<button[^>]*disabled[^>]*>Fix code review findings<\/button>/);
+  assert.ok(html.includes(`>${en.codingActions.compileProject}</button>`));
   assert.ok(!html.includes(`>${en.codingActions.interactionImage}</button>`), "image prompt lives in the closed More menu");
   assert.ok(html.includes("coding-shortcuts-secondary"), "second row contains document workflow actions");
   assert.ok(html.indexOf(en.codingActions.diagnose) < html.indexOf(en.codingActions.more), "More follows Diagnose in the primary row");
@@ -47,8 +49,8 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
   assert.ok(html.indexOf(`aria-label="${en.coding.initialize}"`) < html.indexOf(`aria-label="${en.codingActions.askNext}"`));
   assert.ok(html.includes(en.codingActions.diagnose));
   assert.ok(html.includes(en.codingActions.more));
-  const orderedLabels = [en.coding.initialize, en.codingActions.askNext, en.codingActions.visualRequirements,
-    en.codingActions.defaults.implement, en.codingActions.defaults["code-review"],
+  const orderedLabels = [en.coding.initialize, en.codingActions.askNext, en.codingActions.requirementsDiscussion,
+    en.codingActions.defaults.implement, en.codingActions.defaults["code-review"], en.codingActions.reviewFix,
     en.codingActions.diagnose, en.codingActions.commitCode, en.codingActions.more];
   const positions = orderedLabels.map(label => html.indexOf(`>${label}</button>`));
   assert.ok(positions.every((position, index) => position >= 0 && (index === 0 || position > positions[index - 1])), "Primary actions follow the engineering order");
@@ -114,7 +116,7 @@ test("Coding Actions zh-CN 两排按钮呈现与顺序正确", async t => {
     createElement(CodingWorkbench, { disabled: false, error: null, onExecute: () => {}, onSelectSkill: () => {}, onSelectPrompt: () => {} })));
 
   // 第一排：初始化、咨询、需求讨论、实现、代码审查、Bug排查、提交代码、更多
-  const row1Expected = ["初始化", "咨询", "需求讨论", "实现", "代码审查", "Bug排查", "提交代码", "更多"];
+  const row1Expected = ["初始化", "咨询", "需求讨论（文本/可视化）", "实现", "代码审查", "修复审查问题", "Bug排查", "提交代码", "编译", "更多"];
   for (const label of row1Expected) {
     assert.ok(html.includes(`>${label}</button>`), `Row 1 should include ${label}`);
   }
@@ -122,8 +124,8 @@ test("Coding Actions zh-CN 两排按钮呈现与顺序正确", async t => {
   assert.ok(row1Positions.every((pos, idx) => pos >= 0 && (idx === 0 || pos > row1Positions[idx - 1])), "Row 1 buttons follow exact sequence");
 
   // 更多里面的需求讨论配置文案为“需求讨论-文本”
-  assert.equal(zhCN.codingActions.discussRequirementsText, "需求讨论-文本");
-  assert.equal(zhCN.codingActions.visualRequirements, "需求讨论");
+  assert.equal(zhCN.codingActions.discussRequirementsText, "文本");
+  assert.equal(zhCN.codingActions.visualRequirements, "可视化");
 
   // 第二排：需求文档、总体设计文档、概要设计文档、接口文档、数据库设计、测试方案、测试报告
   const row2Expected = ["需求文档", "总设文档", "概设文档", "接口文档", "数据库设计", "合并并转换格式"];

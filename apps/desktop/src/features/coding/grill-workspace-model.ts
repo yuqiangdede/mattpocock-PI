@@ -153,6 +153,7 @@ export function grillPrompt(state: GrillState, operation: GrillOperation): strin
     "You are conducting an iterative requirements interview within mattpocock-PI.",
     "Study the current conversation and relevant project code/documents before suggesting decisions.",
     "Do not implement or change project files during this interview except a design document explicitly requested at Finish.",
+    "Do not compile, build or package the project during this interview; compilation is a separate user action.",
     "Never replace confirmed choices with your recommendation. A discussion is not a confirmed answer.",
     "For this workspace action, respond with exactly one <grill-workspace-result> JSON object followed by its closing tag; no Markdown fence.",
     "Use only the JSON keys in the requested schema. Always repeat requestId exactly.",
