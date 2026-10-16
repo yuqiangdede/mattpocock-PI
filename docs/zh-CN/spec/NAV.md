@@ -19,7 +19,6 @@
 - [requirements-confirmation.md](/zh-CN/spec/01-product/requirements-confirmation)
 - [executable-updates.md](/zh-CN/spec/01-product/executable-updates)
 
-- [development-navigator.md](/zh-CN/spec/01-product/development-navigator) — 阶段二计划规格，尚未交付
 
 ## 2. 架构
 - [README.md](/zh-CN/spec/02-architecture/README)

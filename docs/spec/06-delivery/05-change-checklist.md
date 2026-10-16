@@ -14,18 +14,6 @@ targeted regression checks. Obtain architecture approval and record an ADR
 before implementation. See AGENTS.md's mandatory extension-first policy.
 The policy sync gate checks that both agent entry points retain this rule.
 
-## Parallel stage development exception
-
-For fork stage-two experiments, the parallel-stage policy in
-[AGENTS.md](https://github.com/yuqiangdede/mattpocock-PI/blob/main/AGENTS.md#parallel-stage-development-fork-exception)
-and [the branch guide](../../project/parallel-stage-development.md) overrides
-the main-only task-start, PR-target and task-cleanup wording below.
-Before experimental validation or a PR update, refresh the stage target from latest origin/main, incorporate its latest head and check task ancestry with node scripts/check-pr-base-main.mjs --base <latest-stage-head>. Record the exploration base and main revision, validate the actual
-exploration integration candidate, and retain active stage worktrees.
-Promotion to stable main still requires a fresh main-based delivery branch,
-latest-main ancestry and the normal validation/PR gates. This exception
-does not authorize commits, publishing, merging or live-instance testing.
-
 
 ---
 

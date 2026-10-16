@@ -18,7 +18,6 @@
 
 | 医生 | 描述 |
 |---|---|
-| [Development Navigator](/zh-CN/spec/01-product/development-navigator) | 阶段二 Work Item 计划规格，尚未交付 |
 | [NAV.md](/zh-CN/spec/NAV) | 单页完整导航 |
 | [00-基线.md](/zh-CN/spec/00-baseline) | 冻结基线 |
 | [08-meta/decisions-log.md](/zh-CN/spec/08-meta/decisions-log) | 冻结细节决策 |

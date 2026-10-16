@@ -59,10 +59,10 @@ node scripts/e2e-electron-boot.mjs
 
 完整构建发现 electron-vite 静态 import 正则误识别以 import 结尾的英文译文；将导入按钮文案明确为 Validate and import actions 后构建恢复。未修改打包器或 Runtime。
 
-## 第二阶段与后续工单
+## Scope and historical tickets
 
 Development Navigator、ProjectState、Artifact Tracking / Freshness、Recommendation、Next Step、流程百分比、强制阶段跳转与自动推进均未实现。本次不做 Workflow 模板升级引擎。
 
-#31–#36 保留编号并重写为轻量动作能力；#37 改为阶段一验收与原生交互回归。PR #38 已于 2026-10-06 合并，#31–#37 已关闭。建议后续导航能力另行提出需求与工单，不将强流程回填到这七张工单中。
+#31–#36 保留编号并重写为轻量动作能力；#37 改为阶段一验收与原生交互回归。PR #38 已于 2026-10-06 合并，#31–#37 已关闭。
 
 实现交付时未做安装包验收。后续 Windows 候选包验收见 [2026-10-06 验收记录](windows-skill-launcher-acceptance-2026-10-06.md)；最新主分支 0.16.1-beta.2 发行验收见 [2026-10-07 发布验收](windows-release-acceptance-2026-10-07-beta2.md)。签名、干净机器及跨平台验收仍未覆盖。
