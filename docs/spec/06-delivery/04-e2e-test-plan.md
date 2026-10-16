@@ -18282,6 +18282,16 @@ host-created files. The full app's file-preview viewer is covered separately.
 
 ### E2E-CODING-continue-task
 
-- Steps: retain a draft with an attachment; click Continue after Commit code.
+- Steps: retain a draft with an attachment; click Continue after Compile.
 - Expected: the localized continuation prompt precedes the retained draft, attachments remain intact, and no turn is sent automatically. The action is disabled while the launcher is blocked.
 - Automated path: `apps/desktop/test/coding-prompt-user-path.test.mjs`.
+
+### E2E-coding-toolbar-collapse
+
+- Steps: inspect the localized primary action order; open Requirements; collapse
+  the shortcuts; expand them; choose Text discussion or Visual discussion.
+- Expected: both rows disappear and return together; the menu closes on collapse;
+  the draft and attachments survive; expanding never submits a prompt. Requirements
+  retains both modes. Compile precedes Continue, which precedes More.
+- Automated coverage: `coding-workbench-shortcuts.test.mjs` (labels and order) and
+  `coding-prompt-user-path.test.mjs` (isolated Electron interaction and draft flow).

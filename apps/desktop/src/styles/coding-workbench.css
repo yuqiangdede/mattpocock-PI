@@ -20,3 +20,5 @@
 .requirements-confirmation-dialog li { overflow-wrap: anywhere; }
 .requirements-confirmation-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .coding-menu-group-label { padding: 6px 10px; color: var(--ds-text-secondary); font-size: var(--text-sm); }
+
+.coding-shortcuts-toggle { display: block; margin-inline-start: auto; margin-block-end: 4px; }
