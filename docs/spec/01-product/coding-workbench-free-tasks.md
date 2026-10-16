@@ -7,7 +7,7 @@
 
 ## Current Coding Actions contract
 
-The primary Requirements (text / visual) button opens a menu with both modes.
+The primary Requirements button opens a menu with both modes.
 Text uses the configured `grill-with-docs` action, including its saved prompt.
 Visual prepares topic entry in the external Composer. Manual Send submits the
 initial interview through the existing native prompt path, materializing a
@@ -197,9 +197,16 @@ manual-Send contract, including skills whose eventual execution requires an exte
 as Claude Code.
 
 
-The shortcuts share one wrapping row: Initialize, Ask next step, Visual
-requirements discussion, Implement, Code review,
-Diagnose bug, Commit code, optional custom plain prompts, then More.
+The primary wrapping row presents Initialize, Ask, Requirements, Implement,
+Code review, Repair, Diagnose bug, Commit, Compile, Continue, then More.
+Chinese labels are shortened for this toolbar; Requirements offers Text discussion
+and Visual discussion in its existing dropdown. Saved custom prompt names remain
+unchanged. Additional configured prompt actions still follow Commit.
+A localized Collapse shortcuts / Expand shortcuts button controls both rows
+as one unit. The toolbar starts expanded and keeps its state for the current
+component lifetime. Collapsing closes launcher menus, preserves the Composer draft
+and attachments, and leaves errors and active work panels available.
+The second row retains its document workflow actions.
 Interaction image prompt, Ordinary discussion, Create specification and Create
 tickets live in More. Selecting Interaction image prompt closes More and inserts
 an editable prompt, preserving the existing Composer draft and attachments.

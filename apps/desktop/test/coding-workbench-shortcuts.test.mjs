@@ -109,14 +109,14 @@ test("Coding Actions zh-CN 两排按钮呈现与顺序正确", async t => {
   const { createDefaultCodingActions } = await server.ssrLoadModule("@pi-desktop/shared");
   const { api } = await server.ssrLoadModule("/src/lib/api.ts");
   const { loadCodingActions } = await server.ssrLoadModule("/src/features/extensions/coding-action-state.ts");
-  api.getCodingActions = async () => ({ configuration: createDefaultCodingActions(zhCN.codingActions.defaults) });
+  api.getCodingActions = async () => ({ configuration: { ...createDefaultCodingActions(zhCN.codingActions.defaults), promptActions: [{ id: "commit-code", label: "提交代码", prompt: null }] } });
   await loadCodingActions(true);
   const i18n = createInstance(); await i18n.init({ lng: "zh-CN", resources: { "zh-CN": { translation: zhCN } } });
   const html = renderToStaticMarkup(createElement(I18nextProvider, { i18n },
     createElement(CodingWorkbench, { disabled: false, error: null, onExecute: () => {}, onSelectSkill: () => {}, onSelectPrompt: () => {} })));
 
   // 第一排：初始化、咨询、需求讨论、实现、代码审查、Bug排查、提交代码、更多
-  const row1Expected = ["初始化", "咨询", "需求讨论（文本/可视化）", "实现", "代码审查", "修复审查问题", "Bug排查", "提交代码", "编译", "更多"];
+  const row1Expected = ["初始化", "咨询", "需求讨论", "实现", "走读", "修复", "bug排查", "提交", "编译", "继续", "更多"];
   for (const label of row1Expected) {
     assert.ok(html.includes(`>${label}</button>`), `Row 1 should include ${label}`);
   }
@@ -124,8 +124,8 @@ test("Coding Actions zh-CN 两排按钮呈现与顺序正确", async t => {
   assert.ok(row1Positions.every((pos, idx) => pos >= 0 && (idx === 0 || pos > row1Positions[idx - 1])), "Row 1 buttons follow exact sequence");
 
   // 更多里面的需求讨论配置文案为“需求讨论-文本”
-  assert.equal(zhCN.codingActions.discussRequirementsText, "文本");
-  assert.equal(zhCN.codingActions.visualRequirements, "可视化");
+  assert.equal(zhCN.codingActions.discussRequirementsText, "文本讨论");
+  assert.equal(zhCN.codingActions.visualRequirements, "可视化讨论");
 
   // 第二排：需求文档、总体设计文档、概要设计文档、接口文档、数据库设计、测试方案、测试报告
   const row2Expected = ["需求文档", "总设文档", "概设文档", "接口文档", "数据库设计", "合并并转换格式"];

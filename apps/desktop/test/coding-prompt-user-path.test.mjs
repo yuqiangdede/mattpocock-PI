@@ -59,9 +59,11 @@ function ExternalTopicComposer() {
 }
 const render = element => flushSync(() => root.render(<I18nextProvider i18n={i18n}>{element}</I18nextProvider>));
 const field = key => document.querySelector('[aria-label="' + i18n.t("codingActions." + key) + '"]');
-const until = async (read, description = read.toString()) => { const end = performance.now() + 8000; while (performance.now() < end) { const value = await read(); if (value) return value; await new Promise(requestAnimationFrame); } throw new Error("Timed out waiting for " + description + ": " + document.body.textContent); };
-const click = async label => { const button = await until(() => [...document.querySelectorAll("button")].find(item => item.textContent.trim() === label && !item.disabled), "enabled button: " + label); button.click(); await new Promise(requestAnimationFrame); };
-const fill = async (key, value) => { const input = await until(() => field(key)); const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(prototype, "value").set.call(input, value); input.dispatchEvent(new Event("input", { bubbles: true })); await new Promise(requestAnimationFrame); };
+// Hidden Electron windows may pause animation frames; yield through the task queue.
+const nextTask = () => new Promise(resolve => { const channel = new MessageChannel(); channel.port1.onmessage = () => { channel.port1.close(); channel.port2.close(); resolve(); }; channel.port2.postMessage(null); });
+const until = async (read, description = read.toString()) => { const end = performance.now() + 8000; while (performance.now() < end) { const value = await read(); if (value) return value; await nextTask(); } throw new Error("Timed out waiting for " + description + ": " + document.body.textContent); };
+const click = async label => { const button = await until(() => [...document.querySelectorAll("button")].find(item => item.textContent.trim() === label && !item.disabled), "enabled button: " + label); button.click(); await nextTask(); };
+const fill = async (key, value) => { const input = await until(() => field(key)); const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(prototype, "value").set.call(input, value); input.dispatchEvent(new Event("input", { bubbles: true })); await nextTask(); };
 const check = (value, message) => { if (!value) throw new Error(message); };
 window.promptButtonsProbe = async () => {
   await i18n.use(initReactI18next).init({ lng: "zh-CN", resources: { "zh-CN": { translation: zhCN } }, interpolation: { escapeValue: false } });
@@ -79,10 +81,25 @@ window.promptButtonsProbe = async () => {
   await loadCodingActions(true);
   render(<DraftComposer />);
   await until(() => document.querySelector('[aria-label="Draft"]'));
+  const toolbarToggle = () => document.querySelector('.coding-shortcuts-toggle');
+  check(toolbarToggle()?.getAttribute('aria-expanded') === 'true', "Toolbar starts expanded");
+  const draftBeforeCollapse = document.querySelector('[aria-label="Draft"]').value;
+  await click(i18n.t("codingActions.requirementsDiscussion"));
+  await until(() => document.querySelector('.coding-requirements-menu'));
+  toolbarToggle().click();
+  await until(() => toolbarToggle().getAttribute('aria-expanded') === 'false');
+  check(!document.querySelector('.coding-shortcuts-primary') && !document.querySelector('.coding-shortcuts-secondary'), "Collapse hides both rows");
+  check(!document.querySelector('.coding-requirements-menu'), "Collapse closes the open requirements menu");
+  check(document.querySelector('[aria-label="Draft"]').value === draftBeforeCollapse, "Collapse retains the draft");
+  toolbarToggle().click();
+  await until(() => document.querySelector('.coding-shortcuts-secondary'));
+  check(toolbarToggle().getAttribute('aria-expanded') === 'true', "Expand restores both rows");
+  const labels = [...document.querySelectorAll('.coding-shortcuts-primary button')].map(button => button.textContent);
+  check(labels.indexOf(i18n.t("codingActions.compileProject")) < labels.indexOf(i18n.t("codingActions.continueTask")), "Compile precedes Continue");
   const repairButton = () => [...document.querySelectorAll('.coding-shortcuts-primary button')].find(button => button.textContent === i18n.t("codingActions.reviewFix"));
   check(repairButton()?.disabled, "Repair starts disabled before a completed review");
   const primaryButtons = [...document.querySelectorAll('.coding-shortcuts-primary button')];
-  check(primaryButtons.indexOf(repairButton()) === primaryButtons.findIndex(button => button.textContent === "Code review") + 1, "Repair immediately follows Code review");
+  check(primaryButtons.indexOf(repairButton()) === primaryButtons.findIndex(button => button.textContent === i18n.t("codingActions.walkthrough")) + 1, "Repair immediately follows Code review");
   await click(i18n.t("codingActions.requirementsDiscussion"));
   const visualTrigger = await until(() => [...document.querySelectorAll('.coding-requirements-menu button')].find(button => button.textContent === i18n.t("codingActions.visualRequirements")));
   check(visualTrigger.disabled, "Native visual discussion requires an existing session");
@@ -98,14 +115,13 @@ window.promptButtonsProbe = async () => {
   await until(() => !document.querySelector('.coding-more-menu[role="menu"]'));
   await click("My commit");
   await until(() => document.querySelector('[aria-label="Draft"]').value === "Build first, commit with Git or SVN\n\n" + initialDraft + "\n\n" + i18n.t("codingActions.noCompilePrompt"));
-  const commitButton = [...document.querySelectorAll("button")].find(button => button.textContent === "My commit");
-  check(commitButton.nextElementSibling.textContent === i18n.t("codingActions.continueTask"), "Continue immediately follows Commit");
+  check([...document.querySelectorAll("button")].find(button => button.textContent === i18n.t("codingActions.compileProject")).nextElementSibling.textContent === i18n.t("codingActions.continueTask"), "Continue immediately follows Compile");
   await click(i18n.t("codingActions.continueTask"));
   await until(() => document.querySelector('[aria-label="Draft"]').value === i18n.t("codingActions.continuePrompt") + "\n\n" + i18n.t("codingActions.noCompilePrompt") + "\n\nBuild first, commit with Git or SVN\n\n" + initialDraft + "\n\n" + i18n.t("codingActions.noCompilePrompt"));
   check(document.querySelector(".coding-shortcuts-secondary button"), "Document shortcuts retain their separate row");
   const actionRow = document.querySelector('.coding-shortcuts-primary');
   actionRow.style.width = "360px";
-  await new Promise(requestAnimationFrame);
+  await nextTask();
   check([...actionRow.querySelectorAll('button')].every(button => button.getBoundingClientRect().right <= actionRow.getBoundingClientRect().right + 1), "Unified row wraps without horizontal overflow");
   actionRow.style.width = "";
   check([...actionRow.querySelectorAll('button')].findIndex(button => button.textContent === "My commit") < [...actionRow.querySelectorAll('button')].findIndex(button => button.textContent === i18n.t("codingActions.more")), "Commit precedes More");
@@ -137,11 +153,11 @@ window.promptButtonsProbe = async () => {
   const pending = { id: "auto-open-fixture", kind: "round", text: "", submittedAt: new Date().toISOString() };
   saveGrill({ ...newGrill("visual-fixture", "Visual interview"), pending });
   useAppStore.setState({ activeSessionId: "visual-fixture", messages: [] });
-  await new Promise(requestAnimationFrame);
+  await nextTask();
   check(!document.querySelector('.grill-dialog'), "No automatic opening before a correlated reply");
   const reply = requestId => '<grill-workspace-result>' + JSON.stringify({ requestId, kind: "questions", questions: [{title:"Fixture question",body:"Choose a scope\n".repeat(160),options:[{key:"A",label:"Local"},{key:"B",label:"Remote"}],recommended:["A"],why:"Keep the first slice small",multi:false}] }) + '</grill-workspace-result>';
   useAppStore.setState({ messages: [{ role: "assistant", content: reply("unrelated") }] });
-  await new Promise(requestAnimationFrame);
+  await nextTask();
   check(!document.querySelector('.grill-dialog'), "Unrelated response must not open the panel");
   useAppStore.setState({ messages: [{ role: "assistant", content: reply(pending.id) }] });
   const panel = await until(() => document.querySelector('.grill-dialog'));
@@ -158,7 +174,7 @@ window.promptButtonsProbe = async () => {
   check(scroll.scrollHeight > scroll.clientHeight, "Long questions must scroll independently");
   const footerTop = footer.getBoundingClientRect().top;
   scroll.scrollTop = scroll.scrollHeight;
-  await new Promise(requestAnimationFrame);
+  await nextTask();
   check(scroll.scrollTop > 0 && Math.abs(footer.getBoundingClientRect().top - footerTop) < 1, "Scrolling question content must not move the footer");
   for (const label of ["确认本题", "暂缓本题"]) {
     const bounds = [...footer.querySelectorAll('button')].find(button => button.textContent === label).getBoundingClientRect();
@@ -173,14 +189,14 @@ window.promptButtonsProbe = async () => {
   const customInput = panel.querySelector('[aria-label="'+i18n.t("codingActions.visualOtherAnswer")+'"]');
   Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set.call(customInput,"Use separate fields for name and number");
   customInput.dispatchEvent(new Event("input",{bubbles:true}));
-  await new Promise(requestAnimationFrame);
+  await nextTask();
   await click("确认本题");
   await until(() => loadGrill("visual-fixture")?.questions[0].status === "confirmed");
   check(loadGrill("visual-fixture").questions[0].customAnswer === "Use separate fields for name and number", "Custom alternative persists with confirmation");
   await click("关闭");
   await until(() => !document.querySelector('.grill-dialog'));
   useAppStore.setState({ messages: [{ role: "assistant", content: reply(pending.id) }] });
-  await new Promise(requestAnimationFrame);
+  await nextTask();
   check(!document.querySelector('.grill-dialog'), "Closing a completed reply must not reopen it");
   const followup = { id: "followup-fixture", kind: "discuss", questionId: "q1", text: "Which database field?", submittedAt: new Date().toISOString() };
   const saved = loadGrill("visual-fixture");
@@ -200,7 +216,7 @@ window.promptButtonsProbe = async () => {
   check(getComputedStyle(document.querySelector('.grill-thread-entry.agent p')).webkitUserSelect === "text", "Agent reply must be selectable");
   check(!document.querySelector('.grill-pending'), "A late valid reply clears the pending follow-up");
   releaseHistory({ session: { messages: [{role:"user",content:followup.id},{role:"assistant",content:"Old intermediate response",status:"complete"}] } });
-  await new Promise(requestAnimationFrame);
+  await nextTask();
   check(!document.querySelector('.grill-pending'), "Stale Host history must not restore an invalid result after acceptance");
   await click("关闭");
   await until(() => !document.querySelector('.grill-dialog'));
@@ -240,7 +256,7 @@ window.promptButtonsProbe = async () => {
   useAppStore.setState({activeSessionId:"visual-fixture",messages:reviewMessages});
   await until(() => repairButton() && !repairButton().disabled);
   useAppStore.setState({messages:[{role:"user",content:repairRequest},{role:"assistant",status:"complete",content:"Fixed save cancellation and regression tests pass"}]});
-  await until(() => [...document.querySelectorAll('.coding-shortcuts-primary .coding-action-recommended')].some(button => button.textContent === "Code review"));
+  await until(() => [...document.querySelectorAll('.coding-shortcuts-primary .coding-action-recommended')].some(button => button.textContent === i18n.t("codingActions.walkthrough")));
   const finished = loadGrill("visual-fixture");
   saveGrill({...finished,pending:null,finished:true,finishNote:"Design document: docs/design.md"});
   await click(i18n.t("codingActions.requirementsDiscussion"));
@@ -258,7 +274,7 @@ window.promptButtonsProbe = async () => {
   const topicInput = document.querySelector('[aria-label="External topic"]');
   Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set.call(topicInput,"Search alerts by resource number");
   topicInput.dispatchEvent(new Event("input",{bubbles:true}));
-  await new Promise(requestAnimationFrame);
+  await nextTask();
   await click("External Send");
   const started = await until(() => loadGrill("materialized-visual"));
   await until(() => document.querySelector('.grill-dialog')?.textContent.includes("Search alerts by resource number"));
@@ -349,7 +365,7 @@ window.promptButtonsProbe = async () => {
   await until(() => document.querySelector('.grill-pending')?.textContent.includes("自动重试已达 3 次"));
   check(autoRetries === 3 && loadGrill("retry-fixture").pending.retryCount === 3, "Automatic retry stops at three and persists its budget");
   useAppStore.setState({messages:[{role:"assistant",content:"Another invalid answer"}]});
-  await new Promise(requestAnimationFrame);
+  await nextTask();
   check(autoRetries === 3, "Transcript updates cannot restart an exhausted retry budget");
   useAppStore.setState({sendPrompt:originalNativeSend});
   render(<DraftComposer key="image-menu"/>);

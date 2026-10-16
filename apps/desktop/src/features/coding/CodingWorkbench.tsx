@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ENGINEERING_SHORTCUTS, CodingActionError, CodingActionRegistry, resolveCodingAction, codingPromptActions, type ComposerCommand } from "@pi-desktop/shared";
 import { TaskGraphViewer } from "./TaskGraphViewer";
@@ -35,6 +35,8 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
   const recommendation = codingNextSteps(messages, result, running);
   const reviewContext = completedReviewContext(messages, result, running);
   const { configuration, diagnostic } = useCodingActions();
+  const [shortcutsExpanded, setShortcutsExpanded] = useState(true);
+  const shortcutsId = useId();
   const [moreOpen, setMoreOpen] = useState(false);
   const [requirementsOpen, setRequirementsOpen] = useState(false);
   const [nativeGrillOpen, setNativeGrillOpen] = useState(false);
@@ -97,7 +99,7 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
     }
     const label = menu && action.skillId === "grill-with-docs"
       ? t("codingActions.discussRequirementsText", { defaultValue: "需求讨论-文本" })
-      : action.label;
+      : !menu && action.skillId === "code-review" ? t("codingActions.walkthrough") : action.label;
     return <TooltipButton key={action.id} disabled={(disabled && action.skillId !== "implement-spec") || Boolean(unavailable)} className={(menu ? "btn btn-ghost context-menu-item" : "btn btn-secondary") + (isRecommended(action.skillId) ? " coding-action-recommended" : "")}
       role={menu ? "menuitem" : undefined} ariaLabel={label} tooltip={isRecommended(action.skillId) ? t("codingActions.recommendedNext") + " · " + note : note} aria-description={isRecommended(action.skillId) ? t("codingActions.recommendedNext") + " · " + note : note}
       tooltipClassName="ui-tooltip-help coding-skill-tooltip" onClick={event => { if (action.skillId === "implement-spec") returnFocusRef.current = menu ? workbenchRef.current?.querySelector<HTMLButtonElement>(`button[aria-haspopup="menu"]`) ?? null : event.currentTarget; setMoreOpen(false); if (isRecommended(action.skillId)) { onSelectSkill(action.skillId, recommendation?.context); return; } activateCodingShortcut(shortcut, { openTaskGraph: () => setTaskGraphOpen(true), execute: onExecute, selectSkill: onSelectSkill }); }}>{label}</TooltipButton>;
@@ -126,17 +128,24 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
   };
 
   return <section ref={workbenchRef} className="coding-workbench" aria-label={t("codingActions.title")}>
+    <Button className="btn btn-ghost coding-shortcuts-toggle" aria-expanded={shortcutsExpanded} aria-controls={shortcutsId}
+      onClick={() => { setMoreOpen(false); setRequirementsOpen(false); setShortcutsExpanded(value => !value); }}>
+      {t(shortcutsExpanded ? "codingActions.collapseShortcuts" : "codingActions.expandShortcuts")}
+    </Button>
+    <div id={shortcutsId}>
+    {shortcutsExpanded && <>
     <div className="coding-shortcuts coding-shortcuts-primary">{primary.filter(shortcut => ["setup-matt-pocock-skills", "ask-matt", "grill-with-docs"].includes(shortcut.action.skillId)).map(action => renderAction(action))}
       {primary.filter(shortcut => !["setup-matt-pocock-skills", "ask-matt", "grill-with-docs"].includes(shortcut.action.skillId)).map(action => <Fragment key={action.action.id}>{renderAction(action)}{action.action.skillId === "code-review" && renderReviewFix()}</Fragment>)}
       {!primary.some(shortcut => shortcut.action.skillId === "code-review") && renderReviewFix()}
         {orderedPromptActions.map(action => {
           const tooltip = tooltipLine(t(action.id === "commit-code" ? "codingActions.commitTooltipWhen" : "codingActions.promptTooltipWhen"), t(action.id === "commit-code" ? "codingActions.commitTooltipExample" : "codingActions.promptTooltipExample"));
+          const label = action.id === "commit-code" && ["提交代码", "Commit code"].includes(action.label) ? t("codingActions.commitCode") : action.label;
           const description = isRecommended(action.id) ? `${t("codingActions.recommendedNext")} · ${tooltip}` : tooltip;
-          return <Fragment key={action.id}><TooltipButton className={`btn btn-secondary${isRecommended(action.id) ? " coding-action-recommended" : ""}`} aria-description={description} tooltip={tooltip} disabled={disabled} onClick={() => onSelectPrompt(action.id, isRecommended(action.id) ? recommendation?.context : undefined)}>{action.label}</TooltipButton>{action.id === "commit-code" && renderContinue()}</Fragment>;
+          return <Fragment key={action.id}><TooltipButton className={`btn btn-secondary${isRecommended(action.id) ? " coding-action-recommended" : ""}`} aria-description={description} tooltip={tooltip} disabled={disabled} onClick={() => onSelectPrompt(action.id, isRecommended(action.id) ? recommendation?.context : undefined)}>{label}</TooltipButton></Fragment>;
         })}
-      {!orderedPromptActions.some(action => action.id === "commit-code") && renderContinue()}
 
       <TooltipButton className="btn btn-secondary" disabled={disabled} tooltip={tooltipLine(t("codingActions.compileTooltipWhen"), t("codingActions.compileTooltipExample"))} onClick={() => onSelectPrompt("compile-project")}>{t("codingActions.compileProject")}</TooltipButton>
+      {renderContinue()}
       <AnchoredMenu open={moreOpen} onClose={() => setMoreOpen(false)} role="menu" side="top" restoreFocus={!disabled || more.some(shortcut => shortcut.action.skillId === "implement-spec")} label={t("codingActions.more")} menuClassName="context-menu coding-more-menu"
         trigger={ref => {
           const tooltip = tooltipLine(t("codingActions.moreTooltipWhen"), t("codingActions.moreTooltipExample"));
@@ -155,6 +164,8 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
     </div>
     <div className="coding-shortcuts coding-shortcuts-secondary">
       {documentActions.map((shortcut, index) => renderDocumentAction(shortcut, index))}
+    </div>
+    </>}
     </div>
     {actions.some(action => reason(action)) && <div role="status">{actions.filter(action => reason(action)).map(shortcut => `${shortcut.action.label}：${reason(shortcut)}`).join("；")}<Button onClick={() => setCatalogVersion(value => value + 1)}>{t("codingActions.recheck")}</Button></div>}
     {(error || diagnostic) && <div className="coding-shortcut-error" role="alert"><span>{error || t("codingActions.diagnostic", { detail: diagnostic })}</span><Button onClick={configure}>{t("codingActions.configure")}</Button></div>}
