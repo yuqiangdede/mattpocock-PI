@@ -441,6 +441,12 @@ For every pi loop turn:
    checkpoint is re-estimated before persistence and continuation, and cannot
    authorize a request at or above the hard budget
 
+Summary requests (including split-turn and delegate summaries) omit an explicit
+`maxTokens` cap and let the provider size output from the model and actual input.
+`reserveTokens` must not cap summary output: reasoning can consume that budget
+before a usable summary is produced. Existing input preflight, checkpoint budget
+validation, cancellation, retry and failure recovery remain authoritative.
+
 Checkpoint generation and installation are separate operations.
 `buildCheckpoint` runs the preparation, budget preflight, and summary request
 without persisting anything or changing the active checkpoint; installation

@@ -18285,3 +18285,18 @@ host-created files. The full app's file-preview viewer is covered separately.
 - Steps: retain a draft with an attachment; click Continue after Commit code.
 - Expected: the localized continuation prompt precedes the retained draft, attachments remain intact, and no turn is sent automatically. The action is disabled while the launcher is blocked.
 - Automated path: `apps/desktop/test/coding-prompt-user-path.test.mjs`.
+
+
+### E2E-RUNTIME-summary-output-budget
+
+- Preconditions: reasoning model with output capacity above the old summary cap.
+- Steps: summarize history with low and default reserves; compact a split turn.
+  Exercise delegate summarization through the existing subagent context suite.
+- Expected: summary calls delegate output sizing to the provider, retain thinking
+  options, complete both split requests and aggregate usage. Input preflight and
+  checkpoint installation budgets still apply.
+- Specs: `03-runtime/02-agent-runtime.md`; acceptance: reliable context continuation;
+  milestone: maintenance.
+- Automated boundary coverage: `pi-runtime-compaction-summary.test.ts`,
+  `subagent-context.test.ts`, `compaction-summary-input.test.ts`. These use a fake
+  model boundary; real provider and packaged Electron validation are separate.

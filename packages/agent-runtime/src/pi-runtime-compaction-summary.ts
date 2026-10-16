@@ -113,12 +113,9 @@ Summarize the prefix to provide context for the retained suffix:
 
 Be concise. Focus on what's needed to understand the kept suffix.`;
 
-const MAX_SUMMARY_TOKENS = 0.8;
-
 async function requestSummary(
   messages: AgentMessage[],
   model: Model<Api>,
-  reserveTokens: number,
   options: {
     previousSummary?: string;
     customInstructions?: string;
@@ -128,14 +125,9 @@ async function requestSummary(
     retry?: RetryPolicy;
     callbacks?: RetryCallbacks;
     prompt?: string;
-    outputRatio?: number;
   },
   models: Models,
 ): Promise<Result<{ text: string; usage: Usage }>> {
-  const maxTokens = Math.min(
-    Math.floor((options.outputRatio ?? MAX_SUMMARY_TOKENS) * reserveTokens),
-    model.maxTokens > 0 ? model.maxTokens : Number.POSITIVE_INFINITY,
-  );
   const basePrompt = options.prompt ?? (options.previousSummary
     ? UPDATE_SUMMARY_PROMPT
     : NEW_SUMMARY_PROMPT);
@@ -156,8 +148,9 @@ async function requestSummary(
       timestamp: Date.now(),
     }],
   };
+  // Let the provider size output from the model and actual input. Reasoning
+  // shares this budget; reserveTokens must not impose a smaller summary cap.
   const requestOptions: SimpleStreamOptions = {
-    maxTokens,
     ...(model.reasoning && options.thinkingLevel && options.thinkingLevel !== "off"
       ? { reasoning: options.thinkingLevel }
       : {}),
@@ -231,7 +224,8 @@ export async function generateSummaryWithUsage(
   currentMessages: AgentMessage[],
   models: Models,
   model: Model<Api>,
-  reserveTokens: number,
+  // Retained for caller compatibility; this is not an output budget.
+  _reserveTokens: number,
   customInstructions: string | undefined,
   previousSummary: string | undefined,
   thinkingLevel: RuntimeThinkingLevel | undefined,
@@ -239,7 +233,7 @@ export async function generateSummaryWithUsage(
   callbacks: RetryCallbacks | undefined,
   signal: AbortSignal | undefined,
 ): Promise<Result<{ text: string; usage: Usage }>> {
-  return requestSummary(currentMessages, model, reserveTokens, {
+  return requestSummary(currentMessages, model, {
     ...(customInstructions ? { customInstructions } : {}),
     ...(previousSummary ? { previousSummary } : {}),
     ...(thinkingLevel ? { thinkingLevel } : {}),
@@ -287,7 +281,6 @@ export async function compact(
       const result = await requestSummary(
         preparation.messagesToSummarize,
         model,
-        preparation.settings.reserveTokens,
         {
           ...(preparation.previousSummary ? { previousSummary: preparation.previousSummary } : {}),
           ...(customInstructions ? { customInstructions } : {}),
@@ -305,11 +298,9 @@ export async function compact(
     const prefix = await requestSummary(
       preparation.turnPrefixMessages,
       model,
-      preparation.settings.reserveTokens,
       {
         prompt: TURN_PREFIX_PROMPT,
         errorLabel: "Turn prefix summarization",
-        outputRatio: 0.5,
         ...(thinkingLevel ? { thinkingLevel } : {}),
         ...(retry ? { retry } : {}),
         ...(callbacks ? { callbacks } : {}),
@@ -324,7 +315,6 @@ export async function compact(
     const result = await requestSummary(
       preparation.messagesToSummarize,
       model,
-      preparation.settings.reserveTokens,
       {
         ...(preparation.previousSummary ? { previousSummary: preparation.previousSummary } : {}),
         ...(customInstructions ? { customInstructions } : {}),
