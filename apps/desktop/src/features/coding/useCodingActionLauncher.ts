@@ -62,9 +62,9 @@ export function useCodingActionLauncher(options: {
     if (owner.blocked || inFlight.current) return;
     owner.invalidatePromptEnhancement();
     try {
-      if (id === INTERACTION_IMAGE_PROMPT_ID || id === REVIEW_FIX_PROMPT_ID) {
+      if (id === "continue-task" || id === INTERACTION_IMAGE_PROMPT_ID || id === REVIEW_FIX_PROMPT_ID) {
         const language = i18n.resolvedLanguage ?? i18n.language;
-        const prompt = id === REVIEW_FIX_PROMPT_ID ? reviewFixPrompt(language) : interactionImagePrompt(language);
+        const prompt = id === "continue-task" ? t("codingActions.continuePrompt") : id === REVIEW_FIX_PROMPT_ID ? reviewFixPrompt(language) : interactionImagePrompt(language);
         const text = buildCommitCodeDraft(prompt, [context, owner.readLiveDraft()].filter(Boolean).join("\n\n"));
         owner.applyEditorDraft(text, owner.fileReferencesRef.current, text.length);
         setError(null);

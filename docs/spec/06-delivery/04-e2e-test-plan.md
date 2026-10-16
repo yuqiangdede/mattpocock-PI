@@ -18255,3 +18255,9 @@ host-created files. The full app's file-preview viewer is covered separately.
 - Open Settings → Skills and verify that bundled document Skills appear alongside upstream built-ins. Disable Requirements specification, then verify that its Composer action cannot load the disabled Skill. Restart and verify the disabled state, re-enable it, and prepare an editable draft without submitting it automatically.
 - Coverage: `document-shortcuts.test.mjs` exercises the production Composer catalog and Skill body loader; `user_skills::tests::document_builtin_activation_survives_restart` covers Host persistence. Existing `image-generation.test.mjs` covers unchanged upstream built-in activation.
 - Remote SSH supervisor, Unix admin-socket, POSIX executable and mode-bit fixtures remain explicitly platform-scoped; Windows skips do not certify remote Linux/macOS execution or Windows ACLs.
+
+### E2E-CODING-continue-task
+
+- Steps: retain a draft with an attachment; click Continue after Commit code.
+- Expected: the localized continuation prompt precedes the retained draft, attachments remain intact, and no turn is sent automatically. The action is disabled while the launcher is blocked.
+- Automated path: `apps/desktop/test/coding-prompt-user-path.test.mjs`.

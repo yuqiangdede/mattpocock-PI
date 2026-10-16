@@ -384,3 +384,7 @@ Database design reads project SQL (preferring `_pkg/linux/bin/*db`), migration
 chains and supporting source to reconstruct the documented database baseline.
 Both actions only prepare drafts; their workflows generate documentation without
 changing APIs, connecting to databases or executing SQL.
+
+## Continue interrupted work
+
+The Continue button follows Commit code (or remains available when that action is hidden). It prepares a localized editable prompt to check conversation context and actual progress, resume unfinished work and preserve agreed requirements and existing changes. Existing drafts and attachments are retained. It does not submit a turn automatically and follows the launcher blocked state.

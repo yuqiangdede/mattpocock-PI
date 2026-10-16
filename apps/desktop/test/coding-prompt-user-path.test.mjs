@@ -91,6 +91,10 @@ window.promptButtonsProbe = async () => {
   await until(() => !document.querySelector('.coding-more-menu[role="menu"]'));
   await click("My commit");
   await until(() => document.querySelector('[aria-label="Draft"]').value === "Build first, commit with Git or SVN\n\n" + initialDraft);
+  const commitButton = [...document.querySelectorAll("button")].find(button => button.textContent === "My commit");
+  check(commitButton.nextElementSibling.textContent === i18n.t("codingActions.continueTask"), "Continue immediately follows Commit");
+  await click(i18n.t("codingActions.continueTask"));
+  await until(() => document.querySelector('[aria-label="Draft"]').value === i18n.t("codingActions.continuePrompt") + "\n\nBuild first, commit with Git or SVN\n\n" + initialDraft);
   check(document.querySelector(".coding-shortcuts-secondary button"), "Document shortcuts retain their separate row");
   const actionRow = document.querySelector('.coding-shortcuts-primary');
   actionRow.style.width = "360px";
