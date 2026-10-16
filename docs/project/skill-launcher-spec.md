@@ -86,6 +86,6 @@ backup and import/export path. See the current
 
 ## 明确不实现
 
-Development Navigator 留待第二阶段：ProjectState、Artifact Tracking / Freshness、Recommendation、Next Step、流程完成状态与百分比、强制阶段跳转、依赖阻塞和自动推进均不实现。
+ProjectState, artifact freshness, recommendations, next-step guidance, workflow percentages, enforced stage transitions, dependency blocking and automatic advancement are outside the Skill Launcher scope.
 
 本轮不引入 Workflow / Stage / Run / Constraint 核心模型，不修改 Pi Core 或 Pi Agent Runtime 核心执行语义，不实现模板版本升级引擎。后续导航能力可以包围 executeCodingAction，但用户仍可自由选择动作。

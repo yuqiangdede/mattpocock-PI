@@ -49,15 +49,13 @@ For mattpocock-PI-specific behavior, prioritize independent feature modules,
 approved plugin/work-panel APIs, existing Host interfaces, and additive
 versioned data models. Do not modify PI-Desktop Project/Session/Turn,
 permission, queue, recovery or Agent Runtime lifecycles merely to implement
-workflow grouping, custom Skills or Navigator UI.
+custom Skills or workflow UI.
 
 When a core change cannot be avoided, document rejected extension alternatives,
 exact upstream touchpoints, migration/compatibility impact and regression tests;
 obtain explicit architecture approval and record an ADR before implementing.
 This is the enforceable fork-maintenance rule mirrored in
 [AGENTS.md](https://github.com/yuqiangdede/mattpocock-PI/blob/main/AGENTS.md) and [CLAUDE.md](https://github.com/yuqiangdede/mattpocock-PI/blob/main/CLAUDE.md).
-For a concrete example, see the
-[Work Item / standalone Navigator proposal](development-navigator-work-items.md).
 
 新增定制优先扩展这些模块，保持官方接入位置短小。Agent Runtime 已恢复官方实现；不要为 Matt 工作流复制或替换推理、压缩、提供商和 OAuth 核心。现有 Workflow 持久化与执行还会接触 Host/共享类型，不能宣称已完全插件化；本次不改变数据库和执行语义，也不搬迁全部定制代码。
 

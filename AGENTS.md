@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Policy-Sync: 2026-10-13.1
+Policy-Sync: 2026-10-16.1
 
 Mandatory rules for AI coding agents working in PI-Desktop.
 
@@ -197,8 +197,8 @@ Evaluate in this order:
 
 Do not rewrite Project / Session / Turn / queue / approval / Agent Runtime
 creation, execution, recovery, or deletion semantics for a custom workflow
-or organizational feature. For example, Work Item grouping **references**
-existing Session IDs and must not become a second Session owner or runtime.
+or organizational feature. Organizational metadata must not become a second
+Session owner or runtime.
 
 If a core-lifecycle change is truly unavoidable, *before implementation*
 document (a) the extension alternatives tried and why they fail, (b) the
@@ -216,7 +216,7 @@ isolated, and independently reviewable. Do not silently expand feature scope.
 - Skills specify workflows, questions, decision criteria and output contracts; they do not own desktop UI or authoritative session lifecycles.
 - Agent Runtime performs reasoning and executes Skills; the renderer never becomes a second agent executor.
 - UI presents questions, recommendations, decisions, progress and feedback, and sends user actions through existing permission-gated interfaces.
-- Durable workflow state (such as Work Item decisions, question status, evidence and resume checkpoints) has explicit ownership, stable identifiers and versioned persistence. Use existing Host-owned persistence or an approved independent state store; never bypass Host/SQLite boundaries or duplicate Session ownership.
+- Durable workflow state (such as question status, evidence and resume checkpoints) has explicit ownership, stable identifiers and versioned persistence. Use existing Host-owned persistence or an approved independent state store; never bypass Host/SQLite boundaries or duplicate Session ownership.
 - Keep workflow state recoverable and traceable across conversations. Prefer incremental, validated updates over rewriting entire histories. Derived previews must not silently override confirmed decisions.
 - Implement fork features through extensions or independent modules first; do not alter PI-Desktop core lifecycles merely to add a workflow UI.
 
@@ -276,49 +276,6 @@ cd <worktree-path>
 
 All implementation, targeted validation, conflict resolution, and
 task-candidate E2E happen inside the task's dedicated worktree.
-
-### Parallel stage development (fork exception)
-
-Stable delivery starts from current origin/main. Stage-two exploration may
-instead start a dedicated request branch and worktree from the recorded
-commit of codex/stage2-development-navigator. This exception applies to
-experimental integration only; the main-targeted delivery order and gates
-below remain mandatory for promotion.
-
-- main is the stable source of accepted stage-one functionality.
-- codex/stage1-maintenance and codex/stage2-development-navigator are
-  long-lived integration candidates, each with its own worktree. Implement
-  individual tasks in separate request branches/worktrees.
-- Stage-one tasks start from latest origin/main and land through main PRs.
-  The stage-one integration branch may collect validated task candidates
-  for combined acceptance when the user authorizes that integration.
-- Before the first experiment, refresh both stage branches from the main
-  commit containing this policy. Stage-one source tags remain immutable.
-- Before experimental validation or a stage-targeted PR update, refresh the
-  stage branch from current origin/main and incorporate the latest target
-  stage head into the task candidate. Check ancestry against that target
-  with node scripts/check-pr-base-main.mjs --base <latest-stage-head>.
-  R7/latest-main E2E requirements still hold through this refreshed target.
-- Stage-two experiments start from the recorded exploration head, run
-  relevant checks and target only that exploration branch when publishing
-  is authorized. Record both exploration base and main revision. Check
-  the actual integration tree; main PR gates do not certify an experiment.
-- Refresh long-lived stage branches by merging origin/main, without
-  rebasing shared history. If a merge needs a commit, retain the existing
-  user-authorization requirement.
-- Promote a mature stage-two slice using a fresh delivery branch/worktree
-  from current origin/main. Transfer only the selected coherent changes,
-  rerun applicable validation and use the normal main-targeted PR gates.
-- Retain stage integration worktrees while parallel development is active;
-  clean up completed task worktrees only after their authorized delivery.
-- Keep experimental profiles, databases, ports and logs isolated from the
-  stable application and other tasks. Reuse compatible host tools/caches.
-- stage1-complete records the initial stable-main source baseline; never
-  move or overwrite it. It is not a new release or fresh acceptance claim.
-
-For branch roles, local paths and examples, read
-[Parallel stage development](docs/project/parallel-stage-development.md)
-before starting a stage-two experiment or promoting it to main.
 
 ### E2E environment reuse
 

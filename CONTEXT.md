@@ -35,7 +35,7 @@ Restoring it retains subsequent local customizations.
 _Avoid_: application rollback
 
 **Workflow Run**:
-A historical V0 project-owned development effort with Discovery, Spec, Tickets, Implement, Review, and Retro. A project can retain multiple runs, with only one active run at a time. This fixed-stage V0 model is **not** the required workflow or session owner for stage-two Work Items.
+A historical V0 project-owned development effort with Discovery, Spec, Tickets, Implement, Review, and Retro. A project can retain multiple runs, with only one active run at a time. Native Pi conversations retain their existing ownership and lifecycle.
 _Avoid_: Project workflow, chat, agent turn
 
 **Stage Completion**:
@@ -101,25 +101,6 @@ _Avoid_: 页面按钮配置、Workflow Step、强制阶段
 **Skill Launcher**:
 将 Coding Action 交给当前项目和会话的原生 Pi Agent 执行的附加操作入口。
 _Avoid_: Workflow Engine、状态机、Recommendation Engine
-
-**Work Item**:
-An optional project-scoped engineering-goal container that groups explicitly
-linked existing Pi conversations and later references verified artifacts,
-tasks and evidence. Work Item relationships do not own Session lifecycles.
-One Work Item focuses on one requirement, defect or refactoring objective;
-ordinary ungrouped conversations remain supported.
-_Avoid_: Chat folder as the only purpose, Session, a fixed workflow stage,
-automatic transcript-based grouping, a second Session owner
-
-**Work Item Session Association**:
-An explicit and reversible link from one durable Session ID to a Work Item
-within the same logical project. It changes navigation metadata only;
-unassigning or deleting a Work Item does not delete the underlying Session.
-_Avoid_: Session migration, transcript ownership, automatic context merging
-
-**Development Navigator**:
-The planned stage-two capability centered on Matt Pocock Skills and Work Items. A standalone Navigator page links native Pi conversations, Spec/Ticket artifacts, human confirmation and verifiable execution states around one engineering goal. Ordinary chat and stage-one Coding Actions remain available. Prioritize grouping, Spec → Tickets → Implement handoff and restart recovery; defer graphs and broader evidence governance until needed. Product requirements: `docs/spec/01-product/development-navigator.md`; positioning: `docs/project/development-navigator-positioning.md`; interaction proposal: `docs/project/development-navigator-work-items.md`. Issue #46 remains a separate narrower scope.
-_Avoid_: Mandatory stage machine, automatic advancement, cross-framework Runtime, automatic transcript merging, equating Agent termination with engineering acceptance
 
 **Engineering Skills Setup**:
 Configuring a project's issue tracker, triage vocabulary and domain documentation conventions for engineering skills.

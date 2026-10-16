@@ -2,13 +2,13 @@
 
 > 2026-10-10 · Design/repository-source review only. No plugin prototype, running Electron verification, or migration is claimed.
 > Scope: verify whether the **existing** Coding Actions can be implemented through PI-Desktop plugin APIs before changing native core/UI architecture.
-> Related: [Stage 1](skill-launcher-spec.md), [Stage 2 Matt-only direction](development-navigator-positioning.md), [Work Item design](development-navigator-work-items.md).
+> Related: [Skill Launcher](skill-launcher-spec.md).
 
 ## 1. Decision and sequencing
 
-The default roadmap is **one Matt Pocock Skills ecosystem**, a lightweight **Skill Launcher**, and an optional **Work Item + standalone Navigator page**. Do not implement Superpowers/ECC integration or a generic cross-framework runtime in Stage 2.
+The current scope is Matt Pocock Skills and the lightweight Skill Launcher.
 
-Before expanding Navigator or refactoring the launcher, conduct a **small, disposable plugin proof of concept**. A source-level extension surface is not proof that every current user interaction can migrate unchanged.
+Before refactoring the launcher, conduct a **small, disposable plugin proof of concept**. A source-level extension surface is not proof that every current user interaction can migrate unchanged.
 
 If feasible, prefer a plugin package and extension-owned UI; keep the native Pi Skill Catalog/Loader, Session, Turn, permissions and prompt sending authoritative. If plugin APIs cannot meet the gates, preserve the current launcher and use narrowly scoped first-party adapters; do **not** weaken host permissions or alter core lifecycles.
 
@@ -37,7 +37,7 @@ These sources make a plugin **plausible**, but the full parity of the shortcut U
 | Preserve explicit Send / no auto-execution | Native Composer draft actions; send-time Skill resolver | Should remain intact; plugin must only prepare the draft and must never call `agent/prompt` to simulate a button click |
 | Persist Action label, skillId, order, enabled and prompt | `pi.plugin.getSettings/setSettings`, `contributes.settings` or plugin-owned UI | Check schema, migration, backup, damaged-config behavior, reset and existing user setting preservation; never silently lose user custom Actions |
 | Project/session switch and async races | Composer draft generation / project scope | Prove stale callback refusal, same-session attachment, and no cross-project draft mutation |
-| Work Panel settings/standalone UI | `contributes.views` / `ui.view` | Well-suited for optional Navigator view; an isolated view does **not** automatically get a Composer toolbar API |
+| Work Panel settings/standalone UI | `contributes.views` / `ui.view` | Suitable for optional plugin views; an isolated view does **not** automatically get a Composer toolbar API |
 | Existing Pi session creation, recovery and permissions | Native APIs | Must be reused, not reimplemented; plugin may not become a new Session/Turn owner |
 | Security/trust | `renderer.extension` runs inside renderer realm; `ui.view` uses isolated view | Renderer extension is a **trusted high-impact** integration, not a sandbox. Compare this coupling/risk with a small first-party host UI before choosing |
 
@@ -59,14 +59,6 @@ These sources make a plugin **plausible**, but the full parity of the shortcut U
 
 Pluginization is an **implementation option, not an objective by itself**. The actual objectives are low upstream merge conflict, stable developer experience, preserved user data and predictable maintenance.
 
-## 5. Work Item sequencing impact
+## 5. Launcher scope
 
-The plugin POC is a **Stage-1 architecture validation step (P0)** and should precede major Stage-2 integration work. It does not block ordinary existing Coding Actions or the independent design of Work Items.
-
-After the POC decision:
-1. retain or minimally migrate the existing Stage-1 launcher without changing user behavior;
-2. build the optional Work Item grouping and standalone Navigator page;
-3. validate Matt `to-spec` → `to-tickets` → `implement` across multiple existing Pi sessions;
-4. add evidence and task references only where real use shows a need.
-
-Do not broaden the scope of issue #46 or PR #53 or claim this document implements any runtime capability.
+The plugin POC is an optional architecture validation step for the existing launcher. It does not block ordinary Coding Actions. Retain the current launcher unless the parity gate proves that migration preserves behavior and data. This document does not authorize implementation or claim any runtime capability.
