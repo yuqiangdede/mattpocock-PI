@@ -1,4 +1,4 @@
 interface:
   display_name: "总体设计说明书编制"
   short_description: "参考模块与流程写法，从源码或需求形成架构，将多组件材料融合为专业总体设计"
-  default_prompt: "使用 $overall-design，先请我提供源码路径（含项目沉淀文档）和参考文档（Word、Excel、PDF 等，无参考时明确说明），输入收齐并核对可读取后再开始分析与编制。随后参考指定文档的格式、模块说明及流程写法，从实际需求或源码推导设计，将多个组件文档融合为一份总体设计说明书，默认保存到 docs/Design/，中间与最终文档仅生成 Markdown（.md），不提交代码。"
+  default_prompt: "使用 $overall-design，先请我提供源码路径（含项目沉淀文档）和参考文档（Word、Excel、PDF 等，无参考时明确说明），输入收齐并核对可读取后再开始分析与编制。随后参考指定文档的格式、模块说明及流程写法，从实际需求或源码推导设计，将多个组件文档融合为一份总体设计说明书，强制使用 diagram-design 制图，默认保存到 docs/Design/，中间与最终文档仅生成 Markdown（.md），不提交代码。"
