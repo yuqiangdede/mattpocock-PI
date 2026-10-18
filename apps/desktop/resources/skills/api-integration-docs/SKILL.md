@@ -24,6 +24,8 @@ description: 从源码反推、项目需求与设计文档、其他参考文档�
 
 ## 2. 建立接口资产清单
 
+Within the confirmed project scope, discover and read existing requirements, overall design and outline design documents as additional references alongside source code, relevant SQL scripts and user-supplied reference documents. Check the project root and documentation directories (including `docs/Requirements/` and `docs/Design/`), then follow relevant document links. Use requirements for business intent and authorization constraints, overall design for integration boundaries and direction, and outline design for interface contracts, data semantics, state transitions and error handling. Reuse project-local documents without requiring a separate upload. These documents are optional: record missing or unreadable sources and their impact without requiring another document to be generated first. Include their paths, versions, scope and purpose in the source inventory, reconcile differences under the existing multi-source rules, and keep documented target contracts distinct from implemented endpoints and runtime verification.
+
 有源码时读取 [源码反推指南](references/source-analysis.md)，按实际注册的外部输入边界盘点；有项目文档或其他参考文档时读取 [多来源融合规则](references/source-reconciliation.md)，提取接口契约与业务约束。
 
 先生成 api-index.md，包含稳定编号、名称、所属模块、协议、方向、方法与路径/主题/服务方法、启用条件、契约状态、来源和分析进度。编号采用 HTTP-001、MSG-001、WS-001、GRPC-001、TCP-001、FILE-001 等；保留已有编号，补充时不重排。相同路径的不同 HTTP 方法分别建项；同一入口的多个消息类型逐项可追踪。

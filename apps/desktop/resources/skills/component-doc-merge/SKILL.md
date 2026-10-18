@@ -35,6 +35,8 @@ description: 将不同组件的需求文档或设计文档融合为产品层面�
 
 ## 4 校审与交接
 
+Before delivery or Word conversion, run the final chapter-title audit defined in [references/merge-rules.md](references/merge-rules.md#final-chapter-title-audit). Resolve accidental duplicate headings and recheck the revised document before handoff.
+
 按 merge-rules.md 的完成条件检查全量输入映射、产品能力覆盖、跨组件正常/异常链路、编号、图文及资产。没有读过的材料不能声称已融合；没有实际证据时不声明功能或部署已验证。
 
 本技能的内容产物为统一 Markdown 与必要资产，同时保留用户选择的模板/格式用于后续 Word。用户同时要求 Word，或由 `$markdown-to-docx` 的合并入口调用时，将已校审 MD、人工名称、模板路径/格式标识与输出位置一次性交给转换流程，继续完成 DOCX，不停在“可以再转换”的建议上。

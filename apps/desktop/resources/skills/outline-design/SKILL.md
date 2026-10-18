@@ -26,6 +26,8 @@ description: 先收集并核对用户提供的源码路径（含项目沉淀文�
 
 ## 1 输入与口径
 
+Within the confirmed project scope, discover and read existing requirements and overall design documents as additional references alongside source code, relevant SQL scripts and user-supplied reference documents. Check the project root and documentation directories (including `docs/Requirements/` and `docs/Design/`), then follow relevant document links. Use requirements for business scenarios and constraints, and overall design for system boundaries, subsystem responsibilities and accepted architectural decisions before expanding module interactions. Reuse project-local documents without requiring a separate upload; an explicit absence of external reference documents does not exclude them. These documents are optional: record missing or unreadable sources and their impact without requiring another document to be generated first. Record each selected document's path, version, scope and purpose; reconcile conflicting baselines using the existing conflict rules, and distinguish intended design from verified implementation.
+
 输入门槛通过后，在用户指定源码路径内读取适用的 AGENTS.md 和 [references/analysis.md](references/analysis.md)。输入按已收集源码路径、沉淀文档和参考材料组织；已有总体设计、接口协议及数据库定义时使用。优先使用明确版本与范围，有源码时记录其快照及本地修改。
 
 读取 [references/source-and-merge.md](references/source-and-merge.md)，执行参考借鉴、源码反推、需求推导及组件融合的适用分支。参考文档的格式、总体说明性质的模块描述和各种流程写法均可借鉴；内容事实与写作样式分别核对。已有材料和选择直接沿用。

@@ -30,6 +30,16 @@
 
 正文只保留一份概述、范围、术语、角色及章节目录。去除“组件 A 文档指出”“本次合并”“源码反推”等编制痕迹，保留有业务意义的组件差异、工程取舍和待确认项。原始文档保持只读。
 
+## Final chapter-title audit
+
+After the final content revision and before delivery or Word conversion, enumerate every Markdown heading outside code blocks, including ATX and Setext headings. Record its level, parent chapter path, original title and location in `.merge-work/`.
+
+Compare title text after removing chapter numbering and Markdown formatting, trimming and collapsing whitespace, and ignoring Latin letter case. Check the whole document as well as siblings under each parent: different numbering must not hide repeated titles. Review synonymous titles for overlapping scope.
+
+For each match, inspect the section content and parent context. Merge sections that repeat the same subject while preserving unique requirements and design constraints. Rename distinct sections with ambiguous titles to express their actual scope. Keep legitimate repeated subsection labels under different parents (such as "Overview" or "Error handling") when their context is clear; record the reason rather than deleting content mechanically.
+
+After corrections, regenerate chapter numbering and the table of contents, update anchors and cross-section links, and repeat the audit. Completion requires no unresolved accidental duplicate titles, valid references, and a recorded list of resolved matches or justified repetitions; record an explicit zero-match result when none are found.
+
 ## 完成条件
 
 1. 每份输入和每项有效内容均有处理去向，排除有理由，重要约束无遗漏，重复规则已统一。
@@ -37,5 +47,6 @@
 3. 跨组件正常和关键异常链路闭合，或准确标出未闭合处；数据/接口/状态和各侧契约一致或缺口明确。
 4. 最终编号唯一、引用有效，图形语义与正文一致，公式/单位/图表数据保留，资产可携带；输入与输出未相互覆盖。
 5. 名称及模板/推荐格式来自用户的明确选择，已贯彻结构和交接信息；正式正文没有来源拼接或内部证据痕迹。
+6. The final chapter-title audit is complete, all accidental duplicates are resolved, and any justified repeated labels and reference checks are recorded in `.merge-work/`.
 
 完成上述校审后再交给 Word 转换，不把文档校审、模板采用或 DOCX 结构校验称为客户验收、运行测试或全页视觉通过。

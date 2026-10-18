@@ -29,6 +29,8 @@ description: 从项目 SQL 和辅助源码编制详尽的数据库结构设计�
 
 ## 3. 用源码补全业务与动态行为
 
+Within the confirmed project scope, discover and read existing requirements, overall design and outline design documents as additional references alongside SQL scripts, source code and user-supplied reference documents. Check the project root and documentation directories (including `docs/Requirements/` and `docs/Design/`), then follow relevant document links. Use requirements for business entities, rules and retention constraints, overall design for data ownership and storage boundaries, and outline design for logical models, relationships, state and transaction behavior. Reuse project-local documents without requiring a separate upload. These documents are optional: record missing or unreadable sources and their impact without requiring another document to be generated first. Record their paths, versions, scope and purpose, and map relevant statements to database objects. The selected SQL installation/migration baseline remains authoritative for physical definitions; use code to verify dynamic behavior, and retain document discrepancies or unimplemented target designs explicitly rather than inventing tables, columns, constraints or relationships.
+
 从 SQL 对象名反查 ORM 实体、Mapper/Repository、服务、任务、数据库路由、配置与项目已有文档，解释业务职责、字段枚举和状态、逻辑关系、主要读写路径及生命周期。SQL 主导静态物理定义；源码用于解释业务语义及 SQL 未覆盖的运行时行为。源码和 SQL 不一致时保留差异，不能用实体声明覆盖实际 DDL。
 
 对动态表名、拼接 DDL、建表模板、分片中间件、继承/分区语法、归档与清理任务进行专项追踪。区分应用分表、数据库原生分区、分库、归档表及普通带日期后缀的独立表。逐表族说明命名、路由键、算法/时间粒度、时区与边界、创建时机、跨表查询、索引约束继承、保留清理和失败处理；只有命名相似时标为候选，不据此断言分表。
