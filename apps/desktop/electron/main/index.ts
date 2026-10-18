@@ -558,10 +558,13 @@ closeBehaviorRuntime = createCloseBehaviorRuntime({
   dataDir,
   getLocale: () => mainState.updaterLocale,
   createTray,
+  logger,
 });
 const {
   applyCloseBehavior,
   confirmQuitDialog,
+  markLifecycleDialogRendererReady,
+  respondLifecycleDialog,
 } = closeBehaviorRuntime;
 
 const createdLauncher = createLauncher({
@@ -631,6 +634,7 @@ const {
   addActiveTurnUsage,
   activeToolCallKey,
   planSubmissionTurnKey,
+  recordTurnStart,
   lockAbortReason,
   clearAbortReason,
   isTurnDispatchable,
@@ -723,6 +727,7 @@ const eventPersistence = createEventPersistence({
   logger,
   finishTurn,
   isStaleTerminalEvent,
+  transcriptRewrite: sessionCoordination,
   finishApprovedExecution,
   emitAgentEvent: (envelope) => emitAgentEvent(envelope),
 });
@@ -869,6 +874,9 @@ function registerIpc() {
     sessionCapabilityContext,
     enrichSession,
     acquireSessionOperation,
+    beginTranscriptRewrite: eventPersistence.beginTranscriptRewrite,
+    forgetTranscriptRewriteHistory: sessionCoordination.forgetTranscriptRewriteHistory,
+    recordTurnStart,
     stripWinLongPrefix,
     normalizeSettings,
     validateSettingsWrite,
@@ -900,6 +908,8 @@ function registerIpc() {
     applyCloseBehavior,
     getCloseBehavior: () => mainState.closeBehavior,
     markMenuRendererReady,
+    markLifecycleDialogRendererReady,
+    respondLifecycleDialog,
     executeNativeMenuAction,
     scheduledRunsBySession,
     isQuitting: () => mainState.quitting,

@@ -10,7 +10,7 @@ export const APP_DISPLAY_NAME = forkConfig.displayName;
 export const APP_REPOSITORY = forkConfig.repository;
 export const UPSTREAM_REPOSITORY = forkConfig.upstreamRepository;
 export const APP_MANUAL_UPDATES_ONLY = forkConfig.manualUpdatesOnly;
-export const APP_VERSION = "0.20.1";
+export const APP_VERSION = "0.21.0-beta.3";
 
 export const APP_MENU_COMMANDS = [
   "newTask",
@@ -56,6 +56,13 @@ export const WINDOW_CONTROL_ACTIONS = [
 
 export type WindowControlAction = (typeof WINDOW_CONTROL_ACTIONS)[number];
 
+export type LifecycleDialogKind = "quit-confirmation" | "close-behavior";
+export type LifecycleDialogChoice = "cancel" | "confirm" | "tray" | "quit";
+export type LifecycleDialogRequest = {
+  requestId: string;
+  kind: LifecycleDialogKind;
+};
+export type LifecycleDialogDismiss = { requestId: string };
 export const IPC = {
   invoke: {
     storageGet: "pi-desktop/storage/get",
@@ -145,6 +152,21 @@ export const IPC = {
     /** Validate and select a durable session from a reviewed host operation. */
     sessionOpen: "pi-desktop/session/open",
     sessionDelete: "pi-desktop/session/delete",
+    /** Isolated sessions in git worktrees (ADR 0329). */
+    worktreeProbe: "pi-desktop/worktree/probe",
+    worktreePreview: "pi-desktop/worktree/preview",
+    worktreeMerge: "pi-desktop/worktree/merge",
+    worktreePendingWork: "pi-desktop/worktree/pendingWork",
+    /** "Sync from project": project commits the session lacks, and the sync. */
+    worktreeBehind: "pi-desktop/worktree/behind",
+    worktreeSync: "pi-desktop/worktree/sync",
+    /** Behind counts of every isolated session, for the sidebar marker. */
+    worktreeBehindAll: "pi-desktop/worktree/behindAll",
+    worktreeSetupLog: "pi-desktop/worktree/setupLog",
+    /** Opens the worktree folder in the OS file manager; no path is returned. */
+    worktreeReveal: "pi-desktop/worktree/reveal",
+    worktreeSetupCommandGet: "pi-desktop/worktree/setupCommand/get",
+    worktreeSetupCommandSet: "pi-desktop/worktree/setupCommand/set",
     sessionRename: "pi-desktop/session/rename",
     /** Deterministic first-prompt title for a session that is still untitled. */
     sessionDeriveTitle: "pi-desktop/session/deriveTitle",
@@ -166,6 +188,9 @@ export const IPC = {
     settingsGet: "pi-desktop/settings/get",
     settingsSet: "pi-desktop/settings/set",
     configSyncGetState: "pi-desktop/configSync/getState",
+    backgroundTasksList: "pi-desktop/backgroundTasks/list",
+    backgroundTasksOutput: "pi-desktop/backgroundTasks/output",
+    backgroundTasksStop: "pi-desktop/backgroundTasks/stop",
     configSyncConfigure: "pi-desktop/configSync/configure",
     configSyncTest: "pi-desktop/configSync/test",
     configSyncSyncNow: "pi-desktop/configSync/syncNow",
@@ -400,6 +425,8 @@ export const IPC = {
     marketCheckUpdates: "pi-desktop/market/checkUpdates",
     marketApplyUpdates: "pi-desktop/market/applyUpdates",
     marketCancelInstall: "pi-desktop/market/cancelInstall",
+    marketReviewSummaries: "pi-desktop/market/reviewSummaries",
+    marketReviews: "pi-desktop/market/reviews",
     commandPaletteSearch: "pi-desktop/commandPalette/search",
     commandPaletteExecute: "pi-desktop/commandPalette/execute",
     logOpenFolder: "pi-desktop/log/openFolder",
@@ -433,6 +460,8 @@ export const IPC = {
     windowControl: "pi-desktop/window/control",
     closeBehaviorGet: "pi-desktop/window/closeBehavior/get",
     closeBehaviorSet: "pi-desktop/window/closeBehavior/set",
+    lifecycleDialogReady: "pi-desktop/window/lifecycleDialog/ready",
+    lifecycleDialogRespond: "pi-desktop/window/lifecycleDialog/respond",
     menuRendererReady: "pi-desktop/menu/rendererReady",
     traySetSessionPreferences: "pi-desktop/tray/setSessionPreferences",
     nativeMenuAction: "pi-desktop/menu/nativeAction",
@@ -444,6 +473,8 @@ export const IPC = {
     /** Host-originated app settings mutation (e.g. plugin `app.setTheme`). */
     settingsChanged: "pi-desktop/app/event/settingsChanged",
     configSyncChanged: "pi-desktop/configSync/event/changed",
+    /** A chat-started background task started, exited, or was stopped. */
+    backgroundTasksChanged: "pi-desktop/backgroundTasks/event/changed",
     /** What a running sync is doing, while it is still running. */
     configSyncProgress: "pi-desktop/configSync/event/progress",
     extensionsUiPrompt: "pi-desktop/extensions/event/uiPrompt",
@@ -462,9 +493,12 @@ export const IPC = {
     insecureEndpointNotice: "pi-desktop/network/event/insecureEndpointNotice",
     browserState: "pi-desktop/browser/event/state",
     browserPreview: "pi-desktop/browser/event/preview",
+    browserOpenFile: "pi-desktop/browser/event/openFile",
     windowMaximized: "pi-desktop/window/event/maximized",
     windowFullScreen: "pi-desktop/window/event/fullscreen",
     windowWorkPanelResize: "pi-desktop/window/event/workPanelResize",
+    lifecycleDialogRequest: "pi-desktop/window/event/lifecycleDialogRequest",
+    lifecycleDialogDismiss: "pi-desktop/window/event/lifecycleDialogDismiss",
     menuCommand: "pi-desktop/menu/event/command",
     traySessionActivated: "pi-desktop/tray/event/sessionActivated",
     notificationChanged: "pi-desktop/notification/event/changed",

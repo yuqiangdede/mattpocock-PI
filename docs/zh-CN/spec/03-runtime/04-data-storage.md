@@ -1,4 +1,10 @@
-# 04. 数据存储（架构 v23）
+# 04. 数据存储（架构 v24）
+
+Schema v24 adds the Host-owned worktree registry and optional project setup
+command (ADR 0329). A v23 migration first creates a verified backup; existing
+v24 profiles reopen without a downgrade. `node scripts/e2e-schema-upgrade.mjs`
+checks migration, backup, transcript preservation and restart in an isolated
+profile. Optional `PI_DESKTOP_PREVIOUS_HOST_BIN` verifies the old v23 refusal.
 
 > **翻译说明：** 本页是与 [英文源规格](/spec/03-runtime/04-data-storage) 一一对应的机器辅助翻译。代码、协议字段和标识符保持原文；如翻译与英文源事实有歧义，以英文版本为准。
 
@@ -1120,6 +1126,9 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
   条目，因为一次重写可能落在完全相同的长度上。
 - 撕裂的尾行（追加过程中崩溃）会同时被排除在偏移量和 `file_len` 之外，因此在
   写入方补全它之后，后续刷新会重新收录它。
+- 完整行中包含非法 UTF-8 时，有界与完整读取仍会尽力恢复：可解析记录中的坏字节会以
+  U+FFFD 替代；仍不符合 JSON 或记录结构的行会记录诊断并跳过。分页仍使用一致的物理
+  消息行位置。读取不会改写转录文件字节；实际文件 I/O 错误仍会返回错误。
 - 行分类通过一次感知深度的扫描读取 `type` 判别字段，绝不把整行解析成值。只有
   **顶层**的 `type` 键决定行的种类：工具结果与检查点详情是开放式 JSON，可能
   嵌套一个自身带 `type` 的对象，而该 `type` 恰好是某个行种类的名字。每条新行都
@@ -1225,6 +1234,11 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
 主机读取设置时会将缺失、格式错误或超出范围的值规范化为 600，设置写入则验证
 1–1,000,000 的整数范围。因此现有数据库会在读取时延迟获得默认值，不需要破坏性
 迁移或第二个设置存储。
+
+应用设置 JSON 还可选存储布尔值 `showThinking`，用于转录中的推理可见性。它是可移植的
+应用偏好，会像旧字段一样跨设备同步。缺失值回退到旧版 `thinkingDisplayMode` 字段
+（`compact` 隐藏，`detailed`／未知／缺失显示）；该旧字段仅为持久化设置兼容性保留，
+并作为该回退来源。这些新增展示偏好既不重写已存推理，也不改变数据库 schema。
 
 应用设置 JSON 可能仍包含旧版本写入的提示词增强键。为支持回退和降级，宿主保留这些值，
 但不会再把它们作为有效偏好读取或写入。用户安装并授权独立的

@@ -127,6 +127,8 @@ type RuntimeParams = {
   /** Session-bound workspace root supplied by Electron main. */
   projectPath?: string;
   remoteWorkspace?: { hostKey: string; path: string };
+  /** An isolated session's worktree root, supplied by Electron main (ADR 0329). */
+  workspaceRoot?: string;
   customSystemPrompt?: CustomSystemPrompt;
   projectInstructions?: ProjectInstructions;
   projectMemory?: string;
@@ -241,6 +243,7 @@ async function runtimeFor(
     projectMemory: params.projectMemory,
     projectPath: params.projectPath,
     remoteWorkspace: params.remoteWorkspace,
+    workspaceRoot: params.workspaceRoot,
     commandShell: params.commandShell,
   })
     ? existing
@@ -313,6 +316,7 @@ async function runtimeFor(
     subagentModelKeys,
     projectPath: params.projectPath,
     remoteWorkspace: params.remoteWorkspace,
+    workspaceRoot: params.workspaceRoot,
     customSystemPrompt: params.customSystemPrompt,
     projectInstructions: params.projectInstructions,
     projectMemory: params.projectMemory,

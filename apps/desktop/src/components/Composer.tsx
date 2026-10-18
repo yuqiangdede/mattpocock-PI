@@ -32,6 +32,7 @@ import { ComposerAutocomplete } from "./ComposerAutocomplete";
 import { AskToolCard } from "./AskToolCard";
 import { PlanApprovalBar } from "./PlanApprovalBar";
 import { TodoDock } from "./TodoDock";
+import { BackgroundTasksBar } from "./BackgroundTasksBar";
 import {
   COMPOSER_MAX_VISIBLE_ROWS,
   COMPOSER_MIN_HEIGHT_PX,
@@ -544,6 +545,7 @@ export function Composer({
         />
         {visualDiscussion.preparing && <div className="coding-next-steps" role="status"><span>{visualDiscussion.hint}</span>{visualDiscussion.canResume && <Button onClick={visualDiscussion.resume}>{t("codingActions.visualResume")}</Button>}<Button onClick={visualDiscussion.cancel}>{t("common.cancel")}</Button></div>}
         {activeSessionId && localToolsAllowed ? <TodoDock sessionId={activeSessionId} /> : null}
+        <BackgroundTasksBar />
         {planCheckpoint?.status === "pending" ? (
           <PlanApprovalBar proposal={planCheckpoint} />
         ) : null}

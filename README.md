@@ -2,7 +2,7 @@
 
 mattpocock-PI 是面向软件工程的 PI-Desktop 扩展，集成 [Matt Pocock Skills](https://github.com/mattpocock/skills) 与可配置 Coding Actions。
 
-当前定制版发布线：`0.20.x`；官方源码基线：`0.20.1`。
+当前定制版发布线：`0.21.x`；官方源码基线：`0.21.0-beta.3`。
 
 ## 当前功能范围 (Current scope)
 
@@ -19,7 +19,7 @@ Skill Launcher provides configurable Coding Actions using Matt Pocock Skills and
 
 | 依赖项 | Git 仓库路径 | 当前接入版本 / Commit | 作用说明 | 更新方式 / 脚本 |
 | :--- | :--- | :--- | :--- | :--- |
-| **PI-Desktop** (宿主主干) | `https://github.com/vastsa/PI-Desktop.git` | `v0.20.1`<br>(`cb88131b34680afd45d931a37d4bd0a7893f29ed`) | 本仓库的官方基线源码，提供 Electron 宿主架构与原生插件机制 | `node scripts/update-upstream.mjs --version <new_version>`<br>(基线记录：[`packages/shared/src/upstream.ts`](packages/shared/src/upstream.ts)) |
+| **PI-Desktop** (宿主主干) | `https://github.com/vastsa/PI-Desktop.git` | `v0.21.0-beta.3`<br>(`5e1655893ce6181b3e9324b0f49b52f1c7f79762`) | 本仓库的官方基线源码，提供 Electron 宿主架构与原生插件机制 | `node scripts/update-upstream.mjs --version <new_version>`<br>(基线记录：[`packages/shared/src/upstream.ts`](packages/shared/src/upstream.ts)) |
 | **pi** (底层 Agent 引擎) | `https://github.com/earendil-works/pi.git`<br>*(原 `badlogic/pi-mono`)* | `v1.1.0` | 提供底层 Agent 执行循环与核心依赖包（`@earendil-works/pi-agent-core`、`pi-ai`、`pi-coding-agent` 等） | 本地 patch 机制（`patches/@earendil-works__*.patch`）<br>检查脚本：`node scripts/check-pi-dependencies.mjs` |
 
 ### 2. 内置技能与工具库 (Bundled Skills & Tools)

@@ -21,7 +21,11 @@ pnpm upstream:check --version 0.17.0 --apply
 pnpm upstream:verify
 ```
 
-版本号只是下一次更新的示例，必须使用真实官方稳定版本。
+The version above is an example. Prefer stable releases. A prerelease requires
+an explicitly selected actual tag, such as `0.21.0-beta.3`; it is never selected
+automatically. The entry point validates stable and prerelease SemVer, verifies
+the tag against its package version, and rejects downgrades, including stable
+to prerelease and numeric prerelease downgrades (`beta.10` to `beta.3`).
 
 Reuse compatible host dependencies and build caches for candidate validation. Install from the frozen lockfile only when dependencies are missing or incompatible; keep mutable dependency metadata, profiles and test state local to the request worktree.
 
@@ -69,3 +73,7 @@ The 0.18.0 adoption and Desktop engineering boundaries are recorded in
 [the 0.18.0 integration report](upstream-0.18.0.md).
 
 The 0.20.1 adoption is recorded in [the 0.20.1 integration report](upstream-0.20.1.md).
+
+The explicitly selected 0.21.0-beta.3 adoption, including schema 24 and the
+old ZIP Host reproduction, is recorded in
+[the 0.21.0-beta.3 integration report](upstream-0.21.0-beta.3.md).

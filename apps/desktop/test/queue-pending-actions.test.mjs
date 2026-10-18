@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createServer } from "vite";
 import { IPC } from "@pi-desktop/shared";
 
-test("sending the first prompt derives a replaceable title instead of renaming", async (t) => {
+test("sending the first prompt keeps its placeholder until the title plugin supplies a summary", async (t) => {
   const server = await createServer({
     root: fileURLToPath(new URL("..", import.meta.url)),
     configFile: false,
@@ -65,17 +65,16 @@ test("sending the first prompt derives a replaceable title instead of renaming",
     });
 
     assert.equal(await slice.sendPrompt("Summarize the first turn", undefined, "session-a"), true);
-    // The host, not the renderer, owns the title: the sidebar keeps the
-    // placeholder until the derived title comes back, and the rename path stays
-    // unused so an installed title plugin can still replace the derived text.
+    // Preserve the current semantic-title policy: a prompt must not become a
+    // fallback title before the installed title plugin supplies its summary.
     assert.equal(state.sessions[0].title, "New task");
     assert.deepEqual(
       invoked.filter(([channel]) => channel === IPC.invoke.sessionDeriveTitle),
-      [[IPC.invoke.sessionDeriveTitle, "session-a", "Summarize the first turn"]],
+      [],
     );
     assert.equal(invoked.some(([channel]) => channel === IPC.invoke.sessionRename), false);
     await new Promise((resolve) => setImmediate(resolve));
-    assert.equal(refreshed, 1);
+    assert.equal(refreshed, 0);
   } finally {
     globalThis.window = previousWindow;
     await server.close();

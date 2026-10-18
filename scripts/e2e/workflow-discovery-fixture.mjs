@@ -162,6 +162,7 @@ export function registerWorkflowDiscoveryFixture({ registrar, getHost, dataDir, 
     registrar: agentRegistrar, getHost, getSidecar: () => sidecar, getAgentHostBridge: () => bridge,
     logger, vendorOAuth: {}, agentExtensions: { cancelPrompts() {} }, cancelSessionTools() {}, persistenceOutbox: { flush: async () => {} },
     dataDir, activeTurns, isTurnDispatchable: () => true, activeTurnUsages: coordination.activeTurnUsages,
+    recordTurnStart: coordination.recordTurnStart,
     approvedExecutionIdsBySession: new Map(), claimedExecutionSessions: new Map(),
     async resolveAgentRuntimeLaunch(sessionId, session) {
       await launchGate;
