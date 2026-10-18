@@ -47,7 +47,24 @@ try {
   if (!previousBinary) {
     const db = new DatabaseSync(database);
     try {
-      db.exec("DROP TABLE worktrees; ALTER TABLE projects DROP COLUMN worktree_setup_command; PRAGMA user_version=23;");
+      // Build the historical table only in this throwaway fixture. Node's
+      // SQLite can reject DROP COLUMN when the last column has a SQL comment.
+      db.exec(`
+        PRAGMA foreign_keys=OFF;
+        BEGIN;
+        DROP TABLE worktrees;
+        CREATE TABLE projects_v23 (
+          id INTEGER PRIMARY KEY, path TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
+          pinned INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL,
+          last_opened_at INTEGER NOT NULL
+        );
+        INSERT INTO projects_v23 SELECT id, path, name, pinned, created_at, last_opened_at FROM projects;
+        DROP TABLE projects;
+        ALTER TABLE projects_v23 RENAME TO projects;
+        PRAGMA user_version=23;
+        COMMIT;
+        PRAGMA foreign_keys=ON;
+      `);
     } finally { db.close(); }
   }
   assert.equal(schemaVersion(), 23, "fixture must start at the previous schema");
