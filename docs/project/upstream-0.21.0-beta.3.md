@@ -99,3 +99,19 @@ No other checkout or branch was cleaned.
 Windows-incompatible POSIX fixtures are explicit skips. Live-model worktree
 E2E, native macOS/Linux, signed installers, updater installation and the user's
 actual selected profile remain outside this source PR's qualification.
+
+### Committed task candidate
+
+- Integration source: `d365d78cdc2e698b876b7f7aacc1ffacede9155b`.
+- Acceptance candidate: `2ce1732e6acc4e9b199b7be9ae872cde02515a7c`.
+- Base main: `bbe01472ef40e1e586951fe95ef459a0880bc8ee`.
+- Candidate Host SHA256:
+  `782f4a58580c4c181ef91a40ffd265700464673214e911560754b06c98b5d307`.
+- All six committed-candidate probes passed: original ZIP comparison,
+  standalone v23 fixture, Electron cold boot, Coding Actions, storage bootstrap
+  and UTF-8 review follow-up/restart. No test process remains running.
+- The standalone fixture reconstructs the historical projects table only in
+  its throwaway profile, avoiding a Node SQLite DROP COLUMN/comment parser
+  incompatibility. The original packaged-Host path uses its real v23 schema.
+- The final evidence commit changes this report only; executable source and
+  acceptance scripts remain identical to the validated candidate.
