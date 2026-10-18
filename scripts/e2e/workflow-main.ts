@@ -99,6 +99,8 @@ const readFixtureFile = async (path: string) => {
 registerWorkflowArtifactsIpc({ registrar, getHost: () => host, readFile: readFixtureFile });
 registerRequirementsIpc({ registrar, getHost: () => host, readFile: readFixtureFile });
 registrar.handle(IPC.invoke.fsRead, async (input: { path: string }) => readFixtureFile(input.path));
+registrar.handle(IPC.invoke.backgroundTasksList, async (input: { sessionId?: string } = {}) =>
+  host!.call("backgroundTasks.list", input));
 ipcMain.handle("workflow.artifacts.fixture", async (_event, name, input) => {
   if (name === "pauseOpen") {
     interceptNextArtifactOpen = true;

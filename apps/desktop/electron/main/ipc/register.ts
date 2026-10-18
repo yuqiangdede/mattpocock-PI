@@ -1,8 +1,8 @@
 import { catalogs, resolveLocale } from "@pi-desktop/i18n";
 import { CodingActionStore } from "../extensions/coding-action-store";
 import { join } from "node:path";
-import { app, dialog, type BrowserWindow, type IpcMain, type IpcMainInvokeEvent } from "electron";
-import { err, ErrorCodes, IPC, ok, type Result } from "@pi-desktop/shared";
+import { app, dialog, shell, type BrowserWindow, type IpcMain, type IpcMainInvokeEvent } from "electron";
+import { err, ErrorCodes, IPC, ok, type LifecycleDialogChoice, type Result } from "@pi-desktop/shared";
 import type { AgentHostBridge } from "../agent-host-bridge";
 import type { AgentSidecar } from "../agent-sidecar";
 import type { HostProcess } from "../host-process";
@@ -32,11 +32,13 @@ import { registerSessionIpc } from "./session-ipc";
 import { registerSettingsIpc } from "./settings-ipc";
 import { registerStorageIpc } from "../storage/ipc";
 import { registerConfigSyncIpc } from "./config-sync-ipc";
+import { registerBackgroundTasksIpc } from "./background-tasks-ipc";
 import { registerSkillsIpc } from "./skills-ipc";
 import { registerAgentImportIpc } from "./agent-import-ipc";
 import { registerRemoteHostIpc } from "./remote-host-ipc";
 import { fetchSkillMarketDocument, searchSkillMarket } from "../skill-market-catalog";
 import { registerWindowIpc } from "./window-ipc";
+import { registerWorktreeIpc } from "./worktree-ipc";
 import { createComposerTemplateLoader, registerWorkspaceIpc } from "./workspace-ipc";
 import { registerComposerIpc } from "./composer-ipc";
 import { registerSpeechIpc } from "./speech-ipc";
@@ -71,6 +73,8 @@ export type RegisterIpcDependencies = {
   liveCallService?: LiveCallService;
   restartForStorage: () => void;
   mcpOAuth?: McpOAuthManager;
+  markLifecycleDialogRendererReady: (window: BrowserWindow) => boolean;
+  respondLifecycleDialog: (senderWindowId: number, requestId: unknown, choice: LifecycleDialogChoice) => boolean;
   [name: string]: any;
 };
 
@@ -111,6 +115,9 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     sessionCapabilityContext,
     enrichSession,
     acquireSessionOperation,
+    beginTranscriptRewrite,
+    forgetTranscriptRewriteHistory,
+    recordTurnStart,
     stripWinLongPrefix,
     normalizeSettings,
     validateSettingsWrite,
@@ -141,6 +148,8 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     applyCloseBehavior,
     getCloseBehavior,
     markMenuRendererReady,
+    markLifecycleDialogRendererReady,
+    respondLifecycleDialog,
     traySessions,
     taskbarUnreadBadge,
     executeNativeMenuAction,
@@ -271,6 +280,8 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     sessionCapabilityContext,
     enrichSession,
     acquireSessionOperation,
+    beginTranscriptRewrite,
+    forgetTranscriptRewriteHistory,
     stripWinLongPrefix,
   });
   const codingActionStore = new CodingActionStore(dataDir, settings => {
@@ -311,6 +322,10 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     getHost,
     sendToRenderer,
   });
+  registerBackgroundTasksIpc({
+    registrar,
+    getHost,
+  });
   registerProviderIpc({
     registrar,
     getHost,
@@ -324,6 +339,13 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     onProviderInvalidated: (providerId) => liveCallService?.invalidateProvider(providerId),
   });
   registerJevIpc({ registrar, logger });
+  registerWorktreeIpc({
+    registrar,
+    getHost,
+    logger,
+    openPath: (path) => shell.openPath(path),
+    stripWinLongPrefix,
+  });
   const loadComposerTemplatesCached = createComposerTemplateLoader(logger);
   const composerCommandService = registerComposerIpc({
     registrar,
@@ -348,6 +370,8 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     applyCloseBehavior,
     getCloseBehavior,
     markMenuRendererReady,
+    markLifecycleDialogRendererReady,
+    respondLifecycleDialog,
     executeNativeMenuAction,
   });
   registerScheduledIpc({
@@ -416,6 +440,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     persistenceOutbox,
     dataDir,
     activeTurns,
+    recordTurnStart,
     isTurnDispatchable,
     activeTurnUsages,
     approvedExecutionIdsBySession,

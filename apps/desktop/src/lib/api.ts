@@ -75,6 +75,9 @@ import type {
   MarketPluginDetail,
   PluginInstallResult,
   PluginInstallProgress,
+  PluginReviewPage,
+  PluginReviewQuery,
+  PluginReviewSummary,
   ProjectRecord,
   ProjectGroupRecord,
   ProjectMemory,
@@ -91,6 +94,14 @@ import type {
   SessionSearchContext,
   SessionSearchContextRequest,
   SessionSummary,
+  CreatedSessionWorktree,
+  WorktreeMergeOutcome,
+  WorktreeMergePreview,
+  WorktreePendingWork,
+  WorktreeSyncOutcome,
+  WorktreeBehindCounts,
+  WorktreeProbeResult,
+  WorktreeSetupLog,
   SessionCollaborationSummary,
   TraySessionPreferences,
   ToolPermissionResolution,
@@ -128,6 +139,9 @@ import type {
   UpdateState,
   WindowControlAction,
   CloseBehavior,
+  LifecycleDialogChoice,
+  LifecycleDialogKind,
+  LifecycleDialogRequest,
   ConfigSyncApprovalInput,
   ConfigSyncChangePasswordInput,
   ConfigSyncHistoryEntry,
@@ -350,6 +364,37 @@ async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
   return result.data;
 }
 
+/** One chat-started background command reported by host-core. */
+export type BackgroundTaskSummary = {
+  id: string;
+  sessionId: string;
+  command: string;
+  commandShellId: string;
+  state: "running" | "exited" | "failed" | "stopped";
+  elapsedMs: number;
+  exitCode?: number;
+};
+
+export type BackgroundTasksListResult = {
+  tasks: BackgroundTaskSummary[];
+  version: number;
+};
+
+export type BackgroundTaskOutput = {
+  id: string;
+  state: "running" | "exited" | "failed" | "stopped";
+  exitCode?: number;
+  stdout: string;
+  stderr: string;
+  truncated: boolean;
+};
+
+/** `session.create` input: summary fields plus the isolation switch. */
+export type CreateSessionInput = Partial<SessionSummary> & {
+  /** Run the session in its own git worktree (ADR 0329). */
+  isolated?: boolean;
+};
+
 function normalizeSession(session: SessionSummary): SessionSummary {
   return {
     ...safeSessionSummary(session),
@@ -416,6 +461,14 @@ export function validateSettingsWrite(settings: AppSettings): AppSettings {
       errorCode: "INVALID_PARAMS",
     });
   }
+  if (
+    Object.prototype.hasOwnProperty.call(settings, "showThinking") &&
+    typeof settings.showThinking !== "boolean"
+  ) {
+    throw Object.assign(new Error("showThinking is invalid"), {
+      errorCode: "INVALID_PARAMS",
+    });
+  }
   const value = settings as AppSettings & {
     defaultCommandShell?: unknown;
     largePasteThreshold?: unknown;
@@ -424,6 +477,9 @@ export function validateSettingsWrite(settings: AppSettings): AppSettings {
     infiniteProviderRetry?: unknown;
     jevEnabled?: unknown;
     smoothStreaming?: unknown;
+    sidebarRunningIndicators?: unknown;
+    sidebarRunningBadge?: unknown;
+    sidebarRunningRail?: unknown;
     updatePreference?: unknown;
     lastNotifiedUpdateVersion?: unknown;
     networkProxy?: unknown;
@@ -485,6 +541,20 @@ export function validateSettingsWrite(settings: AppSettings): AppSettings {
     throw Object.assign(new Error("smoothStreaming is invalid"), {
       errorCode: "INVALID_PARAMS",
     });
+  }
+  for (const key of [
+    "sidebarRunningIndicators",
+    "sidebarRunningBadge",
+    "sidebarRunningRail",
+  ] as const) {
+    if (
+      Object.prototype.hasOwnProperty.call(value, key) &&
+      typeof value[key] !== "boolean"
+    ) {
+      throw Object.assign(new Error(`${key} is invalid`), {
+        errorCode: "INVALID_PARAMS",
+      });
+    }
   }
   if (
     Object.prototype.hasOwnProperty.call(value, "updatePreference") &&
@@ -627,10 +697,34 @@ export const api = {
       ...result,
       sessions: result.sessions.map(normalizeSession),
     })),
-  createSession: (input?: Partial<SessionSummary>) =>
-    invoke<{ session: SessionSummary }>(IPC.invoke.sessionCreate, input ?? {}).then(
-      (result) => ({ ...result, session: normalizeSession(result.session) }),
-    ),
+  createSession: (input?: CreateSessionInput) =>
+    invoke<{ session: SessionSummary; worktree?: CreatedSessionWorktree }>(
+      IPC.invoke.sessionCreate,
+      input ?? {},
+    ).then((result) => ({ ...result, session: normalizeSession(result.session) })),
+  /** Isolated sessions in git worktrees (ADR 0329). No call returns a path. */
+  probeWorktree: (projectPath: string) =>
+    invoke<WorktreeProbeResult>(IPC.invoke.worktreeProbe, { projectPath }),
+  previewWorktreeMerge: (sessionId: string) =>
+    invoke<WorktreeMergePreview>(IPC.invoke.worktreePreview, { sessionId }),
+  mergeWorktree: (sessionId: string, previewToken: string) =>
+    invoke<WorktreeMergeOutcome>(IPC.invoke.worktreeMerge, { sessionId, previewToken }),
+  getWorktreeBehind: (sessionId: string) =>
+    invoke<number>(IPC.invoke.worktreeBehind, { sessionId }),
+  /** Project commits each isolated session lacks, keyed by session id. */
+  getWorktreeBehindAll: () => invoke<WorktreeBehindCounts>(IPC.invoke.worktreeBehindAll),
+  syncWorktree: (sessionId: string) =>
+    invoke<WorktreeSyncOutcome>(IPC.invoke.worktreeSync, { sessionId }),
+  getWorktreePendingWork: (sessionId: string) =>
+    invoke<WorktreePendingWork>(IPC.invoke.worktreePendingWork, { sessionId }),
+  getWorktreeSetupLog: (sessionId: string) =>
+    invoke<WorktreeSetupLog>(IPC.invoke.worktreeSetupLog, { sessionId }),
+  revealWorktree: (sessionId: string) =>
+    invoke<{ ok: boolean }>(IPC.invoke.worktreeReveal, { sessionId }),
+  getWorktreeSetupCommand: (projectPath: string) =>
+    invoke<{ command: string | null }>(IPC.invoke.worktreeSetupCommandGet, { projectPath }),
+  setWorktreeSetupCommand: (projectPath: string, command: string | null) =>
+    invoke<{ ok: boolean }>(IPC.invoke.worktreeSetupCommandSet, { projectPath, command }),
   forkSession: (sessionId: string, title?: string, throughMessageId?: string) =>
     invoke<{ session: SessionDetail }>(IPC.invoke.sessionFork, {
       sessionId,
@@ -717,6 +811,18 @@ export const api = {
    */
   testJevApiKey: (value: string) =>
     invoke<JevKeyCheckResult>(IPC.invoke.jevTest, value),
+  backgroundTasksList: () =>
+    invoke<BackgroundTasksListResult>(IPC.invoke.backgroundTasksList),
+  backgroundTasksOutput: (id: string) =>
+    invoke<BackgroundTaskOutput>(IPC.invoke.backgroundTasksOutput, { id }),
+  backgroundTasksStop: (id: string) =>
+    invoke<{ ok: boolean; found: boolean }>(IPC.invoke.backgroundTasksStop, { id }),
+  onBackgroundTasksChanged: (listener: (payload: { version?: number }) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.backgroundTasksChanged, (payload) =>
+      listener((payload ?? {}) as { version?: number }),
+    );
+  },
   configSyncGetState: () => invoke<ConfigSyncState>(IPC.invoke.configSyncGetState),
   configSyncConfigure: (input: ConfigSyncConfigureInput) =>
     invoke<ConfigSyncState>(IPC.invoke.configSyncConfigure, input),
@@ -1444,6 +1550,19 @@ export const api = {
   /** Ask the running install to stop. Only a download can be interrupted. */
   marketCancelInstall: (id: string) =>
     invoke<{ cancelled: boolean; id: string }>(IPC.invoke.marketCancelInstall, { id }),
+  /**
+   * Public rating summaries for plugin ids, keyed by id. Anonymous read
+   * through the host; an unreachable or older center rejects instead of
+   * answering fabricated zeros, so callers show an unavailable state.
+   */
+  marketReviewSummaries: (pluginIds: string[]) =>
+    invoke<{ summaries: Record<string, PluginReviewSummary> }>(
+      IPC.invoke.marketReviewSummaries,
+      { pluginIds },
+    ).then((result) => result.summaries),
+  /** One page of public reviews, its summary, and the trusted review URL. */
+  marketReviews: (query: PluginReviewQuery) =>
+    invoke<PluginReviewPage>(IPC.invoke.marketReviews, query),
   /** Import a pi CLI extension file or directory as a development plugin (spec 16 §3). */
   importPiExtension: () =>
     invoke<
@@ -1556,6 +1675,31 @@ export const api = {
     invoke<{ behavior: CloseBehavior }>(IPC.invoke.closeBehaviorSet, {
       behavior,
     }),
+  markLifecycleDialogRendererReady: () =>
+    invoke<{ ready: boolean }>(IPC.invoke.lifecycleDialogReady),
+  respondLifecycleDialog: (requestId: string, choice: LifecycleDialogChoice) =>
+    invoke<{ accepted: boolean }>(IPC.invoke.lifecycleDialogRespond, { requestId, choice }),
+  onLifecycleDialogRequest: (listener: (request: LifecycleDialogRequest) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.lifecycleDialogRequest, (payload) => {
+      if (!payload || typeof payload !== "object") return;
+      const value = payload as Record<string, unknown>;
+      if (
+        typeof value.requestId !== "string" ||
+        !value.requestId ||
+        (value.kind !== "quit-confirmation" && value.kind !== "close-behavior")
+      ) return;
+      listener({ requestId: value.requestId, kind: value.kind as LifecycleDialogKind });
+    });
+  },
+  onLifecycleDialogDismiss: (listener: (requestId: string) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.lifecycleDialogDismiss, (payload) => {
+      if (!payload || typeof payload !== "object") return;
+      const requestId = (payload as Record<string, unknown>).requestId;
+      if (typeof requestId === "string" && requestId) listener(requestId);
+    });
+  },
   getTokenUsageHistory: (query?: { startDate?: number; endDate?: number; bucket?: "day" | "week" | "month" }) =>
     invoke<import("@pi-desktop/shared").TokenUsageHistoryResult>(
       IPC.invoke.statsGetTokenUsageHistory,
@@ -1636,6 +1780,13 @@ export const api = {
         revealOnly?: boolean;
       }),
     );
+  },
+  onBrowserOpenFile: (listener: (event: { path: string }) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.browserOpenFile, (payload) => {
+      const event = payload as { path?: unknown };
+      if (typeof event?.path === "string") listener({ path: event.path });
+    });
   },
   onAgentEvent: (listener: (event: AgentEventEnvelope) => void) => {
     if (!window.piDesktop?.on) return () => undefined;

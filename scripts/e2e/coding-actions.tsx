@@ -126,7 +126,8 @@ globalThis.codingActionsProbe = async () => {
     } else {
       await until(() => readEditorValue(editor()).includes(i18n.t(`coding.prompts.${action}`)));
     }
-    check(readEditorValue(editor()).endsWith("Keep my draft"), `Draft lost: ${action}`);
+    const retainedDraft = action === "implementSpec" ? "Keep my draft" : `Keep my draft\n\n${i18n.t("codingActions.noCompilePrompt")}`;
+    check(readEditorValue(editor()).endsWith(retainedDraft), `Draft lost: ${action}`);
     check((await fixture("snapshot") as { prompts: number }).prompts === 0, `Shortcut auto-submitted: ${action}`);
     check(JSON.stringify((await api.getCodingActions()).configuration) === originalConfiguration, `Configuration changed: ${action}`);
     useAppStore.setState({ composerPrefill: { sessionId: view.sessionId, text: "", fileReferences: [] } });
@@ -150,14 +151,14 @@ globalThis.codingActionsProbe = async () => {
   check(!document.querySelector(".coding-shortcuts-secondary [aria-haspopup='menu']"), "More left the Skill row");
   const beforePlain = (await fixture("snapshot") as { prompts: number }).prompts;
   await click("Verify and commit");
-  await until(() => readEditorValue(editor()) === "Verify the build, then commit with Git or SVN.\n\nKeep my draft");
+  await until(() => readEditorValue(editor()) === `Verify the build, then commit with Git or SVN.\n\nKeep my draft\n\n${i18n.t("codingActions.noCompilePrompt")}`);
   check((await fixture("snapshot") as { prompts: number }).prompts === beforePlain, "Plain button submitted automatically");
   useAppStore.setState({ composerPrefill: { sessionId: view.sessionId, text: "", fileReferences: [] } });
   await until(() => readEditorValue(editor()) === "");
   view.settings(); await until(() => input("Action 名称") && !input("Action 名称").disabled);
   await select("选择 Action", "create-spec", "固化需求");
   check(input("可选提示词").value === i18n.t("coding.prompts.spec"), "设置未显示生效的默认提示词");
-  const specGuidance = ["when", "purpose", "example"].map(part => i18n.t(`coding.skillGuides.spec.${part}`)).join("\n\n");
+  const specGuidance = `${i18n.t("codingActions.tooltipWhen")}：${i18n.t("coding.skillGuides.spec.when")}\n\n${i18n.t("codingActions.tooltipExample")}：${i18n.t("coding.skillGuides.spec.example")}`;
   check(input("Action 说明").value === specGuidance, "设置说明与按钮悬浮介绍不一致");
   check(document.body.textContent?.includes(i18n.t("codingActions.promptDefault")), "未标明默认提示词状态");
   await fill("可选提示词", "Temporary custom instruction", type);
@@ -178,7 +179,7 @@ globalThis.codingActionsProbe = async () => {
   await setActionEnabled(false); await click("保存");
   await until(async () => (await api.getCodingActions()).configuration.actions.find(action => action.id === "code-review")?.enabled === false);
   view.composer(); await until(() => editor());
-  check(![...document.querySelectorAll("button")].some(button => button.textContent?.trim() === "快速审查"), "停用 Action 仍然显示");
+  check(![...document.querySelectorAll(".coding-shortcuts-primary button")].some(button => button.textContent?.trim() === i18n.t("codingActions.walkthrough")), "停用 Action 仍然显示");
   view.settings(); await until(() => input("Action 名称"));
   await select("选择 Action", "code-review", "快速审查（已停用）");
   await setActionEnabled(true); await click("保存");
@@ -193,7 +194,7 @@ globalThis.codingActionsProbe = async () => {
   check(before.prompts === 0, "设置或菜单渲染触发了执行");
   useAppStore.setState({ composerPrefill: { sessionId: view.sessionId, text: "检验 Action 当前会话请求", fileReferences: [] } });
   await until(() => readEditorValue(editor()) === "检验 Action 当前会话请求");
-  await fixture("releaseLaunch"); await click("快速审查");
+  await fixture("releaseLaunch"); await click(i18n.t("codingActions.walkthrough"));
   await until(() => readEditorValue(editor()).startsWith("/skill:code-review 检查当前项目改动。"));
   check((await fixture("snapshot") as { prompts: number }).prompts === before.prompts, "选择 Action 自动发送了请求");
   await until(() => document.activeElement === editor());
@@ -206,7 +207,7 @@ globalThis.codingActionsProbe = async () => {
   check(executed.skillIds.includes("code-review"), "Pi Runtime 未加载 Skill");
   await fixture("updateActionSkill", { path: view.projectPath, body: "UPDATED_ACTION_SKILL_BODY" });
   const configBeforeUpdate = JSON.stringify((await api.getCodingActions()).configuration);
-  await fixture("reset"); const beforeSecond = await fixture("snapshot") as { prompts: number }; await fixture("releaseLaunch"); await click("快速审查");
+  await fixture("reset"); const beforeSecond = await fixture("snapshot") as { prompts: number }; await fixture("releaseLaunch"); await click(i18n.t("codingActions.walkthrough"));
   await until(() => readEditorValue(editor()).startsWith("/skill:code-review 检查当前项目改动。"));
   check((await fixture("snapshot") as { prompts: number }).prompts === beforeSecond.prompts, "选择 Action 自动发送了请求");
   await until(() => document.activeElement === editor());
@@ -238,7 +239,7 @@ globalThis.codingActionsProbe = async () => {
   window.confirm = () => false; await click("重试读取");
   check(input("Action 名称").value === "不要丢失的编辑", "取消重试读取丢失未保存编辑");
   window.confirm = () => true; await click("重试读取");
-  await until(() => input("Action 名称").value === "需求讨论");
+  await until(() => input("Action 名称").value === i18n.t("codingActions.defaults.discuss-requirements"));
   await click("恢复默认 Actions");
   await until(() => input(i18n.t("codingActions.promptName")).value === i18n.t("codingActions.commitCode"));
   await fill(i18n.t("codingActions.promptName"), "Final commit", type);

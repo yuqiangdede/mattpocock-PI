@@ -27,6 +27,7 @@ fn preserves_forward_slash_project_identity_after_relocation() {
     let roots = Roots {
         source: source.clone(),
         canonical_source: source.clone(),
+        project_source: source.clone(),
         destination: destination.clone(),
     };
     let stored = source.join("project").to_string_lossy().replace('\\', "/");
@@ -35,6 +36,44 @@ fn preserves_forward_slash_project_identity_after_relocation() {
         .to_string_lossy()
         .replace('\\', "/");
     assert_eq!(roots.remap(&stored), Some(expected));
+}
+
+#[test]
+fn relocated_project_memory_remains_readable_through_the_repository() {
+    // Keep the synthetic profile for inspection; no user data is involved.
+    let temporary = tempfile::tempdir().unwrap().keep();
+    let source = temporary.join("old profile");
+    let destination = temporary.join("new profile");
+    let project = source.join("projects").join("saved project");
+    fs::create_dir_all(&project).unwrap();
+    let database = Database::open_in_dir(&source).unwrap();
+    database
+        .set_project_memory(&project.to_string_lossy(), "Keep project memory")
+        .unwrap();
+    drop(database);
+    copy_directory(&source, &destination);
+    // A picker can return different case from the canonical spelling stored by
+    // project repositories. Windows canonicalize also adds a verbatim prefix.
+    #[cfg(windows)]
+    let source = temporary.join("OLD PROFILE");
+    relocate(&source, &destination).unwrap();
+    let moved_project = destination.join("projects").join("saved project");
+    let database = Database::open_in_dir(&destination).unwrap();
+    assert_eq!(
+        database
+            .get_project_memory(&moved_project.to_string_lossy())
+            .unwrap()
+            .content,
+        "Keep project memory"
+    );
+    let stored: String = database
+        .conn()
+        .query_row("SELECT path FROM projects", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(
+        stored,
+        crate::db::canonical_project_path(&moved_project.to_string_lossy()).unwrap()
+    );
 }
 
 #[test]
@@ -176,7 +215,10 @@ fn relocates_a_real_copied_profile_without_recovery_or_changing_user_content() {
             row.get(0)
         })
         .unwrap();
-    assert_eq!(inside, destination.join("project").to_string_lossy());
+    assert_eq!(
+        inside,
+        crate::db::normalize_project_path(&destination.join("project").to_string_lossy()).unwrap()
+    );
     let outside: String = connection
         .query_row(
             "SELECT path FROM projects WHERE name='outside'",
@@ -208,7 +250,10 @@ fn relocates_a_real_copied_profile_without_recovery_or_changing_user_content() {
             row.get(0)
         })
         .unwrap();
-    assert_eq!(memory_key, destination.join("project").to_string_lossy());
+    assert_eq!(
+        memory_key,
+        crate::db::normalize_project_path(&destination.join("project").to_string_lossy()).unwrap()
+    );
     let group: String = connection
         .query_row(
             "SELECT value_json FROM kv WHERE ns='projectGroups'",
@@ -245,6 +290,7 @@ fn exact_path_boundaries_preserve_prose_prefix_neighbors_and_traversal() {
     let roots = Roots {
         source: temporary.path().join("old"),
         canonical_source: temporary.path().join("old"),
+        project_source: temporary.path().join("old"),
         destination: temporary.path().join("new"),
     };
     let inside = roots.source.join("nested/file");
@@ -317,7 +363,10 @@ fn handles_legacy_schema_without_upgrading_or_creating_missing_tables() {
     let path: String = database
         .query_row("SELECT path FROM projects", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(path, destination.join("project").to_string_lossy());
+    assert_eq!(
+        path,
+        crate::db::normalize_project_path(&destination.join("project").to_string_lossy()).unwrap()
+    );
     let tables: i64 = database
         .query_row(
             "SELECT count(*) FROM sqlite_master WHERE type='table'",

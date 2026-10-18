@@ -30,6 +30,27 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.21.0",
+    date: "2026-10-16",
+    highlights: [
+      "Browse installed plugins as cards in an auto-filling grid, each with one clear action and its trust, update, and scope state at a glance.",
+      "Read public ratings and reviews for marketplace plugins, and open the plugin center to write one — the desktop never signs in.",
+      "Keep long-running Bash commands going after a turn ends, then review their output as background tasks.",
+      "Run parallel conversations in a project with an isolated Git worktree for each session.",
+      "Keep the Todo list docked beside the Composer and expand it when you need the full checklist.",
+      "Follow the checklist step that is running: a light sweep crosses its text, and finished rows read as plain struck-through lines.",
+      "See Bash commands and reasoning in separate transcript rows.",
+      "See running activity in project headers, including collapsed groups, and choose the count badge and activity rail independently.",
+      "Copy session and project details from contextual sidebar submenus.",
+      "Find files by their full relative path in @ suggestions.",
+      "Return to the same reading position when you switch away from a long conversation and back.",
+      "Reopen archived projects from the sidebar.",
+      "Open local HTML artifacts within the session that created them.",
+      "Scroll wide Markdown tables without losing the conversation layout.",
+      "Keep conversations usable when a tool returns an oversized image.",
+    ],
+  },
+   {
   "version": "0.20.1",
   "date": "2026-10-15",
   "highlights": [
@@ -981,6 +1002,27 @@ const enEntries: ChangelogEntry[] = [
 
 const zhCNEntries: ChangelogEntry[] = [
   {
+    version: "0.21.0",
+    date: "2026-10-16",
+    highlights: [
+      "已安装插件改为自适应卡片网格，每张卡片都有明确的主操作，信任、更新与作用范围一目了然。",
+      "可查看插件市场的公开评分与评论，并可前往插件中心发表评论——桌面端无需登录。",
+      "长时间运行的 Bash 命令可转为后台任务，在本轮结束后继续执行，并可随时查看输出。",
+      "同一项目中的并行会话各自在独立的 Git 工作树中运行。",
+      "Todo 清单可停靠在输入框旁，需要时展开查看完整列表。",
+      "一眼看出清单里正在执行的那一步：它的文字上会扫过一道光带，已完成的行则是朴素的删除线文本。",
+      "对话中将 Bash 命令和思考过程分行显示。",
+      "项目标题会显示运行状态，折叠分组也可见；计数徽标和活动轨道可分别设置。",
+      "可从侧边栏上下文子菜单复制项目和会话信息。",
+      "在 @ 文件建议中查看完整相对路径，准确找到目标文件。",
+      "切换离开长对话再返回时，会回到之前的阅读位置。",
+      "可从侧边栏重新打开已归档项目。",
+      "可在创建 HTML 本地页面的会话中直接打开页面。",
+      "宽 Markdown 表格可横向滚动，不影响对话布局。",
+      "工具返回超大图片时，对话仍可正常使用。",
+    ],
+  },
+   {
   "version": "0.20.1",
   "date": "2026-10-15",
   "highlights": [
@@ -1932,6 +1974,27 @@ const zhCNEntries: ChangelogEntry[] = [
 
 const zhTWEntries: ChangelogEntry[] = [
   {
+    version: "0.21.0",
+    date: "2026-10-16",
+    highlights: [
+      "已安裝外掛改為自適應卡片網格，每張卡片都有明確的主要操作，信任、更新與作用範圍一目了然。",
+      "可查看外掛市場的公開評分與評論，並可前往外掛中心發表評論——桌面端無需登入。",
+      "長時間執行的 Bash 命令可轉為背景工作，在本輪結束後繼續執行，並可隨時查看輸出。",
+      "同一專案中的平行對話各自在獨立的 Git 工作樹中執行。",
+      "Todo 清單可停駐在輸入框旁，需要時展開查看完整清單。",
+      "一眼看出清單中正在執行的那一步：文字上會掃過一道光帶，已完成的行則是樸素的刪除線文字。",
+      "對話中會分開顯示 Bash 命令與思考過程。",
+      "專案標題會顯示執行狀態，收合群組也看得到；計數徽章和活動軌道可分開設定。",
+      "可從側邊欄的情境子選單複製專案與對話資訊。",
+      "在 @ 檔案建議中查看完整相對路徑，準確找到目標檔案。",
+      "離開長對話再回來時，會回到先前的閱讀位置。",
+      "可從側邊欄重新開啟已封存的專案。",
+      "可在建立本機 HTML 頁面的對話中直接開啟頁面。",
+      "寬大的 Markdown 表格可橫向捲動，不影響對話版面。",
+      "工具回傳超大圖片時，對話仍可正常使用。",
+    ],
+  },
+   {
   "version": "0.20.1",
   "date": "2026-10-15",
   "highlights": [

@@ -18,6 +18,7 @@ test("release preflight works without installed dependencies and still rejects d
     "packages/shared/src/changelog.test.ts", "scripts/check-release-docs.mjs",
     "scripts/release-version-check.mjs", "apps/desktop/package.json",
     "apps/desktop/electron/main/settings-operation-metadata.json",
+    "apps/desktop/resources/models.dev/api.json",
     ...["", "-de", "-es", "-fr", "-ko", "-pt-BR", "-tr"].map(
       (suffix) => `packages/shared/src/changelog${suffix}.ts`,
     ),
@@ -46,8 +47,8 @@ test("release preflight works without installed dependencies and still rejects d
   const regressions = [
     ["docs/package.json", (source) => source.replace(surfaceVersion, driftVersion), /docs.*package\.json: version is/],
     ["packages/shared/src/changelog.ts", (source) => source.replace(`version: "${documentVersion}"`, `version: "${driftVersion}"`), /en has no entry for/],
-    ["packages/shared/src/changelog-de.ts", (source) => source.replace(`"version": "${documentVersion}"`, `"version": "${driftVersion}"`), /de has no entry for/],
-    ["packages/shared/src/changelog-de.ts", (source) => source.replace('"highlights": [', '"highlights": ["Extra highlight",'), /de highlight count differs/],
+    ["packages/shared/src/changelog-de.ts", (source) => source.replace(`version: "${documentVersion}"`, `version: "${driftVersion}"`).replace(`"version": "${documentVersion}"`, `"version": "${driftVersion}"`), /de has no entry for/],
+    ["packages/shared/src/changelog-de.ts", (source) => source.replace(/("?highlights"?: \[)/, '$1"Extra highlight",'), /de highlight count differs/],
     ["packages/shared/src/changelog.test.ts", (source) => source.replaceAll(`"${documentVersion}"`, `"${driftVersion}"`), /expected version list does not contain/],
     ["README.zh-CN.md", (source) => source.replaceAll(releaseLine, "999.0.x"), /README\.zh-CN\.md: status section/],
   ];

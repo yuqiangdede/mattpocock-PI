@@ -20,12 +20,12 @@ test("Commit code preserves existing text, whitespace and attachment tokens", ()
   assert.equal(buildCommitCodeDraft(prompt, existing), prompt + "\n\n" + existing);
   assert.equal(buildCommitCodeDraft(prompt, buildCommitCodeDraft(prompt, existing)), prompt + "\n\n" + prompt + "\n\n" + existing);
 });
-test("Localized commit instructions require successful verification and support GitLab and SVN", () => {
+test("Localized commit instructions preserve the commit-only scope and support GitLab and SVN", () => {
   assert.match(zhCN.codingActions.commitPrompt, /GitLab\/SVN/);
-  assert.match(zhCN.codingActions.commitPrompt, /编译/);
-  assert.match(zhCN.codingActions.commitPrompt, /验证通过后/);
-  assert.match(zhCN.codingActions.commitPrompt, /仅在用户明确要求时才执行 Git Push/);
+  assert.match(zhCN.codingActions.commitPrompt, /不执行编译、构建或打包/);
+  assert.match(zhCN.codingActions.commitPrompt, /仅在用户明确要求时执行 Git Push/);
   assert.match(en.codingActions.commitPrompt, /GitLab/);
   assert.match(en.codingActions.commitPrompt, /SVN/);
-  assert.match(en.codingActions.commitPrompt, /Only push Git commits when the user explicitly asks/);
+  assert.match(en.codingActions.commitPrompt, /Do not compile, build or package/);
+  assert.match(en.codingActions.commitPrompt, /Only push when explicitly requested/);
 });

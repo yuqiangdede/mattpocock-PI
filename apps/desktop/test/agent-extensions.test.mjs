@@ -438,20 +438,20 @@ test("the default dependency runner isolates npm config sources and proxies", as
   const { defaultDependencyRunner } = await import("../electron/main/agent-extensions.ts");
   const result = await defaultDependencyRunner(
     process.execPath,
-    ["-e", "process.stderr.write(JSON.stringify(process.env))"],
+    ["-e", "process.stderr.write(JSON.stringify(Object.fromEntries(Object.entries(process.env).filter(([key]) => key.startsWith('npm_config_') || ['NPM_TOKEN', 'NODE_AUTH_TOKEN'].includes(key)))))"],
     process.cwd(),
     30_000,
   );
   assert.equal(result.code, 0);
   const childEnv = JSON.parse(result.stderr);
   assert.notEqual(childEnv.npm_config_userconfig, childEnv.npm_config_globalconfig);
-  assert.ok(childEnv.npm_config_userconfig.startsWith(tmpdir()));
-  assert.ok(childEnv.npm_config_globalconfig.startsWith(tmpdir()));
+  assert.ok(childEnv.npm_config_userconfig.startsWith(join(tmpdir())));
+  assert.ok(childEnv.npm_config_globalconfig.startsWith(join(tmpdir())));
   assert.equal(childEnv.npm_config_registry, "https://registry.npmjs.org/");
   assert.equal(childEnv.npm_config_proxy, "");
   assert.equal(childEnv.npm_config_https_proxy, "");
   assert.equal(childEnv.npm_config_noproxy, "*");
-  assert.ok(childEnv.npm_config_git.startsWith(tmpdir()));
+  assert.ok(childEnv.npm_config_git.startsWith(join(tmpdir())));
   assert.equal(childEnv.npm_config_cache, join(process.cwd(), ".npm-cache"));
   assert.equal(childEnv.NPM_TOKEN, undefined);
   assert.equal(childEnv.NODE_AUTH_TOKEN, undefined);
