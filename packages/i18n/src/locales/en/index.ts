@@ -3444,7 +3444,7 @@ importConfirm: "Imported extensions run inside the agent process with the same a
     TIMEOUT: "The request to the AI provider timed out.",
     STREAM_FAILED: "The reply was interrupted.",
     EMPTY_MODEL_RESPONSE:
-      "The model finished its turn without saying anything, twice in a row. Try again, or rephrase your request.",
+      "The model still produced no output after 10 automatic retries. Try again, or rephrase your request.",
     MUTATION_RETRY_BUDGET_EXHAUSTED:
       "The same edit failed three times, so this turn stopped instead of retrying blind. Ask again to continue.",
     CONTEXT_TOO_LARGE: "This chat is still too long after context recovery. Shorten your message or start a new chat.",

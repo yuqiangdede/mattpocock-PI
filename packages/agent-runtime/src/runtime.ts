@@ -811,8 +811,10 @@ function pathInstructionScope(path: string): string {
   return slash >= 0 ? normalized.slice(0, slash) || "/" : ".";
 }
 
+const SILENT_TURN_MAX_RETRIES = 10;
+
 /**
- * Appended for one automatic re-run after a turn that produced nothing the
+ * Appended for each automatic re-run after a turn that produced nothing the
  * user can see. Two shapes were observed: a wholly empty response, and a
  * finished conclusion written into reasoning while the visible text stayed
  * empty. The same nudge covers both, because both need the same next move.
@@ -1929,9 +1931,9 @@ export class DesktopAgentRuntime {
   /* Silent-turn recovery: a turn that ends with no tool call and no visible
    * text is invisible to the user. 15 of 255 recorded sessions ended a turn
    * that way, and every one of them was followed by the user typing "继续".
-   * One automatic re-run per prompt, then the failure becomes visible. */
+   * Up to ten automatic re-runs per prompt before the failure becomes visible. */
   private pendingSilentTurnRerun = false;
-  private silentTurnRerunAttempted = false;
+  private silentTurnRerunAttempts = 0;
   /**
    * The first settled reply to a current Host-ledger completion notice may
    * need no acknowledgement (D446). Spent by that reply, and revoked as soon
@@ -6380,7 +6382,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     this.providerRetryInProgress = false;
     this.suppressProviderRetryRunEnd = false;
     this.pendingSilentTurnRerun = false;
-    this.silentTurnRerunAttempted = false;
+    this.silentTurnRerunAttempts = 0;
     this.allowSilentCompletion = false;
     this.silentTurnRerunInProgress = false;
     this.suppressSilentTurnRunEnd = false;
@@ -6461,7 +6463,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
   }
 
   /**
-   * Re-run the request that came back silent, once, with SILENT_TURN_NUDGE
+   * Re-run a request that came back silent with SILENT_TURN_NUDGE
    * appended. The nudge goes on `agent.state.systemPrompt` rather than through
    * `prepareNextTurn`, because that hook only shapes turns inside a live run
    * and this run has already ended; `continue()` rebuilds its context from
@@ -8211,7 +8213,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             this.providerTransientRetryAttempt = 0;
             this.providerRateLimitRetryAttempt = 0;
           }
-          // Re-run an invisible answer once before surfacing a finished turn.
+          // Retry invisible answers within the per-run budget before surfacing an error.
           const silence =
             !failed &&
             !aborted &&
@@ -8226,8 +8228,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           const exemptSilence = silence && this.allowSilentCompletion;
           if (!failed && !aborted) this.allowSilentCompletion = false;
           const silentTurn = silence && !exemptSilence;
-          if (silentTurn && !this.silentTurnRerunAttempted) {
-            this.silentTurnRerunAttempted = true;
+          if (silentTurn && this.silentTurnRerunAttempts < SILENT_TURN_MAX_RETRIES) {
+            this.silentTurnRerunAttempts++;
             this.pendingSilentTurnRerun = true;
             this.suppressSilentTurnRunEnd = true;
             // Hold the bubble open. The re-run streams into this same one, so
@@ -8252,7 +8254,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             break;
           }
           if (silentTurn) {
-            // The re-run came back silent too. Stop guessing and say so: an
+            // All recovery attempts came back silent. Stop and say so: an
             // error row with a retriable code gives the UI its "continue"
             // affordance instead of leaving the user to invent one.
             classifiedError = this.providerErrorWithDiagnostics(
@@ -8274,7 +8276,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             !aborted &&
             !silentTurn &&
             this.autonomousExecution &&
-            !this.silentTurnRerunAttempted &&
+            this.silentTurnRerunAttempts === 0 &&
             !this.progressTurnRerunAttempted &&
             isProgressOnlyAssistantTurn(event.message);
           if (progressOnlyTurn) {

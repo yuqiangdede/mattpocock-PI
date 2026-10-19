@@ -2903,7 +2903,7 @@ sklm: {
     NETWORK_POLICY_BLOCKED: "Le contrôle d'adresse de l'application a bloqué cette requête. Si vous utilisez un proxy ou un VPN, vérifiez Paramètres → Général → Réseau.",
     "TIMEOUT": "La demande adressée au fournisseur d'IA a expiré.",
     "STREAM_FAILED": "La réponse a été interrompue.",
-    "EMPTY_MODEL_RESPONSE": "Le modèle a terminé son tour sans rien dire, deux fois de suite. Réessayez ou reformulez votre demande.",
+    "EMPTY_MODEL_RESPONSE": "Le modèle n’a toujours produit aucune réponse après 10 nouvelles tentatives automatiques. Réessayez ou reformulez votre demande.",
     "MUTATION_RETRY_BUDGET_EXHAUSTED": "La même modification a échoué trois fois, donc ce tour s'est arrêté au lieu de réessayer en aveugle. Demandez à nouveau pour continuer.",
     "CONTEXT_TOO_LARGE": "Ce chat est encore trop long après la récupération du contexte. Raccourcissez votre message ou démarrez une nouvelle discussion.",
     "CONTEXT_COMPACTION_FAILED": "Impossible de compacter le contexte du modèle de cette conversation.",
