@@ -116,7 +116,7 @@ test("Coding Actions zh-CN 两排按钮呈现与顺序正确", async t => {
     createElement(CodingWorkbench, { disabled: false, error: null, onExecute: () => {}, onSelectSkill: () => {}, onSelectPrompt: () => {} })));
 
   // 第一排：初始化、咨询、需求讨论、实现、代码审查、Bug排查、提交代码、更多
-  const row1Expected = ["初始化", "咨询", "需求讨论", "实现", "走读", "修复", "bug排查", "提交", "编译", "继续", "更多"];
+  const row1Expected = ["初始化", "咨询", "需求讨论", "实现", "代码审核", "修复", "bug排查", "提交", "编译", "继续", "更多"];
   for (const label of row1Expected) {
     assert.ok(html.includes(`>${label}</button>`), `Row 1 should include ${label}`);
   }

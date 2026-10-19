@@ -70,6 +70,7 @@ export const en = {
   visualTooltipWhen: "When requirements need a visual question-and-answer interview.",
   visualTooltipExample: "Discuss options for a Work Item feature in the browser.",
   walkthrough: "Code review",
+  reviewAfterFixContext: "Review this round's changed files and current diff; first establish the actual scope and comparison baseline. Consult the original requirements, full review and subsequent clarifications in this conversation. Verify reported defects against current code and check for regressions introduced by the changes. Do not treat the previous repair summary or unresolved status as a current conclusion. Report only evidenced findings that still apply; do not implement fixes.",
   collapseShortcuts: "Collapse shortcuts",
   expandShortcuts: "Expand shortcuts",
   continueTask: "Continue",

@@ -1,7 +1,14 @@
+import { catalogs } from "@pi-desktop/i18n";
+
 export const REVIEW_FIX_PROMPT_ID = "review-fix";
 const headings = { zh: "修复审查问题", en: "Fix code review findings" };
 export function isReviewFixRequest(text: string): boolean {
   return Object.values(headings).includes(text.trimStart().split(/\r?\n/, 1)[0]);
+}
+/** Re-review current code rather than promoting a repair summary to a new goal. */
+export function reviewAfterFixContext(request: string): string {
+  const language = request.trimStart().startsWith(headings.zh) ? "zh-CN" : "en";
+  return catalogs[language].codingActions.reviewAfterFixContext;
 }
 export function reviewFixPrompt(language: string): string {
   return language.startsWith("zh") ? [
