@@ -13,7 +13,7 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
     cacheDir: fileURLToPath(new URL("../../../cache/coding-action-ssr", import.meta.url)),
     configFile: false, logLevel: "silent", server: { middlewareMode: true, hmr: false, ws: false, watch: null },
     esbuild: { jsx: "automatic" }, appType: "custom", optimizeDeps: { noDiscovery: true, include: [] },
-    resolve: { alias: { "@pi-desktop/shared": fileURLToPath(new URL("../../../packages/shared/src/index.ts", import.meta.url)) } },
+    resolve: { alias: { "@pi-desktop/i18n": fileURLToPath(new URL("../../../packages/i18n/src/index.ts", import.meta.url)), "@pi-desktop/shared": fileURLToPath(new URL("../../../packages/shared/src/index.ts", import.meta.url)) } },
   });
   t.after(() => server.close());
   const original = Object.getOwnPropertyDescriptor(globalThis, "window");
@@ -101,7 +101,7 @@ test("Coding Actions zh-CN 两排按钮呈现与顺序正确", async t => {
     cacheDir: fileURLToPath(new URL("../../../cache/coding-action-ssr", import.meta.url)),
     configFile: false, logLevel: "silent", server: { middlewareMode: true, hmr: false, ws: false, watch: null },
     esbuild: { jsx: "automatic" }, appType: "custom", optimizeDeps: { noDiscovery: true, include: [] },
-    resolve: { alias: { "@pi-desktop/shared": fileURLToPath(new URL("../../../packages/shared/src/index.ts", import.meta.url)) } },
+    resolve: { alias: { "@pi-desktop/i18n": fileURLToPath(new URL("../../../packages/i18n/src/index.ts", import.meta.url)), "@pi-desktop/shared": fileURLToPath(new URL("../../../packages/shared/src/index.ts", import.meta.url)) } },
   });
   t.after(() => server.close());
   const { CodingWorkbench } = await server.ssrLoadModule("/src/features/coding/CodingWorkbench.tsx");
@@ -116,7 +116,7 @@ test("Coding Actions zh-CN 两排按钮呈现与顺序正确", async t => {
     createElement(CodingWorkbench, { disabled: false, error: null, onExecute: () => {}, onSelectSkill: () => {}, onSelectPrompt: () => {} })));
 
   // 第一排：初始化、咨询、需求讨论、实现、代码审查、Bug排查、提交代码、更多
-  const row1Expected = ["初始化", "咨询", "需求讨论", "实现", "走读", "修复", "bug排查", "提交", "编译", "继续", "更多"];
+  const row1Expected = ["初始化", "咨询", "需求讨论", "实现", "代码审核", "修复", "bug排查", "提交", "编译", "继续", "更多"];
   for (const label of row1Expected) {
     assert.ok(html.includes(`>${label}</button>`), `Row 1 should include ${label}`);
   }

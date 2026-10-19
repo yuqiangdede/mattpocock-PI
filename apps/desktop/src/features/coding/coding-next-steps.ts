@@ -1,3 +1,4 @@
+import { catalogs } from "@pi-desktop/i18n";
 import { isReviewFixRequest } from "./review-fix-prompt";
 import { reviewOutcome } from "./review-outcome";
 import { skillHandoff } from "./skill-handoff";
@@ -29,5 +30,5 @@ export function codingNextSteps(messages: readonly { role?: string; content?: st
   // A final persisted answer also qualifies after recovered tool errors or history reload.
   if (result?.status !== "completed" && last.status !== "complete") return null;
   const steps: readonly CodingNextStep[] = skill === "code-review" ? [reviewOutcome(last.content ?? "") === "clear" ? "commit-code" : "review-fix"] : next[skill];
-  return { steps, context: skillHandoff(skillRequestGoal(request, customPrompts), last.content ?? "") };
+  return { steps, context: skill === "review-fix" ? catalogs[request.trimStart().startsWith("修复审查问题") ? "zh-CN" : "en"].codingActions.reviewAfterFixContext : skillHandoff(skillRequestGoal(request, customPrompts), last.content ?? "") };
 }

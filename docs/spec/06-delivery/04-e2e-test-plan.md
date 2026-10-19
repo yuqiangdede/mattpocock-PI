@@ -18801,6 +18801,13 @@ host-created files. The full app's file-preview viewer is covered separately.
   the goal and short final-answer excerpts, including the artifact, decision
   and pending question, without intermediate progress or code. Preserve the
   existing draft and attachment references; no prompt is submitted.
+- Repair-to-review variant: complete a repair turn whose answer includes an
+  old priority finding and unresolved status, then prepare Code review from the
+  recommendation. The Chinese button reads `代码审核`. The draft asks to inspect
+  current changed files/diff, original requirements and complete review history;
+  it includes neither the repair command heading nor copied stale findings.
+  Covered by `coding-next-steps.test.mjs` through recommendation and draft
+  preparation, and `coding-workbench-shortcuts.test.mjs` for the rendered label.
 - The generated handoff is at most 600 Unicode characters. Repeat the chain
   and verify historical handoffs are not recursively copied from user prompts.
 - Automated: `coding-next-steps.test.mjs` covers extraction and bounds;

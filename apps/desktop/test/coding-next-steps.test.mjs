@@ -4,6 +4,7 @@ import { createServer } from "vite";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 const server = await createServer({ root: dirname(dirname(fileURLToPath(import.meta.url))), configFile: false,
+  resolve: { alias: { "@pi-desktop/shared": fileURLToPath(new URL("../../../packages/shared/src/index.ts", import.meta.url)), "@pi-desktop/i18n": fileURLToPath(new URL("../../../packages/i18n/src/index.ts", import.meta.url)) } },
   server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom", optimizeDeps: { noDiscovery: true } });
 try {
   const { codingNextSteps } = await server.ssrLoadModule("/src/features/coding/coding-next-steps.ts");
@@ -88,6 +89,18 @@ try {
       assert.deepEqual(codingNextSteps(transcript,completed).steps,["code-review"]);
       assert.equal(codingNextSteps(transcript,completed,true),null);
       assert.equal(codingNextSteps([{...transcript[0],content:"Quoted: "+transcript[0].content},transcript[1]],completed),null);
+    }
+  });
+  test("repair to review drafts inspect current changes without recycling repair commands or stale findings", () => {
+    for (const [language, heading] of [["zh-CN", "修复审查问题"], ["en", "Fix code review findings"]]) {
+      const transcript = [{role:"user",content:heading+"\n\nVerify the latest review"},
+        {role:"assistant",status:"complete",content:"[P2] STALE_FINDING\nUnresolved: OLD_STATUS"}];
+      const recommendation = codingNextSteps(transcript, completed);
+      assert.deepEqual(recommendation.steps,["code-review"]);
+      const draft = buildSkillShortcutDraft("skill:code-review", catalogs[language].coding.prompts.review, recommendation.context);
+      assert.doesNotMatch(draft,/修复审查问题|Fix code review findings|STALE_FINDING|OLD_STATUS/);
+      assert.match(recommendation.context,language === "en" ? /changed files.*diff/i : /修改.*文件.*差异/);
+      assert.match(recommendation.context,language === "en" ? /original requirements/i : /原始需求/);
     }
   });
   test("completed engineering actions expose the requested optional chain and outcome context", () => {

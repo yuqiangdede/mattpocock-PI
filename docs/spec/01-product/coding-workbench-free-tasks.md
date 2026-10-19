@@ -96,7 +96,14 @@ consults the original conversation when unclear, fixes only confirmed defects wi
 minimal changes, adds regression coverage and validates the user path. Report only
 fixes, rejected/unresolved findings and validation briefly; do not repeat a detailed
 review inventory before fixing. Existing draft/attachments and manual Send remain.
-Completed repair requests recommend Code review again. The localized leading
+Completed repair requests recommend Code review again. The repair heading is
+not a review goal. This handoff asks to inspect the current
+changed files and diff against an explicit baseline, consult the original
+requirements, full review and clarifications, verify repairs and detect new
+regressions without implementing fixes. It does not copy the repair heading or
+extract possibly stale findings/status from the repair answer. The Chinese
+primary Code review button reads `代码审核`.
+The localized leading
 repair heading identifies this plain-prompt action; editing that heading may
 remove the optional next-step hint. Saved Skill/prompt configuration is retained.
 These are optional next actions, not workflow prerequisites or acceptance claims.
