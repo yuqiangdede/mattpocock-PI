@@ -3370,7 +3370,7 @@ sklm: {
     NETWORK_POLICY_BLOCKED: "应用的地址校验阻止了该请求。若使用代理或 VPN,请检查 设置 → 常规 → 网络。",
     TIMEOUT: "请求 AI 服务超时。",
     STREAM_FAILED: "回复中断了。",
-    EMPTY_MODEL_RESPONSE: "模型连续两轮都没有输出内容。可以重试，或换一种说法。",
+    EMPTY_MODEL_RESPONSE: "模型自动重试 10 次后仍未输出内容。可以重试，或换一种说法。",
     MUTATION_RETRY_BUDGET_EXHAUSTED:
       "同一处修改连续失败三次，本轮已停止，不再盲目重试。再说一次即可继续。",
     CONTEXT_TOO_LARGE: "上下文恢复后对话仍然过长。请缩短消息内容或新开对话。",

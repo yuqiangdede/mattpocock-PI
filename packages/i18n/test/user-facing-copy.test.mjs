@@ -234,3 +234,9 @@ test("pt-BR keeps security disclosures and action semantics intact", () => {
   assert.match(brazilian["chat.acHint"], /Enter/);
   assert.match(brazilian["chat.acHint"], /Esc/);
 });
+
+test("empty response copy describes the ten-retry budget in every locale", () => {
+  for (const [locale, catalog] of Object.entries(catalogs)) {
+    assert.match(flattenCatalog(catalog)["errors.EMPTY_MODEL_RESPONSE"], /10/, locale);
+  }
+});

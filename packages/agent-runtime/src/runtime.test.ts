@@ -3275,7 +3275,7 @@ describe("DesktopAgentRuntime plan transitions", () => {
     await runtime.dispose();
   });
 
-  it("re-runs a silent turn during approved plan execution", async () => {
+  it.each([1, 10])("recovers approved plan execution on silent re-run %i", async (retries) => {
     const onEvent = vi.fn();
     const runtime = createRuntime({ onEvent });
     const agent = (runtime as any).agent;
@@ -3314,7 +3314,7 @@ describe("DesktopAgentRuntime plan transitions", () => {
       });
       await handleAgentEvent({
         type: "message_end",
-        message: attempts === 1 ? silentMessage : recoveredMessage,
+        message: attempts <= retries ? silentMessage : recoveredMessage,
       });
       await handleAgentEvent({ type: "turn_end" });
       await handleAgentEvent({ type: "agent_end", messages: [] });
@@ -3340,7 +3340,7 @@ describe("DesktopAgentRuntime plan transitions", () => {
     await runtime.executeApprovedPlan(execution, "execution-turn-silent");
 
     const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
-    expect(agent.continue).toHaveBeenCalledTimes(2);
+    expect(agent.continue).toHaveBeenCalledTimes(retries + 1);
     // The run closes exactly once, carrying the recovered text; the empty turn
     // leaves neither a bubble nor an error row behind.
     expect(events.filter((event) => event.type === "turn_end")).toHaveLength(1);
@@ -3605,7 +3605,7 @@ describe("DesktopAgentRuntime plan transitions", () => {
     // A run-end suppression left over from a previous turn would swallow this
     // execution's own `turn_end` and `agent_end`, ending it invisibly.
     (runtime as any).suppressSilentTurnRunEnd = true;
-    (runtime as any).silentTurnRerunAttempted = true;
+    (runtime as any).silentTurnRerunAttempts = 10;
     (runtime as any).pendingSilentTurnRerun = true;
     (runtime as any).suppressProgressTurnRunEnd = true;
     (runtime as any).progressTurnRerunAttempted = true;
@@ -3634,7 +3634,7 @@ describe("DesktopAgentRuntime plan transitions", () => {
     await runtime.executeApprovedPlan(execution, "execution-turn-clean");
 
     expect((runtime as any).suppressSilentTurnRunEnd).toBe(false);
-    expect((runtime as any).silentTurnRerunAttempted).toBe(false);
+    expect((runtime as any).silentTurnRerunAttempts).toBe(0);
     expect((runtime as any).pendingSilentTurnRerun).toBe(false);
     expect((runtime as any).suppressProgressTurnRunEnd).toBe(false);
     expect((runtime as any).progressTurnRerunAttempted).toBe(false);
@@ -3994,7 +3994,7 @@ describe("DesktopAgentRuntime session collaboration provenance", () => {
       expect(buildSessionContext((runtime as any).fullEntries).messages).toEqual([]);
       onEvent.mockClear();
       await runtime.prompt("Please answer", "human-user", "human-turn");
-      expect(agent.continue).toHaveBeenCalledOnce();
+      expect(agent.continue).toHaveBeenCalledTimes(10);
       expect(eventsOf(onEvent)).toContainEqual(emptyModelResponse);
     } finally {
       await runtime.dispose();
@@ -4042,7 +4042,7 @@ describe("DesktopAgentRuntime session collaboration provenance", () => {
       try {
         await runtime.prompt(kind === "text-only" ? formatSessionMessage("Task completed", origin)
           : { text: "Task completed", sessionMessage: origin }, "user", "notice-turn");
-        expect(agent.continue).toHaveBeenCalledOnce();
+        expect(agent.continue).toHaveBeenCalledTimes(10);
         expect(eventsOf(onEvent)).toContainEqual(emptyModelResponse);
       } finally { await runtime.dispose(); }
     },
@@ -4078,7 +4078,7 @@ describe("DesktopAgentRuntime session collaboration provenance", () => {
     try {
       await runtime.prompt({ text: "Task completed", sessionMessage: completionOrigin }, "notice-user", "notice-turn");
       // The model did work and then said nothing about it: D193 applies.
-      expect(agent.continue).toHaveBeenCalledOnce();
+      expect(agent.continue).toHaveBeenCalledTimes(10);
       expect(eventsOf(onEvent)).toContainEqual(emptyModelResponse);
     } finally { await runtime.dispose(); }
   });
@@ -4161,8 +4161,8 @@ describe("DesktopAgentRuntime session collaboration provenance", () => {
     try {
       await runtime.prompt({ text: "Task completed", sessionMessage: completionOrigin }, "notice-user", "notice-turn");
       // The notice reply spent the exception silently; the reply to the user
-      // still gets its one re-run and then the visible error.
-      expect(agent.continue).toHaveBeenCalledOnce();
+      // still gets ten re-runs and then the visible error.
+      expect(agent.continue).toHaveBeenCalledTimes(10);
       expect(eventsOf(onEvent)).toContainEqual(emptyModelResponse);
     } finally { await runtime.dispose(); }
   });
@@ -5525,7 +5525,7 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     await runtime.dispose();
   });
 
-  it("recovers a silent turn with one automatic re-run", async () => {
+  it.each([1, 10])("recovers a silent turn on automatic re-run %i", async (successAttempt) => {
     const onEvent = vi.fn();
     const runtime = createRuntime({ onEvent });
     const agent = (runtime as any).agent;
@@ -5551,7 +5551,9 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
       await handleAgentEvent({ type: "agent_end", messages: [] });
     });
     agent.waitForIdle = vi.fn(async () => undefined);
+    let attempts = 0;
     agent.continue = vi.fn(async () => {
+      attempts++;
       promptDuringRerun = agent.state.systemPrompt;
       // The silent assistant must be gone: agentLoopContinue rejects a
       // transcript that ends with one.
@@ -5564,7 +5566,7 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
       });
       await handleAgentEvent({
         type: "message_end",
-        message: recoveredMessage,
+        message: attempts === successAttempt ? recoveredMessage : silentMessage,
       });
       await handleAgentEvent({ type: "turn_end" });
       await handleAgentEvent({ type: "agent_end", messages: [] });
@@ -5573,7 +5575,7 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     await runtime.prompt("which provider?", "user-1");
 
     const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
-    expect(agent.continue).toHaveBeenCalledOnce();
+    expect(agent.continue).toHaveBeenCalledTimes(successAttempt);
     expect(promptDuringRerun).toContain("<no_output_recovery>");
     // One-shot: the nudge does not ride along on later prompts.
     expect(agent.state.systemPrompt).not.toContain("<no_output_recovery>");
@@ -5601,7 +5603,7 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     await runtime.dispose();
   });
 
-  it("reports an empty response when the re-run stays silent", async () => {
+  it("reports an empty response after ten silent re-runs and resets for a new prompt", async () => {
     const onEvent = vi.fn();
     const runtime = createRuntime({ onEvent });
     const agent = (runtime as any).agent;
@@ -5634,8 +5636,9 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     await runtime.prompt("continue", "user-1");
 
     const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
-    // Exactly one re-run, then the failure becomes visible instead of looping.
-    expect(agent.continue).toHaveBeenCalledOnce();
+    // Stop at ten re-runs; the eleventh silent response is terminal.
+    expect(agent.continue).toHaveBeenCalledTimes(10);
+    expect(events.filter(event => event.type === "agent_end")).toHaveLength(1);
     expect(events).toContainEqual(
       expect.objectContaining({
         type: "message_end",
@@ -5658,7 +5661,58 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     // An assistant message with nothing in it is not worth resending.
     expect((runtime as any).fullEntries).toHaveLength(0);
 
+    await runtime.prompt("try again", "user-2");
+    expect(agent.continue).toHaveBeenCalledTimes(20);
     await runtime.dispose();
+  });
+
+  it("stops empty-response recovery when the user aborts a retry", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    const internal = runtime as unknown as {
+      agent: Agent;
+      handleAgentEvent(event: unknown): Promise<void>;
+    };
+    const agent = internal.agent;
+    const silent = assistantMessage({ content: [] });
+    const respond = async (message: AssistantMessage) => {
+      await internal.handleAgentEvent({ type: "agent_start" });
+      await internal.handleAgentEvent({ type: "message_start", message });
+      await internal.handleAgentEvent({ type: "message_end", message });
+      await internal.handleAgentEvent({ type: "turn_end" });
+      await internal.handleAgentEvent({ type: "agent_end", messages: [] });
+    };
+    let markRetryStarted!: () => void;
+    let releaseRetry!: () => void;
+    const retryStarted = new Promise<void>(resolve => { markRetryStarted = resolve; });
+    const retryReleased = new Promise<void>(resolve => { releaseRetry = resolve; });
+    vi.spyOn(agent, "prompt").mockImplementation(async () => {
+      agent.state.messages = [{ role: "user", content: "Please answer", timestamp: 1 }, silent];
+      await respond(silent);
+    });
+    vi.spyOn(agent, "waitForIdle").mockResolvedValue(undefined);
+    let attempts = 0;
+    const continuation = vi.spyOn(agent, "continue").mockImplementation(async () => {
+      if (++attempts < 3) { await respond(silent); return; }
+      markRetryStarted();
+      await retryReleased;
+      await respond(assistantMessage({ content: [], stopReason: "aborted" }));
+    });
+    try {
+      const prompt = runtime.prompt("Please answer", "user-1");
+      await retryStarted;
+      const stopping = runtime.abort();
+      releaseRetry();
+      await Promise.all([prompt, stopping]);
+      expect(continuation).toHaveBeenCalledTimes(3);
+      const events = onEvent.mock.calls.map(([envelope]) => (envelope as AgentEventEnvelope).event);
+      expect(events.some(event => event.type === "error")).toBe(false);
+      expect(events.filter(event => event.type === "agent_end")).toHaveLength(1);
+      expect(events).toContainEqual(expect.objectContaining({
+        type: "message_end", message: expect.objectContaining({ status: "aborted" }),
+      }));
+      expect(agent.state.systemPrompt).not.toContain("<no_output_recovery>");
+    } finally { releaseRetry(); await runtime.dispose(); }
   });
 
   it("treats a tool-calling turn with no text as normal work", async () => {

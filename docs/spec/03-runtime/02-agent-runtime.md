@@ -306,11 +306,13 @@ abort, the message requested no tools (no `toolCall` content part), and the
 visible text is blank after trimming. Reasoning content does not exempt a turn
 — a thinking-only turn is exactly the case that needs recovery.
 
-Recovery mirrors §5d and is bounded the same way: at most one re-run per run.
+Recovery allows at most ten automatic re-runs per run (eleven provider responses
+including the initial request). The budget resets only for a new user prompt or
+approved execution, not after a tool call or context-overflow recovery.
 The silent assistant is dropped from the model context (`continue()`
 refuses a transcript ending in an assistant message, and an empty one is not
 worth resending), a short no-output instruction is appended to the system
-prompt for that one continuation, and the bubble id is reused so a recovered
+prompt for each recovery continuation, and the bubble id is reused so a recovered
 turn leaves no empty row behind. The silent attempt's `turn_end` and
 `agent_end` are suppressed; the re-run emits the single terminal lifecycle.
 
@@ -333,7 +335,7 @@ and this run has already ended. It is removed afterwards unless a path-scoped
 instruction reload rewrote the prompt meanwhile, in which case the newer
 rebuild wins.
 
-If the re-run is silent too, the turn ends as a visible assistant error with
+If all ten re-runs are silent too, the turn ends as a visible assistant error with
 retriable `EMPTY_MODEL_RESPONSE`, which gives the transcript its normal retry
 action. No empty assistant message is persisted in either case.
 

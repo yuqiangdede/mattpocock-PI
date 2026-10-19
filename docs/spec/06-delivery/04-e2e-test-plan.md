@@ -8429,21 +8429,23 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - **Status**: Unit-covered (`tool-presentation.test.mjs`,
   `transcript-style.test.mjs`); full UI journey Draft
 
-#### E2E-146: A turn that produces no visible text re-runs once
+#### E2E-146: A turn that produces no visible text retries up to ten times
 
 - **Preconditions**: A project-bound Agent session uses a deterministic provider
   fixture that ends one turn with no tool call and no text — once with reasoning
-  content present, once with nothing at all; a second fixture run ends both the
-  first turn and the re-run that way.
+  content present, once with nothing at all; a second fixture keeps all eleven
+  responses empty. Another fixture recovers on the tenth retry.
 - **Steps**:
   1. Start an Agent turn with the reasoning-only fixture and watch the
      transcript while the runtime recovers.
   2. Inspect the transcript, session state, and terminal diagnostics afterwards.
   3. Repeat with the nothing-at-all fixture.
-  4. Repeat with the twice-silent fixture and inspect the terminal error message,
-     its details disclosure, and its action button.
+  4. Repeat with the eleven-response silent fixture and inspect the terminal
+     error message, its details disclosure, and its action button.
   5. Click the error's retry action.
-  6. Reload the session and verify what stayed durable.
+  6. Repeat with the tenth-retry recovery fixture, then stop during recovery
+     and verify no further retry is issued.
+  7. Reload the session and verify what stayed durable.
 - **Expected**:
   - The recovered turn keeps the same visible assistant message id, emits one
     terminal lifecycle, and shows no error. The user sees only the answer.
@@ -8452,13 +8454,13 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
     appended to the durable transcript.
   - The terminal diagnostics identify the empty-response recovery and the
     re-run's outcome.
-  - The second silence emits one terminal retriable `EMPTY_MODEL_RESPONSE`
-    assistant error and lifecycle event; the message names both attempts, and
-    the retry action re-sends the last prompt.
+  - The eleventh silent response emits one terminal retriable `EMPTY_MODEL_RESPONSE`
+    assistant error and lifecycle event; the message states that ten automatic
+    retries were exhausted, and the retry action re-sends the last prompt.
   - A turn whose text is empty because it requested tools is untouched, and so
     is an aborted or already-failed turn.
-  - Only one re-run happens per prompt, including after context-overflow
-    recovery within the same prompt.
+  - At most ten re-runs happen per prompt, including after context-overflow
+    recovery within the same prompt. A new prompt receives a fresh budget.
 - **Specs linked**: `03-runtime/02-agent-runtime.md` §5e, §7,
   `03-runtime/08-error-codes.md` §3.2, `08-meta/decisions-log.md` (D193)
 - **Acceptance**: C (chat & stream), F (persistence), H (diagnostics), Quality
@@ -18814,7 +18816,10 @@ host-created files. The full app's file-preview viewer is covered separately.
   `coding-prompt-user-path.test.mjs` exercises the highlighted menu action,
   real launcher and editable draft in isolated Electron with fixture IPC.
 - Review-to-repair variant: complete a review, discuss a correction, click Repair
-  and verify original finding plus latest clarification fit within 600 characters.
+  and verify the full original review remains intact, including long findings
+  and fenced evidence. Discussion uses at most 600 Unicode characters, preferring
+  recent whole paragraphs. Oversized paragraphs are omitted rather than cut.
+  No finding is shortened with an ellipsis or dropped by ranking.
   The Chinese default instruction stays under 200 characters, asks for verification
   and regression coverage, and does not request a repeated detailed review list.
   Switching to an unreviewed session still disables Repair. Covered by
