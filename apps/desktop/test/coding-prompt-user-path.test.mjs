@@ -223,7 +223,7 @@ window.promptButtonsProbe = async () => {
   api.composerCommands = async () => ({commands:["to-spec","to-tickets","implement","code-review"].map(skillId => ({kind:"skill",name:"skill:"+skillId,skillId}))});
   await click(i18n.t("codingActions.recheck"));
   await until(() => [...document.querySelectorAll('.coding-shortcuts-primary button')].some(button => button.textContent === "Implement" && !button.disabled));
-  useAppStore.setState({messages:[{role:"user",command:"/skill:to-spec Finalize requirements",content:"<skill>Expanded specification instructions</skill>\nFinalize requirements"},{role:"tool",content:"Recovered command failure",isError:true},{role:"assistant",status:"complete",content:"Artifact: docs/requirements.md"}],latestTurnResults:{"visual-fixture":{status:"failed",turnId:"spec-turn",finishedAt:Date.now()}}});
+  useAppStore.setState({messages:[{role:"user",command:"/skill:to-spec Finalize requirements",content:"<skill>Expanded specification instructions</skill>\nFinalize requirements"},{role:"tool",content:"Recovered command failure",isError:true},{role:"assistant",status:"complete",content:"PROGRESS_ONLY ".repeat(1000)},{role:"assistant",status:"complete",content:"Artifact: docs/requirements.md\nConfirmed: keep local storage.\nPending: confirm retention.\n" + fence + "ts\nCODE_ONLY\n" + fence}],latestTurnResults:{"visual-fixture":{status:"failed",turnId:"spec-turn",finishedAt:Date.now()}}});
   await until(() => document.querySelector('.coding-shortcuts-primary .coding-action-recommended[aria-haspopup="menu"]'));
   check(document.querySelectorAll('.coding-shortcuts-primary .coding-action-recommended').length === 2, "Specification highlights implementation and More");
   check(getComputedStyle(document.querySelector('.coding-shortcuts-primary .coding-action-recommended')).boxShadow !== "none", "Recommended buttons render a visible accent ring with real theme tokens");
@@ -234,6 +234,10 @@ window.promptButtonsProbe = async () => {
   await until(() => document.querySelector('[aria-label="Draft"]').value.startsWith("/skill:to-tickets "));
   check(document.querySelector('[aria-label="Draft"]').value.includes("Artifact: docs/requirements.md"), "Recommendation carries the artifact context");
   check(document.querySelector('[aria-label="Draft"]').value.includes(initialDraft), "Recommendation preserves the editable draft");
+  const handoffDraft = document.querySelector('[aria-label="Draft"]').value;
+  check(handoffDraft.includes("Confirmed: keep local storage.") && handoffDraft.includes("Pending: confirm retention."), "Handoff retains decisions and unresolved work");
+  check(!handoffDraft.includes("PROGRESS_ONLY") && !handoffDraft.includes("CODE_ONLY"), "Handoff excludes verbose progress and code");
+
   useAppStore.setState({messages:[{role:"user",content:"/skill:code-review Review changes"},{role:"assistant",content:"No findings."}],latestTurnResults:{"visual-fixture":{status:"completed",turnId:"review-turn",finishedAt:Date.now()}}});
   await until(() => [...document.querySelectorAll('.coding-shortcuts-primary .coding-action-recommended')].some(button=>button.textContent === "My commit"));
   [...document.querySelectorAll('.coding-shortcuts-primary .coding-action-recommended')].find(button=>button.textContent === "My commit").click();
@@ -245,10 +249,12 @@ window.promptButtonsProbe = async () => {
   const reviewMessages = useAppStore.getState().messages;
   flushSync(() => useAppStore.setState({messages:[...reviewMessages,{role:"user",content:"Please also check cancellation"},{role:"assistant",status:"complete",content:"[P2] Missing cancellation cleanup"}]}));
   const repair = await until(() => repairButton() && !repairButton().disabled && repairButton());
+  const beforeRepair = document.querySelector('[aria-label="Draft"]').value;
   repair.click();
   await until(() => document.querySelector('[aria-label="Draft"]').value.startsWith("修复审查问题\n"));
   check(document.querySelector('[aria-label="Draft"]').value.includes("[P1] Lost updates in save.ts") && document.querySelector('[aria-label="Draft"]').value.includes(initialDraft), "Repair draft carries findings and preserves existing text");
-  check(document.querySelector('[aria-label="Draft"]').value.includes("Missing cancellation cleanup") && document.querySelector('[aria-label="Draft"]').value.includes("先汇总"), "Repair summarizes findings and the follow-up discussion");
+  check(document.querySelector('[aria-label="Draft"]').value.includes("Missing cancellation cleanup") && document.querySelector('[aria-label="Draft"]').value.includes("核实本会话"), "Repair summarizes findings and the follow-up discussion");
+  check(document.querySelector('[aria-label="Draft"]').value.length - beforeRepair.length < 900, "Repair adds only a concise instruction and handoff");
   check(!document.querySelector('.coding-more-menu[role="menu"]'), "Repair selection closes More without sending");
   const repairRequest = document.querySelector('[aria-label="Draft"]').value;
   useAppStore.setState({activeSessionId:"unreviewed-session",messages:[]});

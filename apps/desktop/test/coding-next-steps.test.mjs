@@ -55,8 +55,30 @@ try {
   });
   test("completed engineering actions expose the requested optional chain and outcome context", () => {
     for (const [skill, expected] of Object.entries({"to-spec":["to-tickets","implement"],"to-tickets":["implement"],implement:["code-review"],"code-review":["review-fix"]})) {
-      assert.deepEqual(codingNextSteps(messages(skill), completed), {steps:expected,context:"docs/spec.md"});
+      assert.deepEqual(codingNextSteps(messages(skill), completed), {steps:expected,context:"- Do this\n- docs/spec.md"});
     }
+  });
+  test("handoffs extract a short goal and final facts without copying progress, code or duplicates", () => {
+    const transcript = [{role:"user",command:"/skill:to-spec Add offline search",content:"Expanded Skill"},
+      {role:"assistant",content:"PROCESS_ONLY ".repeat(1000)},
+      {role:"tool",content:"TOOL_ONLY"},
+      {role:"assistant",status:"complete",content:[
+        "Background explanation ".repeat(500),
+        "Confirmed: use the local index.", "Artifact: docs/search.md", "Artifact: docs/search.md",
+        "Pending: confirm the retention period.", "```ts", "CODE_ONLY", "```",
+      ].join("\n")}];
+    const {context, steps} = codingNextSteps(transcript, completed);
+    assert.deepEqual(steps,["to-tickets","implement"]);
+    assert.ok(Array.from(context).length <= 600);
+    assert.match(context,/Add offline search/);
+    assert.match(context,/Confirmed: use the local index/);
+    assert.match(context,/docs\/search.md/);
+    assert.match(context,/Pending: confirm/);
+    assert.equal(context.match(/docs\/search.md/g).length,1);
+    assert.doesNotMatch(context,/PROCESS_ONLY|TOOL_ONLY|CODE_ONLY|Background explanation|Expanded Skill/);
+    const repeated = codingNextSteps([{role:"user",content:"/skill:implement Continue\n\n"+context},
+      {role:"assistant",status:"complete",content:"Implemented docs/search.md"}],completed).context;
+    assert.doesNotMatch(repeated,/Pending: confirm/);
   });
   test("running, failed, cancelled, unrelated and newer user turns do not recommend", () => {
     assert.equal(codingNextSteps(messages("implement"), completed, true), null);
@@ -77,6 +99,6 @@ try {
   test("persisted expanded Skill rows use their original command metadata", () => {
     const transcript = [{role:"user",command:"/skill:to-spec Finalize the agreed requirements",content:"<skill>Full expanded instructions</skill>\nFinalize the agreed requirements"},
       {role:"assistant",status:"complete",content:"Updated and reread .scratch/project/spec.md"}];
-    assert.deepEqual(codingNextSteps(transcript,undefined),{steps:["to-tickets","implement"],context:"Updated and reread .scratch/project/spec.md"});
+    assert.deepEqual(codingNextSteps(transcript,undefined),{steps:["to-tickets","implement"],context:"- Finalize the agreed requirements\n- Updated and reread .scratch/project/spec.md"});
   });
 } finally { await server.close(); }

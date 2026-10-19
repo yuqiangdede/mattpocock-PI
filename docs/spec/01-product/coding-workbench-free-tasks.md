@@ -85,12 +85,14 @@ Fix code review findings is an always-visible primary plain-prompt button immedi
 after Code review. It starts disabled and becomes available only after an actual
 completed code-review turn in the current conversation; clicking Review alone,
 streaming/failed replies, running turns and switching to an unreviewed conversation
-do not unlock it. The latest review supersedes earlier reviews. It includes the
-review replies and subsequent user/assistant discussion, excluding tool output,
-in a bounded context. First summarize and deduplicate the findings with severity,
-locations, impact and evidence, then verify the latest report, fix confirmed defects minimally, add regression coverage and
-report rejected/unresolved findings. It carries the review discussion context,
-retains existing draft/attachments and waits for manual Send.
+do not unlock it. The latest review supersedes earlier reviews. It carries a local
+extractive handoff of the final review answer (350 characters)
+and latest user/assistant clarification (240 characters), excluding tool output.
+The concise default instruction verifies the latest review and follow-up discussion,
+consults the original conversation when unclear, fixes only confirmed defects with
+minimal changes, adds regression coverage and validates the user path. Report only
+fixes, rejected/unresolved findings and validation briefly; do not repeat a detailed
+review inventory before fixing. Existing draft/attachments and manual Send remain.
 Completed repair requests recommend Code review again. The localized leading
 repair heading identifies this plain-prompt action; editing that heading may
 remove the optional next-step hint. Saved Skill/prompt configuration is retained.
@@ -108,9 +110,15 @@ An explicitly complete, non-error final assistant answer also qualifies after
 recovered tool failures or history restoration without a live turn result. A
 final error, streaming reply or running Session never qualifies. This fallback
 offers navigation only and does not certify the generated artifact or review.
-Selecting a recommendation carries the preceding outcome (bounded to 8000
-characters), or the interview's decisions and finish note, into an editable draft.
-Existing draft text and attachments survive. Only manual Send executes it.
+Selecting a recommendation carries a local extractive handoff of at most 600
+Unicode characters (up to four bullets, each at most 145 characters). It uses
+the original command's first-line goal and the final assistant answer only;
+it omits intermediate replies, tool output and fenced code, deduplicates lines,
+and prioritizes unresolved work, decisions and artifact paths over prose.
+Ellipses mark shortened excerpts. This is a navigation aid, not a complete
+record or inferred acceptance: the full conversation remains authoritative.
+No extra model call, persistence or automatic submission is introduced. Existing
+draft text and attachments remain verbatim, outside the summary budget.
 Commit uses the configured plain-prompt action with the no-build instruction; recommendations never send, commit or push automatically.
 
 More groups available Matt skills by Requirements and exploration, Design and planning, Development and testing, Review and maintenance, and Collaboration and delivery. Unknown configured overflow appears under Custom actions. Empty groups are hidden. Grouping is presentation only: no stage prerequisites, execution order, or persisted configuration changes.

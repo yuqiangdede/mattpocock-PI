@@ -1,5 +1,6 @@
 import { isReviewFixRequest } from "./review-fix-prompt";
 import { reviewOutcome } from "./review-outcome";
+import { skillHandoff } from "./skill-handoff";
 export type CodingNextStep = "to-spec" | "to-tickets" | "implement" | "code-review" | "commit-code" | "review-fix";
 const next: Readonly<Record<string, readonly CodingNextStep[]>> = {
   "to-spec": ["to-tickets", "implement"],
@@ -27,5 +28,5 @@ export function codingNextSteps(messages: readonly { role?: string; content?: st
   // A final persisted answer also qualifies after recovered tool errors or history reload.
   if (result?.status !== "completed" && last.status !== "complete") return null;
   const steps: readonly CodingNextStep[] = skill === "code-review" ? [reviewOutcome(last.content ?? "") === "clear" ? "commit-code" : "review-fix"] : next[skill];
-  return { steps, context: replies.map(message => message.content).join("\n\n").slice(-8000) };
+  return { steps, context: skillHandoff(request, last.content ?? "") };
 }
