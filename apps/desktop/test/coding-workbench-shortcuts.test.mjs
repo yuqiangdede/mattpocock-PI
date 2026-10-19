@@ -13,7 +13,7 @@ test("Coding Actions 呈现独立入口，渲染不会执行或调用 Host", asy
     cacheDir: fileURLToPath(new URL("../../../cache/coding-action-ssr", import.meta.url)),
     configFile: false, logLevel: "silent", server: { middlewareMode: true, hmr: false, ws: false, watch: null },
     esbuild: { jsx: "automatic" }, appType: "custom", optimizeDeps: { noDiscovery: true, include: [] },
-    resolve: { alias: { "@pi-desktop/shared": fileURLToPath(new URL("../../../packages/shared/src/index.ts", import.meta.url)) } },
+    resolve: { alias: { "@pi-desktop/i18n": fileURLToPath(new URL("../../../packages/i18n/src/index.ts", import.meta.url)), "@pi-desktop/shared": fileURLToPath(new URL("../../../packages/shared/src/index.ts", import.meta.url)) } },
   });
   t.after(() => server.close());
   const original = Object.getOwnPropertyDescriptor(globalThis, "window");
@@ -101,7 +101,7 @@ test("Coding Actions zh-CN 两排按钮呈现与顺序正确", async t => {
     cacheDir: fileURLToPath(new URL("../../../cache/coding-action-ssr", import.meta.url)),
     configFile: false, logLevel: "silent", server: { middlewareMode: true, hmr: false, ws: false, watch: null },
     esbuild: { jsx: "automatic" }, appType: "custom", optimizeDeps: { noDiscovery: true, include: [] },
-    resolve: { alias: { "@pi-desktop/shared": fileURLToPath(new URL("../../../packages/shared/src/index.ts", import.meta.url)) } },
+    resolve: { alias: { "@pi-desktop/i18n": fileURLToPath(new URL("../../../packages/i18n/src/index.ts", import.meta.url)), "@pi-desktop/shared": fileURLToPath(new URL("../../../packages/shared/src/index.ts", import.meta.url)) } },
   });
   t.after(() => server.close());
   const { CodingWorkbench } = await server.ssrLoadModule("/src/features/coding/CodingWorkbench.tsx");

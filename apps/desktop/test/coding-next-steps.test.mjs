@@ -4,7 +4,7 @@ import { createServer } from "vite";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 const server = await createServer({ root: dirname(dirname(fileURLToPath(import.meta.url))), configFile: false,
-  resolve: { alias: { "@pi-desktop/i18n": fileURLToPath(new URL("../../../packages/i18n/src/index.ts", import.meta.url)) } },
+  resolve: { alias: { "@pi-desktop/shared": fileURLToPath(new URL("../../../packages/shared/src/index.ts", import.meta.url)), "@pi-desktop/i18n": fileURLToPath(new URL("../../../packages/i18n/src/index.ts", import.meta.url)) } },
   server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom", optimizeDeps: { noDiscovery: true } });
 try {
   const { codingNextSteps } = await server.ssrLoadModule("/src/features/coding/coding-next-steps.ts");
