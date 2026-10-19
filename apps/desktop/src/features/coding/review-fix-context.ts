@@ -1,5 +1,3 @@
-import { skillHandoff } from "./skill-handoff.ts";
-
 type ReviewMessage = { role?: string; content?: string; command?: string; status?: string; isError?: boolean; createdAt?: string };
 
 /** Derive availability from this session's actual review transcript, never from clicking a shortcut. */
@@ -20,11 +18,19 @@ export function completedReviewContext(messages: readonly ReviewMessage[], resul
     const createdAt = Date.parse(messages[start].createdAt ?? "");
     if (end !== messages.length || result?.status !== "completed" || !Number.isFinite(createdAt) || createdAt > result.finishedAt) return null;
   }
-  const initial = skillHandoff("", last.content ?? "", 350);
-  const discussion = messages.slice(end);
-  const latestUserIndex = discussion.findLastIndex(message => message.role === "user");
-  const latestUser = discussion[latestUserIndex];
-  const latestAnswer = discussion.slice(latestUserIndex + 1).findLast(message => message.role === "assistant" && message.status === "complete" && !message.isError && message.content);
-  const followup = skillHandoff(latestUser?.content ?? "", latestAnswer?.content ?? "", 240);
-  return [initial, followup].filter(Boolean).join("\n\n");
+  // Preserve the full review. Fit recent discussion as whole paragraphs, never
+  // shorten findings or manufacture ellipses. Omitted discussion stays in history.
+  const discussion = messages.slice(end).filter(message =>
+    message.role === "user" || (message.role === "assistant" && message.status === "complete" && !message.isError)
+  );
+  const paragraphs = discussion.flatMap(message => (message.content ?? "").split(/\r?\n\s*\r?\n/)).filter(Boolean);
+  const recent: string[] = [];
+  let length = 0;
+  for (const paragraph of paragraphs.reverse()) {
+    const size = Array.from(paragraph).length + (recent.length ? 2 : 0);
+    if (length + size > 600) break;
+    recent.unshift(paragraph);
+    length += size;
+  }
+  return [last.content ?? "", recent.join("\n\n")].filter(Boolean).join("\n\n");
 }

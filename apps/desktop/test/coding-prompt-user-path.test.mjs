@@ -243,7 +243,7 @@ window.promptButtonsProbe = async () => {
   [...document.querySelectorAll('.coding-shortcuts-primary .coding-action-recommended')].find(button=>button.textContent === "My commit").click();
   await until(() => document.querySelector('[aria-label="Draft"]').value.startsWith("Build first, commit with Git or SVN"));
   check(document.querySelector('[aria-label="Draft"]').value.includes("No findings."), "Commit draft carries review evidence");
-  useAppStore.setState({messages:[{role:"user",command:"/skill:code-review Review changes",content:"Expanded review instructions"},{role:"assistant",status:"complete",content:"[P1] Lost updates in save.ts"}]});
+  useAppStore.setState({messages:[{role:"user",command:"/skill:code-review Review changes",content:"Expanded review instructions"},{role:"assistant",status:"complete",content:"[P1] Lost updates in save.ts\n\n" + "Detailed evidence ".repeat(100) + "END_OF_REVIEW"}]});
   await until(() => repairButton() && !repairButton().disabled);
   check(![...document.querySelectorAll('.coding-shortcuts-primary .coding-action-recommended')].some(button => button.textContent === "My commit"), "Review findings never recommend Commit");
   const reviewMessages = useAppStore.getState().messages;
@@ -254,7 +254,7 @@ window.promptButtonsProbe = async () => {
   await until(() => document.querySelector('[aria-label="Draft"]').value.startsWith("修复审查问题\n"));
   check(document.querySelector('[aria-label="Draft"]').value.includes("[P1] Lost updates in save.ts") && document.querySelector('[aria-label="Draft"]').value.includes(initialDraft), "Repair draft carries findings and preserves existing text");
   check(document.querySelector('[aria-label="Draft"]').value.includes("Missing cancellation cleanup") && document.querySelector('[aria-label="Draft"]').value.includes("核实本会话"), "Repair summarizes findings and the follow-up discussion");
-  check(document.querySelector('[aria-label="Draft"]').value.length - beforeRepair.length < 900, "Repair adds only a concise instruction and handoff");
+  check(document.querySelector('[aria-label="Draft"]').value.includes("Detailed evidence ".repeat(100) + "END_OF_REVIEW"), "Repair preserves long review evidence without truncation");
   check(!document.querySelector('.coding-more-menu[role="menu"]'), "Repair selection closes More without sending");
   const repairRequest = document.querySelector('[aria-label="Draft"]').value;
   const beforeFencedRepair = document.querySelector('[aria-label="Draft"]').value;

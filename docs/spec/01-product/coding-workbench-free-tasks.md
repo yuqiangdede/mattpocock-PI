@@ -86,11 +86,16 @@ after Code review. It starts disabled and becomes available only after an actual
 completed code-review turn in the current conversation; clicking Review alone,
 streaming/failed replies, running turns and switching to an unreviewed conversation
 do not unlock it. The latest review supersedes earlier reviews. It carries a local
-extractive handoff of the final review answer (350 characters)
-and latest user clarification plus a completed assistant answer from that same turn
-(240 characters), excluding tool output. Unanswered, failed or interrupted followups
-never reuse an earlier turn's answer. A completed review remains available for Repair
-even if fenced-only output leaves the extract empty; `null` alone means unavailable.
+handoff of the complete final review answer without truncation or ranking, including
+fenced evidence. Subsequent user clarifications and completed assistant replies
+use a separate 600-Unicode-character budget, selecting recent whole paragraphs
+and restoring chronological order. Stop at the first paragraph that does not fit,
+so an omitted recent correction cannot leave older discussion alone as context.
+Oversized paragraphs are omitted, never cut
+with ellipses; the repair instruction requires consulting original history. Tool output,
+progress, failed and interrupted replies are excluded. Unanswered clarifications
+remain after earlier discussion and never acquire an earlier turn's answer.
+A completed fenced-only review retains its full source; `null` alone means unavailable.
 The concise default instruction verifies the latest review and follow-up discussion,
 consults the original conversation when unclear, fixes only confirmed defects with
 minimal changes, adds regression coverage and validates the user path. Report only

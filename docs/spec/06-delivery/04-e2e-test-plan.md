@@ -18814,7 +18814,10 @@ host-created files. The full app's file-preview viewer is covered separately.
   `coding-prompt-user-path.test.mjs` exercises the highlighted menu action,
   real launcher and editable draft in isolated Electron with fixture IPC.
 - Review-to-repair variant: complete a review, discuss a correction, click Repair
-  and verify original finding plus latest clarification fit within 600 characters.
+  and verify the full original review remains intact, including long findings
+  and fenced evidence. Discussion uses at most 600 Unicode characters, preferring
+  recent whole paragraphs. Oversized paragraphs are omitted rather than cut.
+  No finding is shortened with an ellipsis or dropped by ranking.
   The Chinese default instruction stays under 200 characters, asks for verification
   and regression coverage, and does not request a repeated detailed review list.
   Switching to an unreviewed session still disables Repair. Covered by
