@@ -225,10 +225,11 @@ function runtimeTool(runtime: DesktopAgentRuntime, name: string): AgentTool {
 
 /** Minimal pi-ai assistant message; overrides carry the shape under test. */
 function assistantMessage(overrides: {
+  /** Loose on purpose: tests also build content the runtime must reject. */
   content: unknown[];
-  stopReason?: string;
+  stopReason?: AssistantMessage["stopReason"];
   durationMs?: number;
-}) {
+}): AssistantMessage {
   return {
     role: "assistant",
     api: "openai-completions",
@@ -245,7 +246,7 @@ function assistantMessage(overrides: {
     stopReason: overrides.stopReason ?? "stop",
     timestamp: 2,
     ...(overrides.durationMs !== undefined ? { durationMs: overrides.durationMs } : {}),
-    content: overrides.content,
+    content: overrides.content as AssistantMessage["content"],
   };
 }
 
