@@ -89,7 +89,7 @@ export const en = {
   enablePrompt: "Enable prompt button",
   plainPromptHint: "Prepare an editable prompt. Sending remains manual.",
   commitHint: "Prepare a Git/GitLab or SVN commit prompt. Sending remains manual.",
-  commitPrompt: "Detect version control (Git/GitLab/SVN), inspect task-related changes, generate a meaningful message and commit only related files. Do not compile, build or package. Preserve unrelated work and stop on unexpected problems. Only push when explicitly requested.",
+  commitPrompt: "Detect version control (Git/GitLab/SVN), inspect task-related changes, generate a meaningful message and commit only related files. Do not compile, build or package. Set the commit command timeout to 1 minute (60 seconds). Preserve unrelated work and stop on unexpected problems. Only push when explicitly requested.",
   "navLabel": "Extensions",
   "settingsTitle": "Extensions · Coding Actions",
   "defaults": {"discuss-requirements": "Discuss requirements", "create-spec": "Create specification", "design": "Technical design", "create-tickets": "Create tickets", "implement": "Implement", "code-review": "Code review"},

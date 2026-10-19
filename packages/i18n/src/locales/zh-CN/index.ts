@@ -90,7 +90,7 @@ export const zhCN = {
   enablePrompt: "启用提示词按钮",
   plainPromptHint: "准备可编辑的提示词，需手动发送后执行。",
   commitHint: "准备 Git（含 GitLab）或 SVN 的提交提示词，需手动发送后执行。",
-  commitPrompt: "识别项目的版本管理工具（Git/GitLab/SVN），检查本次相关代码变更，生成提交说明并仅提交相关文件，不执行编译、构建或打包。保留无关改动，发现异常则停止并说明原因。仅在用户明确要求时执行 Git Push；否则提交后停止。",
+  commitPrompt: "识别项目的版本管理工具（Git/GitLab/SVN），检查本次相关代码变更，生成提交说明并仅提交相关文件，不执行编译、构建或打包。提交命令的超时时间设置为 1 分钟（60 秒）。保留无关改动，发现异常则停止并说明原因。仅在用户明确要求时执行 Git Push；否则提交后停止。",
   "navLabel": "扩展设置",
   "settingsTitle": "扩展设置 · Coding Actions",
   "defaults": {"discuss-requirements": "需求讨论-文本", "create-spec": "固化需求", "design": "技术设计", "create-tickets": "拆分任务", "implement": "实现", "code-review": "代码审查"},
