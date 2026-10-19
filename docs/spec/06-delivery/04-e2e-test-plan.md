@@ -18792,3 +18792,33 @@ host-created files. The full app's file-preview viewer is covered separately.
   the theme-token and reduced-motion guarantees; the interactive sidebar
   scenario remains a manual validation scenario run in a capable
   environment.
+
+### E2E-CODING-concise-handoff
+
+- Complete a specification turn with verbose intermediate progress, duplicate
+  artifact lines, a confirmed decision, a pending question and fenced code.
+  Click the highlighted Create tickets action. The editable draft contains
+  the goal and short final-answer excerpts, including the artifact, decision
+  and pending question, without intermediate progress or code. Preserve the
+  existing draft and attachment references; no prompt is submitted.
+- The generated handoff is at most 600 Unicode characters. Repeat the chain
+  and verify historical handoffs are not recursively copied from user prompts.
+- Automated: `coding-next-steps.test.mjs` covers extraction and bounds;
+  `coding-prompt-user-path.test.mjs` exercises the highlighted menu action,
+  real launcher and editable draft in isolated Electron with fixture IPC.
+- Review-to-repair variant: complete a review, discuss a correction, click Repair
+  and verify original finding plus latest clarification fit within 600 characters.
+  The Chinese default instruction stays under 200 characters, asks for verification
+  and regression coverage, and does not request a repeated detailed review list.
+  Switching to an unreviewed session still disables Repair. Covered by
+  `review-fix-context.test.mjs` and the same isolated Electron user path.
+
+- PR #115 repair regressions: a completed fenced JSON review must keep Repair
+  enabled and prepare an editable prompt without sending. A latest correction
+  with a failed, streaming or absent reply must not include an older answer.
+  Launcher commands produced by `buildSkillShortcutDraft` retain the user goal
+  after each shipped localized default and current custom prompt. Markdown risk
+  headings retain their `None` conclusion even with a smaller review budget;
+  `apps/**/*.test.ts` and literal asterisks remain unchanged. Automated in
+  `coding-next-steps.test.mjs`, `review-fix-context.test.mjs` and the isolated
+  Electron `coding-prompt-user-path.test.mjs` flow.

@@ -32,9 +32,9 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
   const revealedReplies = useRef(new Set<string>());
   const result = useAppStore(state => sessionId ? state.latestTurnResults[sessionId] : undefined);
   const running = useAppStore(state => sessionId ? state.runningSessions[sessionId] ?? false : false);
-  const recommendation = codingNextSteps(messages, result, running);
   const reviewContext = completedReviewContext(messages, result, running);
   const { configuration, diagnostic } = useCodingActions();
+  const recommendation = codingNextSteps(messages, result, running, configuration.actions.flatMap(action => typeof action.prompt === "string" ? [action.prompt] : []));
   const [shortcutsExpanded, setShortcutsExpanded] = useState(true);
   const shortcutsId = useId();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -107,9 +107,9 @@ export function CodingWorkbench({ disabled, error, onExecute, onSelectSkill, onS
   const configure = () => { const store = useAppStore.getState(); store.setSettingsTab("codingActions"); store.setPage("settings"); };
 
   const renderReviewFix = () => <TooltipButton className={"btn btn-secondary" + (isRecommended(REVIEW_FIX_PROMPT_ID) ? " coding-action-recommended" : "")}
-    disabled={disabled || !reviewContext} ariaLabel={t("codingActions.reviewFix")} aria-description={t(reviewContext ? "codingActions.reviewFixHint" : "codingActions.reviewFixRequiresReview")}
-    tooltip={t(reviewContext ? "codingActions.reviewFixHint" : "codingActions.reviewFixRequiresReview")} tooltipClassName="ui-tooltip-help coding-skill-tooltip"
-    onClick={() => { if (reviewContext) onSelectPrompt(REVIEW_FIX_PROMPT_ID, reviewContext); }}>{t("codingActions.reviewFix")}</TooltipButton>;
+    disabled={disabled || reviewContext === null} ariaLabel={t("codingActions.reviewFix")} aria-description={t(reviewContext !== null ? "codingActions.reviewFixHint" : "codingActions.reviewFixRequiresReview")}
+    tooltip={t(reviewContext !== null ? "codingActions.reviewFixHint" : "codingActions.reviewFixRequiresReview")} tooltipClassName="ui-tooltip-help coding-skill-tooltip"
+    onClick={() => { if (reviewContext !== null) onSelectPrompt(REVIEW_FIX_PROMPT_ID, reviewContext); }}>{t("codingActions.reviewFix")}</TooltipButton>;
 
   const renderContinue = () => {
     const tooltip = tooltipLine(t("codingActions.continueTooltipWhen"), t("codingActions.continueTooltipExample"));

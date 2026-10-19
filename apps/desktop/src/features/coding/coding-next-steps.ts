@@ -1,5 +1,7 @@
 import { isReviewFixRequest } from "./review-fix-prompt";
 import { reviewOutcome } from "./review-outcome";
+import { skillHandoff } from "./skill-handoff";
+import { skillRequestGoal } from "./skill-request-goal";
 export type CodingNextStep = "to-spec" | "to-tickets" | "implement" | "code-review" | "commit-code" | "review-fix";
 const next: Readonly<Record<string, readonly CodingNextStep[]>> = {
   "to-spec": ["to-tickets", "implement"],
@@ -10,7 +12,7 @@ const next: Readonly<Record<string, readonly CodingNextStep[]>> = {
 
 /** A successful native turn offers navigation, never proof of release acceptance. */
 export function codingNextSteps(messages: readonly { role?: string; content?: string; command?: string; createdAt?: string; status?: string; isError?: boolean }[],
-  result?: { status: string; finishedAt: number }, running = false) {
+  result?: { status: string; finishedAt: number }, running = false, customPrompts: readonly string[] = []) {
   if (running) return null;
   let index = messages.length - 1;
   while (index >= 0 && messages[index].role !== "user") index--;
@@ -27,5 +29,5 @@ export function codingNextSteps(messages: readonly { role?: string; content?: st
   // A final persisted answer also qualifies after recovered tool errors or history reload.
   if (result?.status !== "completed" && last.status !== "complete") return null;
   const steps: readonly CodingNextStep[] = skill === "code-review" ? [reviewOutcome(last.content ?? "") === "clear" ? "commit-code" : "review-fix"] : next[skill];
-  return { steps, context: replies.map(message => message.content).join("\n\n").slice(-8000) };
+  return { steps, context: skillHandoff(skillRequestGoal(request, customPrompts), last.content ?? "") };
 }

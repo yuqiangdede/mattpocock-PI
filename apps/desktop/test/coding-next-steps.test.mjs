@@ -8,6 +8,43 @@ const server = await createServer({ root: dirname(dirname(fileURLToPath(import.m
 try {
   const { codingNextSteps } = await server.ssrLoadModule("/src/features/coding/coding-next-steps.ts");
   const { startGrillFromComposer } = await server.ssrLoadModule("/src/features/coding/grill-composer-start.ts");
+  const { skillHandoff } = await server.ssrLoadModule("/src/features/coding/skill-handoff.ts");
+  const { buildSkillShortcutDraft } = await server.ssrLoadModule("/src/features/chat/composer/skill-shortcut-draft.ts");
+  const { catalogs } = await server.ssrLoadModule("../../packages/i18n/src/index.ts");
+  test("launcher handoffs preserve the user goal after localized default instructions", () => {
+    for (const catalog of Object.values(catalogs)) {
+      const command = buildSkillShortcutDraft("skill:to-spec", catalog.coding.prompts.spec, "Add offline search");
+      const context = codingNextSteps([{role:"user",command,content:"Expanded Skill"},{role:"assistant",status:"complete",content:"Artifact: docs/search.md"}]).context;
+      assert.match(context,/Add offline search/);
+      assert.ok(!context.includes(catalog.coding.prompts.spec));
+    }
+  });
+  test("custom launcher prompts are removed exactly while manual constraints retain the goal", () => {
+    const prompt = "Prepare a specification\nwith my custom rules";
+    const command = buildSkillShortcutDraft("skill:to-spec", prompt, "Add offline search");
+    const reply = {role:"assistant",status:"complete",content:"Saved docs/search.md"};
+    assert.match(codingNextSteps([{role:"user",command},reply],undefined,false,[prompt]).context,/Add offline search/);
+    assert.doesNotMatch(codingNextSteps([{role:"user",command},reply],undefined,false,[prompt]).context,/custom rules/);
+    assert.match(codingNextSteps([{role:"user",command:"/skill:to-spec Add offline search\n\nKeep storage local."},reply]).context,/Add offline search/);
+    for (const catalog of Object.values(catalogs)) {
+      const command = buildSkillShortcutDraft("skill:to-spec", catalog.coding.prompts.spec, "") + "\n\n" + catalog.codingActions.noCompilePrompt;
+      assert.equal(codingNextSteps([{role:"user",command},reply]).context,"- Saved docs/search.md");
+    }
+  });
+  test("small review budgets retain a heading's conclusion after large earlier facts", () => {
+    const summary = skillHandoff("", "Confirmed: " + "x".repeat(180) + "\nArtifact: " + "y".repeat(180) + "\n## Remaining risks\nNone.", 350);
+    assert.match(summary,/risks[^\n]*None\./);
+    assert.ok(Array.from(summary).length<=350);
+  });
+  test("prioritized headings retain their conclusions", () => {
+    const context = skillHandoff("Add search", ["## Confirmed decisions","Use the local index.",
+      "## Artifact", "docs/search.md", "## Remaining risks", "- None."].join("\n"));
+    assert.match(context,/Remaining risks[^\n]*None\./);
+  });
+  test("literal globs and asterisks survive cleanup", () => {
+    assert.match(skillHandoff("", "Confirmed: update `apps/**/*.test.ts` and a*b."),/apps\/\*\*\/\*\.test\.ts/);
+    assert.match(skillHandoff("", "Confirmed: update `apps/**/*.test.ts` and a*b."),/a\*b/);
+  });
   test("external topic admission preserves draft and only opens an accepted checkpoint", async () => {
     const previous = globalThis.localStorage;
     const writes = [];
@@ -55,8 +92,30 @@ try {
   });
   test("completed engineering actions expose the requested optional chain and outcome context", () => {
     for (const [skill, expected] of Object.entries({"to-spec":["to-tickets","implement"],"to-tickets":["implement"],implement:["code-review"],"code-review":["review-fix"]})) {
-      assert.deepEqual(codingNextSteps(messages(skill), completed), {steps:expected,context:"docs/spec.md"});
+      assert.deepEqual(codingNextSteps(messages(skill), completed), {steps:expected,context:"- Do this\n- docs/spec.md"});
     }
+  });
+  test("handoffs extract a short goal and final facts without copying progress, code or duplicates", () => {
+    const transcript = [{role:"user",command:"/skill:to-spec Add offline search",content:"Expanded Skill"},
+      {role:"assistant",content:"PROCESS_ONLY ".repeat(1000)},
+      {role:"tool",content:"TOOL_ONLY"},
+      {role:"assistant",status:"complete",content:[
+        "Background explanation ".repeat(500),
+        "Confirmed: use the local index.", "Artifact: docs/search.md", "Artifact: docs/search.md",
+        "Pending: confirm the retention period.", "```ts", "CODE_ONLY", "```",
+      ].join("\n")}];
+    const {context, steps} = codingNextSteps(transcript, completed);
+    assert.deepEqual(steps,["to-tickets","implement"]);
+    assert.ok(Array.from(context).length <= 600);
+    assert.match(context,/Add offline search/);
+    assert.match(context,/Confirmed: use the local index/);
+    assert.match(context,/docs\/search.md/);
+    assert.match(context,/Pending: confirm/);
+    assert.equal(context.match(/docs\/search.md/g).length,1);
+    assert.doesNotMatch(context,/PROCESS_ONLY|TOOL_ONLY|CODE_ONLY|Background explanation|Expanded Skill/);
+    const repeated = codingNextSteps([{role:"user",content:"/skill:implement Continue\n\n"+context},
+      {role:"assistant",status:"complete",content:"Implemented docs/search.md"}],completed).context;
+    assert.doesNotMatch(repeated,/Pending: confirm/);
   });
   test("running, failed, cancelled, unrelated and newer user turns do not recommend", () => {
     assert.equal(codingNextSteps(messages("implement"), completed, true), null);
@@ -77,6 +136,6 @@ try {
   test("persisted expanded Skill rows use their original command metadata", () => {
     const transcript = [{role:"user",command:"/skill:to-spec Finalize the agreed requirements",content:"<skill>Full expanded instructions</skill>\nFinalize the agreed requirements"},
       {role:"assistant",status:"complete",content:"Updated and reread .scratch/project/spec.md"}];
-    assert.deepEqual(codingNextSteps(transcript,undefined),{steps:["to-tickets","implement"],context:"Updated and reread .scratch/project/spec.md"});
+    assert.deepEqual(codingNextSteps(transcript,undefined),{steps:["to-tickets","implement"],context:"- Finalize the agreed requirements\n- Updated and reread .scratch/project/spec.md"});
   });
 } finally { await server.close(); }

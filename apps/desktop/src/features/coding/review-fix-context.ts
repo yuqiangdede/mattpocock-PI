@@ -1,3 +1,5 @@
+import { skillHandoff } from "./skill-handoff.ts";
+
 type ReviewMessage = { role?: string; content?: string; command?: string; status?: string; isError?: boolean; createdAt?: string };
 
 /** Derive availability from this session's actual review transcript, never from clicking a shortcut. */
@@ -18,8 +20,11 @@ export function completedReviewContext(messages: readonly ReviewMessage[], resul
     const createdAt = Date.parse(messages[start].createdAt ?? "");
     if (end !== messages.length || result?.status !== "completed" || !Number.isFinite(createdAt) || createdAt > result.finishedAt) return null;
   }
-  const initial = replies.map(message => `Assistant: ${message.content}`).join("\n\n").slice(0, 8000);
-  const discussion = messages.slice(end).filter(message => (message.role === "user" || (message.role === "assistant" && message.status === "complete" && !message.isError)) && message.content)
-    .map(message => `${message.role === "user" ? "User" : "Assistant"}: ${message.content}`).join("\n\n");
-  return discussion ? `${initial}\n\n${discussion.slice(-3998)}` : initial;
+  const initial = skillHandoff("", last.content ?? "", 350);
+  const discussion = messages.slice(end);
+  const latestUserIndex = discussion.findLastIndex(message => message.role === "user");
+  const latestUser = discussion[latestUserIndex];
+  const latestAnswer = discussion.slice(latestUserIndex + 1).findLast(message => message.role === "assistant" && message.status === "complete" && !message.isError && message.content);
+  const followup = skillHandoff(latestUser?.content ?? "", latestAnswer?.content ?? "", 240);
+  return [initial, followup].filter(Boolean).join("\n\n");
 }

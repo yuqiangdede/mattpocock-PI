@@ -26,13 +26,46 @@ test("only the matching terminal turn may qualify a legacy statusless response",
 });
 test("large discussions keep original findings and recent clarification within a bound", () => {
   const context = completedReviewContext([review,answer,{role:"user",content:"x".repeat(20000)},{...answer,content:"Latest clarification"}]);
-  assert.ok(context.length<=12000); assert.match(context,/Lost updates/); assert.match(context,/Latest clarification/);
+  assert.ok(Array.from(context).length<=600); assert.match(context,/Lost updates/); assert.match(context,/Latest clarification/);
 });
 
-test("repair prompt summarizes and deduplicates review discussion before fixes", async () => {
+test("repair prompt stays concise while preserving verification and follow-up context", async () => {
   const { reviewFixPrompt } = await import("../src/features/coding/review-fix-prompt.ts");
-  assert.match(reviewFixPrompt("zh-CN"), /先汇总.*后续讨论/);
-  assert.match(reviewFixPrompt("zh-CN"), /去重合并/);
-  assert.match(reviewFixPrompt("en"), /First summarize.*follow-up discussion/);
-  assert.match(reviewFixPrompt("en"), /Deduplicate/);
+  assert.ok(reviewFixPrompt("zh-CN").length <= 200);
+  assert.match(reviewFixPrompt("zh-CN"), /后续讨论/);
+  assert.match(reviewFixPrompt("zh-CN"), /核实/);
+  assert.ok(reviewFixPrompt("en").length <= 650);
+  assert.match(reviewFixPrompt("en"), /follow-up discussion/);
+  assert.match(reviewFixPrompt("en"), /Verify/);
+});
+
+test("handoff prioritizes findings and excludes unfinished code fences and progress", () => {
+  const content = ["Background ".repeat(100), "More background ".repeat(100),
+    "[P1] Fix save.ts: cancellation leaks a subscription.", "~~~ts", "PRIVATE_CODE"].join("\n");
+  const context = completedReviewContext([review,{role:"assistant",content:"PROGRESS_ONLY"},{...answer,content}]);
+  assert.match(context,/\[P1\] Fix save.ts/);
+  assert.doesNotMatch(context,/PRIVATE_CODE|PROGRESS_ONLY/);
+});
+
+test("Unicode excerpts stay bounded and preserve numeric and relative-path prefixes", () => {
+  const context = completedReviewContext([review,{...answer,content:"2026 compatibility decision\n.scratch/spec.md\nPending: " + "😀".repeat(900)}]);
+  assert.ok(Array.from(context).length <= 600);
+  assert.match(context,/2026 compatibility/);
+  assert.match(context,/\.scratch\/spec.md/);
+  assert.doesNotMatch(context,/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+});
+
+test("completed fenced-only reviews stay available even when their handoff is empty", () => {
+  const context = completedReviewContext([review,{...answer,content:'```json\n{"findings":[]}\n```'}]);
+  assert.notEqual(context,null);
+  assert.equal(context, "");
+});
+
+test("an unanswered or failed latest clarification never receives a previous answer", () => {
+  for (const tail of [[], [{...answer,status:"error",isError:true,content:"Failed"}], [{...answer,status:"streaming",content:"Incomplete"}]]) {
+    const context = completedReviewContext([review,answer,{role:"user",content:"Should we keep cloud sync?"},
+      {...answer,content:"Confirmed: keep cloud sync."}, {role:"user",content:"Correction: disable cloud sync."},...tail]);
+    assert.match(context,/Correction: disable cloud sync/);
+    assert.doesNotMatch(context,/Confirmed: keep cloud sync|Failed|Incomplete/);
+  }
 });
