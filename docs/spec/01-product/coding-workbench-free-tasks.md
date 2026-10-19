@@ -87,7 +87,10 @@ completed code-review turn in the current conversation; clicking Review alone,
 streaming/failed replies, running turns and switching to an unreviewed conversation
 do not unlock it. The latest review supersedes earlier reviews. It carries a local
 extractive handoff of the final review answer (350 characters)
-and latest user/assistant clarification (240 characters), excluding tool output.
+and latest user clarification plus a completed assistant answer from that same turn
+(240 characters), excluding tool output. Unanswered, failed or interrupted followups
+never reuse an earlier turn's answer. A completed review remains available for Repair
+even if fenced-only output leaves the extract empty; `null` alone means unavailable.
 The concise default instruction verifies the latest review and follow-up discussion,
 consults the original conversation when unclear, fixes only confirmed defects with
 minimal changes, adds regression coverage and validates the user path. Report only
@@ -112,9 +115,14 @@ final error, streaming reply or running Session never qualifies. This fallback
 offers navigation only and does not certify the generated artifact or review.
 Selecting a recommendation carries a local extractive handoff of at most 600
 Unicode characters (up to four bullets, each at most 145 characters). It uses
-the original command's first-line goal and the final assistant answer only;
+the first user-goal line after removing an exact known launcher instruction
+(all shipped languages and current custom prompts), plus the final assistant answer;
+manual requests are not split at arbitrary paragraph boundaries;
 it omits intermediate replies, tool output and fenced code, deduplicates lines,
 and prioritizes unresolved work, decisions and artifact paths over prose.
+Markdown headings stay attached to their qualifying content, with per-item budgets
+that retain body excerpts. Literal asterisks, inline code and glob scopes remain
+verbatim; dangling headings are omitted rather than treated as conclusions.
 Ellipses mark shortened excerpts. This is a navigation aid, not a complete
 record or inferred acceptance: the full conversation remains authoritative.
 No extra model call, persistence or automatic submission is introduced. Existing

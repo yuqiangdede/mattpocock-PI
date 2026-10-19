@@ -8,6 +8,43 @@ const server = await createServer({ root: dirname(dirname(fileURLToPath(import.m
 try {
   const { codingNextSteps } = await server.ssrLoadModule("/src/features/coding/coding-next-steps.ts");
   const { startGrillFromComposer } = await server.ssrLoadModule("/src/features/coding/grill-composer-start.ts");
+  const { skillHandoff } = await server.ssrLoadModule("/src/features/coding/skill-handoff.ts");
+  const { buildSkillShortcutDraft } = await server.ssrLoadModule("/src/features/chat/composer/skill-shortcut-draft.ts");
+  const { catalogs } = await server.ssrLoadModule("../../packages/i18n/src/index.ts");
+  test("launcher handoffs preserve the user goal after localized default instructions", () => {
+    for (const catalog of Object.values(catalogs)) {
+      const command = buildSkillShortcutDraft("skill:to-spec", catalog.coding.prompts.spec, "Add offline search");
+      const context = codingNextSteps([{role:"user",command,content:"Expanded Skill"},{role:"assistant",status:"complete",content:"Artifact: docs/search.md"}]).context;
+      assert.match(context,/Add offline search/);
+      assert.ok(!context.includes(catalog.coding.prompts.spec));
+    }
+  });
+  test("custom launcher prompts are removed exactly while manual constraints retain the goal", () => {
+    const prompt = "Prepare a specification\nwith my custom rules";
+    const command = buildSkillShortcutDraft("skill:to-spec", prompt, "Add offline search");
+    const reply = {role:"assistant",status:"complete",content:"Saved docs/search.md"};
+    assert.match(codingNextSteps([{role:"user",command},reply],undefined,false,[prompt]).context,/Add offline search/);
+    assert.doesNotMatch(codingNextSteps([{role:"user",command},reply],undefined,false,[prompt]).context,/custom rules/);
+    assert.match(codingNextSteps([{role:"user",command:"/skill:to-spec Add offline search\n\nKeep storage local."},reply]).context,/Add offline search/);
+    for (const catalog of Object.values(catalogs)) {
+      const command = buildSkillShortcutDraft("skill:to-spec", catalog.coding.prompts.spec, "") + "\n\n" + catalog.codingActions.noCompilePrompt;
+      assert.equal(codingNextSteps([{role:"user",command},reply]).context,"- Saved docs/search.md");
+    }
+  });
+  test("small review budgets retain a heading's conclusion after large earlier facts", () => {
+    const summary = skillHandoff("", "Confirmed: " + "x".repeat(180) + "\nArtifact: " + "y".repeat(180) + "\n## Remaining risks\nNone.", 350);
+    assert.match(summary,/risks[^\n]*None\./);
+    assert.ok(Array.from(summary).length<=350);
+  });
+  test("prioritized headings retain their conclusions", () => {
+    const context = skillHandoff("Add search", ["## Confirmed decisions","Use the local index.",
+      "## Artifact", "docs/search.md", "## Remaining risks", "- None."].join("\n"));
+    assert.match(context,/Remaining risks[^\n]*None\./);
+  });
+  test("literal globs and asterisks survive cleanup", () => {
+    assert.match(skillHandoff("", "Confirmed: update `apps/**/*.test.ts` and a*b."),/apps\/\*\*\/\*\.test\.ts/);
+    assert.match(skillHandoff("", "Confirmed: update `apps/**/*.test.ts` and a*b."),/a\*b/);
+  });
   test("external topic admission preserves draft and only opens an accepted checkpoint", async () => {
     const previous = globalThis.localStorage;
     const writes = [];

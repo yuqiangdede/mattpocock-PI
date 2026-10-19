@@ -21,9 +21,10 @@ export function completedReviewContext(messages: readonly ReviewMessage[], resul
     if (end !== messages.length || result?.status !== "completed" || !Number.isFinite(createdAt) || createdAt > result.finishedAt) return null;
   }
   const initial = skillHandoff("", last.content ?? "", 350);
-  const discussion = messages.slice(end).filter(message => (message.role === "user" || (message.role === "assistant" && message.status === "complete" && !message.isError)) && message.content);
-  const latestUser = discussion.findLast(message => message.role === "user");
-  const latestAnswer = discussion.findLast(message => message.role === "assistant");
+  const discussion = messages.slice(end);
+  const latestUserIndex = discussion.findLastIndex(message => message.role === "user");
+  const latestUser = discussion[latestUserIndex];
+  const latestAnswer = discussion.slice(latestUserIndex + 1).findLast(message => message.role === "assistant" && message.status === "complete" && !message.isError && message.content);
   const followup = skillHandoff(latestUser?.content ?? "", latestAnswer?.content ?? "", 240);
   return [initial, followup].filter(Boolean).join("\n\n");
 }

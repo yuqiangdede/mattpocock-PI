@@ -18812,3 +18812,13 @@ host-created files. The full app's file-preview viewer is covered separately.
   and regression coverage, and does not request a repeated detailed review list.
   Switching to an unreviewed session still disables Repair. Covered by
   `review-fix-context.test.mjs` and the same isolated Electron user path.
+
+- PR #115 repair regressions: a completed fenced JSON review must keep Repair
+  enabled and prepare an editable prompt without sending. A latest correction
+  with a failed, streaming or absent reply must not include an older answer.
+  Launcher commands produced by `buildSkillShortcutDraft` retain the user goal
+  after each shipped localized default and current custom prompt. Markdown risk
+  headings retain their `None` conclusion even with a smaller review budget;
+  `apps/**/*.test.ts` and literal asterisks remain unchanged. Automated in
+  `coding-next-steps.test.mjs`, `review-fix-context.test.mjs` and the isolated
+  Electron `coding-prompt-user-path.test.mjs` flow.

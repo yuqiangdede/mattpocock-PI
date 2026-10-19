@@ -257,6 +257,12 @@ window.promptButtonsProbe = async () => {
   check(document.querySelector('[aria-label="Draft"]').value.length - beforeRepair.length < 900, "Repair adds only a concise instruction and handoff");
   check(!document.querySelector('.coding-more-menu[role="menu"]'), "Repair selection closes More without sending");
   const repairRequest = document.querySelector('[aria-label="Draft"]').value;
+  const beforeFencedRepair = document.querySelector('[aria-label="Draft"]').value;
+  flushSync(() => useAppStore.setState({messages:[reviewMessages[0],{role:"assistant",status:"complete",content:fence + 'json\n{"findings":[{"title":"[P2] Missing cleanup"}]}\n' + fence}]}));
+  check(!repairButton().disabled, "A completed fenced-only review keeps Repair enabled even with an empty summary");
+  repairButton().click();
+  await until(() => document.querySelector('[aria-label="Draft"]').value.length > beforeFencedRepair.length);
+
   useAppStore.setState({activeSessionId:"unreviewed-session",messages:[]});
   await until(() => repairButton()?.disabled);
   useAppStore.setState({activeSessionId:"visual-fixture",messages:reviewMessages});

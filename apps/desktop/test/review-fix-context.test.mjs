@@ -54,3 +54,18 @@ test("Unicode excerpts stay bounded and preserve numeric and relative-path prefi
   assert.match(context,/\.scratch\/spec.md/);
   assert.doesNotMatch(context,/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
 });
+
+test("completed fenced-only reviews stay available even when their handoff is empty", () => {
+  const context = completedReviewContext([review,{...answer,content:'```json\n{"findings":[]}\n```'}]);
+  assert.notEqual(context,null);
+  assert.equal(context, "");
+});
+
+test("an unanswered or failed latest clarification never receives a previous answer", () => {
+  for (const tail of [[], [{...answer,status:"error",isError:true,content:"Failed"}], [{...answer,status:"streaming",content:"Incomplete"}]]) {
+    const context = completedReviewContext([review,answer,{role:"user",content:"Should we keep cloud sync?"},
+      {...answer,content:"Confirmed: keep cloud sync."}, {role:"user",content:"Correction: disable cloud sync."},...tail]);
+    assert.match(context,/Correction: disable cloud sync/);
+    assert.doesNotMatch(context,/Confirmed: keep cloud sync|Failed|Incomplete/);
+  }
+});

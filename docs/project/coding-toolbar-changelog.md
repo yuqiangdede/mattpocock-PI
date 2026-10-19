@@ -15,3 +15,6 @@
 - The repair action's Chinese default instruction is under 200 characters. Its
   review/follow-up handoff is under 600 characters rather than up to 12000;
   verification, minimal fixes, regression coverage and manual delivery remain.
+- Repair stays enabled after fenced-only reviews. Followup answers must belong
+  to the latest user turn. Handoffs extract user goals after known launcher
+  prompts, preserve literal glob scopes, and retain headings with their conclusions.
