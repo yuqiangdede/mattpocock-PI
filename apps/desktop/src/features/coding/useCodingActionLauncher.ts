@@ -12,6 +12,7 @@ import { buildCommitCodeDraft } from "./commit-code-draft";
 import { visualGrillingDefaultPrompt } from "./visual-grilling-prompt";
 import { REVIEW_FIX_PROMPT_ID, reviewFixPrompt } from "./review-fix-prompt";
 import { documentPromptKey } from "./document-shortcuts";
+import { withCompileInstruction } from "./compile-instruction";
 
 export function useCodingActionLauncher(options: {
   sessionId: string | null | undefined; projectPath: string; blocked: boolean; draftKey: string;
@@ -50,7 +51,8 @@ export function useCodingActionLauncher(options: {
         applyDraft: text => {
           const draft = latest.current;
           draft.invalidatePromptEnhancement();
-          const guarded = `${text}\n\n${t("codingActions.noCompilePrompt")}`;
+          const skillId = "skillId" in target ? target.skillId : configuration.actions.find(action => action.id === actionId)?.skillId ?? "";
+          const guarded = withCompileInstruction(text, t("codingActions.noCompilePrompt"), { skillId });
           draft.applyEditorDraft(guarded, draft.fileReferencesRef.current, guarded.length);
         },
       });
@@ -66,14 +68,14 @@ export function useCodingActionLauncher(options: {
         const language = i18n.resolvedLanguage ?? i18n.language;
         const prompt = id === "continue-task" ? t("codingActions.continuePrompt") : id === "compile-project" ? t("codingActions.compilePrompt") : id === REVIEW_FIX_PROMPT_ID ? reviewFixPrompt(language) : interactionImagePrompt(language);
         const handoff = id === REVIEW_FIX_PROMPT_ID ? [t("codingActions.reviewFixSummaryContext"), context].filter(Boolean).join("\n\n") : context;
-        const text = buildCommitCodeDraft(id === "compile-project" ? prompt : `${prompt}\n\n${t("codingActions.noCompilePrompt")}`, [handoff, owner.readLiveDraft()].filter(Boolean).join("\n\n"));
+        const text = buildCommitCodeDraft(withCompileInstruction(prompt, t("codingActions.noCompilePrompt"), { promptId: id }), [handoff, owner.readLiveDraft()].filter(Boolean).join("\n\n"));
         owner.applyEditorDraft(text, owner.fileReferencesRef.current, text.length);
         setError(null);
         return;
       }
       preparePromptAction(id, { configuration: getCodingActions(), commitPrompt: t("codingActions.commitPrompt"),
         readLiveDraft: () => [context, owner.readLiveDraft()].filter(Boolean).join("\n\n"),
-        applyDraft: text => { const guarded = `${text}\n\n${t("codingActions.noCompilePrompt")}`; owner.applyEditorDraft(guarded, owner.fileReferencesRef.current, guarded.length); },
+        applyDraft: text => { const guarded = withCompileInstruction(text, t("codingActions.noCompilePrompt"), { promptId: id }); owner.applyEditorDraft(guarded, owner.fileReferencesRef.current, guarded.length); },
       });
       setError(null);
     } catch (cause) {

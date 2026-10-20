@@ -117,7 +117,7 @@ window.promptButtonsProbe = async () => {
   await until(() => document.querySelector('[aria-label="Draft"]').value === "Build first, commit with Git or SVN\n\n" + initialDraft + "\n\n" + i18n.t("codingActions.noCompilePrompt"));
   check([...document.querySelectorAll("button")].find(button => button.textContent === i18n.t("codingActions.compileProject")).nextElementSibling.textContent === i18n.t("codingActions.continueTask"), "Continue immediately follows Compile");
   await click(i18n.t("codingActions.continueTask"));
-  await until(() => document.querySelector('[aria-label="Draft"]').value === i18n.t("codingActions.continuePrompt") + "\n\n" + i18n.t("codingActions.noCompilePrompt") + "\n\nBuild first, commit with Git or SVN\n\n" + initialDraft + "\n\n" + i18n.t("codingActions.noCompilePrompt"));
+  await until(() => document.querySelector('[aria-label="Draft"]').value === i18n.t("codingActions.continuePrompt") + "\n\nBuild first, commit with Git or SVN\n\n" + initialDraft + "\n\n" + i18n.t("codingActions.noCompilePrompt"));
   check(document.querySelector(".coding-shortcuts-secondary button"), "Document shortcuts retain their separate row");
   const actionRow = document.querySelector('.coding-shortcuts-primary');
   actionRow.style.width = "360px";
@@ -135,7 +135,7 @@ window.promptButtonsProbe = async () => {
   render(<DraftComposer />);
   await until(() => document.querySelector('[aria-label="Draft"]'));
   await click("Summary");
-  await until(() => document.querySelector('[aria-label="Draft"]').value === "Summarize my changes\n\n" + initialDraft + "\n\n" + i18n.t("codingActions.noCompilePrompt"));
+  await until(() => document.querySelector('[aria-label="Draft"]').value === "Summarize my changes\n\n" + initialDraft);
   render(<DraftComposer key="compile-fixture" />);
   await click(i18n.t("codingActions.compileProject"));
   await until(() => document.querySelector('[aria-label="Draft"]').value === i18n.t("codingActions.compilePrompt") + "\n\n" + initialDraft);
@@ -146,8 +146,13 @@ window.promptButtonsProbe = async () => {
   await click(i18n.t("codingActions.requirementsDiscussion"));
   await click(i18n.t("codingActions.discussRequirementsText"));
   await until(() => document.querySelector('[aria-label="Draft"]').value.startsWith("/grill-with-docs"));
-  check(document.querySelector('[aria-label="Draft"]').value.includes(initialDraft) && document.querySelector('[aria-label="Draft"]').value.includes(i18n.t("codingActions.noCompilePrompt")), "Text discussion preserves draft and disables compilation");
+  check(document.querySelector('[aria-label="Draft"]').value.includes(initialDraft) && !document.querySelector('[aria-label="Draft"]').value.includes(i18n.t("codingActions.noCompilePrompt")), "Text discussion preserves draft without a compilation restriction");
   check(!document.querySelector('.coding-requirements-menu'), "Selecting text closes the dropdown");
+  api.composerCommands = async () => ({ commands: [{ kind:"skill", name:"implement", skillId:"implement", description:"Implement changes" }] });
+  render(<DraftComposer key="implement-mode-fixture" />);
+  await click("Implement");
+  await until(() => document.querySelector('[aria-label="Draft"]').value.startsWith("/implement"));
+  check(document.querySelector('[aria-label="Draft"]').value.includes(initialDraft) && document.querySelector('[aria-label="Draft"]').value.endsWith(i18n.t("codingActions.noCompilePrompt")), "Implementation preserves draft and retains the separate-compilation reminder");
   api.composerCommands = originalCommands;
   render(<DraftComposer key="visual-mode-fixture" />);
   const pending = { id: "auto-open-fixture", kind: "round", text: "", submittedAt: new Date().toISOString() };
@@ -392,7 +397,7 @@ window.promptButtonsProbe = async () => {
   await click(i18n.t("codingActions.more"));
   check([...document.querySelectorAll('.coding-more-menu [role="menuitem"]')].some(button => button.textContent === i18n.t("codingActions.interactionImage")), "Image prompt is reachable as a More menu item");
   await click(i18n.t("codingActions.interactionImage"));
-  await until(() => document.querySelector('[aria-label="Draft"]').value === interactionImagePrompt("zh-CN") + "\n\n" + i18n.t("codingActions.noCompilePrompt") + "\n\n" + initialDraft);
+  await until(() => document.querySelector('[aria-label="Draft"]').value === interactionImagePrompt("zh-CN") + "\n\n" + initialDraft);
   check(!document.querySelector('.coding-more-menu[role="menu"]'), "Selecting the image prompt closes More and retains the editable draft");
   root.unmount(); return { ok: true };
 };

@@ -34,6 +34,15 @@ CodingActionRegistry 负责默认动作、查询、排序与启用状态。它�
 
 Selecting an Action only fills the Composer draft. Undefined/null prompt uses the current localized engineering instruction; an explicit empty string inserts only the skill marker. Custom prompts remain verbatim. Existing text, file references and images are preserved. No session/model is required to prepare a draft. Only manual Send invokes the native queue, model, permission and Plan/Goal controls. Delayed selection reads the latest draft and cannot cross session/project ownership, unmount or blocked input.
 
+The separate-compilation reminder is appended only for `implement`,
+`implement-spec`, `diagnosing-bugs`, `tdd`, `prototype`,
+`improve-codebase-architecture`, `resolving-merge-conflicts`, Commit code and
+Fix review findings. Skill classification uses the configured skill ID, not
+the button label. Discussion, specifications, tickets, review, research,
+documentation, interaction images, Continue and custom actions receive no
+automatic reminder. Compile keeps its build instruction. Existing draft text
+is preserved, including reminders previously inserted by other actions.
+
 Skill Resolver 消费原生 Catalog 已合并的结果，不自行规定项目、用户、内置或插件优先级，不引入来源限定别名。Skill 更新无需保存 Action。
 
 After adopting upstream 0.17.0, the native catalog supplies `skill:<id>` command names. Actions resolve by the stable `skillId` and insert `/skill:<id>` using the catalog name. Persisted Actions retain their existing ids and configuration. Historical Workflow and Free Task prompts continue resolving their host-owned bare skill markers through the same active Skill ids.

@@ -18682,7 +18682,11 @@ host-created files. The full app's file-preview viewer is covered separately.
   Select Commit and verify its no-build instruction. Complete a conversation and
   receive its title; repeat with a manual rename while generation is pending.
 - Expected: both modes share one menu; opening it sends nothing; Compile is the
-  only launcher action requesting a build; draft text and attachments survive;
+  only launcher action requesting a build. The no-build reminder is added only
+  to implementation, diagnosis/repair, TDD, prototype, architecture improvement,
+  conflict resolution and commit actions. Discussion, documents, review,
+  interaction images, Continue and custom prompts do not receive it;
+  draft text and attachments survive;
   tooltips omit fixed prefixes. Titles summarize the topic, never overwrite manual
   names, coalesce concurrent events and ignore responses after plugin unload.
 - Specs: `01-product/coding-workbench-free-tasks.md`;

@@ -1,5 +1,8 @@
 # Coding toolbar changes (unreleased)
 
+- Limit the separate-compilation reminder to code-changing skills, review
+  repairs and commits; remove automatic reminders from discussion, review,
+  documentation, interaction images, Continue and custom prompt buttons.
 - Repair drafts now include a concise review handoff instead of copying the full
   report. The entire handoff, including its notice and latest clarification,
   stays under 600 Unicode characters. Structured reviews retain finding titles
