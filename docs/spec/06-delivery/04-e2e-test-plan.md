@@ -32,6 +32,22 @@
 
 ## 1. Goals
 
+### E2E-BUILD-runtime-bundle-windows-rename
+
+- Preconditions: provisioned build dependencies and an existing runtime bundle.
+- Steps: invoke the runtime bundler with a transient Windows `EPERM` during
+  staged-directory installation; repeat with persistent `EPERM` and `EBUSY`,
+  then a non-retryable `EACCES`.
+- Expected: transient denial recovers within the retry budget and installs the
+  ESM bundle; persistent failure remains fatal, restores the old bundle and
+  removes staging. Non-retryable errors fail without repeated installation.
+- Specs: `06-delivery/06-release-runbook.md`, Build lanes; acceptance: safe
+  bundle replacement; milestone: maintenance.
+- Status: automated with real bundle generation and filesystem operations in
+  `packages/agent-runtime/scripts/bundle-rename.test.mjs`; rename denials are
+  injected at the OS boundary. Does not reproduce the external lock holder or
+  validate the complete installer build.
+
 ### E2E-STORAGE-schema-24-upgrade-and-restart
 
 - Seed an isolated v23 profile with a project, session and Unicode message.

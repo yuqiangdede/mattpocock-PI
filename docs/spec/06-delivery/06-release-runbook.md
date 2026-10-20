@@ -7,6 +7,14 @@
 
 ## 1. Build lanes
 
+Agent Runtime bundle publication on Windows retries directory renames for
+`EPERM` and `EBUSY` up to five times after the initial attempt, with increasing
+100 ms delays (1.5 seconds total). This applies to backup, installation and
+rollback. Other errors fail immediately; exhausted installation retries restore
+the previous bundle using the existing rollback path. No copy-over fallback is
+used. Run `node --test packages/agent-runtime/scripts/bundle-rename.test.mjs`
+for transient-denial recovery and persistent-failure rollback coverage.
+
 Windows Electron extraction retries the final temporary-directory rename up to
 five times after the initial attempt, with a one-second delay, for `EPERM` or
 `EBUSY` only. The staged files and extraction lock are retained during retries.

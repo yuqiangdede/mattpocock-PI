@@ -4,9 +4,27 @@ import { randomUUID } from "node:crypto";
 import { copyFile, mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { setTimeout as delay } from "node:timers/promises";
 
 const packageRoot = fileURLToPath(new URL("../", import.meta.url));
 const outputDir = join(packageRoot, "dist-bundle");
+
+async function renameBundleDirectory(source, destination) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await rename(source, destination);
+      return;
+    } catch (error) {
+      // Windows scanners can briefly retain directory handles after a build.
+      if (process.platform !== "win32" || attempt >= 5 ||
+          !error || typeof error !== "object" ||
+          !("code" in error) || !["EPERM", "EBUSY"].includes(error.code)) {
+        throw error;
+      }
+      await delay(100 * (attempt + 1));
+    }
+  }
+}
 
 const resizeWorkerBanner = [
   "import { createRequire as __piCreateRequire } from 'node:module';",
@@ -72,7 +90,7 @@ export async function bundleAgentRuntime(outputDir = join(packageRoot, "dist-bun
     await writeBundlePackageManifest(stagingDir);
 
     try {
-      await rename(outputDir, backupDir);
+      await renameBundleDirectory(outputDir, backupDir);
       previousOutputMoved = true;
     } catch (error) {
       if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
@@ -83,11 +101,11 @@ export async function bundleAgentRuntime(outputDir = join(packageRoot, "dist-bun
     }
 
     try {
-      await rename(stagingDir, outputDir);
+      await renameBundleDirectory(stagingDir, outputDir);
     } catch (error) {
       if (previousOutputMoved) {
         try {
-          await rename(backupDir, outputDir);
+          await renameBundleDirectory(backupDir, outputDir);
           previousOutputMoved = false;
         } catch (restoreError) {
           throw new AggregateError(
