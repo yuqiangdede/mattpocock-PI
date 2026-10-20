@@ -12,8 +12,11 @@ Agent Runtime bundle publication on Windows retries directory renames for
 100 ms delays (1.5 seconds total). This applies to backup, installation and
 rollback. Other errors fail immediately; exhausted installation retries restore
 the previous bundle using the existing rollback path. No copy-over fallback is
-used. Run `node --test packages/agent-runtime/scripts/bundle-rename.test.mjs`
-for transient-denial recovery and persistent-failure rollback coverage.
+used. Run `pnpm --filter @pi-desktop/agent-runtime test -- scripts/bundle-rename.test.mjs`
+for transient-denial recovery and persistent-failure rollback coverage. The
+Vitest suite injects platform, rename and delay dependencies to exercise the
+Windows retry budget deterministically on every platform, in addition to
+real filesystem bundle publication tests.
 
 Windows Electron extraction retries the final temporary-directory rename up to
 five times after the initial attempt, with a one-second delay, for `EPERM` or

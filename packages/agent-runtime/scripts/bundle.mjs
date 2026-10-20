@@ -9,19 +9,23 @@ import { setTimeout as delay } from "node:timers/promises";
 const packageRoot = fileURLToPath(new URL("../", import.meta.url));
 const outputDir = join(packageRoot, "dist-bundle");
 
-async function renameBundleDirectory(source, destination) {
+export async function renameBundleDirectory(source, destination, {
+  platform = process.platform,
+  renameDirectory = rename,
+  wait = delay,
+} = {}) {
   for (let attempt = 0; ; attempt += 1) {
     try {
-      await rename(source, destination);
+      await renameDirectory(source, destination);
       return;
     } catch (error) {
       // Windows scanners can briefly retain directory handles after a build.
-      if (process.platform !== "win32" || attempt >= 5 ||
+      if (platform !== "win32" || attempt >= 5 ||
           !error || typeof error !== "object" ||
           !("code" in error) || !["EPERM", "EBUSY"].includes(error.code)) {
         throw error;
       }
-      await delay(100 * (attempt + 1));
+      await wait(100 * (attempt + 1));
     }
   }
 }

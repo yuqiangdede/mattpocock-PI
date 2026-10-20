@@ -45,7 +45,9 @@
   bundle replacement; milestone: maintenance.
 - Status: automated with real bundle generation and filesystem operations in
   `packages/agent-runtime/scripts/bundle-rename.test.mjs`; rename denials are
-  injected at the OS boundary. Does not reproduce the external lock holder or
+  injected at the OS boundary. Vitest also exercises Windows retry and delay
+  policy on every platform with injected dependencies and no real wait.
+  Does not reproduce the external lock holder or
   validate the complete installer build.
 
 ### E2E-STORAGE-schema-24-upgrade-and-restart
