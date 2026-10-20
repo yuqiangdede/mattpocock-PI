@@ -1,5 +1,10 @@
 # Coding toolbar changes (unreleased)
 
+- Repair drafts now include a concise review handoff instead of copying the full
+  report. The entire handoff, including its notice and latest clarification,
+  stays under 600 Unicode characters. Structured reviews retain finding titles
+  and locations; a localized notice points back to the complete source and requires verification before
+  fixing. Existing drafts, attachments and manual Send remain unchanged.
 - Shorten the Chinese primary action labels and place Continue after Compile.
 - Keep the Requirements dropdown with Text discussion and Visual discussion.
 - Add a single accessible toggle to collapse and expand both shortcut rows while

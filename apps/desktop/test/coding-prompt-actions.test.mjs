@@ -9,6 +9,24 @@ const shared = await import("@pi-desktop/shared");
 const { CodingActionStore } = await import("../electron/main/extensions/coding-action-store.ts");
 const { preparePromptAction } = await import("../src/features/coding/prepare-prompt-action.ts");
 const { reviewFixPrompt, isReviewFixRequest } = await import("../src/features/coding/review-fix-prompt.ts");
+const { completedReviewContext } = await import("../src/features/coding/review-fix-context.ts");
+const { catalogs } = await import("@pi-desktop/i18n");
+
+test("repair handoffs including the localized notice never exceed 600 Unicode characters", () => {
+  const findings = Array.from({length:20},(_,i)=>`[P2] Finding ${i} in src/save.ts: ${"Evidence 😀 ".repeat(100)}`).join("\n\n");
+  const messages = [{role:"user",command:"/skill:code-review Inspect changes"},{role:"assistant",status:"complete",content:findings},
+    {role:"user",content:"Latest correction: " + "Keep scope narrow. ".repeat(80)},
+    {role:"assistant",status:"complete",content:"Pending: " + "Verify against current code. ".repeat(80)}];
+  const context = completedReviewContext(messages);
+  for (const catalog of Object.values(catalogs)) {
+    const handoff = catalog.codingActions.reviewFixSummaryContext + "\n\n" + context;
+    assert.ok(Array.from(handoff).length <= 600);
+    assert.match(handoff,/Finding 0/);
+    assert.match(handoff,/Latest correction/);
+    assert.ok(!handoff.includes(findings));
+    assert.doesNotMatch(handoff,/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+  }
+});
 test("review fix drafts require verification, regression coverage and manual delivery in both languages", () => {
   for (const language of ["zh-CN", "en"]) {
     const prompt = reviewFixPrompt(language);

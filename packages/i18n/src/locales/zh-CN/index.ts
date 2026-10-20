@@ -35,6 +35,7 @@ export const zhCN = {
     stubTooltipExample: "功能暂未开放（空实现）。",
     stubActionToast: "{{title}}功能暂未开放（空实现）",
     reviewFix: "修复",
+    reviewFixSummaryContext: "审查交接摘要（仅供定位；修复前核实完整审查、最新讨论及当前范围）：",
     reviewFixRequiresReview: "当前会话完成代码审查后可用。先点击「代码审查」并发送，等待审查回复完成。",
     reviewFixHint: "汇总代码审查及后续讨论中的问题，去重并逐项核实后修复，补充回归测试并说明未解决项。点击仅生成可编辑草稿，手动发送后执行。",
     visualTopicHint: "在下方输入讨论主题，发送后自动打开可视化讨论面板。",

@@ -86,16 +86,30 @@ after Code review. It starts disabled and becomes available only after an actual
 completed code-review turn in the current conversation; clicking Review alone,
 streaming/failed replies, running turns and switching to an unreviewed conversation
 do not unlock it. The latest review supersedes earlier reviews. It carries a local
-handoff of the complete final review answer without truncation or ranking, including
-fenced evidence. Subsequent user clarifications and completed assistant replies
-use a separate 600-Unicode-character budget, selecting recent whole paragraphs
-and restoring chronological order. Stop at the first paragraph that does not fit,
-so an omitted recent correction cannot leave older discussion alone as context.
-Oversized paragraphs are omitted, never cut
-with ellipses; the repair instruction requires consulting original history. Tool output,
-progress, failed and interrupted replies are excluded. Unanswered clarifications
-remain after earlier discussion and never acquire an earlier turn's answer.
-A completed fenced-only review retains its full source; `null` alone means unavailable.
+extractive handoff of the final review answer, reusing the recommendation summary
+extractor with a 350-Unicode-character review budget and a 150-character latest
+discussion budget. The entire handoff, including its localized notice and
+separators, stays under 600 Unicode characters. Each extract uses up to four
+deduplicated bullets, each at most 145 characters. Findings, unresolved work,
+decisions and paths take priority over background prose; headings retain their
+qualifying content and ellipses mark
+shortened excerpts. Fenced code and long evidence bodies are not copied.
+Plain or fenced JSON reviews contribute valid finding titles and source locations,
+plus an explicit overall correctness value when present; no verdict is inferred.
+Only the latest subsequent user clarification and its completed assistant reply
+contribute discussion excerpts. An unanswered, failed or interrupted clarification
+never inherits a previous turn's answer. Long clarifications are summarized
+rather than copied or omitted in favor of older advice. The repair instruction
+requires consulting original history. Tool output, progress, failed and
+interrupted replies are excluded. Unanswered clarifications remain available
+without acquiring an earlier turn's answer.
+A completed fenced-only review remains available even when no summary can be
+extracted; `null` alone means unavailable. The localized handoff notice identifies
+source excerpts, points to the complete review and latest discussion, and
+requires checking the current scope before fixing.
+The verification instruction still permits only confirmed defects; summary
+excerpts do not establish acceptance or completeness. This local extraction adds no
+model request, persistence or automatic submission.
 The concise default instruction verifies the latest review and follow-up discussion,
 consults the original conversation when unclear, fixes only confirmed defects with
 minimal changes, adds regression coverage and validates the user path. Report only

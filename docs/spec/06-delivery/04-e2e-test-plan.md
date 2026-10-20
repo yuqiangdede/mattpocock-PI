@@ -18699,8 +18699,9 @@ host-created files. The full app's file-preview viewer is covered separately.
   review, discuss a finding, select Fix code review findings; switch to an
   unreviewed conversation and back. Repeat with a pending or failed review.
 - Expected: repair immediately follows Code review and is initially disabled;
-  only a completed review unlocks it. Its draft asks for a deduplicated issue
-  summary before repair, carries original findings and discussion, preserves
+  only a completed review unlocks it. Its draft includes a bounded, deduplicated
+  review summary and recent discussion, identifies possibly incomplete excerpts
+  and points to the complete review for verification before repair, preserves
   draft/attachments and never submits or compiles automatically. Availability
   follows the active conversation; a new unfinished review locks it again.
 - Specs: `01-product/coding-workbench-free-tasks.md`; acceptance: explicit repair
@@ -18834,10 +18835,15 @@ host-created files. The full app's file-preview viewer is covered separately.
   `coding-prompt-user-path.test.mjs` exercises the highlighted menu action,
   real launcher and editable draft in isolated Electron with fixture IPC.
 - Review-to-repair variant: complete a review, discuss a correction, click Repair
-  and verify the full original review remains intact, including long findings
-  and fenced evidence. Discussion uses at most 600 Unicode characters, preferring
-  recent whole paragraphs. Oversized paragraphs are omitted rather than cut.
-  No finding is shortened with an ellipsis or dropped by ranking.
+  and verify that the entire handoff, including the localized notice and latest
+  discussion, stays under 600 Unicode characters without copying long evidence
+  or fenced code. Plain and fenced JSON
+  reviews contribute finding titles and source locations without dumping JSON.
+  A localized notice points to the complete review and discussion, requires
+  checking the current scope. Only the latest user clarification and its own
+  completed reply contribute follow-up excerpts; older replies are not paired
+  with an unanswered clarification. Long text is summarized, not copied.
+  Review excerpts use ellipses for shortened text; full findings remain in history.
   The Chinese default instruction stays under 200 characters, asks for verification
   and regression coverage, and does not request a repeated detailed review list.
   Switching to an unreviewed session still disables Repair. Covered by
