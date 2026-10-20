@@ -254,7 +254,12 @@ window.promptButtonsProbe = async () => {
   await until(() => document.querySelector('[aria-label="Draft"]').value.startsWith("修复审查问题\n"));
   check(document.querySelector('[aria-label="Draft"]').value.includes("[P1] Lost updates in save.ts") && document.querySelector('[aria-label="Draft"]').value.includes(initialDraft), "Repair draft carries findings and preserves existing text");
   check(document.querySelector('[aria-label="Draft"]').value.includes("Missing cancellation cleanup") && document.querySelector('[aria-label="Draft"]').value.includes("核实本会话"), "Repair summarizes findings and the follow-up discussion");
-  check(document.querySelector('[aria-label="Draft"]').value.includes("Detailed evidence ".repeat(100) + "END_OF_REVIEW"), "Repair preserves long review evidence without truncation");
+  check(!document.querySelector('[aria-label="Draft"]').value.includes("Detailed evidence ".repeat(100) + "END_OF_REVIEW"), "Repair summarizes long review evidence instead of copying it");
+  check(document.querySelector('[aria-label="Draft"]').value.includes(i18n.t("codingActions.reviewFixSummaryContext")), "Repair labels excerpts and points back to the complete review");
+  const repairDraft = document.querySelector('[aria-label="Draft"]').value;
+  const summaryStart = repairDraft.indexOf(i18n.t("codingActions.reviewFixSummaryContext"));
+  const summaryEnd = repairDraft.length - beforeRepair.length;
+  check(Array.from(repairDraft.slice(summaryStart, summaryEnd).trim()).length <= 600, "The entire review handoff including its notice stays within 600 characters");
   check(!document.querySelector('.coding-more-menu[role="menu"]'), "Repair selection closes More without sending");
   const repairRequest = document.querySelector('[aria-label="Draft"]').value;
   const beforeFencedRepair = document.querySelector('[aria-label="Draft"]').value;
@@ -262,6 +267,7 @@ window.promptButtonsProbe = async () => {
   check(!repairButton().disabled, "A completed fenced-only review keeps Repair enabled even with an empty summary");
   repairButton().click();
   await until(() => document.querySelector('[aria-label="Draft"]').value.length > beforeFencedRepair.length);
+  check(document.querySelector('[aria-label="Draft"]').value.includes("[P2] Missing cleanup") && !document.querySelector('[aria-label="Draft"]').value.includes('"findings"'), "Structured reviews contribute finding titles without a JSON dump");
 
   useAppStore.setState({activeSessionId:"unreviewed-session",messages:[]});
   await until(() => repairButton()?.disabled);

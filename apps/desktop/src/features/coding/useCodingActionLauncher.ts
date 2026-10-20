@@ -65,7 +65,8 @@ export function useCodingActionLauncher(options: {
       if (id === "compile-project" || id === "continue-task" || id === INTERACTION_IMAGE_PROMPT_ID || id === REVIEW_FIX_PROMPT_ID) {
         const language = i18n.resolvedLanguage ?? i18n.language;
         const prompt = id === "continue-task" ? t("codingActions.continuePrompt") : id === "compile-project" ? t("codingActions.compilePrompt") : id === REVIEW_FIX_PROMPT_ID ? reviewFixPrompt(language) : interactionImagePrompt(language);
-        const text = buildCommitCodeDraft(id === "compile-project" ? prompt : `${prompt}\n\n${t("codingActions.noCompilePrompt")}`, [context, owner.readLiveDraft()].filter(Boolean).join("\n\n"));
+        const handoff = id === REVIEW_FIX_PROMPT_ID ? [t("codingActions.reviewFixSummaryContext"), context].filter(Boolean).join("\n\n") : context;
+        const text = buildCommitCodeDraft(id === "compile-project" ? prompt : `${prompt}\n\n${t("codingActions.noCompilePrompt")}`, [handoff, owner.readLiveDraft()].filter(Boolean).join("\n\n"));
         owner.applyEditorDraft(text, owner.fileReferencesRef.current, text.length);
         setError(null);
         return;

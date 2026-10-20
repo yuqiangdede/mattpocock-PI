@@ -34,6 +34,7 @@ export const en = {
     stubTooltipExample: "Feature not yet implemented (stub).",
     stubActionToast: "{{title}} is not yet implemented (stub)",
     reviewFix: "Fix code review findings",
+    reviewFixSummaryContext: "Review handoff (excerpts only; verify full review, latest discussion and current scope):",
     reviewFixRequiresReview: "Available after a completed code review in this conversation. Send Code review and wait for the final response.",
     reviewFixHint: "Summarize and deduplicate the code review and follow-up discussion, verify and fix confirmed defects, add regression tests and report unresolved issues. Selection only prepares an editable draft; send manually to execute.",
     visualTopicHint: "Enter the discussion topic below, then Send to open the visual interview.",
